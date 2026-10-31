@@ -1,0 +1,23 @@
+# The model endpoint is fully env-driven (design D4) — nothing is hardcoded here.
+# Point at any OpenAI-compatible endpoint via:
+#   OPENAI_CUSTOM_BASE_URL, OPENAI_CUSTOM_API_KEY, OPENAI_CUSTOM_MODELS, EMBABEL_MODELS_DEFAULT_LLM
+embabel:
+  agent:
+    platform:
+      models:
+        openai:
+          custom:
+            api-key: ${OPENAI_CUSTOM_API_KEY:}
+            base-url: ${OPENAI_CUSTOM_BASE_URL:}
+            models: ${OPENAI_CUSTOM_MODELS:}
+spring:
+  ai:
+    mcp:
+      server:
+        type: SYNC
+        # Streamable HTTP is the default since v1.5.3; endpoint is http://localhost:8080/mcp.
+        protocol: STREAMABLE
+  main:
+    banner-mode: off
+  # NOTE: deliberately no `web-application-type: none` — the MCP server needs a web server
+  # listening on :8080/mcp. The mcpserver starter supplies the reactive (webflux) transport.

@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.embabel.smith</groupId>
+        <artifactId>embabel-smith-poc</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>poc-8-retrieval</artifactId>
+    <name>poc-8-retrieval</name>
+    <description>
+        POC 8: skill retrieval at scale / skill shadowing. A SkillRegistry indexes a library of
+        same-typed skill-packs and a semantic (lexical-similarity) pre-filter narrows candidates
+        before the type-based GOAP planner runs — measuring selection accuracy as the library grows.
+        Fully offline and deterministic (no model endpoint); running a selected skill is covered by
+        POC 1 / POC 7.
+    </description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.embabel.smith</groupId>
+            <artifactId>smith-common</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.1.0</version>
+                <configuration>
+                    <mainClass>com.embabel.smith.retrieval.RetrievalApp</mainClass>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>

@@ -1,0 +1,13 @@
+stepType: action
+name: extractTopic
+description: "Extract the topic, audience and tone from the user's request"
+inputTypeNames:
+  - com.embabel.agent.domain.io.UserInput
+outputTypeName: TopicBrief
+prompt: |
+  From the user request below, extract three things:
+  - topic: what they want explained
+  - audience: who it is for
+  - tone: the voice and style they are asking for
+  If the request does not specify audience or tone, choose sensible defaults.
+  User request: {{userInput.content}}

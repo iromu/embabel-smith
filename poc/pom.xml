@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.embabel.smith</groupId>
+        <artifactId>embabel-smith-parent</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>embabel-smith-poc</artifactId>
+    <packaging>pom</packaging>
+    <name>Embabel Smith POCs</name>
+    <description>
+        Aggregator for the POC modules. Each module is a numbered proof of one aspect of the
+        "skills, not agents" hypothesis (POC 1-11); see docs/04-poc-run-results.md.
+    </description>
+
+    <modules>
+        <module>poc-1-no-code-runtime</module>
+        <module>poc-2-nl-compile</module>
+        <module>poc-3-builder-agent</module>
+        <module>poc-4-skill-format</module>
+        <module>poc-5-eval</module>
+        <module>poc-6-skill-composition</module>
+        <module>poc-7-runtime-adapter</module>
+        <module>poc-8-retrieval</module>
+        <module>poc-9-quality-refinement</module>
+        <module>poc-10-trust-tiers</module>
+        <module>poc-11-progressive-disclosure</module>
+        <module>poc-12-semantic-retrieval</module>
+        <module>poc-13-remote-mcp</module>
+        <module>poc-14-composer</module>
+        <module>poc-15-composer-ui</module>
+    </modules>
+</project>

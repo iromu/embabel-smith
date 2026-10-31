@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Embabel Smith — Skill Composer</title>
+<style>
+  :root { --bg:#0f1117; --panel:#1a1d27; --node:#232838; --ink:#e6e8ef; --dim:#9aa1b3;
+          --ok:#4ade80; --bad:#f87171; --accent:#6ea8fe; }
+  * { box-sizing: border-box; }
+  body { margin:0; font:14px/1.4 system-ui, sans-serif; background:var(--bg); color:var(--ink);
+         display:flex; flex-direction:column; height:100vh; }
+  header { padding:10px 16px; background:var(--panel); border-bottom:1px solid #2a2f3f;
+           display:flex; align-items:center; gap:16px; }
+  header h1 { font-size:15px; margin:0; font-weight:600; }
+  header .sub { color:var(--dim); font-size:12px; }
+  main { flex:1; display:flex; min-height:0; }
+  #palette { width:210px; background:var(--panel); border-right:1px solid #2a2f3f; padding:12px;
+             overflow-y:auto; }
+  #palette h2 { font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:var(--dim); margin:0 0 8px; }
+  .chip { background:var(--node); border:1px solid #323a52; border-radius:8px; padding:8px 10px;
+          margin-bottom:8px; cursor:grab; user-select:none; }
+  .chip .n { font-weight:600; }
+  .chip .io { color:var(--dim); font-size:11px; margin-top:2px; }
+  #stage { flex:1; position:relative; overflow:hidden; }
+  svg#wires { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+  .node { position:absolute; width:170px; background:var(--node); border:1px solid #3a4364;
+          border-radius:10px; padding:10px; box-shadow:0 4px 14px rgba(0,0,0,.4); }
+  .node .n { font-weight:600; margin-bottom:6px; }
+  .node .io { font-size:11px; color:var(--dim); }
+  .port { position:absolute; width:14px; height:14px; border-radius:50%; background:var(--accent);
+          top:50%; transform:translateY(-50%); cursor:crosshair; }
+  .port.in  { left:-8px; }
+  .port.out { right:-8px; }
+  #status { position:absolute; top:10px; left:10px; right:10px; display:flex; gap:10px;
+            align-items:center; pointer-events:none; }
+  .badge { padding:4px 10px; border-radius:20px; font-size:12px; font-weight:600; }
+  .badge.ok { background:rgba(74,222,128,.15); color:var(--ok); }
+  .badge.bad { background:rgba(248,113,113,.15); color:var(--bad); }
+  #chain { color:var(--dim); font-size:12px; }
+  #toolbar { padding:10px 16px; background:var(--panel); border-top:1px solid #2a2f3f;
+             display:flex; gap:10px; align-items:center; }
+  button { background:var(--accent); color:#0b1020; border:none; border-radius:8px; padding:7px 14px;
+           font-weight:600; cursor:pointer; }
+  button.ghost { background:transparent; color:var(--dim); border:1px solid #323a52; }
+  #result { color:var(--dim); font-size:12px; white-space:pre-wrap; max-height:120px; overflow:auto; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Embabel Smith — Skill Composer</h1>
+  <span class="sub">Drag skills onto the canvas, then drag an output port to an input port to connect.
+  A connection only "snaps" when the types match (POC 14's edge type-check).</span>
+</header>
+<main>
+  <div id="palette"><h2>Skills</h2><div id="chips"></div></div>
+  <div id="stage">
+    <div id="status">
+      <span id="badge" class="badge ok">empty canvas</span>
+      <span id="chain"></span>
+    </div>
+    <svg id="wires"></svg>
+  </div>
+</main>
+<div id="toolbar">
+  <button id="export">Export composite</button>
+  <button id="reset" class="ghost">Reset</button>
+  <div id="result"></div>
+</div>
+
+<script>
+const NODE_W = 170, NODE_H = 64;
+let skills = [];
+let nodes = {};      // id -> {name, x, y}
+let edges = [];      // [{from, to}]
+let nodeId = 0;
+
+const stage = document.getElementById('stage');
+const wires = document.getElementById('wires');
+const chips = document.getElementById('chips');
+const badge = document.getElementById('badge');
+const chainEl = document.getElementById('chain');
+const resultEl = document.getElementById('result');
+
+async function init() {
+  const res = await fetch('/api/skills');
+  skills = await res.json();
+  for (const s of skills) {
+    const chip = document.createElement('div');
+    chip.className = 'chip';
+    chip.draggable = true;
+    chip.innerHTML = `<div class="n">${s.name}</div>
+      <div class="io">${s.externalInputTypes.join(', ') || '—'} → ${short(s.outputType)}</div>`;
+    chip.addEventListener('dragstart', e => e.dataTransfer.setData('skill', s.name));
+    chip.addEventListener('click', () => addNode(s.name, 40 + (nodeId % 5) * 20, 40 + (nodeId % 5) * 20));
+    chips.appendChild(chip);
+  }
+}
+
+stage.addEventListener('dragover', e => e.preventDefault());
+stage.addEventListener('drop', e => {
+  e.preventDefault();
+  const skill = e.dataTransfer.getData('skill');
+  const move = e.dataTransfer.getData('move');
+  const rect = stage.getBoundingClientRect();
+  const x = e.clientX - rect.left - NODE_W / 2;
+  const y = e.clientY - rect.top - NODE_H / 2;
+  if (skill) addNode(skill, x, y);
+  else if (move && nodes[move]) { nodes[move].x = x; nodes[move].y = y; render(); }
+});
+
+function addNode(name, x, y) {
+  const id = 'n' + (++nodeId);
+  nodes[id] = { name, x: Math.max(4, x), y: Math.max(4, y) };
+  render();
+  revalidate();
+}
+
+function portPos(id, side) {
+  const n = nodes[id];
+  return side === 'out'
+    ? { x: n.x + NODE_W, y: n.y + NODE_H / 2 }
+    : { x: n.x, y: n.y + NODE_H / 2 };
+}
+
+function render() {
+  stage.querySelectorAll('.node').forEach(el => el.remove());
+  wires.innerHTML = '';
+  for (const [id, n] of Object.entries(nodes)) {
+    const el = document.createElement('div');
+    el.className = 'node';
+    el.style.left = n.x + 'px';
+    el.style.top = n.y + 'px';
+    el.draggable = true;
+    el.innerHTML = `<div class="n">${n.name}</div>
+      <div class="io">in: ${skillIn(n.name)} · out: ${short(skillOut(n.name))}</div>`;
+    el.addEventListener('dragstart', e => { e.dataTransfer.setData('move', id); });
+    const out = document.createElement('div');
+    out.className = 'port out';
+    out.draggable = true;
+    out.title = 'Drag to an input port to connect';
+    out.addEventListener('dragstart', e => { e.dataTransfer.setData('connect', id); e.stopPropagation(); });
+    const inn = document.createElement('div');
+    inn.className = 'port in';
+    inn.addEventListener('dragover', e => e.preventDefault());
+    inn.addEventListener('drop', e => {
+      e.preventDefault(); e.stopPropagation();
+      const from = e.dataTransfer.getData('connect');
+      if (from && from !== id && !edges.some(ed => ed.from === from && ed.to === id)) {
+        edges.push({ from, to: id });
+        render(); revalidate();
+      }
+    });
+    el.appendChild(out); el.appendChild(inn);
+    stage.appendChild(el);
+  }
+  for (const ed of edges) {
+    const a = portPos(ed.from, 'out'), b = portPos(ed.to, 'in');
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.setAttribute('x1', a.x); line.setAttribute('y1', a.y);
+    line.setAttribute('x2', b.x); line.setAttribute('y2', b.y);
+    line.setAttribute('stroke', ed._bad ? 'var(--bad)' : 'var(--accent)');
+    line.setAttribute('stroke-width', '2.5');
+    wires.appendChild(line);
+  }
+}
+
+function skillIn(name) { const s = skills.find(s => s.name === name); return s ? s.externalInputTypes.map(short).join(', ') : ''; }
+function skillOut(name) { const s = skills.find(s => s.name === name); return s ? s.outputType : ''; }
+function short(t) { return t ? t.split('.').pop() : ''; }
+
+async function revalidate() {
+  if (Object.keys(nodes).length === 0) { badge.className = 'badge ok'; badge.textContent = 'empty canvas'; chainEl.textContent = ''; return; }
+  const nodeIds = Object.keys(nodes);
+  const nameOf = id => nodes[id].name;
+  const req = { nodes: nodeIds.map(nameOf),
+                edges: edges.map(ed => ({ from: nameOf(ed.from), to: nameOf(ed.to) })) };
+  const res = await fetch('/api/canvas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(req) });
+  const data = await res.json();
+  // mark which edges are type-incompatible
+  const bad = new Set();
+  for (const issue of data.issues) {
+    const m = issue.match(/^edge (.+) -> (.+) is type-incompatible/);
+    if (m) { const e = edges.find(ed => nameOf(ed.from) === m[1] && nameOf(ed.to) === m[2]); if (e) bad.add(edges.indexOf(e)); }
+  }
+  edges.forEach((e, i) => e._bad = bad.has(i));
+  if (data.valid) { badge.className = 'badge ok'; badge.textContent = 'valid chain'; chainEl.textContent = 'chain: ' + data.chain.join(' → '); }
+  else { badge.className = 'badge bad'; badge.textContent = data.issues.length + ' issue(s)'; chainEl.textContent = data.issues.join(' · '); }
+  render();
+}
+
+document.getElementById('export').addEventListener('click', async () => {
+  const nameOf = id => nodes[id].name;
+  const req = { name: 'compose-composite', nodes: Object.keys(nodes).map(nameOf),
+                edges: edges.map(ed => ({ from: nameOf(ed.from), to: nameOf(ed.to) })) };
+  const res = await fetch('/api/compose', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(req) });
+  const data = await res.json();
+  if (data.issues && data.issues.length) { resultEl.textContent = 'Cannot export — ' + data.issues.join('; '); return; }
+  resultEl.textContent =
+    'composite: ' + data.goal.name + ' → ' + short(data.goal.outputType) + ' (export=' + data.goal.export + ')\n' +
+    'steps: ' + data.steps.join(', ') + '\n' +
+    'types: ' + data.types.join(', ') + '\n' +
+    'written to: ' + data.path;
+});
+
+document.getElementById('reset').addEventListener('click', () => { nodes = {}; edges = []; resultEl.textContent = ''; render(); revalidate(); });
+
+init();
+</script>
+</body>
+</html>

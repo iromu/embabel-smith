@@ -1,0 +1,12 @@
+stepType: action
+name: answerFromDomain
+description: "Answer a coffee-brewing question using the bundled domain guide"
+inputTypeNames:
+  - com.embabel.agent.domain.io.UserInput
+outputTypeName: com.embabel.agent.spec.model.BackgroundMessage
+prompt: |
+  Answer the user's question about coffee brewing.
+  Consult the bundled domain guide (references/domain.md) on demand — load only the part you need —
+  then answer in two or three plain-language sentences. Do not paste the guide.
+
+  User question: {{userInput.content}}

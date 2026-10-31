@@ -1,0 +1,19 @@
+# The model endpoint is fully env-driven (design D4) — nothing is hardcoded here.
+# Point at any OpenAI-compatible endpoint (LiteLLM, OpenAI, Ollama, ...) via:
+#   OPENAI_CUSTOM_BASE_URL, OPENAI_CUSTOM_API_KEY, OPENAI_CUSTOM_MODELS, EMBABEL_MODELS_DEFAULT_LLM
+embabel:
+  agent:
+    platform:
+      models:
+        openai:
+          custom:
+            api-key: ${OPENAI_CUSTOM_API_KEY:}
+            base-url: ${OPENAI_CUSTOM_BASE_URL:}
+            models: ${OPENAI_CUSTOM_MODELS:}
+builder:
+  # Where the builder writes the skill-packs it produces.
+  output-dir: ${BUILDER_OUTPUT_DIR:./built-skills}
+spring:
+  main:
+    web-application-type: none
+    banner-mode: off
