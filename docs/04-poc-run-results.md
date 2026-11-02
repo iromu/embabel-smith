@@ -1,13 +1,14 @@
 # Embabel Smith POC — Conclusions vs. the Theory
-*Run 2026-11-02 (Java 25 / GraalVM CE, target Java 21 · Spring Boot 4.1.1 · Embabel 1.5.3) · POC 1–15*
+*Run 2026-11-02 (Java 25 / GraalVM CE, target Java 21 · Spring Boot 4.1.1 · Embabel 1.5.3) · POC 1–17*
 
 This page concludes the POC run **against the hypothesis laid out in docs 01–03**: what the POCs
 actually proved, what they did not, and which POCs are still missing. The run now covers **all
-fifteen POCs** — the feasibility core (POC 1–5), skill composition (POC 6), and the skills-first
-extensions POC 7–15 (runtime adapter, retrieval, eval-guided refinement, trust tiers, progressive
-disclosure, **semantic retrieval at scale**, **remote / MCP invocation**, the **skill Composer**, and
-the **visual skill-chain editor**). The raw run evidence (the green loop, the offline baseline, the
-defects fixed) is kept in §5 as support.
+seventeen POCs** — the feasibility core (POC 1–5), skill composition (POC 6), and the skills-first
+extensions POC 7–17 (runtime adapter, retrieval, eval-guided refinement, trust tiers, progressive
+disclosure, **semantic retrieval at scale**, **remote / MCP invocation**, the **skill Composer**, the
+**visual skill-chain editor**, the **remote-action bridge**, and **GLiNER2 transformer skill
+classification**). The raw run evidence (the green loop, the offline baseline, the defects fixed) is
+kept in §5 as support.
 
 ---
 
@@ -36,8 +37,14 @@ the "normal agent harness"; POC 14 shows the **skill Composer** — skills chain
 type-checked connections, exported as a single composite skill-pack that the runtime runs; and POC 15
 puts a **real drag-and-drop UI** on that canvas — a Spring Boot web app serving a browser canvas that
 loads the skill palette, snaps only type-compatible connections, live-validates the chain, and
-exports the composite over REST. **All three Phase 1 components doc 03 calls for (Registry, Composer,
-Runtime Adapter) are now built — and the "builder UI" doc 01 names as the missing piece now exists.**
+exports the composite over REST; and POC 16 closes the last of doc 03's three runtime bridges —
+**remote-action invocation** — where a GOAP plan plans over, and executes over HTTP, an action
+running on a separate sidecar process, exactly like a local one; and POC 17 takes POC 12's shadowing
+scenario and shows a **real GLiNER2 transformer** — one that scores the query by *meaning*, not
+hashed n-grams — **breaks the shadowing tie** lexical and dense text-similarity cannot (strict
+**100%**, matching **83%** vs 33%/17% and 0%). **All three Phase 1 components doc 03
+calls for (Registry, Composer, Runtime Adapter) are now built — and the "builder UI" doc 01 names as
+the missing piece now exists.**
 And the literature caveat still holds at the *source*: the NL compiler still produces weak
 drafts (POC 9's fix works, but the raw draft is the thing being fixed).
 
@@ -45,10 +52,10 @@ drafts (POC 9's fix works, but the raw draft is the thing being fixed).
   NL→draft · the end-to-end loop · **skill composition (POC 6)** · **CLI/script invocation
   (POC 7)** · **retrieval/disambiguation (POC 8, lexical)** · **eval-guided refinement improves a
   skill (POC 9)** · **trust tiers + guardrails (POC 10)** · **progressive disclosure under load
-  (POC 11)** · **retrieval at 200+ skill scale + the shadowing failure mode (POC 12)** · **remote /
-  MCP invocation (POC 13)** · **the skill Composer (POC 14)** · **the visual skill-chain editor /
-  builder UI (POC 15)** · eval wiring · any OpenAI-compatible endpoint · single-agent,
-  no-orchestration execution.
+  (POC 11)** · **retrieval at 200+ skill scale + the shadowing failure mode (POC 12)** · **a GLiNER2
+  transformer breaks the shadowing tie (POC 17)** · **remote / MCP invocation (POC 13)** · **the
+  skill Composer (POC 14)** · **the visual skill-chain editor / builder UI (POC 15)** · eval wiring ·
+  any OpenAI-compatible endpoint · single-agent, no-orchestration execution.
 - **Not proven / not built:** a real semantic **`EmbeddingService`** (POC 12 uses an offline
   feature-hashing stand-in). The drag-and-drop UI is now built (POC 15); what it does *not* yet do is
   anything beyond chaining skills — it has no NL-authoring pane (POC 2/3) or eval pane (POC 5/9)
@@ -81,12 +88,13 @@ The POCs were scoped to test the **feasibility core** of this, not the full skil
 | C7 | **Any OpenAI-compatible endpoint** works | doc01 §2.5 | all endpoint-gated | ✅ **Proven** |
 | C8 | **Skills compose** — GOAP chains multiple exported goals into a workflow | doc03 §2.2, doc02 §0 idea 2 | POC 6 (live) | ✅ **Proven** (two-skill GOAP chain) |
 | C9 | **LLM-authored skills are good** (or eval-guided refinement makes them good) | doc02 §5 caveat 2 | POC run (degenerate drafts) + **POC 9** | ⚠️ **Negative at source; proven fix** — raw drafts are weak, but eval-guided refinement lifts 0% → 100% |
-| C10 | **Skill selection at scale** — retrieval/routing as the library grows (skill shadowing) | doc03 §2.1, doc02 §5 caveat 1 | **POC 8** (lexical) + **POC 12** (200+ scale) | ✅ **Proven at scale** — clean (P@1 100%) at 191 distinct skills; POC 12 shows near-duplicate shadowing collapses P@1 for *both* lexical and dense retrievers — a library-curation problem, not a retriever problem |
+| C10 | **Skill selection at scale** — retrieval/routing as the library grows (skill shadowing) | doc03 §2.1, doc02 §5 caveat 1 | **POC 8** (lexical) + **POC 12** (200+ scale) + **POC 17** (GLiNER2 transformer) | ✅ **Proven at scale — and the shadowing tie is now broken** — clean (P@1 100%) at 191 distinct skills; POC 12 shows near-duplicate shadowing collapses P@1 for *both* lexical and dense retrievers; POC 17 shows a GLiNER2 transformer that *understands* meaning recovers it (strict **100%**, matching **83%**) where text-similarity cannot (lexical 33%/17%, dense 0%) |
 | C11 | **Skills invoke CLIs/scripts** — the "normal agent harness" (`toolGroups`/`remote`/MCP) | doc03 §2.3, §4.2 | **POC 7** (local CLI) + **POC 13** (remote/MCP) | ✅ **Proven (both halves)** — POC 7: a `shell` tool group ran a real command; POC 13: an exported goal published as an MCP tool and invoked over Streamable HTTP |
 | C12 | **Security / trust tiers** (T1–T4, guardrails, allowlists) | doc02 §5 caveat 3, doc03 §2.1 | **POC 10** (live) | ✅ **Proven** — per-tier allowlist refused `shell` under T1; a global guardrail blocked a prompt-injection |
 | C13 | **Progressive disclosure** — load only what's needed; unbounded on-disk knowledge | doc02 §2, doc03 §1 | **POC 11** (stress) | ✅ **Proven** — plan context constant while a reference grows 3 KB → 313 KB (×100) |
 | C14 | **Skill Composer** — chain exported goals into a workflow, export as a new composite skill | doc03 §2.2 | **POC 14** (offline + live) | ✅ **Proven** — type-checked canvas chains skills; the exported composite pack re-validates and runs end-to-end via GOAP |
 | C15 | The **builder UI** is the missing piece — a visual editor to *see* and *build* skills | doc01 §VERDICT, doc03 §2.2 | **POC 15** (live web app) | ✅ **Proven** — a browser drag-and-drop canvas loads the skill palette, snaps only type-compatible connections, live-validates the chain, and exports the composite skill-pack over REST (the same model POC 14 proves) |
+| C16 | **Skills invoke a remote action** — the third runtime bridge (remote actions, Option B) | doc03 §2.3, §4.2 | **POC 16** (live) | ✅ **Proven** — a GOAP plan plans over, and executes over HTTP, an action running on a separate sidecar process, exactly like a local one (0.127s, no LLM call) |
 
 ---
 
@@ -180,14 +188,33 @@ The feasibility core is real and matches the theory:
     write the composite skill-pack. Every endpoint delegates to POC 14's proven model, so the pixels
     drive the same type-check / chain / export logic the offline POC proves — the "builder UI" doc 01
     names as the missing piece is now a working, browsable surface.
+17. **Skills invoke a remote action** (C16, the third runtime bridge). POC 16 runs a separate
+    **sidecar** process (a standalone HTTP server running deterministic code — no LLM) that exposes an
+    action; the agent pulls it in as a `RestAction` via `embabel-agent-remote`, and a **GOAP plan plans
+    over it and executes it over HTTP** exactly like a local action. The plan `remoteDigest` ran in
+    0.127s, the sidecar produced the result, and the goal was achieved — with **no LLM call** (the
+    model endpoint is only for platform boot). This is the last of doc 03 §2.3's three runtime
+    bridges: a skill invoking an external process, planned and executed by the same GOAP planner.
+18. **A real transformer breaks the shadowing tie** (C10, at scale — the remedy). POC 17 runs a real
+    GLiNER2 zero-shot transformer (GLiNER4j over ONNX Runtime, INT8) on POC 12's *identical*
+    shadowing candidate sets, alongside the lexical and dense baselines. Where POC 12 showed
+    near-duplicate shadowing collapses text-similarity (lexical 17%, dense 0% in the matching set),
+    the transformer — which scores the query against the candidate set by *meaning*, not hashed
+    n-grams — recovers it: **100% in the strict variant** (the near-exact duplicate removed) and
+    **83% in the matching variant**, vs lexical 33%/17% and dense 0%. This is the first POC with a
+    real transformer in the loop, run as a **local-model-gated** benchmark (offline tests mock the
+    classifier, so the build stays green without the ONNX bundle).
 
 **Bottom line:** doc 01's "70% already there" and doc 03's "Embabel is a skills runtime" are now
 **confirmed across the full skills-first surface** — single and composed skills, LLM and
 CLI/script actions, retrieval (including at the 200+ skill scale, POC 12), eval-guided refinement,
 trust tiers/guardrails, progressive disclosure, **remote/MCP invocation (POC 13)**, the **skill
-Composer (POC 14)**, and the **visual builder UI (POC 15)**. All three Phase 1 components doc 03
-calls for are built — and the builder UI doc 01 flags as the missing piece now exists; what remains
-is a real semantic `EmbeddingService`.
+Composer (POC 14)**, the **visual builder UI (POC 15)**, the **remote-action bridge (POC 16)**, and a
+**real GLiNER2 transformer that breaks the shadowing tie (POC 17)** — i.e. **all three of doc 03
+§2.3's runtime bridges are now proven** (shell → POC 7, MCP → POC 13, remote action → POC 16). All
+three Phase 1 components doc 03 calls for are built — and the builder UI doc 01 flags as the missing
+piece now exists; what remains is a real semantic `EmbeddingService` (POC 17's transformer is a
+zero-shot *classifier*, not an embedding index).
 
 ---
 
@@ -195,9 +222,11 @@ is a real semantic `EmbeddingService`.
 
 1. **All three Phase 1 components are built — and the builder UI now exists too; one non-Phase-1
    gap remains.** POC 7 (Runtime Adapter / CLI), POC 8 (retrieval), POC 9 (refinement), POC 10 (trust
-   tiers), POC 13 (remote/MCP invocation), POC 14 (the **skill Composer**), and POC 15 (the
-   **visual builder UI**) close the Phase 1 components doc 03 lists — the Skill Registry, the Skill
-   Composer, and the Skill Runtime Adapter — plus the builder UI doc 01 names as the missing piece.
+   tiers), POC 13 (remote/MCP invocation), POC 14 (the **skill Composer**), POC 15 (the
+   **visual builder UI**), and POC 16 (the **remote-action bridge**) close the Phase 1 components doc
+   03 lists — the Skill Registry, the Skill Composer, and the Skill Runtime Adapter — plus the
+   builder UI doc 01 names as the missing piece. POC 16 also completes the Runtime Adapter's three
+   bridges (shell → POC 7, MCP → POC 13, remote action → POC 16).
    What is **not** yet built: a real semantic **`EmbeddingService`** — POC 8's retriever is lexical
    and only tested at 14 skills, and POC 12's dense index is an offline feature-hashing stand-in.
    (The POC 15 canvas is a chaining editor only: it has no NL-authoring pane (POC 2/3) or
@@ -217,8 +246,11 @@ is a real semantic `EmbeddingService`.
    canonical skill stops being the uniquely-best match and **P@1 collapses for both** (lexical 17%,
    dense 0%). The "−21% at 202 skills" degradation (arXiv:2605.24050) is thus reproduced as a
    *selection* failure, and the denser index does **not** cure it: the fix is library **curation**
-   (dedup / lifecycle, doc 02 §3.3) or a higher-level router — a real `EmbeddingService` plugs into
-   the same `SkillScorer` seam but would face the same near-duplicate ambiguity.
+   (dedup / lifecycle, doc 02 §3.3) or a higher-level selector. POC 17 now shows one such remedy
+   works — a real GLiNER2 transformer that scores by *meaning* (not hashed n-grams) recovers the
+   shadowing tie (**strict 100%**, **matching 83%**) where text-similarity cannot — though a real
+   `EmbeddingService` still isn't in place, and a denser *embedding* index would face the same
+   near-duplicate ambiguity.
 4. **Determinism is half-shown — now with a stability measurement.** The GOAP *plan* is
    deterministic (non-LLM), but the *action bodies* are LLM calls and vary run-to-run. POC 5 now
    measures the eval's stability directly: the same skill + tasks run 5 times, and for the explainer
@@ -245,7 +277,7 @@ is a real semantic `EmbeddingService`.
 
 ## 5. Run evidence (support)
 
-- **Offline baseline:** `mvn test` green across all modules — **110 tests, 0 failures, 0 errors**
+- **Offline baseline:** `mvn test` green across all modules — **114 tests, 0 failures, 0 errors**
   (format round-trip, validation, **draft-quality classifier (POC 2/3 caveat #2)**, builder
   normalization, writer idempotency, composition wiring, shell tool, lexical retrieval,
   **200+ scale retrieval (POC 12)**, **eval-score stability (POC 5)**, refinement scorer +
@@ -346,6 +378,40 @@ is a real semantic `EmbeddingService`.
   and composite export — hermetically against the repo's sample skill-packs and a temp export dir.
   (The tests use standalone `MockMvc` rather than `@WebMvcTest` because the latter lives in the
   `spring-boot-webmvc-test` slice, absent from the offline repo at this project's resolved version.)
+- **Remote-action bridge (POC 16): GREEN (live) + offline.** A separate sidecar process
+  (`RemoteActionSidecar`, a JDK `HttpServer` running deterministic code — no LLM) exposes an action
+  over the three endpoints `embabel-agent-remote`'s client consumes: `GET /api/v1/actions` (the
+  catalog), `GET /api/v1/types` (empty — the action uses the built-in `UserInput`/`BackgroundMessage`),
+  and `POST /api/v1/actions/execute`. The agent pulls the action in as a `RestAction`
+  (`RestServer.agentScope(platform)`), a GOAP plan is formulated over it, and the plan executes the
+  action **over HTTP to the sidecar**. Live: the plan `remoteDigest` ran in `PT0.127S`, the sidecar
+  returned `"Digested on the remote sidecar (no LLM): 9 words, 44 chars. Input began: \"Explain\""`,
+  and the goal was achieved — the whole plan with **no LLM call** (the endpoint is only for platform
+  boot). Offline, four `RemoteActionSidecarTest` tests pin the catalog (input var `userInput`, output
+  var `it`, empty pre/post), the empty types, the deterministic execute (5 words / 25 chars), and
+  unknown-action rejection — hermetically against an ephemeral-port sidecar.
+- **GLiNER2 transformer skill classification (POC 17): real-model run + offline.** POC 17 takes the
+  same within-topic shadowing scenario POC 12 measured and adds a *real* transformer — a GLiNER2 BERT
+  zero-shot classifier (via [GLiNER4j](https://github.com/gravitee-io/GLiNER4j) over ONNX Runtime,
+  INT8 `onnx_quantized` variant) — that scores the task query against a small candidate set and
+  selects the top hit, on the *identical* candidate sets as the lexical (POC 8) and dense (POC 12)
+  baselines. The benchmark is **local-model-gated** (a new runtime category): it runs only when the
+  one-time ONNX bundle is present and fails with a clear missing-model error otherwise; offline tests
+  mock the classifier so the build stays green. Real run (Java 21, ONNX Runtime 1.27.0 CPU):
+
+  | method | matching@1 | strict@1 |
+  | --- | --- | --- |
+  | transformer (GLiNER2) | **83%** | **100%** |
+  | lexical (word TF) | 17% | 33% |
+  | dense (feature hash) | 0% | 0% |
+
+  The transformer **breaks the shadowing tie** text-similarity cannot: with the degenerate near-exact
+  duplicate removed (**strict**) it picks the canonical skill for all six targets (**100%**), while
+  lexical and dense collapse (33% / 0%); in the POC-12-comparable **matching** set (which includes the
+  near-exact `v0` duplicate — a genuinely ambiguous choice) it still leads (**83%** = 5/6). Offline,
+  `SkillSelectorTest`, `LexicalSelectorTest`, `DenseSelectorTest`, `GlinerModelTest`,
+  `GlinerSelectorTest`, and `ShadowingRunnerTest` (19 tests) pin the selector seam, the two baselines,
+  the model gate, the label-building / top-1 logic (stubbed classifier), and the P@1 math — no model.
 - **Two transient failures, both green on retry.** POC 5 first failed with
   `Could not find artifact poc-1-no-code-runtime` (a build-ordering issue — the cross-POC dependency
   wasn't installed); after `mvn install` it ran clean (**eval composite 1.0**, both cases pass). POC 9
@@ -365,7 +431,7 @@ is a real semantic `EmbeddingService`.
 
 ## 6. What other POCs to create
 
-All fifteen POCs are now built. POC 1–5 (feasibility core), POC 6 (composition), and POC 7–15
+All seventeen POCs are now built. POC 1–5 (feasibility core), POC 6 (composition), and POC 7–17
 (the skills-first extensions) are complete and their run evidence is in §5:
 
 1. **POC 6 — Skill composition.** ✅ **Built & proven:** `compose-extract` + `compose-explain`
@@ -398,6 +464,16 @@ All fifteen POCs are now built. POC 1–5 (feasibility core), POC 6 (composition
     type-compatible connections, live-validates the chain, and exports the composite skill-pack over
     REST (C15). Every endpoint delegates to POC 14's model; the "builder UI" doc 01 names as the
     missing piece now exists — see §5.
+11. **POC 16 — The remote-action bridge.** ✅ **Built & proven:** a separate sidecar process exposes
+    an action over HTTP; the agent pulls it in as a `RestAction` and a GOAP plan plans over it and
+    executes it over the network, exactly like a local action (C16). Closes the third of doc 03
+    §2.3's runtime bridges (shell → POC 7, MCP → POC 13, remote action → POC 16) — see §5.
+12. **POC 17 — GLiNER2 transformer skill classification.** ✅ **Built & measured:** a real GLiNER2
+    zero-shot transformer (GLiNER4j over ONNX Runtime) classifies the task query against a small
+    candidate set and selects the top hit, on POC 12's identical shadowing candidate sets. It breaks
+    the shadowing tie text-similarity cannot — strict **100%** vs lexical 33% / dense 0% (matching
+    **83%** vs 17% / 0%) — and introduces the **local-model-gated** runtime category (C10, at scale,
+    now with a proven transformer remedy) — see §5.
 
 **All Phase 1 POCs — and the builder UI — are now built.** Possible follow-ups (non-Phase-1, §4)
 are not new POCs so much as hardening:
@@ -434,12 +510,33 @@ mvn -pl poc/poc-12-semantic-retrieval exec:java        # POC 12 — semantic ret
 mvn -pl poc/poc-14-composer exec:java                  # POC 14 — skill Composer (canvas + composite export)
 ```
 
+**POC 17 — GLiNER2 transformer skill classification (local-model-gated, no endpoint).** Needs the
+one-time ONNX bundle download first (see `poc/poc-17-gliner-retrieval/README.md`); without it the
+launcher prints a clear missing-model error and exits non-zero.
+
+```bash
+hf download gravitee-io/gliner4j-gliner2-base-v1 \
+  --include "*.json" "onnx_quantized/classifier_full.onnx" \
+  --local-dir poc/poc-17-gliner-retrieval/models/gliner2-base-v1   # one-time (~253 MB)
+mvn -pl poc/poc-17-gliner-retrieval exec:java                      # POC 17 — three-method shadowing benchmark
+```
+
 **POC 15 — the visual skill-chain editor (offline, no endpoint).** A web app: boot it, then open
 the canvas in a browser. Pick a free port (8080 may be taken).
 
 ```bash
 SERVER_PORT=18080 mvn -pl poc/poc-15-composer-ui spring-boot:run
 # → open http://localhost:18080/  (drag skills onto the canvas, connect ports, Export)
+```
+
+**POC 16 — the remote-action bridge.** Boots the platform, starts a deterministic sidecar
+(default port 18090), and runs a GOAP plan that executes the sidecar's action over HTTP. The plan
+is fully deterministic (no LLM call), so the endpoint is only needed for platform boot.
+
+```bash
+mvn -pl poc/poc-16-remote-action spring-boot:run -Dbuilder.input="Explain how a remote worker pool runs a task"
+# → "formulated plan: remoteDigest" → "RestAction - Sending request to remote action ... /api/v1/actions/execute"
+#   → sidecar returns the digest → "goal ... achieved in PT0.127S"
 ```
 
 **Run the POC 14 exported composite (endpoint-gated, one-off):** after `exec:java` writes it to

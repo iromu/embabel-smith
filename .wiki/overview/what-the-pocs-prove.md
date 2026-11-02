@@ -14,7 +14,7 @@ updated_at: "2026-11-02"
 # What the POCs prove (vs. the theory)
 
 This page is the **conclusion** of the POC run (2026-11-02) against the hypothesis in docs 01–03.
-It answers: what did the fifteen POCs actually prove, what did they not, and what is still missing.
+It answers: what did the sixteen POCs actually prove, what did they not, and what is still missing.
 The raw run evidence (green loop, offline baseline, defects fixed) lives in
 `docs/04-poc-run-results.md` §5; this page distills the verdict.
 
@@ -39,9 +39,11 @@ The POCs **prove the feasibility core** (the "70% already there") and confirm do
   **trust tiers + guardrails** (POC 10) · **progressive disclosure under load** (POC 11) ·
   **retrieval at 200+ skill scale + the shadowing failure mode** (POC 12) · **remote / MCP
   invocation** (POC 13) · **the skill Composer** (POC 14) · **the visual builder UI** (POC 15) ·
-  eval wiring + **score stability** (POC 5) · any OpenAI-compatible endpoint · single-agent,
-  no-orchestration execution. All three Phase 1 components doc 03 lists (Registry, Composer,
-  Runtime Adapter) are now built — and the builder UI doc 01 names as the missing piece now exists.
+  **the remote-action bridge** (POC 16) · eval wiring + **score stability** (POC 5) ·
+  any OpenAI-compatible endpoint · single-agent, no-orchestration execution. All three Phase 1
+  components doc 03 lists (Registry, Composer, Runtime Adapter) are now built — and the builder UI
+  doc 01 names as the missing piece now exists. **All three of doc 03 §2.3's runtime bridges are
+  proven** (shell → POC 7, MCP → POC 13, remote action → POC 16).
 - **Not proven / not built:** a real semantic **`EmbeddingService`** (POC 12 uses an offline
   feature-hashing stand-in). The drag-and-drop UI is now built (POC 15); it is a chaining editor
   only — no NL-authoring or eval pane wired into the same canvas yet.
@@ -65,6 +67,7 @@ The POCs **prove the feasibility core** (the "70% already there") and confirm do
 | [[runtime-adapter]] (13) | an exported goal is auto-published as an MCP tool over Streamable HTTP and invoked by a separate client over the network | the goal method needs both `@Action` + `@AchievesGoal`; the call must supply all `UserInput` fields (`content` + `timestamp`) |
 | [[skill-composer]] (14) | skills chain on a type-checked canvas; the exported composite pack re-validates and runs end-to-end via GOAP | the headless graph model POC 15's UI sits on |
 | [[skill-composer]] (15) | a browser drag-and-drop canvas loads the palette, snaps only type-compatible connections, live-validates the chain, and exports the composite over REST | the "builder UI" doc 01 names as the missing piece; a chaining editor only — no NL-authoring or eval pane yet |
+| [[runtime-adapter]] (16) | a GOAP plan plans over, and executes over HTTP, an action running in a separate sidecar process — exactly like a local action | fully deterministic / LLM-free (endpoint only for platform boot); the third of doc 03 §2.3's runtime bridges |
 
 ## Still open
 

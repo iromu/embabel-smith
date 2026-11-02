@@ -28,6 +28,20 @@ a one-off live check via the no-code runtime; see `docs/04-poc-run-results.md` �
 
 ## How it works
 
+```mermaid
+flowchart LR
+    PA["compose-extract<br/>(skill-pack)"]
+    PB["compose-explain<br/>(skill-pack)"]
+    SK["SkillNode<br/>output + external input types"]
+    CANVAS["CompositionCanvas<br/>type-checked edges"]
+    VALID["validate() + chain()<br/>one entry→exit path"]
+    EXP["CompositeExporter<br/>union of steps + types"]
+    OUT["composite skill-pack<br/>one new exported goal"]
+    PA --> SK
+    PB --> SK
+    SK --> CANVAS --> VALID --> EXP --> OUT
+```
+
 - **`SkillNode`** — one skill (an exported goal + its action steps); exposes its output type and
   external input types.
 - **`CompositionCanvas`** — the graph (skills + directed edges); `validate()` reports type-in

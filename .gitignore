@@ -7,3 +7,4 @@ built-skills
 .poc-runs
 node_modules
 site/dist
+poc/poc-17-gliner-retrieval/models/

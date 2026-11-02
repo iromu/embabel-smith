@@ -52,12 +52,12 @@ Full orientation: [[getting-started]].
 It is a research/POC vehicle for the **"skills, not agents"** paradigm on Embabel. The thesis (see
 `docs/03-embabel-skills-agent-builder-design.md`): Embabel *already* is a skills runtime — a
 **skill** is just an **exported goal** (`export: true`), and the platform's non-LLM **GOAP**
-planner *is* the skill router. The fourteen POCs prove the load-bearing facts (YAML ingestion
+planner *is* the skill router. The sixteen POCs prove the load-bearing facts (YAML ingestion
 without compilation, NL→draft compilation, deterministic builder structure, skill composition, CLI
 invocation, retrieval, eval-guided refinement, trust tiers, progressive disclosure, semantic
-retrieval at scale, remote/MCP invocation, and the skill Composer). All three Phase 1 skills-layer
-components doc 03 lists (registry, composer, runtime adapter) are built; a real semantic
-`EmbeddingService` and the pixel-level drag-and-drop UI are the remaining **out-of-scope** pieces.
+retrieval at scale, remote/MCP invocation, the skill Composer, and the remote-action bridge).
+All three Phase 1 skills-layer components doc 03 lists (registry, composer, runtime adapter) are
+built; a real semantic `EmbeddingService` is the remaining **out-of-scope** piece.
 See [[exported-goal-as-skill]] and [[what-the-pocs-prove]].
 
 ## 4. What happens when I run it?
@@ -100,10 +100,10 @@ Three entry points matter:
   [[builder-pipeline]].
 - `poc/poc-2-nl-compile` (POC 2), `poc/poc-4-skill-format` (POC 4), `poc/poc-5-eval` (POC 5) — see
   [[architecture]].
-- `poc/poc-6`…`poc-15` — the skills-first extensions: composition, runtime adapter, retrieval,
+- `poc/poc-6`…`poc-16` — the skills-first extensions: composition, runtime adapter, retrieval,
   eval-guided refinement, trust tiers, progressive disclosure, semantic retrieval at scale,
-  remote/MCP invocation, the skill Composer, and the visual builder UI. See
-  [[what-the-pocs-prove]].
+  remote/MCP invocation, the skill Composer, the visual builder UI, and the remote-action bridge.
+  See [[what-the-pocs-prove]].
 
 ## 7. What should I avoid breaking?
 
@@ -127,6 +127,7 @@ Three entry points matter:
 | How is a composite skill authored + exported? | [[skill-composer]] · `poc/poc-14-composer/` |
 | How do I build a skill in the browser (builder UI)? | [[skill-composer]] · `poc/poc-15-composer-ui/` |
 | How does a skill call a CLI? | [[runtime-adapter]] · `shell-runner/` pack |
+| How does a skill invoke a remote action over HTTP? | [[runtime-adapter]] · `poc/poc-16-remote-action/` |
 | How is a skill scored / refined? | [[eval-scoring]] · [[eval-guided-refinement]] |
 | How are skills retrieved at scale? | [[retrieval-shadowing]] |
 | How are trust tiers enforced? | [[trust-tiers]] |

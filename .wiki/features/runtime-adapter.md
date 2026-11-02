@@ -1,5 +1,5 @@
 ---
-title: "Runtime adapter: CLI + remote/MCP invocation (POC 7, POC 13)"
+title: "Runtime adapter: CLI + remote/MCP + remote-action invocation (POC 7, POC 13, POC 16)"
 type: "feature"
 status: "active"
 language: "default"
@@ -10,17 +10,21 @@ source_paths:
   - "skill-packs/shell-runner/steps/runCli.yml"
   - "poc/poc-13-remote-mcp/src/main/java/com/embabel/smith/remote/RemoteExplainerAgent.java"
   - "poc/poc-13-remote-mcp/src/main/java/com/embabel/smith/remote/RemoteMcpServerApp.java"
+  - "poc/poc-16-remote-action/src/main/java/com/embabel/smith/remote/RemoteActionSidecar.java"
+  - "poc/poc-16-remote-action/src/main/java/com/embabel/smith/remote/RemoteActionApp.java"
 updated_at: "2026-11-02"
 ---
 
-# Runtime adapter: CLI + remote/MCP invocation (POC 7, POC 13)
+# Runtime adapter: CLI + remote/MCP + remote-action invocation (POC 7, POC 13, POC 16)
 
 POC 7 is the **runtime adapter** claim (doc 03 §2.3): a skill-pack is **not** locked to LLM-only
 actions. A skill whose action declares `toolGroups: [shell]` gets the real `shell` tool injected by
 the platform, so the skill can drive the host and run an actual CLI command — no orchestration
-code. This is the **local-CLI half** of the "normal agent harness". POC 13 covers the **remote/MCP
-half**: the same exported-goal-as-skill surface, published as an MCP tool and invoked over the
-network. Both halves are now exercised (see [[what-the-pocs-prove]]).
+code. This is the **local-CLI bridge** of the "normal agent harness". POC 13 covers the **remote/MCP
+bridge**: the same exported-goal-as-skill surface, published as an MCP tool and invoked over the
+network. POC 16 covers the **remote-action bridge**: a GOAP plan plans over, and executes over
+HTTP, an action running in a separate sidecar process. All three bridges are now exercised (see
+[[what-the-pocs-prove]]).
 
 ## The `shell` tool group
 
@@ -79,3 +83,29 @@ Endpoint-gated (the server-side action calls the model). Run with a free port (8
 another local service) and the client pointed at the same port — see `poc/poc-13-remote-mcp/README.md`
 and `docs/04-poc-run-results.md` §5. This is the "consume" side of [[exported-goal-as-skill]] across
 processes.
+
+## The remote-action half (POC 16)
+
+The third bridge: a GOAP plan plans over, and executes over HTTP, an action running in a **separate
+sidecar process** — the "normal agent harness" where a skill invokes an external worker. Unlike POC
+13 (where the remote side *is* the Embabel agent publishing a goal), here the remote side is plain
+code; `embabel-agent-remote`'s client pulls it in as a `RestAction` and the local GOAP planner drives
+it.
+
+- **`RemoteActionSidecar`** — a standalone JDK `HttpServer` (no extra deps) running deterministic
+  code (digests the input text into word/char stats, no LLM). It serves the three endpoints the
+  client consumes: `GET /api/v1/actions` (the catalog), `GET /api/v1/types` (empty — the action uses
+  the built-in `UserInput`/`BackgroundMessage`), and `POST /api/v1/actions/execute` (body
+  `{action_name, parameters}`, returns the output as a JSON object).
+- **`RemoteActionApp`** — boots the `AgentPlatform`, starts the sidecar, pulls its action in as a
+  `RestAction` (`RestServer.agentScope(platform)`), registers the built-in I/O types (the platform
+  has no base domain types — the same `JvmType` seam POC 1 uses), adds a `BackgroundMessage` goal,
+  deploys the scope + agent, and runs a GOAP plan over the remote action.
+
+The GOAP variable-binding is the subtle part: the action's input variable is named `userInput` (to
+match the `runAgentFrom` key) and its output `it` (to match the goal's output condition), and
+`pre`/`post` are empty so the preconditions come from the input binding — that is what lets the plan
+chain `UserInput → remoteDigest → BackgroundMessage`. The whole plan is deterministic and **LLM-free**
+(the endpoint is only for platform boot). Live: the plan `remoteDigest` ran in `PT0.127S` and the
+sidecar produced the result. Four offline `RemoteActionSidecarTest` tests pin the three-endpoint
+contract. See `poc/poc-16-remote-action/README.md` and `docs/04-poc-run-results.md` §5.

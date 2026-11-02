@@ -35,5 +35,7 @@
         <module>poc-13-remote-mcp</module>
         <module>poc-14-composer</module>
         <module>poc-15-composer-ui</module>
+        <module>poc-16-remote-action</module>
+        <module>poc-17-gliner-retrieval</module>
     </modules>
 </project>

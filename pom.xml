@@ -79,6 +79,12 @@
                 <artifactId>mcp</artifactId>
                 <version>2.1.0</version>
             </dependency>
+            <!-- Remote-action bridge (POC 16): pull a sidecar's actions in as RestActions. -->
+            <dependency>
+                <groupId>com.embabel.agent</groupId>
+                <artifactId>embabel-agent-remote</artifactId>
+                <version>${embabel-agent.version}</version>
+            </dependency>
             <!-- The no-compilation YAML ingestion engine + NL compiler. -->
             <dependency>
                 <groupId>com.embabel.agent</groupId>
@@ -111,6 +117,11 @@
             <dependency>
                 <groupId>com.embabel.smith</groupId>
                 <artifactId>poc-8-retrieval</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.embabel.smith</groupId>
+                <artifactId>poc-12-semantic-retrieval</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

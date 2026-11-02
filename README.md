@@ -31,6 +31,8 @@ for the design.
 | `poc-13-remote-mcp` | **POC 13.** Remote / MCP invocation: an exported goal (`@Action` + `@AchievesGoal` + `@Export(remote = true)`) is auto-published as an MCP tool over Streamable HTTP and invoked by a separate MCP client over the network — the remote half of the "normal agent harness" (doc 03 §2.3). |
 | `poc-14-composer` | **POC 14.** The skill Composer (headless model of the visual skill-chain editor): skills on a canvas with type-checked connections, the composed chain, and export as a single composite skill-pack that runs end-to-end (doc 03 §2.2). |
 | `poc-15-composer-ui` | **POC 15.** The visual skill-chain editor (the builder UI): a Spring Boot web app serving a browser drag-and-drop canvas that loads the skill palette, snaps only type-compatible connections, live-validates the chain, and exports the composite skill-pack over REST — the pixels on top of POC 14's model (doc 01 §VERDICT, doc 03 §2.2). |
+| `poc-16-remote-action` | **POC 16.** The remote-action bridge: a separate sidecar process exposes an action over HTTP; the agent pulls it in as a `RestAction` and a GOAP plan plans over it and executes it over the network, exactly like a local action — the third of doc 03 §2.3's runtime bridges (shell → POC 7, MCP → POC 13, remote action → POC 16). Fully deterministic (no LLM call). |
+| `poc-17-gliner-retrieval` | **POC 17.** GLiNER2 transformer skill classification: a real zero-shot transformer (GLiNER2 via GLiNER4j over ONNX Runtime) classifies the task query against a small candidate set and selects the top hit, run on POC 12's shadowing scenario to test whether a model that *understands* meaning breaks the tie lexical and dense text-similarity cannot. A **local-model-gated** benchmark (one-time ONNX bundle download; offline tests mock the classifier). |
 
 Sample skill-pack: [`skill-packs/explainer`](skill-packs/explainer)
 (`UserInput → extractTopic → TopicBrief → writeExplainer → BackgroundMessage`). Composition samples:
@@ -155,6 +157,17 @@ BUILDER_TOPIC="how a coffee machine works" \
 #   canvas in a browser — drag skills onto the canvas, connect ports, and Export the composite.
 SERVER_PORT=18080 mvn -pl poc/poc-15-composer-ui spring-boot:run
 #   → open http://localhost:18080/
+
+# POC 16 — the remote-action bridge. Boots the platform, starts a deterministic sidecar
+#   (default port 18090), and runs a GOAP plan that executes the sidecar's action over HTTP.
+#   The plan is fully deterministic (no LLM call); the endpoint is only needed for platform boot.
+mvn -pl poc/poc-16-remote-action spring-boot:run -Dbuilder.input="Explain how a remote worker pool runs a task"
+
+# POC 17 — GLiNER2 transformer skill classification (local-model-gated, no endpoint): the
+#   three-method shadowing benchmark. Needs the one-time ONNX bundle download first (see
+#   poc/poc-17-gliner-retrieval/README.md); without it the launcher prints a clear missing-model
+#   error and exits non-zero.
+mvn -pl poc/poc-17-gliner-retrieval exec:java
 ```
 
 ## Full loop (task 7.1)
@@ -186,4 +199,9 @@ guardrail demo's clean run (POC 10), and the remote/MCP goal run (POC 13) — ar
 working code but require a live endpoint to execute. POC 8, POC 11, POC 12, POC 14 (the
 Composer's canvas + composite export), and POC 15 (the visual builder UI — a web app that only
 manipulates the same offline composer model) are fully offline and need no endpoint; running
-POC 14's *exported* composite through the runtime is the one endpoint-gated step.
+POC 14's *exported* composite through the runtime is the one endpoint-gated step. POC 16 (the
+remote-action bridge) needs the endpoint only to boot the platform — its GOAP plan over the remote
+action is fully deterministic and never calls the model. POC 17 (GLiNER2 skill classification)
+introduces a **third category — local-model-gated**: it needs no endpoint, but runs the benchmark
+only when the one-time ONNX bundle is present (offline tests mock the classifier, so the build stays
+green without it).

@@ -22,6 +22,19 @@ the endpoint-gated part.
 
 ## How it works
 
+```mermaid
+sequenceDiagram
+    participant A as RemoteExplainerAgent<br/>@Export(remote=true)
+    participant S as MCP server<br/>Streamable HTTP
+    participant C as MCP client (separate connection)
+    A ->> S: goal auto-published as tool
+    C ->> S: initialize
+    C ->> S: listTools
+    C ->> S: callTool(explainTopic, {content, timestamp})
+    S ->> S: GOAP plan → action → LLM call
+    S -->> C: result (genuine HTTP round-trip)
+```
+
 `RemoteExplainerAgent` defines a single goal — `explainTopic(UserInput) → String` — with
 `@Action`, `@AchievesGoal`, and `@Export(remote = true, name = "explainTopic")`. `RemoteMcpServerApp`
 is a `@SpringBootApplication` that boots the MCP server (the default Streamable HTTP transport on the

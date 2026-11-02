@@ -27,6 +27,18 @@ Fully offline and deterministic — no model endpoint.
 
 ## How it works
 
+```mermaid
+flowchart LR
+    LIB["ScaleSkillLibrary<br/>191 core skills + near-duplicates"]
+    LEX["LexicalScorer<br/>POC 8 word-TF cosine"]
+    SEM["SemanticScorer<br/>feature-hashing n-grams → cosine"]
+    REG["ScaleSkillRegistry<br/>ranks by pluggable SkillScorer"]
+    RUN["ScaleRetrievalRunner<br/>precision@1/@5 + growth curve"]
+    LIB --> LEX --> REG
+    LIB --> SEM --> REG
+    REG --> RUN
+```
+
 `ScaleSkillLibrary` builds the same-typed library: a **core** of 191 distinct-topic skills across six
 verb families, plus **near-duplicates** — 15 same-topic variants per benchmark target. `SkillScorer`
 is the retriever seam; `LexicalScorer` reuses POC 8's word-TF cosine, `SemanticScorer` uses

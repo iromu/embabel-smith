@@ -26,6 +26,22 @@ through POC 14's proven `CompositionCanvas` / `CompositeExporter`; it never call
 
 ## How it works
 
+```mermaid
+sequenceDiagram
+    participant B as Browser canvas<br/>(static/index.html)
+    participant C as CanvasController (REST)
+    participant M as POC 14 model<br/>CompositionCanvas / CompositeExporter
+    B ->> C: GET /api/skills
+    C ->> M: load valid exported packs
+    C -->> B: skill palette (draggable chips)
+    B ->> C: POST /api/canvas (drag edge)
+    C ->> M: validate() + chain()
+    C -->> B: {valid, issues, chain} — blue/red wire
+    B ->> C: POST /api/compose (Export)
+    C ->> M: CompositeExporter
+    C -->> B: composite skill-pack written
+```
+
 - **`ComposerUiApp`** — a `@SpringBootApplication` that boots the web app.
 - **`SkillCatalog`** — the palette: loads every valid, exported skill-pack under the skill-packs
   directory into a `name → SkillNode` map (walks up from the working dir to find the repo's
