@@ -33,6 +33,7 @@ for the design.
 | `poc-15-composer-ui` | **POC 15.** The visual skill-chain editor (the builder UI): a Spring Boot web app serving a browser drag-and-drop canvas that loads the skill palette, snaps only type-compatible connections, live-validates the chain, and exports the composite skill-pack over REST — the pixels on top of POC 14's model (doc 01 §VERDICT, doc 03 §2.2). |
 | `poc-16-remote-action` | **POC 16.** The remote-action bridge: a separate sidecar process exposes an action over HTTP; the agent pulls it in as a `RestAction` and a GOAP plan plans over it and executes it over the network, exactly like a local action — the third of doc 03 §2.3's runtime bridges (shell → POC 7, MCP → POC 13, remote action → POC 16). Fully deterministic (no LLM call). |
 | `poc-17-gliner-retrieval` | **POC 17.** GLiNER2 transformer skill classification: a real zero-shot transformer (GLiNER2 via GLiNER4j over ONNX Runtime) classifies the task query against a small candidate set and selects the top hit, run on POC 12's shadowing scenario to test whether a model that *understands* meaning breaks the tie lexical and dense text-similarity cannot. A **local-model-gated** benchmark (one-time ONNX bundle download; offline tests mock the classifier). |
+| `poc-18-skill-lifecycle` | **POC 18.** Skill lifecycle / drift detection: a skill's contract is its eval pass-rate, and a SkillOps-style proactive re-eval compares the skill's content hash and pass-rate against the recorded baseline, moving it through `incubating → active → degraded → retired` — catching both a silent prompt edit (content drift) and a full score collapse (doc 03 §1 "Skill decay / lifecycle", doc 02 §5 caveat 4). Content-hash / drift / state-machine halves are pure and offline-tested; the live re-eval is endpoint-gated. |
 
 Sample skill-pack: [`skill-packs/explainer`](skill-packs/explainer)
 (`UserInput → extractTopic → TopicBrief → writeExplainer → BackgroundMessage`). Composition samples:
@@ -168,6 +169,11 @@ mvn -pl poc/poc-16-remote-action spring-boot:run -Dbuilder.input="Explain how a 
 #   poc/poc-17-gliner-retrieval/README.md); without it the launcher prints a clear missing-model
 #   error and exits non-zero.
 mvn -pl poc/poc-17-gliner-retrieval exec:java
+
+# POC 18 — skill lifecycle / drift detection (endpoint-gated): a SkillOps-style proactive
+#   re-eval. Runs the deterministic lifecycle walkthrough, then (with a live endpoint) re-evaluates
+#   the healthy vs. regressed skill and moves it through incubating → active → degraded → retired.
+mvn -pl poc/poc-18-skill-lifecycle spring-boot:run
 ```
 
 ## Full loop (task 7.1)
@@ -204,4 +210,6 @@ remote-action bridge) needs the endpoint only to boot the platform — its GOAP 
 action is fully deterministic and never calls the model. POC 17 (GLiNER2 skill classification)
 introduces a **third category — local-model-gated**: it needs no endpoint, but runs the benchmark
 only when the one-time ONNX bundle is present (offline tests mock the classifier, so the build stays
-green without it).
+green without it). POC 18 (skill lifecycle / drift detection) is endpoint-gated for the live
+re-eval, but its content-hash / drift / lifecycle state machine is pure and pinned by offline tests,
+so `mvn test` stays green without a model.
