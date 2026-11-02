@@ -1,0 +1,51 @@
+name: Wiki to GitHub Pages
+
+# Builds the .wiki/ knowledge base into a static site (site/build.mjs) and
+# publishes it to the gh-pages branch, which GitHub Pages serves at
+# https://iromu.github.io/embabel-smith/ . Runs on pushes to the default
+# branch that touch the wiki, the site generator, or this workflow, and can
+# be triggered manually from the Actions tab.
+on:
+  push:
+    branches: [poc/builder]
+    paths:
+      - '.wiki/**'
+      - 'site/**'
+      - '.github/workflows/wiki-pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+
+      - name: Install dependencies
+        working-directory: site
+        run: npm ci
+
+      - name: Build the site
+        working-directory: site
+        run: node build.mjs
+
+      - name: Publish to gh-pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: gh-pages
+          publish_dir: ./site/dist
