@@ -41,6 +41,10 @@
             <groupId>com.embabel.smith</groupId>
             <artifactId>poc-9-quality-refinement</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.embabel.smith</groupId>
+            <artifactId>poc-18-skill-lifecycle</artifactId>
+        </dependency>
 
         <dependency>
             <groupId>org.springframework.boot</groupId>

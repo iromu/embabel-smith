@@ -78,13 +78,16 @@ drafts (POC 9's fix works, but the raw draft is the thing being fixed).
 - **Not proven / not built:** a real semantic **`EmbeddingService`** is now **built** (POC 20 — a
   genuine ONNX sentence-encoder behind the `SkillScorer` seam); what it does *not* do is cure the
   near-duplicate shadowing collapse on its own (33% vs lexical 17% / dense 0% at full scale) — the
-  real fix is library curation (dedup / lifecycle, POC 18). The drag-and-drop UI (POC 15) now also
-  carries a **retrieval pane** (the POC 8/12/20 `SkillScorer` seam — lexical by default, the POC 20
-  embedding a drop-in), an **NL-authoring pane** (POC 2/3 — compile a description to a draft and
-  show its `DraftQuality` verdict, endpoint-gated), and an **eval/refinement pane** (POC 5/9 — run an
-  eval over tasks and, on failure, offer a prompt rewrite + re-score, endpoint-gated); a skill can now
-  be described, routed, and checked/refined on the same canvas. (The doc 03 §1 "skill decay /
-  lifecycle" gap is now **closed** by POC 18.)
+  real fix is library curation (dedup / lifecycle, POC 18), which the POC 15 canvas now **applies**:
+  its retrieval pane stamps every hit with the skill's POC 18 lifecycle state and drops **retired**
+  skills and de-ranks **degraded** ones, and a **curate re-eval** (endpoint-gated) re-scores a skill
+  and moves it through the lifecycle. The drag-and-drop UI (POC 15) now also carries a
+  **retrieval pane** (the POC 8/12/20 `SkillScorer` seam — lexical by default, the POC 20 embedding a
+  drop-in — now POC 18 curation-aware), an **NL-authoring pane** (POC 2/3 — compile a description to a
+  draft and show its `DraftQuality` verdict, endpoint-gated), and an **eval/refinement pane** (POC 5/9
+  — run an eval over tasks and, on failure, offer a prompt rewrite + re-score, endpoint-gated); a
+  skill can now be described, routed, checked/refined, and curated on the same canvas. (The doc 03 §1
+  "skill decay / lifecycle" gap is now **closed** by POC 18, and applied in the builder UI by POC 15.)
 - **Confirmed negative, with a proven fix:** LLM-authored skill **quality** is weak at the source
   (doc 02 caveat #2), **but** eval-guided refinement demonstrably repairs it (POC 9: 0% → 100%).
 
@@ -213,15 +216,23 @@ The feasibility core is real and matches the theory:
     the chain and validation state on every move, and an Export button calls `POST /api/compose` to
     write the composite skill-pack. A right-hand **retrieval pane** (`POST /api/retrieve`) ranks the
     palette by relevance to a natural-language query via the same `SkillScorer` seam POC 12/17/20
-    share (lexical by default; the POC 20 embedding a drop-in). A right-hand **author pane**
+    share (lexical by default; the POC 20 embedding a drop-in) — and now **curates the library with
+    POC 18**: each hit carries the skill's lifecycle state (re-derived offline by POC 18's
+    `LifecycleManager` from the recorded baseline, the live content hash, and the latest measured
+    pass-rate), a **retired** skill is dropped from the results and a **degraded** one is de-ranked.
+    A right-hand **author pane**
     (`POST /api/compile`) compiles a natural-language description into a draft via POC 2's
     `NlCompileRunner` and shows its goal shape + `DraftQuality` verdict (endpoint-gated). A right-hand
     **eval/refinement pane** (`POST /api/eval`) runs a POC 5 eval over a set of tasks against a picked
     skill and, when tasks fail, offers a POC 9-style prompt rewrite + re-score (endpoint-gated) — a
-    skill can now be checked and refined in one place. Every endpoint delegates to a proven POC (POC
-    14's model, POC 12's registry, POC 2's compiler, POC 9's refinement runner), so the pixels drive
-    the same type-check / chain / export / retrieval / compile / eval-refine logic the offline POCs
-    prove — the "builder UI" doc 01 names as the missing piece is now a working, browsable surface.
+    skill can now be checked and refined in one place. A **curate re-eval** (`POST /api/curate`,
+    endpoint-gated) re-scores a skill's live pass-rate with POC 18's `LiveEvalRunner` and moves it
+    through the lifecycle, reporting the before → after transition and POC 18's verdict — the library
+    is curated, not just scored. Every endpoint delegates to a proven POC (POC 14's model, POC 12's
+    registry, POC 2's compiler, POC 9's refinement runner, POC 18's lifecycle + live eval), so the
+    pixels drive the same type-check / chain / export / retrieval / curation / compile / eval-refine
+    logic the offline POCs prove — the "builder UI" doc 01 names as the missing piece is now a
+    working, browsable surface.
 17. **Skills invoke a remote action** (C16, the third runtime bridge). POC 16 runs a separate
     **sidecar** process (a standalone HTTP server running deterministic code — no LLM) that exposes an
     action; the agent pulls it in as a `RestAction` via `embabel-agent-remote`, and a **GOAP plan plans
@@ -312,10 +323,13 @@ is now built (POC 20)** — what remains is wiring it (and the other POCs) into 
    What is **not** yet done: (a) the real embedding improves the shadowing signal (33%) but does not
    cure the near-duplicate collapse on its own (the fix is curation — POC 18); and (b) the POC 15
    canvas now has a **retrieval pane** (the POC 8/12/20 `SkillScorer` seam — lexical by default, the
-   POC 20 embedding a drop-in), an **NL-authoring pane** (POC 2/3 — compile a description to a draft
-   and show its `DraftQuality` verdict, endpoint-gated), and an **eval/refinement pane** (POC 5/9 —
-   run an eval over tasks and, on failure, offer a prompt rewrite + re-score, endpoint-gated), so a
-   skill can be described, routed, and checked/refined on the same surface.
+   POC 20 embedding a drop-in — now **POC 18 curation-aware**: it stamps each hit with the skill's
+   lifecycle state, drops retired skills, and de-ranks degraded ones), an **NL-authoring pane** (POC
+   2/3 — compile a description to a draft and show its `DraftQuality` verdict, endpoint-gated), an
+   **eval/refinement pane** (POC 5/9 — run an eval over tasks and, on failure, offer a prompt rewrite
+   + re-score, endpoint-gated), and a **curate re-eval** (POC 18 — re-score a skill's live pass-rate
+   and move it through the lifecycle, endpoint-gated), so a skill can be described, routed,
+   checked/refined, and curated on the same surface.
 2. **LLM-authored skill quality is still weak at the source — now measured** (C9). The NL compiler
    still emits weak or degenerate drafts — a `void` goal (plan STUCKs), a no-op `UserInput→UserInput`
    goal (trivially "achieved" with no output), a scalar goal, or an *orphan* goal (no action produces
@@ -362,15 +376,18 @@ is now built (POC 20)** — what remains is wiring it (and the other POCs) into 
 
 ## 5. Run evidence (support)
 
-- **Offline baseline:** `mvn test` green across all modules — **188 tests, 0 failures, 0 errors**
+- **Offline baseline:** `mvn test` green across all modules — **200 tests, 0 failures, 0 errors**
   (re-verified 2026-11-03; +10 from POC 20, +3 from the POC 15 retrieval pane, +2 from the POC 15
-  author pane, +3 from the POC 15 eval/refinement pane). Coverage: format round-trip, validation,
+  author pane, +3 from the POC 15 eval/refinement pane, +12 from the POC 15 library curation).
+  Coverage: format round-trip, validation,
   **draft-quality classifier (POC 2/3 caveat #2)**, builder normalization, writer idempotency,
   composition wiring, shell tool, lexical retrieval, **200+ scale retrieval (POC 12)**,
   **eval-score stability (POC 5)**, refinement scorer + re-validation, trust-tier policy,
   **guardrail (normalized multi-pattern matcher, POC 10)**, progressive-disclosure measurement,
   **remote/MCP goal export (POC 13)**, **composer canvas + composite export (POC 14)**,
-  **visual Composer REST surface + retrieval + author + eval/refinement panes (POC 15)**,
+  **visual Composer REST surface + retrieval (curation-aware: retired dropped, degraded de-ranked) +
+  author + eval/refinement + curate panes + the POC 18 curation state machine wired into the canvas
+  (POC 15)**,
   **GLiNER2 selector seam + baselines (POC 17)**,
   **content-hash / drift / lifecycle state machine (POC 18)**, **small-LLM decision prompt +
   selector + serving gate (POC 19)**, and the **real-embedding mean-pool / normalise / cosine /
@@ -486,16 +503,34 @@ is now built (POC 20)** — what remains is wiring it (and the other POCs) into 
   rewrite (the `extractTopic` prompt gained explicit brand-naming), and re-scored to **1.0**
   (`refined: true, improved: true`) in ~28 s. A blank or unknown skill is rejected, and a missing
   endpoint returns a clear, named configuration error before any model call.
-  Offline, twelve standalone-`MockMvc` tests (`CanvasControllerTest` + `RetrievalControllerTest` +
-  `NlAuthoringControllerTest` + `EvalControllerTest`) pin the REST behaviours — palette listing,
-  valid-chain acceptance, type-incompatible rejection, composite export, retrieval ranking (extract/
-  explain queries rank the right skill first, results sorted by score and bounded by `k`), the author
-  pane's offline scaffolding (blank description rejected; missing endpoint → clear config error), and
-  the eval pane's offline scaffolding (no skill selected, unknown skill, and a known skill without an
-  endpoint → clear config error) — hermetically against the repo's sample skill-packs and a temp
-  export dir. (The tests use standalone `MockMvc` rather than `@WebMvcTest` because the latter lives
-  in the `spring-boot-webmvc-test` slice, absent from the offline repo at this project's resolved
-  version.)
+  **The retrieval pane's POC 18 curation** (added 2026-11-03) is verified live end-to-end. At seed
+  every hit carries `state: ACTIVE` and nothing is dropped or de-ranked. Re-evaluating the
+  `reference-heavy` skill (a coffee Q&A skill) with two out-of-domain tasks it cannot satisfy
+  collapsed its live pass-rate **1.00 → 0.00** — `POST /api/curate` returned
+  `{before: ACTIVE, after: RETIRED, verdict: "RETIRED: score collapsed 1.00 -> 0.00; the skill's
+  contract is violated", surfaced: false}` — and the next `POST /api/retrieve` **dropped
+  `reference-heavy` from the results entirely**. Re-evaluating `shell-runner` with one passing and
+  one failing task gave pass-rate **1.00 → 0.50** — `{before: ACTIVE, after: DEGRADED, verdict:
+  "DEGRADED: score dropped 1.00 -> 0.50; re-evaluate before trusting it", surfaced: true}` — and the
+  next retrieval **de-ranked it** (its score halved, so it fell from 1st to 3rd, below the ACTIVE
+  `explainer` / `compose-extract`) while still surfacing it. (The curate re-eval deploys the skill as
+  a throwaway agent, so it only runs skills whose actions use the built-in `UserInput` /
+  `BackgroundMessage` types — POC 18's `LiveEvalRunner` registers exactly those.)
+  Offline, eighteen standalone-`MockMvc` tests (`CanvasControllerTest` + `RetrievalControllerTest` +
+  `NlAuthoringControllerTest` + `EvalControllerTest` + `CurationControllerTest`) pin the REST
+  behaviours — palette listing, valid-chain acceptance, type-incompatible rejection, composite export,
+  retrieval ranking (extract/explain queries rank the right skill first, results sorted by score and
+  bounded by `k`, every hit carries a lifecycle state, a **retired** skill is dropped and a
+  **degraded** one is de-ranked), the author pane's offline scaffolding (blank description rejected;
+  missing endpoint → clear config error), the eval pane's offline scaffolding (no skill selected,
+  unknown skill, and a known skill without an endpoint → clear config error), and the curate
+  re-eval's offline scaffolding (same three guard paths) — hermetically against the repo's sample
+  skill-packs and a temp export dir. A separate `SkillCurationTest` (six tests) pins the pure curation
+  state machine offline (POC 18's `LifecycleManager`, no model): fresh skill active + surfaced, clean
+  re-eval stays active, a score drop degrades + de-ranks, a score collapse retires, retirement is
+  terminal, and the de-rank factor only touches degraded skills. (The tests use standalone `MockMvc`
+  rather than `@WebMvcTest` because the latter lives in the `spring-boot-webmvc-test` slice, absent
+  from the offline repo at this project's resolved version.)
 - **Remote-action bridge (POC 16): GREEN (live) + offline.** A separate sidecar process
   (`RemoteActionSidecar`, a JDK `HttpServer` running deterministic code — no LLM) exposes an action
   over the three endpoints `embabel-agent-remote`'s client consumes: `GET /api/v1/actions` (the
@@ -648,8 +683,10 @@ All twenty POCs are now built. POC 1–5 (feasibility core), POC 6 (composition)
 10. **POC 15 — The visual skill-chain editor (builder UI).** ✅ **Built & proven:** a Spring Boot
     web app serving a browser drag-and-drop canvas that loads the skill palette, snaps only
     type-compatible connections, live-validates the chain, and exports the composite skill-pack over
-    REST (C15). Every endpoint delegates to POC 14's model; the "builder UI" doc 01 names as the
-    missing piece now exists — see §5.
+    REST (C15) — plus a curation-aware **retrieval pane** (POC 18 lifecycle: retired dropped,
+    degraded de-ranked), an **author pane** (POC 2), an **eval/refinement pane** (POC 9), and a
+    **curate re-eval** (POC 18). Every endpoint delegates to a proven POC; the "builder UI" doc 01
+    names as the missing piece now exists — see §5.
 11. **POC 16 — The remote-action bridge.** ✅ **Built & proven:** a separate sidecar process exposes
     an action over HTTP; the agent pulls it in as a `RestAction` and a GOAP plan plans over it and
     executes it over the network, exactly like a local action (C16). Closes the third of doc 03
@@ -688,14 +725,19 @@ drift (POC 18), and the real semantic `EmbeddingService` (POC 20). Possible foll
 (non-Phase-1, §4) are now hardening, not new capability POCs:
 
 - **Wiring the other POCs into the POC 15 canvas** — now fully wired: a **retrieval pane** (the
-  POC 8/12/20 `SkillScorer` seam — lexical by default, the POC 20 embedding a drop-in), an
-  **NL-authoring pane** (POC 2/3 — compile a description to a draft + show its `DraftQuality`
-  verdict, endpoint-gated), and an **eval/refinement pane** (POC 5/9 — run an eval over tasks and,
-  on failure, offer a prompt rewrite + re-score, endpoint-gated). A skill can now be described,
-  routed, and checked/refined on the same surface.
-- **Library curation as the shadowing remedy** — POC 20 shows a real embedding improves the signal
-  but shares the near-duplicate ambiguity; the fundamental fix is dedup / lifecycle (POC 18) applied
-  to the retrieval library, which is not yet wired end-to-end.
+  POC 8/12/20 `SkillScorer` seam — lexical by default, the POC 20 embedding a drop-in — now POC 18
+  curation-aware), an **NL-authoring pane** (POC 2/3 — compile a description to a draft + show its
+  `DraftQuality` verdict, endpoint-gated), an **eval/refinement pane** (POC 5/9 — run an eval over
+  tasks and, on failure, offer a prompt rewrite + re-score, endpoint-gated), and a **curate
+  re-eval** (POC 18 — re-score a skill's live pass-rate and move it through the lifecycle,
+  endpoint-gated). A skill can now be described, routed, checked/refined, and curated on the same
+  surface.
+- **Library curation as the shadowing remedy** — now wired end-to-end (2026-11-03): the POC 15
+  retrieval pane applies POC 18's lifecycle state — each hit carries its state, **retired** skills
+  are dropped from the results, and **degraded** ones are de-ranked — and the **curate re-eval**
+  re-scores a skill with POC 18's `LiveEvalRunner` and moves it through the lifecycle. The pure
+  content-hash / drift / state-machine half is offline-testable; the measured score is endpoint-gated.
+  This closes the last hypothesis gap doc 03 §6 left open.
 
 ---
 
@@ -763,6 +805,7 @@ the canvas in a browser. Pick a free port (8080 may be taken).
 ```bash
 SERVER_PORT=18080 mvn -pl poc/poc-15-composer-ui spring-boot:run
 # → open http://localhost:18080/  (drag skills onto the canvas, connect ports, Export)
+# the author / eval-refine / curate panes also need the OPENAI_CUSTOM_* endpoint env vars
 ```
 
 **POC 16 — the remote-action bridge.** Boots the platform, starts a deterministic sidecar

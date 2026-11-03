@@ -14,6 +14,13 @@ eval/refinement pane runs a POC 5 eval over a set of tasks against a picked skil
 fail, offers a POC 9-style prompt rewrite + re-score. Both return a clear configuration error rather
 than an opaque model failure when no endpoint is set.
 
+On top of the retrieval pane's raw relevance ranking, the canvas applies **POC 18's library
+curation** (offline): each hit carries the skill's lifecycle state (incubating → active → degraded →
+retired, driven by POC 18's `LifecycleManager` from the recorded baseline, the live content hash, and
+the latest measured pass-rate), a retired skill is dropped from the results entirely, and a degraded
+one is de-ranked. A **curate re-eval** (endpoint-gated) re-scores a skill with POC 18's
+`LiveEvalRunner` and moves it through the lifecycle — so the library is curated, not just scored.
+
 ## What it proves
 
 - **A browser canvas loads the skill palette.** `GET /api/skills` returns every valid, exported
@@ -38,6 +45,19 @@ than an opaque model failure when no endpoint is set.
   top-k shown with their scores. It reuses the same pluggable `SkillScorer` seam the whole retrieval
   POC family shares (POC 8 lexical, POC 12 dense, POC 17 GLiNER2, POC 20 real embedding), so the
   offline lexical scorer is the default and a denser scorer is a drop-in.
+- **The retrieval pane curates the library, not just scores it (POC 18).** Each hit carries the
+  skill's lifecycle state, re-derived offline by POC 18's `LifecycleManager` from the recorded
+  baseline, the live content hash, and the latest measured pass-rate. A **retired** skill is dropped
+  from the results entirely (out of the library); a **degraded** one is de-ranked (its relevance
+  score halved, so it falls in the ranking). This is the "shadowing/near-duplicate skills are
+  curated rather than just scored" behaviour — the pure content-hash / drift / state-machine half is
+  deterministic and offline.
+- **A curate re-eval moves a skill through its lifecycle (endpoint-gated).** The right-hand panel's
+  "re-eval + curate" posts `POST /api/curate` with a skill; it re-scores the skill's live eval
+  pass-rate via POC 18's `LiveEvalRunner`, records it, and moves the skill through the lifecycle —
+  reporting the before → after transition, the two drift signals, and POC 18's human-readable
+  verdict. A clean re-eval keeps it active, a score drop degrades it, a score collapse retires it
+  (and it then disappears from retrieval).
 - **An eval/refinement pane checks and refines a skill in one place.** The right-hand panel posts
   `POST /api/eval` with a skill from the palette; it runs a POC 5 eval over a set of tasks and shows
   the composite score + the failing inputs, and (the stretch) when tasks fail it runs a POC 9-style
@@ -58,6 +78,9 @@ sequenceDiagram
     participant S as POC 12 ScaleSkillRegistry<br/>(pluggable SkillScorer)
     participant L as POC 2 NlCompileRunner<br/>(LLM, endpoint-gated)
     participant F as POC 9 RefinementRunner<br/>(deploy + eval + rewrite, endpoint-gated)
+    participant CU as CurationController (REST)
+    participant LC as POC 18 LifecycleManager<br/>+ SkillCuration (offline)
+    participant LE as POC 18 LiveEvalRunner<br/>(deploy + eval, endpoint-gated)
     B ->> C: GET /api/skills
     C ->> M: load valid exported packs
     C -->> B: skill palette (draggable chips)
@@ -76,9 +99,17 @@ sequenceDiagram
     F -->> E: RefinementOutcome (before/after score, failing inputs, revised prompt)
     E -->> B: {score, failing inputs, revised prompt}
     B ->> R: POST /api/retrieve (query)
-    R ->> S: retrieve(query, k) over catalog entries
-    S -->> R: top-k SkillEntry (ranked by scorer)
-    R -->> B: {scorer, results:[{name, score}]}
+    R ->> S: retrieve(query, all) over catalog entries
+    S -->> R: ranked SkillEntry (by scorer)
+    R ->> LC: currentState(name) per hit
+    LC -->> R: drop RETIRED, de-rank DEGRADED
+    R -->> B: {scorer, results:[{name, score, state}]}
+    B ->> CU: POST /api/curate (skill)
+    CU ->> LE: evaluate(pack, tasks)
+    LE -->> CU: live pass-rate
+    CU ->> LC: curate(name, score) — move through lifecycle
+    LC -->> CU: before → after state
+    CU -->> B: {before, after, drift, verdict, surfaced}
 ```
 
 - **`ComposerUiApp`** — a `@SpringBootApplication` that boots the web app.
@@ -91,10 +122,25 @@ sequenceDiagram
   - `GET /api/skills` → the palette (`SkillInfo`).
   - `POST /api/canvas` → `{valid, issues, chain}` via `CompositionCanvas.validate()` / `chain()`.
   - `POST /api/compose` → writes the composite and reports its shape via `CompositeExporter`.
+- **`SkillCuration`** — the library curation (offline): seeds each catalog skill as a validated
+  `ACTIVE` baseline (its live content hash, an assumed-passing score of 1.0), and re-derives each
+  skill's lifecycle state by POC 18's `LifecycleManager.transition()` from the recorded state, the
+  live content hash (content drift) and the latest measured score (score drift). `curate(name,
+  score)` records a freshly-measured pass-rate and persists the new state (so retirement is terminal
+  and promotion is from incubation, as in POC 18). It exposes `surfaced(state)` (a retired skill is
+  out of the library) and `deRankFactor(state)` (a degraded skill's score is halved).
 - **`RetrievalController`** — the retrieval pane: `POST /api/retrieve` ranks `catalog.retrievalEntries()`
   with a pluggable `SkillScorer` (default POC 8's `LexicalScorer`, offline) via POC 12's
-  `ScaleSkillRegistry` and returns the top-k with their scores. The scorer is a constructor field,
-  so POC 20's real `EmbeddingService` drops in here without touching the endpoint.
+  `ScaleSkillRegistry`, then applies POC 18's curation — dropping retired skills, de-ranking degraded
+  ones, and stamping each hit with its lifecycle state — before returning the top-k. The scorer is a
+  constructor field, so POC 20's real `EmbeddingService` drops in here without touching the endpoint.
+- **`CurationController`** — the curate re-eval (endpoint-gated): `POST /api/curate` takes a skill
+  from the palette and re-scores its live eval pass-rate with POC 18's `LiveEvalRunner`, records it
+  via `SkillCuration.curate()`, and returns the before → after transition, the two drift signals,
+  POC 18's `DriftReport` verdict, and whether the skill is still surfaced. It checks
+  `ModelEndpointConfig.configError()` first, so a missing endpoint yields a clear, named error before
+  any model call. (The re-eval deploys the skill as a throwaway agent, so — as in POC 18 — it runs
+  skills whose actions use the built-in `UserInput` / `BackgroundMessage` types.)
 - **`NlAuthoringController`** — the author pane: `POST /api/compile` compiles a description via POC 2's
   `NlCompileRunner` and maps the `AgentCompilationResult` to the draft's goal shape, actions, and the
   `DraftQuality` verdict. It checks `ModelEndpointConfig.configError()` first, so a missing endpoint
@@ -111,8 +157,8 @@ sequenceDiagram
 ## Run it
 
 It's a web app — boot it, then open the canvas in a browser. The canvas, palette, and retrieval
-pane are offline (no endpoint); the **author** and **eval/refinement** panes need the endpoint env
-vars:
+pane (including its POC 18 curation) are offline (no endpoint); the **author**, **eval/refinement**,
+and **curate re-eval** panes need the endpoint env vars:
 
 ```bash
 SERVER_PORT=18080 mvn -pl poc/poc-15-composer-ui spring-boot:run
@@ -135,9 +181,19 @@ rather than `@WebMvcTest` because the latter lives in the `spring-boot-webmvc-te
 not present in the offline repo at this project's resolved Spring Boot version.
 
 `RetrievalControllerTest` pins the retrieval pane offline — an extract query ranks the extract skill
-first, an explain query ranks an explain skill first, and results come back sorted by score and
-bounded by `k` — the same standalone `MockMvc` + hand-built `SkillCatalog`, with the default lexical
-scorer (no model).
+first, an explain query ranks an explain skill first, results come back sorted by score and bounded
+by `k`, every hit carries a lifecycle state, a **retired** skill is dropped from the results, and a
+**degraded** skill's score is de-ranked — the same standalone `MockMvc` + hand-built `SkillCatalog`
+and `SkillCuration`, with the default lexical scorer (no model).
+
+`SkillCurationTest` pins the pure curation state machine offline (POC 18's `LifecycleManager`, no
+model — the scores are plain inputs): a fresh catalog skill is active and surfaced, a clean re-eval
+keeps it active, a score drop degrades it (and de-ranks it), a score collapse retires it out of the
+library, retirement is terminal, and the de-rank factor only touches degraded skills.
+
+`CurationControllerTest` pins the curate re-eval's offline scaffolding — no skill selected, an unknown
+skill, and a known skill without an endpoint (clear, named configuration error) — built with no
+`AgentPlatform` (the offline paths return before any model call).
 
 `NlAuthoringControllerTest` pins the author pane's offline scaffolding — a blank description is
 rejected, and a missing endpoint returns a clear, named configuration error before any LLM call —

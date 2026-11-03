@@ -59,9 +59,15 @@
           font-size:11px; color:var(--dim); white-space:pre-wrap; max-height:120px; overflow:auto; }
   #side .hit { background:var(--node); border:1px solid #323a52; border-radius:8px;
           padding:8px 10px; margin-bottom:8px; }
-  #side .hit .n { font-weight:600; display:flex; justify-content:space-between; gap:6px; }
+  #side .hit .n { font-weight:600; display:flex; justify-content:space-between; gap:6px; align-items:center; }
   #side .hit .score { color:var(--accent); font-size:11px; }
   #side .hit .io { color:var(--dim); font-size:11px; margin-top:2px; }
+  #side .hit .state { font-size:10px; font-weight:600; padding:1px 7px; border-radius:10px; }
+  #side .hit .state.ACTIVE { background:rgba(74,222,128,.15); color:var(--ok); }
+  #side .hit .state.DEGRADED { background:rgba(251,191,36,.15); color:#fbbf24; }
+  #side .hit .state.RETIRED { background:rgba(248,113,113,.15); color:var(--bad); }
+  #side .hit .state.INCUBATING { background:rgba(154,161,179,.18); color:var(--dim); }
+  #side .hit .curate-btn { font-size:10px; padding:2px 8px; margin-top:6px; }
   #side .verdict { font-size:12px; font-weight:600; margin-bottom:6px; }
   #side .verdict.ok { color:var(--ok); }
   #side .verdict.bad { color:var(--bad); }
@@ -106,7 +112,9 @@
       <button id="retrieve">Retrieve top-5</button>
       <div id="retrieval-results" style="margin-top:10px"><div class="hint">
         The same scorer seam as POC 8/12/17/20 (lexical by default — offline; the POC 20 embedding
-        drops in here). Type a task and rank the palette by relevance.</div></div>
+        drops in here). Type a task and rank the palette by relevance. Each hit shows its POC 18
+        lifecycle state — retired skills are dropped and degraded ones de-ranked; "re-eval + curate"
+        re-scores a skill (endpoint-gated) and moves it through the lifecycle.</div></div>
     </section>
   </div>
 </main>
@@ -325,21 +333,53 @@ document.getElementById('retrieve').addEventListener('click', async () => {
   const q = document.getElementById('query').value.trim();
   const box = document.getElementById('retrieval-results');
   if (!q) { box.innerHTML = '<div class="hint">Type a query first.</div>'; return; }
+  box.innerHTML = '<div class="hint">Ranking… (curation-aware)</div>';
   const res = await fetch('/api/retrieve', { method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ query: q, k: 5 }) });
-  const data = await res.json();
-  if (!data.results || !data.results.length) { box.innerHTML = '<div class="hint">No skills matched.</div>'; return; }
-  const max = data.results[0].score || 1;
   box.innerHTML = '';
+  renderRetrievalInto(box, await res.json(), q);
+});
+
+// Append ranked, curation-aware hits (name + POC 18 lifecycle state + a re-eval affordance) into box.
+function renderRetrievalInto(box, data, q) {
+  if (!data.results || !data.results.length) {
+    box.insertAdjacentHTML('beforeend',
+      '<div class="hint">No skills matched (retired skills are dropped by curation).</div>');
+    return;
+  }
+  const max = data.results[0].score || 1;
   for (const r of data.results) {
     const pct = max > 0 ? Math.round(r.score / max * 100) : 0;
     const div = document.createElement('div');
     div.className = 'hit';
-    div.innerHTML = `<div class="n"><span>${r.name}</span><span class="score">${r.score.toFixed(3)}</span></div>
-      <div class="io">out: ${short(r.outputType)} · ${pct}%</div>`;
+    div.innerHTML = `<div class="n"><span>${r.name}</span>
+        <span class="state ${r.state}">${r.state}</span></div>
+      <div class="io">out: ${short(r.outputType)} · ${r.score.toFixed(3)} · ${pct}%</div>
+      <button class="ghost curate-btn">re-eval + curate</button>`;
+    div.querySelector('.curate-btn').addEventListener('click', () => curate(r.name, box, q));
     box.appendChild(div);
   }
-});
+}
+
+// Re-evaluate a skill's pass-rate (endpoint-gated), show its lifecycle transition + verdict, then
+// re-run the retrieval so the curation's effect on the ranking is visible.
+async function curate(name, box, q) {
+  box.innerHTML = '<div class="hint">Re-evaluating <b>' + name + '</b>… (runs the skill + model)</div>';
+  const res = await fetch('/api/curate', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ skillName: name }) });
+  const data = await res.json();
+  if (data.error) { box.innerHTML = '<div class="issue">' + data.error + '</div>'; return; }
+  const cls = data.surfaced ? 'ok' : 'bad';
+  box.innerHTML = '<div class="verdict ' + cls + '">' + (data.before || '—') + ' → ' + data.after
+      + (data.surfaced ? '' : ' (out of library)') + '</div>'
+      + '<div class="hint">' + data.verdict + '</div>'
+      + '<div class="score-row"><span>pass-rate (baseline → measured)</span>'
+      + '<span>' + data.baselineScore.toFixed(2) + ' → ' + data.currentScore.toFixed(2) + '</span></div>'
+      + '<div class="hint" style="margin-top:10px">updated ranking:</div>';
+  const res2 = await fetch('/api/retrieve', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query: q, k: 5 }) });
+  renderRetrievalInto(box, await res2.json(), q);
+}
 
 init();
 </script>
