@@ -1,0 +1,47 @@
+# Gemini NATIVE provider (embabel-agent-starter-google-genai) — the only profile where
+# per-role thinking (reasoning effort) actually reaches the model: the native SDK maps
+# `thinking` to includeThoughts/thinkingBudget. The OpenAI-compatible profile
+# (application-gemini-openai.yml) cannot forward thinking at all.
+# Fully env-driven: nothing hardcoded.
+#   GEMINI_API_KEY               — required, read from the environment
+#   EMBABEL_MODELS_DEFAULT_LLM   — must name one of the roles below
+#
+# Role ladder (free-tier reality, verified 2026-11-03 with GEMINI_API_KEY):
+#   cheapest — gemini-flash-lite-latest : stable alias, cheapest, always on
+#   fast     — gemini-3.1-flash-lite    : fast, no thinking budget
+#   best     — gemini-3.5-flash         : stronger, small thinking budget
+#   reasoning— gemini-3.5-flash         : same model, big thinking budget
+# Excluded on purpose: gemini-3.8-flash (free tier 20 req/day — exhausts in one POC loop),
+# gemini-3.1-pro-preview (free-tier limit 0), gemini-2.5-* (404 for new users).
+embabel:
+  models:
+    # default-llm names a ROLE (v1.5.3), resolved per call
+    default-llm: ${EMBABEL_MODELS_DEFAULT_LLM:fast}
+    default-embedding-model: gemini-embedding-001
+    roles:
+      cheapest:
+        googlegenai:
+          model: gemini-flash-lite-latest
+      fast:
+        googlegenai:
+          model: gemini-3.1-flash-lite
+      best:
+        googlegenai:
+          model: gemini-3.5-flash
+          thinking:
+            enabled: true
+            tokenBudget: 1024
+      reasoning:
+        googlegenai:
+          model: gemini-3.5-flash
+          thinking:
+            enabled: true
+            tokenBudget: 4096
+    embedding-services:
+      fast: gemini-embedding-001
+      accurate: gemini-embedding-2
+  agent:
+    platform:
+      models:
+        googlegenai:
+          api-key: ${GEMINI_API_KEY:}
