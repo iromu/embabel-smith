@@ -34,6 +34,8 @@ for the design.
 | `poc-16-remote-action` | **POC 16.** The remote-action bridge: a separate sidecar process exposes an action over HTTP; the agent pulls it in as a `RestAction` and a GOAP plan plans over it and executes it over the network, exactly like a local action — the third of doc 03 §2.3's runtime bridges (shell → POC 7, MCP → POC 13, remote action → POC 16). Fully deterministic (no LLM call). |
 | `poc-17-gliner-retrieval` | **POC 17.** GLiNER2 transformer skill classification: a real zero-shot transformer (GLiNER2 via GLiNER4j over ONNX Runtime) classifies the task query against a small candidate set and selects the top hit, run on POC 12's shadowing scenario to test whether a model that *understands* meaning breaks the tie lexical and dense text-similarity cannot. A **local-model-gated** benchmark (one-time ONNX bundle download; offline tests mock the classifier). |
 | `poc-18-skill-lifecycle` | **POC 18.** Skill lifecycle / drift detection: a skill's contract is its eval pass-rate, and a SkillOps-style proactive re-eval compares the skill's content hash and pass-rate against the recorded baseline, moving it through `incubating → active → degraded → retired` — catching both a silent prompt edit (content drift) and a full score collapse (doc 03 §1 "Skill decay / lifecycle", doc 02 §5 caveat 4). Content-hash / drift / state-machine halves are pure and offline-tested; the live re-eval is endpoint-gated. |
+| `poc-19-small-llm-selector` | **POC 19.** Small-LLM skill selection: a 0.6B model fine-tuned for single-label decisions (`iromu/Qwen3-0.6B-openjev`, Q8_0 GGUF) as a skill selector on POC 17's shadowing scenario — under its in-distribution decision prompt and an out-of-distribution free-form prompt — alongside the GLiNER2, lexical, and dense baselines. The model is served in a **Docker container (llama.cpp) whose lifecycle Spring Boot Dev Services manages** from the module's `compose.yml`. A **docker-gated** benchmark (one-time GGUF download; offline tests stub the endpoint). |
+| `poc-20-semantic-embedding` | **POC 20.** The real semantic `EmbeddingService` doc 03 §2.1 calls for: a genuine dense sentence-encoder (`all-MiniLM-L6-v2` BERT via ONNX Runtime + the HuggingFace tokenizer, mean-pooled + L2-normalised) behind POC 12's `SkillScorer` seam, on POC 12's 200+ same-typed shadowing scenario. It retrieves cleanly at the distinct scale (100% at 191) and, under shadowing, beats the lexical (17%) and dense feature-hashing (0%) stand-ins (33%) — but does not fully cure the near-duplicate collapse, confirming curation (POC 18) is the real fix. A **local-model-gated** benchmark (one-time ONNX download; offline tests use a stub embedder). |
 
 Sample skill-pack: [`skill-packs/explainer`](skill-packs/explainer)
 (`UserInput → extractTopic → TopicBrief → writeExplainer → BackgroundMessage`). Composition samples:
@@ -174,6 +176,19 @@ mvn -pl poc/poc-17-gliner-retrieval exec:java
 #   re-eval. Runs the deterministic lifecycle walkthrough, then (with a live endpoint) re-evaluates
 #   the healthy vs. regressed skill and moves it through incubating → active → degraded → retired.
 mvn -pl poc/poc-18-skill-lifecycle spring-boot:run
+
+# POC 19 — small-LLM skill selection (docker-gated): the 0.6B decision model is served in a
+#   Docker container (llama.cpp) that Spring Boot Dev Services starts/stops with the app from
+#   the module's compose.yml (port 18081). Needs the one-time GGUF download first (see
+#   poc/poc-19-small-llm-selector/README.md); without it (or without Docker) the launcher prints
+#   a clear error and exits non-zero.
+mvn -pl poc/poc-19-small-llm-selector spring-boot:run
+
+# POC 20 — real semantic EmbeddingService (local-model-gated, no endpoint): a real ONNX sentence
+#   encoder (all-MiniLM-L6-v2) behind POC 12's SkillScorer seam, on POC 12's 200+ shadowing scenario.
+#   Needs the one-time ONNX download first (see poc/poc-20-semantic-embedding/README.md); without
+#   it the launcher prints a clear missing-model error and exits non-zero.
+mvn -pl poc/poc-20-semantic-embedding exec:java
 ```
 
 ## Full loop (task 7.1)

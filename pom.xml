@@ -129,6 +129,11 @@
                 <artifactId>poc-14-composer</artifactId>
                 <version>${project.version}</version>
             </dependency>
+            <dependency>
+                <groupId>com.embabel.smith</groupId>
+                <artifactId>poc-17-gliner-retrieval</artifactId>
+                <version>${project.version}</version>
+            </dependency>
 
             <!-- Jackson (used by smith-common for skill-pack YAML I/O). -->
             <dependency>

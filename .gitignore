@@ -8,3 +8,5 @@ built-skills
 node_modules
 site/dist
 poc/poc-17-gliner-retrieval/models/
+poc/poc-19-small-llm-selector/models/
+poc/poc-20-semantic-embedding/models/

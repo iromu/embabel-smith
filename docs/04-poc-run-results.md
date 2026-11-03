@@ -1,14 +1,16 @@
 # Embabel Smith POC — Conclusions vs. the Theory
-*Run 2026-11-02 (Java 25 / GraalVM CE, target Java 21 · Spring Boot 4.1.1 · Embabel 1.5.3) · POC 1–18*
+*Run 2026-11-02, re-verified 2026-11-03 (Java 25 / GraalVM CE, target Java 21 · Spring Boot 4.1.1 · Embabel 1.5.3) · POC 1–20*
 
 This page concludes the POC run **against the hypothesis laid out in docs 01–03**: what the POCs
 actually proved, what they did not, and which POCs are still missing. The run now covers **all
-eighteen POCs** — the feasibility core (POC 1–5), skill composition (POC 6), and the skills-first
-extensions POC 7–18 (runtime adapter, retrieval, eval-guided refinement, trust tiers, progressive
+twenty POCs** — the feasibility core (POC 1–5), skill composition (POC 6), and the skills-first
+extensions POC 7–20 (runtime adapter, retrieval, eval-guided refinement, trust tiers, progressive
 disclosure, **semantic retrieval at scale**, **remote / MCP invocation**, the **skill Composer**, the
 **visual skill-chain editor**, the **remote-action bridge**, **GLiNER2 transformer skill
-classification**, and **skill lifecycle / drift detection**). The raw run evidence (the green loop,
-the offline baseline, the defects fixed) is kept in §5 as support.
+classification**, **skill lifecycle / drift detection**, **small-LLM skill selection**, and the
+**real semantic `EmbeddingService`**). The raw run evidence (the green loop, the offline baseline,
+the defects fixed) is kept in §5 as support. The full suite was **re-run on 2026-11-03** and every
+POC remains green with consistent numbers.
 
 ---
 
@@ -47,9 +49,18 @@ hashed n-grams — **breaks the shadowing tie** lexical and dense text-similarit
 SkillOps-style **proactive re-eval** that re-scores a skill, compares its content hash and eval
 pass-rate against the recorded baseline, and moves it through a lifecycle
 (incubating → active → degraded → retired), catching both a silent prompt edit and a full score
-collapse (live: healthy **100%** → regressed **0%** → retired). **All three Phase 1 components doc 03
-calls for (Registry, Composer, Runtime Adapter) are now built — and the "builder UI" doc 01 names as
-the missing piece now exists.**
+collapse (live: healthy **100%** → regressed **0%** → retired); and POC 19 takes that same
+shadowing scenario to a **small LLM** — a 0.6B model fine-tuned for single-label decisions
+(`iromu/Qwen3-0.6B-openjev`), served in a Docker container whose lifecycle Spring Boot Dev
+Services manages — which **beats text similarity decisively** (strict **67%** / matching
+**50%** under a free-form prompt; strict **50%** / matching **0%** under its own trained
+decision format) **but does not beat the transformer classifier** (100%/83%); and POC 20 finally
+builds the **real semantic `EmbeddingService`** doc 03 §2.1 calls for — a genuine ONNX sentence
+encoder (`all-MiniLM-L6-v2`, 384-dim) behind POC 12's `SkillScorer` seam — which **retrieves
+cleanly at the distinct scale (100% at 191)** and, under shadowing, **beats the lexical (17%) and
+dense (0%) stand-ins (33%)** without fully curing the near-duplicate collapse. **All three Phase 1
+components doc 03 calls for (Registry, Composer, Runtime Adapter) are now built — and the "builder
+UI" doc 01 names as the missing piece now exists.**
 And the literature caveat still holds at the *source*: the NL compiler still produces weak
 drafts (POC 9's fix works, but the raw draft is the thing being fixed).
 
@@ -59,14 +70,17 @@ drafts (POC 9's fix works, but the raw draft is the thing being fixed).
   skill (POC 9)** · **trust tiers + guardrails (POC 10)** · **progressive disclosure under load
   (POC 11)** · **retrieval at 200+ skill scale + the shadowing failure mode (POC 12)** · **a GLiNER2
   transformer breaks the shadowing tie (POC 17)** · **skill lifecycle / drift detection (POC 18)** ·
+  **small-LLM skill selection + self-contained Docker model serving (POC 19)** ·
+  **the real semantic `EmbeddingService` (POC 20)** ·
   **remote / MCP invocation (POC 13)** · **the skill Composer (POC 14)** · **the visual
   skill-chain editor / builder UI (POC 15)** · eval wiring · any OpenAI-compatible endpoint ·
   single-agent, no-orchestration execution.
-- **Not proven / not built:** a real semantic **`EmbeddingService`** (POC 12 uses an offline
-  feature-hashing stand-in; POC 17's transformer is a zero-shot *classifier*, not an embedding
-  index). The drag-and-drop UI is now built (POC 15); what it does *not* yet do is anything beyond
-  chaining skills — it has no NL-authoring pane (POC 2/3) or eval pane (POC 5/9) wired into the same
-  canvas. (The doc 03 §1 "skill decay / lifecycle" gap is now **closed** by POC 18.)
+- **Not proven / not built:** a real semantic **`EmbeddingService`** is now **built** (POC 20 — a
+  genuine ONNX sentence-encoder behind the `SkillScorer` seam); what it does *not* do is cure the
+  near-duplicate shadowing collapse on its own (33% vs lexical 17% / dense 0% at full scale) — the
+  real fix is library curation (dedup / lifecycle, POC 18). The drag-and-drop UI (POC 15) still
+  chains skills only — it has no NL-authoring pane (POC 2/3) or eval pane (POC 5/9) wired into the
+  same canvas. (The doc 03 §1 "skill decay / lifecycle" gap is now **closed** by POC 18.)
 - **Confirmed negative, with a proven fix:** LLM-authored skill **quality** is weak at the source
   (doc 02 caveat #2), **but** eval-guided refinement demonstrably repairs it (POC 9: 0% → 100%).
 
@@ -95,7 +109,7 @@ The POCs were scoped to test the **feasibility core** of this, not the full skil
 | C7 | **Any OpenAI-compatible endpoint** works | doc01 §2.5 | all endpoint-gated | ✅ **Proven** |
 | C8 | **Skills compose** — GOAP chains multiple exported goals into a workflow | doc03 §2.2, doc02 §0 idea 2 | POC 6 (live) | ✅ **Proven** (two-skill GOAP chain) |
 | C9 | **LLM-authored skills are good** (or eval-guided refinement makes them good) | doc02 §5 caveat 2 | POC run (degenerate drafts) + **POC 9** | ⚠️ **Negative at source; proven fix** — raw drafts are weak, but eval-guided refinement lifts 0% → 100% |
-| C10 | **Skill selection at scale** — retrieval/routing as the library grows (skill shadowing) | doc03 §2.1, doc02 §5 caveat 1 | **POC 8** (lexical) + **POC 12** (200+ scale) + **POC 17** (GLiNER2 transformer) | ✅ **Proven at scale — and the shadowing tie is now broken** — clean (P@1 100%) at 191 distinct skills; POC 12 shows near-duplicate shadowing collapses P@1 for *both* lexical and dense retrievers; POC 17 shows a GLiNER2 transformer that *understands* meaning recovers it (strict **100%**, matching **83%**) where text-similarity cannot (lexical 33%/17%, dense 0%) |
+| C10 | **Skill selection at scale** — retrieval/routing as the library grows (skill shadowing) | doc03 §2.1, doc02 §5 caveat 1 | **POC 8** (lexical) + **POC 12** (200+ scale) + **POC 17** (GLiNER2 transformer) + **POC 19** (0.6B small LLM) + **POC 20** (real `EmbeddingService`) | ✅ **Proven at scale — and the shadowing tie is now broken** — clean (P@1 100%) at 191 distinct skills; POC 12 shows near-duplicate shadowing collapses P@1 for *both* lexical and dense retrievers; POC 17 shows a GLiNER2 transformer that *understands* meaning recovers it (strict **100%**, matching **83%**) where text-similarity cannot (lexical 33%/17%, dense 0%); POC 19 shows a 0.6B decision-tuned LLM (served in Docker, dev-services managed) also beats text similarity (strict **67%** free-form / **50%** its own decision format, matching **50%**/**0%**) but trails the transformer; **POC 20 shows a real semantic `EmbeddingService` (ONNX MiniLM, not a stand-in) retrieves cleanly at the distinct scale (100%) and, under shadowing, beats lexical (17%) and dense (0%) at 33% — but shares the near-duplicate ambiguity, so curation (POC 18) remains the real fix** |
 | C11 | **Skills invoke CLIs/scripts** — the "normal agent harness" (`toolGroups`/`remote`/MCP) | doc03 §2.3, §4.2 | **POC 7** (local CLI) + **POC 13** (remote/MCP) | ✅ **Proven (both halves)** — POC 7: a `shell` tool group ran a real command; POC 13: an exported goal published as an MCP tool and invoked over Streamable HTTP |
 | C12 | **Security / trust tiers** (T1–T4, guardrails, allowlists) | doc02 §5 caveat 3, doc03 §2.1 | **POC 10** (live) | ✅ **Proven** — per-tier allowlist refused `shell` under T1; a global guardrail blocked a prompt-injection |
 | C13 | **Progressive disclosure** — load only what's needed; unbounded on-disk knowledge | doc02 §2, doc03 §1 | **POC 11** (stress) | ✅ **Proven** — plan context constant while a reference grows 3 KB → 313 KB (×100) |
@@ -224,18 +238,51 @@ The feasibility core is real and matches the theory:
     17 offline tests; the live re-eval (real model) shows a healthy tagline skill scoring **100%**
     and its regressed variant (prompt no longer satisfies the eval) scoring **0%**, so the proactive
     re-eval correctly retires it. This closes doc 03 §1's 🔴 "Skill decay / lifecycle" gap.
+20. **A small LLM selects skills — and serves itself in Docker** (C10, at scale — a second remedy).
+    POC 19 puts a **0.6B model fine-tuned for single-label decisions**
+    (`iromu/Qwen3-0.6B-openjev`, Q8_0 GGUF) on POC 12/17's *identical* shadowing candidate sets,
+    alongside the GLiNER2, lexical, and dense baselines, and scores it under **two prompt
+    formats**: its in-distribution typed-decision contract (lettered options, single-letter
+    answer — the shape it was fine-tuned on, 84.9% on its own validation) and an
+    out-of-distribution free-form prompt ("reply with only the number of the best skill").
+    The model **beats text similarity decisively** — free-form **67%** strict / **50%** matching,
+    its own decision format **50%** / **0%** — but **trails the GLiNER2 transformer**
+    (100%/83%). The striking sub-finding: the **free-form prompt outperforms the model's own
+    trained decision format** (67% vs 50% strict) — plausibly because these options are full
+    skill descriptions rather than the short labels its 84.9% was measured on, and because the
+    ID parser is strict (first character must be the letter) while the OOD parser also accepts a
+    number or the skill's name. The POC also introduces the **docker-gated** runtime category
+    and the self-contained serving pattern: the model runs in a `llama.cpp` container whose
+    lifecycle **Spring Boot Dev Services manages from the module's `compose.yml`** (up at app
+    start, readiness-waited, down at shutdown; connect-only if already running), so one
+    `spring-boot:run` is the whole benchmark.
+21. **A real semantic `EmbeddingService` now exists** (C10 — the last retrieval gap). POC 20 plugs a
+    genuine transformer sentence-encoder — `all-MiniLM-L6-v2` (384-dim BERT via ONNX Runtime + the
+    HuggingFace tokenizer, mask-aware mean-pool, L2-normalised) — into POC 12's `SkillScorer` seam
+    and runs the *identical* 191/281 same-typed scenario. Two findings: (a) at the **distinct**
+    scale (191) the real index hits **100%** Precision@1 — a genuine `EmbeddingService` (not a
+    stand-in) retrieves cleanly, closing doc 03 §2.1's "build a semantic index ... using embeddings";
+    and (b) under **near-duplicate shadowing** (281) it scores **33%** — better than lexical (**17%**)
+    and dense feature-hashing (**0%**) because it scores by *meaning*, not hashed n-grams — but it
+    still gets shadowed on 4 of 6 targets, because the near-duplicates are near-identical in
+    *meaning* too. So a real embedding improves the signal over text-similarity but **does not by
+    itself cure the collapse**: the fundamental fix is library curation (dedup / lifecycle, POC 18).
+    The content-hash / drift / state-machine halves are pure and pinned by offline tests; the live
+    run is **local-model-gated** (one-time ONNX download; offline tests use a deterministic stub
+    embedder, so the build stays green without the model).
 
 **Bottom line:** doc 01's "70% already there" and doc 03's "Embabel is a skills runtime" are now
 **confirmed across the full skills-first surface** — single and composed skills, LLM and
 CLI/script actions, retrieval (including at the 200+ skill scale, POC 12), eval-guided refinement,
 trust tiers/guardrails, progressive disclosure, **remote/MCP invocation (POC 13)**, the **skill
 Composer (POC 14)**, the **visual builder UI (POC 15)**, the **remote-action bridge (POC 16)**, a
-**real GLiNER2 transformer that breaks the shadowing tie (POC 17)**, and **skill lifecycle / drift
-detection (POC 18)** — i.e. **all three of doc 03
+**real GLiNER2 transformer that breaks the shadowing tie (POC 17)**, **skill lifecycle / drift
+detection (POC 18)**, **small-LLM skill selection with self-contained Docker model serving
+(POC 19)**, and the **real semantic `EmbeddingService` (POC 20)** — i.e. **all three of doc 03
 §2.3's runtime bridges are now proven** (shell → POC 7, MCP → POC 13, remote action → POC 16). All
-three Phase 1 components doc 03 calls for are built — and the builder UI doc 01 flags as the missing
-piece now exists; what remains is a real semantic `EmbeddingService` (POC 17's transformer is a
-zero-shot *classifier*, not an embedding index).
+three Phase 1 components doc 03 calls for are built, the builder UI doc 01 flags as the missing
+piece now exists, **and the real semantic `EmbeddingService` doc 03 §2.1 names as the missing layer
+is now built (POC 20)** — what remains is wiring it (and the other POCs) into the builder UI canvas.
 
 ---
 
@@ -247,11 +294,13 @@ zero-shot *classifier*, not an embedding index).
    **visual builder UI**), and POC 16 (the **remote-action bridge**) close the Phase 1 components doc
    03 lists — the Skill Registry, the Skill Composer, and the Skill Runtime Adapter — plus the
    builder UI doc 01 names as the missing piece. POC 16 also completes the Runtime Adapter's three
-   bridges (shell → POC 7, MCP → POC 13, remote action → POC 16).
-   What is **not** yet built: a real semantic **`EmbeddingService`** — POC 8's retriever is lexical
-   and only tested at 14 skills, and POC 12's dense index is an offline feature-hashing stand-in.
-   (The POC 15 canvas is a chaining editor only: it has no NL-authoring pane (POC 2/3) or
-   eval pane (POC 5/9) wired into the same surface.)
+   bridges (shell → POC 7, MCP → POC 13, remote action → POC 16). **POC 20 now builds the real
+   semantic `EmbeddingService`** doc 03 §2.1 names as the missing layer (a genuine ONNX
+   sentence-encoder behind the `SkillScorer` seam), so every doc 03 §1/§2 component is now built.
+   What is **not** yet done: (a) the real embedding improves the shadowing signal (33%) but does not
+   cure the near-duplicate collapse on its own (the fix is curation — POC 18); and (b) the POC 15
+   canvas is a chaining editor only — it has no NL-authoring pane (POC 2/3), eval pane (POC 5/9), or
+   retrieval/embedding pane (POC 8/12/17/20) wired into the same surface.
 2. **LLM-authored skill quality is still weak at the source — now measured** (C9). The NL compiler
    still emits weak or degenerate drafts — a `void` goal (plan STUCKs), a no-op `UserInput→UserInput`
    goal (trivially "achieved" with no output), a scalar goal, or an *orphan* goal (no action produces
@@ -298,18 +347,23 @@ zero-shot *classifier*, not an embedding index).
 
 ## 5. Run evidence (support)
 
-- **Offline baseline:** `mvn test` green across all modules — **150 tests, 0 failures, 0 errors**
-  (format round-trip, validation, **draft-quality classifier (POC 2/3 caveat #2)**, builder
-  normalization, writer idempotency, composition wiring, shell tool, lexical retrieval,
-  **200+ scale retrieval (POC 12)**, **eval-score stability (POC 5)**, refinement scorer +
-  re-validation, trust-tier policy, **guardrail (normalized multi-pattern matcher, POC 10)**,
-  progressive-disclosure measurement, **remote/MCP goal export (POC 13)**, **composer canvas +
-  composite export (POC 14)**, **visual Composer REST surface (POC 15)**, **GLiNER2 selector seam +
-  baselines (POC 17)**, and **content-hash / drift / lifecycle state machine (POC 18)**).
+- **Offline baseline:** `mvn test` green across all modules — **180 tests, 0 failures, 0 errors**
+  (re-verified 2026-11-03; +10 from POC 20). Coverage: format round-trip, validation,
+  **draft-quality classifier (POC 2/3 caveat #2)**, builder normalization, writer idempotency,
+  composition wiring, shell tool, lexical retrieval, **200+ scale retrieval (POC 12)**,
+  **eval-score stability (POC 5)**, refinement scorer + re-validation, trust-tier policy,
+  **guardrail (normalized multi-pattern matcher, POC 10)**, progressive-disclosure measurement,
+  **remote/MCP goal export (POC 13)**, **composer canvas + composite export (POC 14)**,
+  **visual Composer REST surface (POC 15)**, **GLiNER2 selector seam + baselines (POC 17)**,
+  **content-hash / drift / lifecycle state machine (POC 18)**, **small-LLM decision prompt +
+  selector + serving gate (POC 19)**, and the **real-embedding mean-pool / normalise / cosine /
+  memoised scorer + report shape + model gate (POC 20)**).
 - **Full loop (task 7.1): GREEN.** `./run-loop.sh` built `a-skill-that-explains-a-topic-in-plain-l`
   (a single `UserInput → BackgroundMessage` step — the LLM named it `explainTopic` this run; the name
   and step count vary run-to-run) and the no-code runtime ran it over *"Explain how a coffee machine
-  works"*, producing a coherent goal output in ~30 s (`goal … achieved in PT29.995S`).
+  works"*, producing a coherent goal output in ~16 s on the 2026-11-03 re-run
+  (`goal … achieved in PT16.218S`; ~30 s on the original 2026-11-02 run — the loop is
+  endpoint-LLM-bound, so wall time varies with the model).
 - **Draft-quality measurement (POC 2/3, caveat #2): live.** The `DraftQuality` classifier now reports
   a draft's goal shape. POC 2 (raw compile) printed **HEALTHY** for one LLM call (goal output `Message`,
   produced by the action). POC 3 (builder) showed the other side of the same coin on the *same*
@@ -448,6 +502,60 @@ zero-shot *classifier*, not an embedding index).
   (9) pin the hash's sensitivity to prompt/type/tool-group changes, both drift signals, and every
   lifecycle transition (promotion, content-drift→degraded, score-drift→degraded, score-collapse→
   retired, terminal retired, drifting-incubating stays) — no model.
+- **Small-LLM skill selection (POC 19): real-model run + offline (docker-gated).** POC 19 puts a
+  0.6B model fine-tuned for single-label decisions — `iromu/Qwen3-0.6B-openjev` (Q8_0 GGUF; the
+  FP8 sibling needs Hopper+ and this machine's 2080 Ti is Turing) — on POC 12/17's *identical*
+  shadowing candidate sets. The model is served in a `ghcr.io/ggml-org/llama.cpp:server`
+  container (OpenAI-compatible `/v1`, CPU) whose lifecycle **Spring Boot Dev Services manages
+  from the module's `compose.yml`** — up at app start, TCP-readiness-waited, down at shutdown,
+  connect-only if already running; one `spring-boot:run` is the whole benchmark. The
+  `LlmSelector` implements POC 17's `SkillSelector` seam in two prompt formats: **llm-id** (the
+  model's typed-decision contract — lettered options, single-letter answer, the shape it was
+  fine-tuned on) and **llm-ood** (free-form — numbered options, "reply with only the number").
+  Real run (llama.cpp CPU, port 18081, full run incl. container lifecycle in ~60s):
+
+  | method | matching@1 | strict@1 |
+  | --- | --- | --- |
+  | transformer (GLiNER2) | **83%** | **100%** |
+  | lexical (word TF) | 17% | 33% |
+  | dense (feature hash) | 0% | 0% |
+  | llm-id (Qwen3-0.6B) | 0% | 50% |
+  | llm-ood (Qwen3-0.6B) | 50% | 67% |
+
+  The small LLM **beats text similarity decisively** but **trails the transformer classifier**;
+  and the **free-form OOD prompt outperforms the model's own trained decision format** (67% vs
+  50% strict) — plausibly because these options are full skill descriptions rather than the
+  short labels its 84.9% was measured on, and because the ID parser is strict (first character
+  must be the letter) while the OOD parser also accepts a number or the skill's name. The POC
+  introduces the **docker-gated** runtime category (after POC 17's local-model-gated): the
+  launcher checks the weights and the Docker daemon before Spring starts, failing with a clear,
+  actionable error otherwise. Offline, `DecisionPromptTest` (8), `LlmSelectorTest` (6, stubbed
+  `/v1` endpoint), `ServingGateTest` (3), and `SmallLlmSelectorAppTest` (3, stubbed selectors +
+  table shape) — 20 tests — pin the prompt builders, reply parsers, top-1/miss contract, gate
+  errors, and the five-method table — no Docker, no model.
+- **Real semantic `EmbeddingService` (POC 20): real-model run + offline (local-model-gated).** POC 20
+  plugs a real dense sentence-encoder — `all-MiniLM-L6-v2` (384-dim BERT via ONNX Runtime 1.27.0 CPU +
+  the HuggingFace tokenizer; `input_ids`/`attention_mask`/`token_type_ids` → `last_hidden_state`,
+  mask-aware mean-pool, L2-normalise) — into POC 12's `SkillScorer` seam and runs the *identical*
+  191/281 same-typed scenario. The `RealEmbeddingScorer` memoises query and entry vectors, so the
+  whole benchmark embeds each distinct skill and query once. Local-model-gated (one-time ~23 MB ONNX
+  download; the launcher names the missing files and the `hf download` command otherwise). Real run
+  (2026-11-03, INT8-quantized MiniLM):
+
+  | method | core@1 (191 distinct) | full@1 (281, shadowing) |
+  | --- | --- | --- |
+  | lexical (word TF) | 100% | 17% |
+  | dense (feature hash) | 100% | 0% |
+  | **embedding (MiniLM)** | **100%** | **33%** |
+
+  A genuine `EmbeddingService` (not a stand-in) retrieves cleanly at the distinct scale (**100%**),
+  and under shadowing the transformer index **beats lexical (17%) and dense (0%) at 33%** — it scores
+  by *meaning*, not hashed n-grams — but still gets shadowed on 4 of 6 targets (the near-duplicates
+  are near-identical in meaning too), confirming curation (POC 18) is the real fix. Offline,
+  `EmbeddingMathTest` (6), `RealEmbeddingScorerTest` (2, deterministic stub `Embedder`), and
+  `EmbeddingRetrievalAppTest` (2, stubbed embedder + gate) — 10 tests — pin the mean-pool/normalise/
+  cosine math, the cosine-of-memoised-embeddings scoring, the once-per-distinct-text caching, the
+  three-method report shape, and the model gate — no ONNX, no model.
 - **Two transient failures, both green on retry.** POC 5 first failed with
   `Could not find artifact poc-1-no-code-runtime` (a build-ordering issue — the cross-POC dependency
   wasn't installed); after `mvn install` it ran clean (**eval composite 1.0**, both cases pass). POC 9
@@ -467,7 +575,7 @@ zero-shot *classifier*, not an embedding index).
 
 ## 6. What other POCs to create
 
-All eighteen POCs are now built. POC 1–5 (feasibility core), POC 6 (composition), and POC 7–18
+All twenty POCs are now built. POC 1–5 (feasibility core), POC 6 (composition), and POC 7–20
 (the skills-first extensions) are complete and their run evidence is in §5:
 
 1. **POC 6 — Skill composition.** ✅ **Built & proven:** `compose-extract` + `compose-explain`
@@ -515,16 +623,35 @@ All eighteen POCs are now built. POC 1–5 (feasibility core), POC 6 (compositio
     content hash and pass-rate against the recorded baseline and moves it through
     `incubating → active → degraded → retired`. Live: healthy **100%** → regressed **0%** → retired.
     Closes doc 03 §1's 🔴 "Skill decay / lifecycle" gap (C17) — see §5.
+14. **POC 19 — Small-LLM skill selection.** ✅ **Built & measured:** a 0.6B model fine-tuned for
+    single-label decisions (`iromu/Qwen3-0.6B-openjev`, Q8_0 GGUF) selects one skill from POC
+    12/17's identical shadowing candidate sets — under its in-distribution decision prompt
+    (strict **50%**) and a free-form prompt (strict **67%** / matching **50%**) — beating text
+    similarity decisively but trailing the GLiNER2 transformer (100%/83%); the free-form prompt
+    outperforming the model's own trained format is the finding. The model is served in a
+    `llama.cpp` Docker container whose lifecycle **Spring Boot Dev Services manages** from the
+    module's `compose.yml` — the **docker-gated** runtime category and the self-contained
+    serving pattern (C10, at scale, a second remedy) — see §5.
+15. **POC 20 — The real semantic `EmbeddingService`.** ✅ **Built & measured:** a genuine dense
+    sentence-encoder (`all-MiniLM-L6-v2` BERT, 384-dim, via ONNX Runtime + the HuggingFace
+    tokenizer, mean-pooled + L2-normalised) behind POC 12's `SkillScorer` seam, on POC 12's
+    identical 200+ shadowing scenario. It retrieves cleanly at the distinct scale (**100%** at 191)
+    and, under shadowing, beats the lexical (**17%**) and dense feature-hashing (**0%**) stand-ins
+    (**33%**) — but does not fully cure the near-duplicate collapse, confirming curation (POC 18)
+    is the real fix. Closes the doc 03 §2.1 "real `EmbeddingService`" gap — see §5.
 
-**All Phase 1 POCs — and the builder UI — are now built, and the last hypothesis gap (skill
-lifecycle / drift, POC 18) is closed.** Possible follow-ups (non-Phase-1, §4) are not new POCs so
-much as hardening:
+**All Phase 1 POCs — and the builder UI — are now built, and every hypothesis gap doc 03 §2 lists
+is now closed:** the runtime bridges (POC 7/13/16), the visual editor (POC 15), skill lifecycle /
+drift (POC 18), and the real semantic `EmbeddingService` (POC 20). Possible follow-ups
+(non-Phase-1, §4) are now hardening, not new capability POCs:
 
-- **Wiring the other POCs into the POC 15 canvas** — an NL-authoring pane (POC 2/3) and an
-  eval/refinement pane (POC 5/9) on the same surface, so a skill can be described, checked, and
-  refined in one place.
-- **A real semantic `EmbeddingService`** behind the `SkillScorer` seam (POC 8 is lexical, POC 12's
-  dense index is an offline feature-hashing stand-in).
+- **Wiring the other POCs into the POC 15 canvas** — an NL-authoring pane (POC 2/3), an
+  eval/refinement pane (POC 5/9), and a **retrieval/embedding pane** (POC 8/12/17/20) on the same
+  surface, so a skill can be described, checked, refined, and its retrieval behaviour inspected in
+  one place.
+- **Library curation as the shadowing remedy** — POC 20 shows a real embedding improves the signal
+  but shares the near-duplicate ambiguity; the fundamental fix is dedup / lifecycle (POC 18) applied
+  to the retrieval library, which is not yet wired end-to-end.
 
 ---
 
@@ -561,6 +688,29 @@ hf download gravitee-io/gliner4j-gliner2-base-v1 \
   --include "*.json" "onnx_quantized/classifier_full.onnx" \
   --local-dir poc/poc-17-gliner-retrieval/models/gliner2-base-v1   # one-time (~253 MB)
 mvn -pl poc/poc-17-gliner-retrieval exec:java                      # POC 17 — three-method shadowing benchmark
+```
+
+**POC 19 — small-LLM skill selection (docker-gated).** The 0.6B decision model is served in a
+Docker container (llama.cpp) that Spring Boot Dev Services starts/stops with the app from the
+module's `compose.yml` (port 18081). Needs the one-time GGUF download first (see
+`poc/poc-19-small-llm-selector/README.md`); without it (or without Docker) the launcher errors.
+
+```bash
+hf download iromu/Qwen3-0.6B-openjev --include "*.gguf" \
+  --local-dir poc/poc-19-small-llm-selector/models   # one-time (~380 MB)
+mvn -pl poc/poc-19-small-llm-selector spring-boot:run   # POC 19 — four-method shadowing benchmark
+```
+
+**POC 20 — real semantic `EmbeddingService` (local-model-gated, no endpoint).** A real ONNX
+sentence encoder (`all-MiniLM-L6-v2`) behind POC 12's `SkillScorer` seam, on POC 12's 200+
+shadowing scenario. Needs the one-time ONNX download first (see
+`poc/poc-20-semantic-embedding/README.md`); without it the launcher errors.
+
+```bash
+hf download Xenova/all-MiniLM-L6-v2 \
+  --include "tokenizer.json" "config.json" "onnx/model_quantized.onnx" \
+  --local-dir poc/poc-20-semantic-embedding/models/all-MiniLM-L6-v2   # one-time (~23 MB)
+mvn -pl poc/poc-20-semantic-embedding exec:java                      # POC 20 — three-method benchmark
 ```
 
 **POC 15 — the visual skill-chain editor (offline, no endpoint).** A web app: boot it, then open

@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.embabel.smith</groupId>
+        <artifactId>embabel-smith-poc</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>poc-20-semantic-embedding</artifactId>
+    <name>poc-20-semantic-embedding</name>
+    <description>
+        POC 20: real semantic EmbeddingService. Runs a real dense sentence-encoder (all-MiniLM-L6-v2
+        BERT via ONNX Runtime + the HuggingFace tokenizer, mean-pooled and L2-normalised) behind
+        POC 12's SkillScorer seam, on POC 12's 200+ same-typed shadowing scenario, to measure whether
+        a real embedding index -- not POC 12's feature-hashing stand-in -- cures the near-duplicate
+        shadowing collapse that lexical and dense text-similarity both suffer. A local-model-gated
+        benchmark (one-time ONNX download); offline tests use a deterministic stub embedder so the
+        module stays green without the model.
+    </description>
+
+    <dependencies>
+        <!-- Reuse POC 12's ScaleSkillLibrary (191/281 same-typed scenario), the SkillScorer
+             seam, the ScaleSkillRegistry ranking, the ScaleRetrievalRunner P@1 math, and the
+             lexical / feature-hash-dense baselines. -->
+        <dependency>
+            <groupId>com.embabel.smith</groupId>
+            <artifactId>poc-12-semantic-retrieval</artifactId>
+        </dependency>
+
+        <!-- Real dense embeddings: local ONNX BERT sentence-encoder (CPU execution provider). -->
+        <dependency>
+            <groupId>com.microsoft.onnxruntime</groupId>
+            <artifactId>onnxruntime</artifactId>
+            <version>1.27.0</version>
+        </dependency>
+        <!-- HuggingFace tokenizer for the ONNX encoder (bundles its native lib; pulls in djl api). -->
+        <dependency>
+            <groupId>ai.djl</groupId>
+            <artifactId>api</artifactId>
+            <version>0.31.0</version>
+        </dependency>
+        <dependency>
+            <groupId>ai.djl.huggingface</groupId>
+            <artifactId>tokenizers</artifactId>
+            <version>0.31.0</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.1.0</version>
+                <configuration>
+                    <mainClass>com.embabel.smith.retrieval.embedding.EmbeddingRetrievalApp</mainClass>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>

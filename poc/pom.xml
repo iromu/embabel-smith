@@ -38,5 +38,7 @@
         <module>poc-16-remote-action</module>
         <module>poc-17-gliner-retrieval</module>
         <module>poc-18-skill-lifecycle</module>
+        <module>poc-19-small-llm-selector</module>
+        <module>poc-20-semantic-embedding</module>
     </modules>
 </project>

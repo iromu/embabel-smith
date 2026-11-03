@@ -20,12 +20,13 @@ builder on the Embabel platform (v1.5.3). Read in order:
 
 ## Results
 
-- [04 — POC Conclusions vs. the Theory](04-poc-run-results.md) — the 2026-11-02 run of all eighteen
-  POCs read against docs 01–03: what each POC proved (no-compile ingestion, skill composition, CLI
-  invocation, retrieval at scale, eval-guided refinement, trust tiers, progressive disclosure,
-  remote/MCP + remote-action invocation, the skill Composer + visual builder UI, GLiNER2 transformer
-  skill classification, and skill lifecycle / drift detection), what remains unproven/unbuilt, the
-  confirmed LLM-authored-quality caveat (with its proven refinement fix), and the shadowing remedy.
+- [04 — POC Conclusions vs. the Theory](04-poc-run-results.md) — the 2026-11-02 run of all twenty
+  POCs (re-verified 2026-11-03) read against docs 01–03: what each POC proved (no-compile ingestion,
+  skill composition, CLI invocation, retrieval at scale, eval-guided refinement, trust tiers,
+  progressive disclosure, remote/MCP + remote-action invocation, the skill Composer + visual builder
+  UI, GLiNER2 transformer skill classification, skill lifecycle / drift detection, small-LLM skill
+  selection, and the real semantic `EmbeddingService`), what remains unproven/unbuilt, the confirmed
+  LLM-authored-quality caveat (with its proven refinement fix), and the shadowing remedy.
 
 ## Reference
 
