@@ -6,8 +6,11 @@ skill-chain editor". POC 14 proved the headless graph model this sits on (the ty
 the composed chain, and the composite export). POC 15 adds the **pixels**: a real, browsable
 drag-and-drop canvas that drives that same model over REST.
 
-Fully offline and deterministic — no model endpoint. The canvas only manipulates skill-packs (YAML)
-through POC 14's proven `CompositionCanvas` / `CompositeExporter`; it never calls a model.
+The canvas, palette, and retrieval pane are fully offline and deterministic — no model endpoint.
+The **author pane** is the one endpoint-gated half: it compiles a natural-language description into
+a draft via POC 2's `NlCompileRunner` (needs a live OpenAI-compatible endpoint) and reports the
+draft's goal shape + `DraftQuality` verdict; without an endpoint it returns a clear configuration
+error rather than an opaque model failure.
 
 ## What it proves
 
@@ -23,6 +26,11 @@ through POC 14's proven `CompositionCanvas` / `CompositeExporter`; it never call
 - **Export writes a composite skill-pack.** The Export button posts `POST /api/compose`, which
   delegates to `CompositeExporter` and writes a well-formed composite pack (goal, steps, types) to
   the output dir — the same pack POC 14 proves runs end-to-end.
+- **An author pane compiles a description into a draft.** The top right-hand panel posts
+  `POST /api/compile` with a natural-language description; the draft's goal shape, its actions, and
+  the `DraftQuality` verdict (HEALTHY / degenerate, with the reason) are shown, alongside any issues
+  to review. This is the "describe a skill in plain language" half of the builder UI — POC 2's
+  `NlCompileRunner` + POC 2/3's `DraftQuality` classifier, surfaced in the canvas. Endpoint-gated.
 - **A retrieval pane shows which skills a task would route to.** The right-hand panel posts
   `POST /api/retrieve` with a natural-language query; the catalog is ranked by relevance and the
   top-k shown with their scores. It reuses the same pluggable `SkillScorer` seam the whole retrieval
@@ -35,9 +43,11 @@ through POC 14's proven `CompositionCanvas` / `CompositeExporter`; it never call
 sequenceDiagram
     participant B as Browser canvas<br/>(static/index.html)
     participant C as CanvasController (REST)
+    participant A as NlAuthoringController (REST)
     participant R as RetrievalController (REST)
     participant M as POC 14 model<br/>CompositionCanvas / CompositeExporter
     participant S as POC 12 ScaleSkillRegistry<br/>(pluggable SkillScorer)
+    participant L as POC 2 NlCompileRunner<br/>(LLM, endpoint-gated)
     B ->> C: GET /api/skills
     C ->> M: load valid exported packs
     C -->> B: skill palette (draggable chips)
@@ -47,6 +57,10 @@ sequenceDiagram
     B ->> C: POST /api/compose (Export)
     C ->> M: CompositeExporter
     C -->> B: composite skill-pack written
+    B ->> A: POST /api/compile (description)
+    A ->> L: compileAgent(name, description)
+    L -->> A: AgentCompilationResult (goal + actions + issues)
+    A -->> B: {goal, actions, DraftQuality verdict, issues}
     B ->> R: POST /api/retrieve (query)
     R ->> S: retrieve(query, k) over catalog entries
     S -->> R: top-k SkillEntry (ranked by scorer)
@@ -67,16 +81,25 @@ sequenceDiagram
   with a pluggable `SkillScorer` (default POC 8's `LexicalScorer`, offline) via POC 12's
   `ScaleSkillRegistry` and returns the top-k with their scores. The scorer is a constructor field,
   so POC 20's real `EmbeddingService` drops in here without touching the endpoint.
+- **`NlAuthoringController`** — the author pane: `POST /api/compile` compiles a description via POC 2's
+  `NlCompileRunner` and maps the `AgentCompilationResult` to the draft's goal shape, actions, and the
+  `DraftQuality` verdict. It checks `ModelEndpointConfig.configError()` first, so a missing endpoint
+  yields a clear, named error before any LLM call (endpoint-gated).
 - **`static/index.html`** — the self-contained canvas (vanilla JS, no build step): a skill palette,
   a drag-and-drop stage, SVG wires, a live status badge, and Export / Reset controls.
 
 ## Run it
 
-Offline (no endpoint). It's a web app — boot it, then open the canvas in a browser:
+It's a web app — boot it, then open the canvas in a browser. The canvas, palette, and retrieval
+pane are offline (no endpoint); the **author pane** needs the endpoint env vars:
 
 ```bash
 SERVER_PORT=18080 mvn -pl poc/poc-15-composer-ui spring-boot:run
 # → open http://localhost:18080/
+
+# for the author pane (endpoint-gated), also set:
+export OPENAI_CUSTOM_BASE_URL=... OPENAI_CUSTOM_API_KEY=...
+export OPENAI_CUSTOM_MODELS=... EMBABEL_MODELS_DEFAULT_LLM=...
 ```
 
 `SERVER_PORT` defaults to 18080 to avoid a local service on 8080; `COMPOSE_OUTPUT_DIR` (default
@@ -94,5 +117,9 @@ not present in the offline repo at this project's resolved Spring Boot version.
 first, an explain query ranks an explain skill first, and results come back sorted by score and
 bounded by `k` — the same standalone `MockMvc` + hand-built `SkillCatalog`, with the default lexical
 scorer (no model).
+
+`NlAuthoringControllerTest` pins the author pane's offline scaffolding — a blank description is
+rejected, and a missing endpoint returns a clear, named configuration error before any LLM call —
+built with no `Ai`/`AgentPlatform` (the offline paths never reach the model).
 
 See `docs/04-poc-run-results.md`.

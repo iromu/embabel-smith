@@ -44,17 +44,23 @@
            font-weight:600; cursor:pointer; }
   button.ghost { background:transparent; color:var(--dim); border:1px solid #323a52; }
   #result { color:var(--dim); font-size:12px; white-space:pre-wrap; max-height:120px; overflow:auto; }
-  #retrieval { width:250px; background:var(--panel); border-left:1px solid #2a2f3f; padding:12px;
-               overflow-y:auto; }
-  #retrieval h2 { font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:var(--dim); margin:0 0 8px; }
-  #retrieval .hint { color:var(--dim); font-size:11px; }
-  #retrieval input[type=text] { width:100%; background:var(--node); border:1px solid #323a52;
-          border-radius:8px; padding:8px 10px; color:var(--ink); margin-bottom:8px; }
-  #retrieval .hit { background:var(--node); border:1px solid #323a52; border-radius:8px;
+  #side { width:290px; background:var(--panel); border-left:1px solid #2a2f3f; padding:12px;
+          overflow-y:auto; }
+  #side section { margin-bottom:20px; }
+  #side h2 { font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:var(--dim); margin:0 0 8px; }
+  #side .hint { color:var(--dim); font-size:11px; }
+  #side input[type=text], #side textarea { width:100%; background:var(--node); border:1px solid #323a52;
+          border-radius:8px; padding:8px 10px; color:var(--ink); margin-bottom:8px; box-sizing:border-box;
+          font:inherit; resize:vertical; }
+  #side .hit { background:var(--node); border:1px solid #323a52; border-radius:8px;
           padding:8px 10px; margin-bottom:8px; }
-  #retrieval .hit .n { font-weight:600; display:flex; justify-content:space-between; gap:6px; }
-  #retrieval .hit .score { color:var(--accent); font-size:11px; }
-  #retrieval .hit .io { color:var(--dim); font-size:11px; margin-top:2px; }
+  #side .hit .n { font-weight:600; display:flex; justify-content:space-between; gap:6px; }
+  #side .hit .score { color:var(--accent); font-size:11px; }
+  #side .hit .io { color:var(--dim); font-size:11px; margin-top:2px; }
+  #side .verdict { font-size:12px; font-weight:600; margin-bottom:6px; }
+  #side .verdict.ok { color:var(--ok); }
+  #side .verdict.bad { color:var(--bad); }
+  #side .issue { color:var(--dim); font-size:11px; margin-bottom:4px; }
 </style>
 </head>
 <body>
@@ -72,13 +78,23 @@
     </div>
     <svg id="wires"></svg>
   </div>
-  <div id="retrieval">
-    <h2>Retrieval <span class="hint">— which skills would this route to?</span></h2>
-    <input id="query" type="text" placeholder="e.g. explain a topic in plain language">
-    <button id="retrieve">Retrieve top-5</button>
-    <div id="retrieval-results" style="margin-top:10px"><div class="hint">
-      The same scorer seam as POC 8/12/17/20 (lexical by default — offline; the POC 20 embedding
-      drops in here). Type a task and rank the palette by relevance.</div></div>
+  <div id="side">
+    <section id="author">
+      <h2>Author <span class="hint">— describe a skill in plain language</span></h2>
+      <textarea id="description" rows="3" placeholder="e.g. A skill that explains a topic in plain language and posts it as a background message"></textarea>
+      <button id="compile">Compile draft</button>
+      <div id="author-results" style="margin-top:10px"><div class="hint">
+        Endpoint-gated: needs the OPENAI_CUSTOM_* env vars. Compiles the description into a draft and
+        shows its goal shape + DraftQuality verdict.</div></div>
+    </section>
+    <section id="retrieval">
+      <h2>Retrieval <span class="hint">— which skills would this route to?</span></h2>
+      <input id="query" type="text" placeholder="e.g. explain a topic in plain language">
+      <button id="retrieve">Retrieve top-5</button>
+      <div id="retrieval-results" style="margin-top:10px"><div class="hint">
+        The same scorer seam as POC 8/12/17/20 (lexical by default — offline; the POC 20 embedding
+        drops in here). Type a task and rank the palette by relevance.</div></div>
+    </section>
   </div>
 </main>
 <div id="toolbar">
@@ -223,6 +239,39 @@ document.getElementById('export').addEventListener('click', async () => {
 });
 
 document.getElementById('reset').addEventListener('click', () => { nodes = {}; edges = []; resultEl.textContent = ''; render(); revalidate(); });
+
+document.getElementById('compile').addEventListener('click', async () => {
+  const desc = document.getElementById('description').value.trim();
+  const box = document.getElementById('author-results');
+  if (!desc) { box.innerHTML = '<div class="issue">Describe the skill first.</div>'; return; }
+  box.innerHTML = '<div class="hint">Compiling… (calls the model)</div>';
+  const res = await fetch('/api/compile', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ description: desc }) });
+  const data = await res.json();
+  if (data.error) { box.innerHTML = '<div class="issue">' + data.error + '</div>'; return; }
+  let html = '<div class="verdict ' + (data.degenerate ? 'bad' : 'ok') + '">' + data.qualityVerdict
+    + (data.degenerate ? ' (degenerate)' : ' (ok)') + '</div>';
+  if (data.goalName) {
+    html += '<div class="hit"><div class="n"><span>goal: ' + data.goalName + '</span>'
+      + '<span class="score">export=' + data.goalExport + '</span></div>'
+      + '<div class="io">out: ' + short(data.goalOutputType) + '</div></div>';
+  } else {
+    html += '<div class="issue">no goal in the draft</div>';
+  }
+  html += '<div class="hint" style="margin-top:6px">' + data.qualityReason + '</div>';
+  if (data.actions && data.actions.length) {
+    html += '<div class="hint" style="margin-top:6px">actions:</div>';
+    for (const a of data.actions) {
+      html += '<div class="hit"><div class="n">' + a.name + '</div>'
+        + '<div class="io">' + (a.inputTypes || []).map(short).join(', ') + ' → ' + short(a.outputType) + '</div></div>';
+    }
+  }
+  if (data.issues && data.issues.length) {
+    html += '<div class="hint" style="margin-top:6px">issues to review:</div>';
+    for (const iss of data.issues) html += '<div class="issue">· ' + iss + '</div>';
+  }
+  box.innerHTML = html;
+});
 
 document.getElementById('retrieve').addEventListener('click', async () => {
   const q = document.getElementById('query').value.trim();

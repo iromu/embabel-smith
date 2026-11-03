@@ -116,6 +116,11 @@
             </dependency>
             <dependency>
                 <groupId>com.embabel.smith</groupId>
+                <artifactId>poc-2-nl-compile</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.embabel.smith</groupId>
                 <artifactId>poc-8-retrieval</artifactId>
                 <version>${project.version}</version>
             </dependency>
