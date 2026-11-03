@@ -78,9 +78,10 @@ drafts (POC 9's fix works, but the raw draft is the thing being fixed).
 - **Not proven / not built:** a real semantic **`EmbeddingService`** is now **built** (POC 20 — a
   genuine ONNX sentence-encoder behind the `SkillScorer` seam); what it does *not* do is cure the
   near-duplicate shadowing collapse on its own (33% vs lexical 17% / dense 0% at full scale) — the
-  real fix is library curation (dedup / lifecycle, POC 18). The drag-and-drop UI (POC 15) still
-  chains skills only — it has no NL-authoring pane (POC 2/3) or eval pane (POC 5/9) wired into the
-  same canvas. (The doc 03 §1 "skill decay / lifecycle" gap is now **closed** by POC 18.)
+  real fix is library curation (dedup / lifecycle, POC 18). The drag-and-drop UI (POC 15) now also
+  carries a **retrieval pane** (the POC 8/12/20 `SkillScorer` seam — lexical by default, the POC 20
+  embedding a drop-in); it still has no NL-authoring pane (POC 2/3) or eval pane (POC 5/9) wired
+  into the same canvas. (The doc 03 §1 "skill decay / lifecycle" gap is now **closed** by POC 18.)
 - **Confirmed negative, with a proven fix:** LLM-authored skill **quality** is weak at the source
   (doc 02 caveat #2), **but** eval-guided refinement demonstrably repairs it (POC 9: 0% → 100%).
 
@@ -207,9 +208,12 @@ The feasibility core is real and matches the theory:
     port to connect it — the connection "snaps" (renders blue) only when `POST /api/canvas` reports
     the edge type-compatible, and renders red with the reason otherwise. The canvas live-recomputes
     the chain and validation state on every move, and an Export button calls `POST /api/compose` to
-    write the composite skill-pack. Every endpoint delegates to POC 14's proven model, so the pixels
-    drive the same type-check / chain / export logic the offline POC proves — the "builder UI" doc 01
-    names as the missing piece is now a working, browsable surface.
+    write the composite skill-pack. A right-hand **retrieval pane** (`POST /api/retrieve`) ranks the
+    palette by relevance to a natural-language query via the same `SkillScorer` seam POC 12/17/20
+    share (lexical by default; the POC 20 embedding a drop-in). Every endpoint delegates to POC 14's
+    proven model (and, for retrieval, POC 12's registry), so the pixels drive the same type-check /
+    chain / export / retrieval logic the offline POCs prove — the "builder UI" doc 01 names as the
+    missing piece is now a working, browsable surface.
 17. **Skills invoke a remote action** (C16, the third runtime bridge). POC 16 runs a separate
     **sidecar** process (a standalone HTTP server running deterministic code — no LLM) that exposes an
     action; the agent pulls it in as a `RestAction` via `embabel-agent-remote`, and a **GOAP plan plans
@@ -299,8 +303,9 @@ is now built (POC 20)** — what remains is wiring it (and the other POCs) into 
    sentence-encoder behind the `SkillScorer` seam), so every doc 03 §1/§2 component is now built.
    What is **not** yet done: (a) the real embedding improves the shadowing signal (33%) but does not
    cure the near-duplicate collapse on its own (the fix is curation — POC 18); and (b) the POC 15
-   canvas is a chaining editor only — it has no NL-authoring pane (POC 2/3), eval pane (POC 5/9), or
-   retrieval/embedding pane (POC 8/12/17/20) wired into the same surface.
+   canvas now has a **retrieval pane** (the POC 8/12/20 `SkillScorer` seam — lexical by default, the
+   POC 20 embedding a drop-in) but still no NL-authoring pane (POC 2/3) or eval pane (POC 5/9)
+   wired into the same surface.
 2. **LLM-authored skill quality is still weak at the source — now measured** (C9). The NL compiler
    still emits weak or degenerate drafts — a `void` goal (plan STUCKs), a no-op `UserInput→UserInput`
    goal (trivially "achieved" with no output), a scalar goal, or an *orphan* goal (no action produces
@@ -347,14 +352,14 @@ is now built (POC 20)** — what remains is wiring it (and the other POCs) into 
 
 ## 5. Run evidence (support)
 
-- **Offline baseline:** `mvn test` green across all modules — **180 tests, 0 failures, 0 errors**
-  (re-verified 2026-11-03; +10 from POC 20). Coverage: format round-trip, validation,
+- **Offline baseline:** `mvn test` green across all modules — **183 tests, 0 failures, 0 errors**
+  (re-verified 2026-11-03; +10 from POC 20, +3 from the POC 15 retrieval pane). Coverage: format round-trip, validation,
   **draft-quality classifier (POC 2/3 caveat #2)**, builder normalization, writer idempotency,
   composition wiring, shell tool, lexical retrieval, **200+ scale retrieval (POC 12)**,
   **eval-score stability (POC 5)**, refinement scorer + re-validation, trust-tier policy,
   **guardrail (normalized multi-pattern matcher, POC 10)**, progressive-disclosure measurement,
   **remote/MCP goal export (POC 13)**, **composer canvas + composite export (POC 14)**,
-  **visual Composer REST surface (POC 15)**, **GLiNER2 selector seam + baselines (POC 17)**,
+  **visual Composer REST surface + retrieval pane (POC 15)**, **GLiNER2 selector seam + baselines (POC 17)**,
   **content-hash / drift / lifecycle state machine (POC 18)**, **small-LLM decision prompt +
   selector + serving gate (POC 19)**, and the **real-embedding mean-pool / normalise / cosine /
   memoised scorer + report shape + model gate (POC 20)**).
@@ -449,11 +454,18 @@ is now built (POC 20)** — what remains is wiring it (and the other POCs) into 
   edge returned `{"valid":false}` with the reason *"'BackgroundMessage' is not one of
   compose-extract's inputs [UserInput]"*; `POST /api/compose` wrote a well-formed composite
   skill-pack (`goal.yml` with `export: true`, `steps/extractTopic.yml`, `steps/writeExplainer.yml`,
-  `types/TopicBrief.yml`). Offline, four standalone-`MockMvc` tests (`CanvasControllerTest`) pin the
-  same four REST behaviours — palette listing, valid-chain acceptance, type-incompatible rejection,
-  and composite export — hermetically against the repo's sample skill-packs and a temp export dir.
-  (The tests use standalone `MockMvc` rather than `@WebMvcTest` because the latter lives in the
-  `spring-boot-webmvc-test` slice, absent from the offline repo at this project's resolved version.)
+  `types/TopicBrief.yml`). **The retrieval pane** (right-hand panel, added 2026-11-03) posts
+  `POST /api/retrieve`; live, the query *"explain a topic in plain language and post it as a
+  background message"* ranked the palette `compose-explain` (0.186) → `compose-extract` (0.151) →
+  `explainer` (0.126) → `shell-runner` (0.073) → `reference-heavy` (0.0) under the offline lexical
+  scorer — the same `SkillScorer` seam POC 12/17/20 share, so the POC 20 embedding is a drop-in.
+  Offline, seven standalone-`MockMvc` tests (`CanvasControllerTest` + `RetrievalControllerTest`) pin
+  the five REST behaviours — palette listing, valid-chain acceptance, type-incompatible rejection,
+  composite export, and retrieval ranking (extract/explain queries rank the right skill first, results
+  sorted by score and bounded by `k`) — hermetically against the repo's sample skill-packs and a temp
+  export dir. (The tests use standalone `MockMvc` rather than `@WebMvcTest` because the latter lives
+  in the `spring-boot-webmvc-test` slice, absent from the offline repo at this project's resolved
+  version.)
 - **Remote-action bridge (POC 16): GREEN (live) + offline.** A separate sidecar process
   (`RemoteActionSidecar`, a JDK `HttpServer` running deterministic code — no LLM) exposes an action
   over the three endpoints `embabel-agent-remote`'s client consumes: `GET /api/v1/actions` (the
@@ -645,10 +657,10 @@ is now closed:** the runtime bridges (POC 7/13/16), the visual editor (POC 15), 
 drift (POC 18), and the real semantic `EmbeddingService` (POC 20). Possible follow-ups
 (non-Phase-1, §4) are now hardening, not new capability POCs:
 
-- **Wiring the other POCs into the POC 15 canvas** — an NL-authoring pane (POC 2/3), an
-  eval/refinement pane (POC 5/9), and a **retrieval/embedding pane** (POC 8/12/17/20) on the same
-  surface, so a skill can be described, checked, refined, and its retrieval behaviour inspected in
-  one place.
+- **Wiring the other POCs into the POC 15 canvas** — a **retrieval pane** is now wired (the
+  POC 8/12/20 `SkillScorer` seam — lexical by default, the POC 20 embedding a drop-in), so a task's
+  routing can be inspected on the same surface; still to wire: an NL-authoring pane (POC 2/3) and an
+  eval/refinement pane (POC 5/9), so a skill can also be described and refined in one place.
 - **Library curation as the shadowing remedy** — POC 20 shows a real embedding improves the signal
   but shares the near-duplicate ambiguity; the fundamental fix is dedup / lifecycle (POC 18) applied
   to the retrieval library, which is not yet wired end-to-end.

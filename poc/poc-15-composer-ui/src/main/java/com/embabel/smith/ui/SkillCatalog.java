@@ -3,6 +3,7 @@ package com.embabel.smith.ui;
 import com.embabel.smith.common.io.SkillPackReader;
 import com.embabel.smith.common.model.SkillPack;
 import com.embabel.smith.composer.SkillNode;
+import com.embabel.smith.retrieval.SkillEntry;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -11,6 +12,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -62,6 +64,33 @@ public class SkillCatalog {
 
     public SkillNode get(String name) {
         return skills.get(name);
+    }
+
+    /**
+     * The catalog as retrieval index entries (POC 8's {@link SkillEntry}) — the same metadata the
+     * retrieval pre-filter (POC 8/12/17/20) scores against. The description is synthesized from the
+     * goal and step descriptions plus the I/O types, so a natural-language query matches on meaning
+     * words, not just type names.
+     */
+    public List<SkillEntry> retrievalEntries() {
+        return skills.values().stream().map(this::toEntry).toList();
+    }
+
+    private SkillEntry toEntry(SkillNode node) {
+        SkillPack pack = node.pack();
+        StringBuilder text = new StringBuilder(node.id());
+        if (pack.goal() != null && pack.goal().description() != null) {
+            text.append(' ').append(pack.goal().description());
+        }
+        pack.steps().forEach(step -> {
+            if (step.description() != null) {
+                text.append(' ').append(step.description());
+            }
+        });
+        text.append(' ').append(String.join(" ", node.externalInputTypes()))
+                .append(" ").append(node.outputType());
+        return new SkillEntry(node.id(), node.id(), text.toString(),
+                List.copyOf(node.externalInputTypes()), node.outputType());
     }
 
     /** Uses the override if given; otherwise walks up from the working dir to find skill-packs. */

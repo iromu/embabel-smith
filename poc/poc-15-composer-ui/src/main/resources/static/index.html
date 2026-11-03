@@ -44,6 +44,17 @@
            font-weight:600; cursor:pointer; }
   button.ghost { background:transparent; color:var(--dim); border:1px solid #323a52; }
   #result { color:var(--dim); font-size:12px; white-space:pre-wrap; max-height:120px; overflow:auto; }
+  #retrieval { width:250px; background:var(--panel); border-left:1px solid #2a2f3f; padding:12px;
+               overflow-y:auto; }
+  #retrieval h2 { font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:var(--dim); margin:0 0 8px; }
+  #retrieval .hint { color:var(--dim); font-size:11px; }
+  #retrieval input[type=text] { width:100%; background:var(--node); border:1px solid #323a52;
+          border-radius:8px; padding:8px 10px; color:var(--ink); margin-bottom:8px; }
+  #retrieval .hit { background:var(--node); border:1px solid #323a52; border-radius:8px;
+          padding:8px 10px; margin-bottom:8px; }
+  #retrieval .hit .n { font-weight:600; display:flex; justify-content:space-between; gap:6px; }
+  #retrieval .hit .score { color:var(--accent); font-size:11px; }
+  #retrieval .hit .io { color:var(--dim); font-size:11px; margin-top:2px; }
 </style>
 </head>
 <body>
@@ -60,6 +71,14 @@
       <span id="chain"></span>
     </div>
     <svg id="wires"></svg>
+  </div>
+  <div id="retrieval">
+    <h2>Retrieval <span class="hint">— which skills would this route to?</span></h2>
+    <input id="query" type="text" placeholder="e.g. explain a topic in plain language">
+    <button id="retrieve">Retrieve top-5</button>
+    <div id="retrieval-results" style="margin-top:10px"><div class="hint">
+      The same scorer seam as POC 8/12/17/20 (lexical by default — offline; the POC 20 embedding
+      drops in here). Type a task and rank the palette by relevance.</div></div>
   </div>
 </main>
 <div id="toolbar">
@@ -204,6 +223,26 @@ document.getElementById('export').addEventListener('click', async () => {
 });
 
 document.getElementById('reset').addEventListener('click', () => { nodes = {}; edges = []; resultEl.textContent = ''; render(); revalidate(); });
+
+document.getElementById('retrieve').addEventListener('click', async () => {
+  const q = document.getElementById('query').value.trim();
+  const box = document.getElementById('retrieval-results');
+  if (!q) { box.innerHTML = '<div class="hint">Type a query first.</div>'; return; }
+  const res = await fetch('/api/retrieve', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query: q, k: 5 }) });
+  const data = await res.json();
+  if (!data.results || !data.results.length) { box.innerHTML = '<div class="hint">No skills matched.</div>'; return; }
+  const max = data.results[0].score || 1;
+  box.innerHTML = '';
+  for (const r of data.results) {
+    const pct = max > 0 ? Math.round(r.score / max * 100) : 0;
+    const div = document.createElement('div');
+    div.className = 'hit';
+    div.innerHTML = `<div class="n"><span>${r.name}</span><span class="score">${r.score.toFixed(3)}</span></div>
+      <div class="io">out: ${short(r.outputType)} · ${pct}%</div>`;
+    box.appendChild(div);
+  }
+});
 
 init();
 </script>
