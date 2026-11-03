@@ -40,5 +40,6 @@
         <module>poc-18-skill-lifecycle</module>
         <module>poc-19-small-llm-selector</module>
         <module>poc-20-semantic-embedding</module>
+        <module>poc-21-skill-security</module>
     </modules>
 </project>

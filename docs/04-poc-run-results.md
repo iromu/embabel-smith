@@ -1,16 +1,18 @@
 # Embabel Smith POC — Conclusions vs. the Theory
-*Run 2026-11-02, re-verified 2026-11-03 (Java 25 / GraalVM CE, target Java 21 · Spring Boot 4.1.1 · Embabel 1.5.3) · POC 1–20*
+*Run 2026-11-02, full re-run 2026-11-03 (Java 25 / GraalVM CE, target Java 21 · Spring Boot 4.1.1 · Embabel 1.5.3) · POC 1–21*
 
 This page concludes the POC run **against the hypothesis laid out in docs 01–03**: what the POCs
 actually proved, what they did not, and which POCs are still missing. The run now covers **all
-twenty POCs** — the feasibility core (POC 1–5), skill composition (POC 6), and the skills-first
-extensions POC 7–20 (runtime adapter, retrieval, eval-guided refinement, trust tiers, progressive
+twenty-one POCs** — the feasibility core (POC 1–5), skill composition (POC 6), and the skills-first
+extensions POC 7–21 (runtime adapter, retrieval, eval-guided refinement, trust tiers, progressive
 disclosure, **semantic retrieval at scale**, **remote / MCP invocation**, the **skill Composer**, the
 **visual skill-chain editor**, the **remote-action bridge**, **GLiNER2 transformer skill
-classification**, **skill lifecycle / drift detection**, **small-LLM skill selection**, and the
-**real semantic `EmbeddingService`**). The raw run evidence (the green loop, the offline baseline,
-the defects fixed) is kept in §5 as support. The full suite was **re-run on 2026-11-03** and every
-POC remains green with consistent numbers.
+classification**, **skill lifecycle / drift detection**, **small-LLM skill selection**, the
+**real semantic `EmbeddingService`**, and **install-time skill security / vulnerability scanning**).
+The raw run evidence (the green loop, the offline baseline, the defects fixed) is kept in §5 as
+support. The full suite was **re-run on 2026-11-03** and every POC remains green with consistent
+numbers (the retrieval / transformer / embedding / small-LLM tables reproduce to the same
+percentages as the 2026-11-02 run).
 
 ---
 
@@ -72,6 +74,7 @@ drafts (POC 9's fix works, but the raw draft is the thing being fixed).
   transformer breaks the shadowing tie (POC 17)** · **skill lifecycle / drift detection (POC 18)** ·
   **small-LLM skill selection + self-contained Docker model serving (POC 19)** ·
   **the real semantic `EmbeddingService` (POC 20)** ·
+  **install-time skill security / vulnerability scanning (POC 21)** ·
   **remote / MCP invocation (POC 13)** · **the skill Composer (POC 14)** · **the visual
   skill-chain editor / builder UI (POC 15)** · eval wiring · any OpenAI-compatible endpoint ·
   single-agent, no-orchestration execution.
@@ -124,6 +127,7 @@ The POCs were scoped to test the **feasibility core** of this, not the full skil
 | C15 | The **builder UI** is the missing piece — a visual editor to *see* and *build* skills | doc01 §VERDICT, doc03 §2.2 | **POC 15** (live web app) | ✅ **Proven** — a browser drag-and-drop canvas loads the skill palette, snaps only type-compatible connections, live-validates the chain, and exports the composite skill-pack over REST (the same model POC 14 proves) |
 | C16 | **Skills invoke a remote action** — the third runtime bridge (remote actions, Option B) | doc03 §2.3, §4.2 | **POC 16** (live) | ✅ **Proven** — a GOAP plan plans over, and executes over HTTP, an action running on a separate sidecar process, exactly like a local one (0.127s, no LLM call) |
 | C17 | **Skills have a lifecycle** — drift is detected, the skill re-evaluated, and it retired when its contract breaks (skill decay) | doc03 §1 (🔴 Gap), §5; doc02 §5 caveat 4 | **POC 18** (live + offline) | ✅ **Proven** — a SkillOps-style proactive re-eval compares the skill's content hash and eval pass-rate against the recorded baseline and moves it through incubating → active → degraded → retired; live: healthy **100%** → regressed **0%** → retired |
+| C18 | **Skills are vetted before install** — a skill-pack's static content is scanned for injection / exfiltration / over-privilege risk before it is loaded (install-time security) | doc02 §5 caveat 3 (26.1% vuln rate, prompt injection), §6.8 (audit before installing) | **POC 21** (offline) | ✅ **Proven** — a static scanner flags prompt-injection in the skill's own prompt, secret-exfiltration, network references, high-privilege tool groups, and the untrusted-input-to-shell chain; verdicts `SAFE` / `REVIEW` / `BLOCK` and maps each pack to the minimum POC 10 trust tier. The benign sample packs scan `SAFE`; a synthetic malicious pack is `BLOCK`ed |
 
 ---
 
@@ -293,6 +297,25 @@ The feasibility core is real and matches the theory:
     The content-hash / drift / state-machine halves are pure and pinned by offline tests; the live
     run is **local-model-gated** (one-time ONNX download; offline tests use a deterministic stub
     embedder, so the build stays green without the model).
+22. **Skills are vetted before install** (C18 — the install-time security half). POC 21 builds the
+    static, install-time scanner doc 02 §5 caveat 3 and §6.8 call for ("26.1% of community skills
+    carry vulnerabilities"; "trivially simple" prompt injection; audit a skill's instructions *before*
+    installing). It is the install-time complement to POC 10's *runtime* trust tiers. Five normalized
+    static rules run over a pack's prompts and declared tool groups: **prompt-injection in the
+    skill's own prompt** (CRITICAL — the skill hijacking the agent that loads it), **secret /
+    credential exfiltration** (CRITICAL), **network reference** (WARN — URL / fetch command),
+    **high-privilege tool group** (WARN — `shell` / `file`), and the **untrusted-input-to-shell
+    chain** (WARN — `UserInput` feeding a `shell` step). Findings aggregate to a verdict
+    (`BLOCK` on any critical, `REVIEW` on any warning, else `SAFE`) and each pack is mapped to the
+    **minimum POC 10 trust tier** whose allowlist covers its tool groups — so the scanner's
+    "load at T3+" is exactly what POC 10 would enforce at runtime. Live: the benign sample packs
+    (`explainer`, `reference-heavy`, `compose-extract`, `compose-explain`) scan **SAFE** at `T1`;
+    `shell-runner` scans **REVIEW** at `T3_PARTNER` (high-privilege tool + injection-to-shell chain);
+    a synthetic malicious pack (injection + API-key exfil + `curl` to a URL + `shell`) is
+    **BLOCK**ed with two criticals. Fully offline (pure pattern analysis, no model); the rules are
+    pinned by 11 tests. The honest limit — same as POC 10's guardrail — is that it is a normalized
+    pattern matcher, not a semantic detector, and it audits the *declared* prompt/tool groups, not a
+    bundled `scripts/` file.
 
 **Bottom line:** doc 01's "70% already there" and doc 03's "Embabel is a skills runtime" are now
 **confirmed across the full skills-first surface** — single and composed skills, LLM and
@@ -371,14 +394,24 @@ is now built (POC 20)** — what remains is wiring it (and the other POCs) into 
    `getVersion()` are Kotlin-mangled and unimplementable from Java; POC 7 registers the group via
    reflection on the mangled companion. It works, but it is integration friction that a first-party
    Java-friendly tool-group API would remove.
+7. **The install-time security scan is a pattern matcher over declared content, not a full
+   vulnerability audit** (C18 caveat). POC 21's scanner shares POC 10's honest limit — it normalizes
+   and matches a set of known injection / exfiltration patterns, so a *novel* rephrasing outside the
+   set can slip through, and it is not a semantic detector. It also audits only what the skill-pack
+   *declares* (the goal/step prompts and tool groups); a skill that smuggles capability through a
+   bundled `scripts/` file, an obfuscated runtime path, or a dependency is beyond a static YAML scan.
+   That is the boundary of a non-LLM install-time gate — it catches the common, declared risks (and
+   maps them to a POC 10 tier) but is a complement to, not a replacement for, sandboxing and
+   dependency auditing.
 
 ---
 
 ## 5. Run evidence (support)
 
-- **Offline baseline:** `mvn test` green across all modules — **200 tests, 0 failures, 0 errors**
-  (re-verified 2026-11-03; +10 from POC 20, +3 from the POC 15 retrieval pane, +2 from the POC 15
-  author pane, +3 from the POC 15 eval/refinement pane, +12 from the POC 15 library curation).
+- **Offline baseline:** `mvn test` green across all modules — **211 tests, 0 failures, 0 errors**
+  (re-run 2026-11-03; +11 from POC 21's security scanner, +10 from POC 20, +3 from the POC 15
+  retrieval pane, +2 from the POC 15 author pane, +3 from the POC 15 eval/refinement pane, +12 from
+  the POC 15 library curation).
   Coverage: format round-trip, validation,
   **draft-quality classifier (POC 2/3 caveat #2)**, builder normalization, writer idempotency,
   composition wiring, shell tool, lexical retrieval, **200+ scale retrieval (POC 12)**,
@@ -390,13 +423,15 @@ is now built (POC 20)** — what remains is wiring it (and the other POCs) into 
   (POC 15)**,
   **GLiNER2 selector seam + baselines (POC 17)**,
   **content-hash / drift / lifecycle state machine (POC 18)**, **small-LLM decision prompt +
-  selector + serving gate (POC 19)**, and the **real-embedding mean-pool / normalise / cosine /
-  memoised scorer + report shape + model gate (POC 20)**).
+  selector + serving gate (POC 19)**, the **real-embedding mean-pool / normalise / cosine /
+  memoised scorer + report shape + model gate (POC 20)**, and the **install-time security scanner —
+  injection / exfiltration / network / high-privilege / untrusted-input-to-shell rules + verdict +
+  recommended-tier (POC 21)**).
 - **Full loop (task 7.1): GREEN.** `./run-loop.sh` built `a-skill-that-explains-a-topic-in-plain-l`
   (a single `UserInput → BackgroundMessage` step — the LLM named it `explainTopic` this run; the name
   and step count vary run-to-run) and the no-code runtime ran it over *"Explain how a coffee machine
-  works"*, producing a coherent goal output in ~16 s on the 2026-11-03 re-run
-  (`goal … achieved in PT16.218S`; ~30 s on the original 2026-11-02 run — the loop is
+  works"*, producing a coherent goal output in ~14 s on the 2026-11-03 re-run
+  (`goal … achieved in PT13.72S`; ~30 s on the original 2026-11-02 run — the loop is
   endpoint-LLM-bound, so wall time varies with the model).
 - **Draft-quality measurement (POC 2/3, caveat #2): live.** The `DraftQuality` classifier now reports
   a draft's goal shape. POC 2 (raw compile) printed **HEALTHY** for one LLM call (goal output `Message`,
@@ -633,6 +668,26 @@ is now built (POC 20)** — what remains is wiring it (and the other POCs) into 
   `EmbeddingRetrievalAppTest` (2, stubbed embedder + gate) — 10 tests — pin the mean-pool/normalise/
   cosine math, the cosine-of-memoised-embeddings scoring, the once-per-distinct-text caching, the
   three-method report shape, and the model gate — no ONNX, no model.
+- **Install-time skill security scanning (POC 21): offline.** A static scanner (doc 02 caveat 3)
+  vets each sample skill-pack before load, as the install-time complement to POC 10's runtime trust
+  tiers. Live run (`mvn -pl poc/poc-21-skill-security exec:java`):
+
+  | skill | verdict | min tier | findings |
+  | --- | --- | --- | --- |
+  | `explainer` | **SAFE** | T1_COMMUNITY | (clean) |
+  | `shell-runner` | **REVIEW** | T3_PARTNER | high-privilege tool (`shell`) + `UserInput → shell` chain |
+  | `reference-heavy` | **SAFE** | T1_COMMUNITY | (clean) |
+  | `compose-extract` / `compose-explain` | **SAFE** | T1_COMMUNITY | (clean) |
+  | synthetic malicious pack | **BLOCK** | T3_PARTNER | prompt-injection + secret-exfil (2 criticals) + network + high-priv + chain |
+
+  The benign packs are `SAFE`; the `shell` runner is `REVIEW` at `T3` (its declared `shell` group
+  needs the partner tier, and untrusted `UserInput` reaches the shell); the synthetic malicious pack
+  (a prompt that says "Ignore all previous instructions", reads the `api key`, `curl`s it to a URL,
+  and runs a shell command) is **BLOCK**ed with two criticals. Offline, `SkillSecurityScannerTest`
+  (11 tests) pins every rule — clean→SAFE, shell→REVIEW/T3, web→T2, injection→BLOCK, obfuscated
+  injection→BLOCK, secret-exfil→BLOCK, network→REVIEW, untrusted-input-to-shell flagged (and *not*
+  flagged when the shell step doesn't read `UserInput`), the combined malicious pack→BLOCK, and the
+  canonical explainer→SAFE — no model.
 - **Two transient failures, both green on retry.** POC 5 first failed with
   `Could not find artifact poc-1-no-code-runtime` (a build-ordering issue — the cross-POC dependency
   wasn't installed); after `mvn install` it ran clean (**eval composite 1.0**, both cases pass). POC 9
@@ -652,7 +707,7 @@ is now built (POC 20)** — what remains is wiring it (and the other POCs) into 
 
 ## 6. What other POCs to create
 
-All twenty POCs are now built. POC 1–5 (feasibility core), POC 6 (composition), and POC 7–20
+All twenty-one POCs are now built. POC 1–5 (feasibility core), POC 6 (composition), and POC 7–21
 (the skills-first extensions) are complete and their run evidence is in §5:
 
 1. **POC 6 — Skill composition.** ✅ **Built & proven:** `compose-extract` + `compose-explain`
@@ -718,11 +773,19 @@ All twenty POCs are now built. POC 1–5 (feasibility core), POC 6 (composition)
     and, under shadowing, beats the lexical (**17%**) and dense feature-hashing (**0%**) stand-ins
     (**33%**) — but does not fully cure the near-duplicate collapse, confirming curation (POC 18)
     is the real fix. Closes the doc 03 §2.1 "real `EmbeddingService`" gap — see §5.
+16. **POC 21 — Install-time skill security / vulnerability scanning.** ✅ **Built & proven:** a
+    static scanner (doc 02 caveat 3 — the "26.1% of community skills carry vulnerabilities" /
+    prompt-injection / "audit before installing" gap) vets a skill-pack *before* it is loaded, as the
+    install-time complement to POC 10's runtime trust tiers. It flags prompt-injection in the skill's
+    own prompt, secret-exfiltration, network references, high-privilege tool groups, and the
+    untrusted-input-to-shell chain; verdicts `SAFE` / `REVIEW` / `BLOCK` and maps each pack to the
+    minimum POC 10 trust tier. Benign sample packs scan `SAFE`; `shell-runner` is `REVIEW` at `T3`;
+    a synthetic malicious pack is `BLOCK`ed (C18) — see §5.
 
 **All Phase 1 POCs — and the builder UI — are now built, and every hypothesis gap doc 03 §2 lists
 is now closed:** the runtime bridges (POC 7/13/16), the visual editor (POC 15), skill lifecycle /
-drift (POC 18), and the real semantic `EmbeddingService` (POC 20). Possible follow-ups
-(non-Phase-1, §4) are now hardening, not new capability POCs:
+drift (POC 18), the real semantic `EmbeddingService` (POC 20), and **install-time security scanning
+(POC 21)**. Possible follow-ups (non-Phase-1, §4) are now hardening, not new capability POCs:
 
 - **Wiring the other POCs into the POC 15 canvas** — now fully wired: a **retrieval pane** (the
   POC 8/12/20 `SkillScorer` seam — lexical by default, the POC 20 embedding a drop-in — now POC 18
@@ -763,6 +826,7 @@ mvn -pl poc/poc-8-retrieval exec:java                 # POC 8 — retrieval / sh
 mvn -pl poc/poc-11-progressive-disclosure exec:java    # POC 11 — progressive-disclosure stress test
 mvn -pl poc/poc-12-semantic-retrieval exec:java        # POC 12 — semantic retrieval at scale
 mvn -pl poc/poc-14-composer exec:java                  # POC 14 — skill Composer (canvas + composite export)
+mvn -pl poc/poc-21-skill-security exec:java            # POC 21 — install-time skill security scanning
 ```
 
 **POC 17 — GLiNER2 transformer skill classification (local-model-gated, no endpoint).** Needs the

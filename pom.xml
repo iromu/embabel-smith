@@ -149,6 +149,12 @@
                 <artifactId>poc-18-skill-lifecycle</artifactId>
                 <version>${project.version}</version>
             </dependency>
+            <!-- POC 21 reuses POC 10's trust tiers for its recommended-load-tier computation. -->
+            <dependency>
+                <groupId>com.embabel.smith</groupId>
+                <artifactId>poc-10-trust-tiers</artifactId>
+                <version>${project.version}</version>
+            </dependency>
 
             <!-- Jackson (used by smith-common for skill-pack YAML I/O). -->
             <dependency>
