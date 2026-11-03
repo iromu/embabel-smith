@@ -7,10 +7,12 @@ the composed chain, and the composite export). POC 15 adds the **pixels**: a rea
 drag-and-drop canvas that drives that same model over REST.
 
 The canvas, palette, and retrieval pane are fully offline and deterministic — no model endpoint.
-The **author pane** is the one endpoint-gated half: it compiles a natural-language description into
-a draft via POC 2's `NlCompileRunner` (needs a live OpenAI-compatible endpoint) and reports the
-draft's goal shape + `DraftQuality` verdict; without an endpoint it returns a clear configuration
-error rather than an opaque model failure.
+The **author pane** and the **eval/refinement pane** are the endpoint-gated halves: the author pane
+compiles a natural-language description into a draft via POC 2's `NlCompileRunner` (needs a live
+OpenAI-compatible endpoint) and reports the draft's goal shape + `DraftQuality` verdict; the
+eval/refinement pane runs a POC 5 eval over a set of tasks against a picked skill and, when tasks
+fail, offers a POC 9-style prompt rewrite + re-score. Both return a clear configuration error rather
+than an opaque model failure when no endpoint is set.
 
 ## What it proves
 
@@ -36,6 +38,12 @@ error rather than an opaque model failure.
   top-k shown with their scores. It reuses the same pluggable `SkillScorer` seam the whole retrieval
   POC family shares (POC 8 lexical, POC 12 dense, POC 17 GLiNER2, POC 20 real embedding), so the
   offline lexical scorer is the default and a denser scorer is a drop-in.
+- **An eval/refinement pane checks and refines a skill in one place.** The right-hand panel posts
+  `POST /api/eval` with a skill from the palette; it runs a POC 5 eval over a set of tasks and shows
+  the composite score + the failing inputs, and (the stretch) when tasks fail it runs a POC 9-style
+  prompt rewrite from the failures and re-scores, showing the before/after score and the revised
+  prompt. This is POC 9's `RefinementRunner` (deploy → evaluate → rewrite → re-validate → redeploy →
+  re-evaluate) surfaced in the canvas. Endpoint-gated.
 
 ## How it works
 
@@ -44,10 +52,12 @@ sequenceDiagram
     participant B as Browser canvas<br/>(static/index.html)
     participant C as CanvasController (REST)
     participant A as NlAuthoringController (REST)
+    participant E as EvalController (REST)
     participant R as RetrievalController (REST)
     participant M as POC 14 model<br/>CompositionCanvas / CompositeExporter
     participant S as POC 12 ScaleSkillRegistry<br/>(pluggable SkillScorer)
     participant L as POC 2 NlCompileRunner<br/>(LLM, endpoint-gated)
+    participant F as POC 9 RefinementRunner<br/>(deploy + eval + rewrite, endpoint-gated)
     B ->> C: GET /api/skills
     C ->> M: load valid exported packs
     C -->> B: skill palette (draggable chips)
@@ -61,6 +71,10 @@ sequenceDiagram
     A ->> L: compileAgent(name, description)
     L -->> A: AgentCompilationResult (goal + actions + issues)
     A -->> B: {goal, actions, DraftQuality verdict, issues}
+    B ->> E: POST /api/eval (skill + tasks)
+    E ->> F: improve(pack, step, tasks, endpoint)
+    F -->> E: RefinementOutcome (before/after score, failing inputs, revised prompt)
+    E -->> B: {score, failing inputs, revised prompt}
     B ->> R: POST /api/retrieve (query)
     R ->> S: retrieve(query, k) over catalog entries
     S -->> R: top-k SkillEntry (ranked by scorer)
@@ -85,19 +99,26 @@ sequenceDiagram
   `NlCompileRunner` and maps the `AgentCompilationResult` to the draft's goal shape, actions, and the
   `DraftQuality` verdict. It checks `ModelEndpointConfig.configError()` first, so a missing endpoint
   yields a clear, named error before any LLM call (endpoint-gated).
+- **`EvalController`** — the eval/refinement pane: `POST /api/eval` takes a skill from the palette and
+  a set of tasks (a default set if none are given), then delegates the whole loop to POC 9's
+  `RefinementRunner.improve()` — deploy the skill, evaluate, rewrite the prompt from the failing tasks,
+  re-validate, redeploy, and re-evaluate. It checks `ModelEndpointConfig.configError()` first, so a
+  missing endpoint yields a clear, named error before any model call (endpoint-gated).
 - **`static/index.html`** — the self-contained canvas (vanilla JS, no build step): a skill palette,
-  a drag-and-drop stage, SVG wires, a live status badge, and Export / Reset controls.
+  a drag-and-drop stage, SVG wires, a live status badge, Export / Reset controls, and a right-hand
+  column with the Author, Eval/refine, and Retrieval panes.
 
 ## Run it
 
 It's a web app — boot it, then open the canvas in a browser. The canvas, palette, and retrieval
-pane are offline (no endpoint); the **author pane** needs the endpoint env vars:
+pane are offline (no endpoint); the **author** and **eval/refinement** panes need the endpoint env
+vars:
 
 ```bash
 SERVER_PORT=18080 mvn -pl poc/poc-15-composer-ui spring-boot:run
 # → open http://localhost:18080/
 
-# for the author pane (endpoint-gated), also set:
+# for the author + eval/refinement panes (endpoint-gated), also set:
 export OPENAI_CUSTOM_BASE_URL=... OPENAI_CUSTOM_API_KEY=...
 export OPENAI_CUSTOM_MODELS=... EMBABEL_MODELS_DEFAULT_LLM=...
 ```
@@ -121,5 +142,9 @@ scorer (no model).
 `NlAuthoringControllerTest` pins the author pane's offline scaffolding — a blank description is
 rejected, and a missing endpoint returns a clear, named configuration error before any LLM call —
 built with no `Ai`/`AgentPlatform` (the offline paths never reach the model).
+
+`EvalControllerTest` pins the eval/refinement pane's offline scaffolding — no skill selected, an
+unknown skill, and a known skill without an endpoint (clear, named configuration error) — built with
+no `AgentPlatform` (the offline paths return before any model call).
 
 See `docs/04-poc-run-results.md`.

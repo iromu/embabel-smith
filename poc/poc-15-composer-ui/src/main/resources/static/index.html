@@ -49,9 +49,14 @@
   #side section { margin-bottom:20px; }
   #side h2 { font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:var(--dim); margin:0 0 8px; }
   #side .hint { color:var(--dim); font-size:11px; }
-  #side input[type=text], #side textarea { width:100%; background:var(--node); border:1px solid #323a52;
+  #side input[type=text], #side textarea, #side select { width:100%; background:var(--node); border:1px solid #323a52;
           border-radius:8px; padding:8px 10px; color:var(--ink); margin-bottom:8px; box-sizing:border-box;
           font:inherit; resize:vertical; }
+  #side .score-row { display:flex; justify-content:space-between; font-size:12px; margin-bottom:6px; }
+  #side .score-row .up { color:var(--ok); }
+  #side .score-row .down { color:var(--bad); }
+  #side .prompt { background:var(--node); border:1px solid #323a52; border-radius:8px; padding:8px 10px;
+          font-size:11px; color:var(--dim); white-space:pre-wrap; max-height:120px; overflow:auto; }
   #side .hit { background:var(--node); border:1px solid #323a52; border-radius:8px;
           padding:8px 10px; margin-bottom:8px; }
   #side .hit .n { font-weight:600; display:flex; justify-content:space-between; gap:6px; }
@@ -86,6 +91,14 @@
       <div id="author-results" style="margin-top:10px"><div class="hint">
         Endpoint-gated: needs the OPENAI_CUSTOM_* env vars. Compiles the description into a draft and
         shows its goal shape + DraftQuality verdict.</div></div>
+    </section>
+    <section id="eval">
+      <h2>Eval / refine <span class="hint">— check a skill, refine it on failure</span></h2>
+      <select id="eval-skill"><option value="">— pick a skill —</option></select>
+      <button id="run-eval">Evaluate + refine</button>
+      <div id="eval-results" style="margin-top:10px"><div class="hint">
+        Endpoint-gated: needs the OPENAI_CUSTOM_* env vars. Runs a POC 5 eval over the tasks and, if any
+        fail, offers a POC 9 prompt rewrite + re-score.</div></div>
     </section>
     <section id="retrieval">
       <h2>Retrieval <span class="hint">— which skills would this route to?</span></h2>
@@ -129,6 +142,9 @@ async function init() {
     chip.addEventListener('dragstart', e => e.dataTransfer.setData('skill', s.name));
     chip.addEventListener('click', () => addNode(s.name, 40 + (nodeId % 5) * 20, 40 + (nodeId % 5) * 20));
     chips.appendChild(chip);
+    const opt = document.createElement('option');
+    opt.value = s.name; opt.textContent = s.name;
+    document.getElementById('eval-skill').appendChild(opt);
   }
 }
 
@@ -269,6 +285,38 @@ document.getElementById('compile').addEventListener('click', async () => {
   if (data.issues && data.issues.length) {
     html += '<div class="hint" style="margin-top:6px">issues to review:</div>';
     for (const iss of data.issues) html += '<div class="issue">· ' + iss + '</div>';
+  }
+  box.innerHTML = html;
+});
+
+document.getElementById('run-eval').addEventListener('click', async () => {
+  const skill = document.getElementById('eval-skill').value;
+  const box = document.getElementById('eval-results');
+  if (!skill) { box.innerHTML = '<div class="issue">Pick a skill to evaluate first.</div>'; return; }
+  box.innerHTML = '<div class="hint">Evaluating… (runs the skill + model; may refine the prompt)</div>';
+  const res = await fetch('/api/eval', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ skillName: skill }) });
+  const data = await res.json();
+  if (data.error) { box.innerHTML = '<div class="issue">' + data.error + '</div>'; return; }
+  let html = '<div class="hit"><div class="n"><span>' + data.skillName + '</span>'
+    + '<span class="score">step: ' + (data.stepName || '—') + '</span></div></div>';
+  if (data.refined) {
+    const cls = data.improved ? 'up' : 'down';
+    html += '<div class="score-row"><span>before → after</span>'
+      + '<span class="' + cls + '">' + data.beforeScore.toFixed(2) + ' → ' + data.afterScore.toFixed(2)
+      + (data.improved ? ' (improved)' : ' (no gain)') + '</span></div>';
+  } else {
+    html += '<div class="score-row"><span>composite score</span>'
+      + '<span class="up">' + data.beforeScore.toFixed(2) + '</span></div>';
+    html += '<div class="hint">all tasks passed — no refinement needed</div>';
+  }
+  if (data.failingInputs && data.failingInputs.length) {
+    html += '<div class="hint" style="margin-top:6px">failing inputs:</div>';
+    for (const f of data.failingInputs) html += '<div class="issue">· ' + f + '</div>';
+  }
+  if (data.revisedPrompt) {
+    html += '<div class="hint" style="margin-top:6px">revised prompt (' + data.stepName + '):</div>'
+      + '<div class="prompt">' + data.revisedPrompt + '</div>';
   }
   box.innerHTML = html;
 });

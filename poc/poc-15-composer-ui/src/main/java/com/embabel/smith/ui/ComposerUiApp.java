@@ -1,6 +1,7 @@
 package com.embabel.smith.ui;
 
 import org.springframework.boot.SpringApplication;
+import org.springframework.boot.WebApplicationType;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 /**
@@ -23,6 +24,12 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 public class ComposerUiApp {
 
     public static void main(String[] args) {
-        SpringApplication.run(ComposerUiApp.class, args);
+        // Force the servlet web app: POC 9's transitive embabel-agent-eval leaks an
+        // application.properties with spring.main.web-application-type=none (it is a CLI eval tool),
+        // which would otherwise make this builder UI boot as a non-web app that exits after refresh.
+        // application.properties shadows it; this programmatic set is a second layer.
+        SpringApplication app = new SpringApplication(ComposerUiApp.class);
+        app.setWebApplicationType(WebApplicationType.SERVLET);
+        app.run(args);
     }
 }

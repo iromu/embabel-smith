@@ -126,6 +126,11 @@
             </dependency>
             <dependency>
                 <groupId>com.embabel.smith</groupId>
+                <artifactId>poc-9-quality-refinement</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.embabel.smith</groupId>
                 <artifactId>poc-12-semantic-retrieval</artifactId>
                 <version>${project.version}</version>
             </dependency>
