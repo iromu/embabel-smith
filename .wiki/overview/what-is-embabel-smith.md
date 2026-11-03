@@ -8,7 +8,7 @@ source_paths:
   - "docs/03-embabel-skills-agent-builder-design.md"
   - "docs/04-poc-run-results.md"
   - "pom.xml"
-updated_at: "2026-11-01"
+updated_at: "2026-11-03"
 ---
 
 # What is Embabel Smith?
@@ -53,7 +53,7 @@ Each POC is an independent module so a failure isolates to one claim (design D1)
 - **POC 4** — an exported goal is a callable skill whose chain loads on demand.
 - **POC 5** — a goal-type skill can be scored, and a failing task can drive a prompt rewrite.
 
-**Skills-first extensions (POC 6–11):**
+**Skills-first extensions (POC 6–20):**
 
 - **POC 6** — skills compose: GOAP chains an action from two independent packs through a shared
   intermediate type. See [[skill-composition]].
@@ -67,6 +67,27 @@ Each POC is an independent module so a failure isolates to one claim (design D1)
   [[trust-tiers]].
 - **POC 11** — the plan context stays constant while a bundled reference grows 100×. See
   [[progressive-disclosure]].
+- **POC 12** — semantic retrieval at scale: clean at 200+ distinct skills, but near-duplicate
+  shadowing collapses P@1 for both the lexical and a dense retriever — a curation problem.
+- **POC 13** — a skill is auto-published as a remote MCP tool and invoked over the network. See
+  [[runtime-adapter]].
+- **POC 14** — the skill Composer: skills chain on a type-checked canvas and export as a composite
+  skill-pack that runs end-to-end. See [[skill-composer]].
+- **POC 15** — the visual builder UI: a drag-and-drop canvas over POC 14's model, plus a
+  curation-aware **retrieval pane** (POC 18), an **author pane** (POC 2), an **eval/refinement
+  pane** (POC 9), and a **curate re-eval** (POC 18). See [[skill-composer]].
+- **POC 16** — a GOAP plan plans over, and executes over HTTP, a remote action running on a
+  sidecar. See [[runtime-adapter]].
+- **POC 17** — a GLiNER2 transformer scores the query by *meaning* and breaks the shadowing tie
+  lexical and dense text-similarity cannot.
+- **POC 18** — skill lifecycle / drift: a proactive re-eval moves a skill through
+  incubating → active → degraded → retired (applied in the POC 15 canvas).
+- **POC 19** — a small (0.6B) LLM, served in a Docker container, selects skills — beats text
+  similarity, trails the transformer.
+- **POC 20** — a real semantic `EmbeddingService` (an ONNX sentence-encoder) behind the
+  `SkillScorer` seam.
+
+The per-POC verdicts, caveats, and run evidence are distilled in [[what-the-pocs-prove]].
 
 ## Offline vs. endpoint-gated
 

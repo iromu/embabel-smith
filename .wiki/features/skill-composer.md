@@ -8,7 +8,12 @@ source_paths:
   - "poc/poc-14-composer/src/main/java/com/embabel/smith/composer/CompositionCanvas.java"
   - "poc/poc-14-composer/src/main/java/com/embabel/smith/composer/CompositeExporter.java"
   - "poc/poc-14-composer/src/main/java/com/embabel/smith/composer/ComposerApp.java"
-updated_at: "2026-11-02"
+  - "poc/poc-15-composer-ui/src/main/java/com/embabel/smith/ui/SkillCatalog.java"
+  - "poc/poc-15-composer-ui/src/main/java/com/embabel/smith/ui/SkillCuration.java"
+  - "poc/poc-15-composer-ui/src/main/java/com/embabel/smith/ui/CurationController.java"
+  - "poc/poc-15-composer-ui/src/main/java/com/embabel/smith/ui/RetrievalController.java"
+  - "poc/poc-15-composer-ui/src/main/resources/static/index.html"
+updated_at: "2026-11-03"
 ---
 
 # Skill Composer (POC 14)
@@ -57,7 +62,9 @@ coherent goal output. See [[runtime-run]] and `docs/04-poc-run-results.md` §5.
 
 POC 15 (`poc/poc-15-composer-ui`) is the **builder UI** doc 01 names as the missing piece: a Spring
 Boot web app that serves a self-contained browser canvas (vanilla JS, no build step) driving this
-exact model over REST.
+exact model over REST. The canvas, palette, and retrieval pane are offline; the author,
+eval/refinement, and curate panes are endpoint-gated (a missing endpoint returns a clear, named
+config error before any model call).
 
 - **`SkillCatalog`** — the palette: every valid, exported skill-pack under `skill-packs/` as a
   `name → SkillNode` map (walks up from the working dir to find the repo's `skill-packs/`, or
@@ -65,14 +72,36 @@ exact model over REST.
 - **`CanvasController`** — the REST surface; every endpoint delegates to POC 14's model:
   `GET /api/skills` (the palette), `POST /api/canvas` (`{valid, issues, chain}` via
   `CompositionCanvas`), and `POST /api/compose` (writes the composite via `CompositeExporter`).
+- **`RetrievalController`** — the retrieval pane: `POST /api/retrieve` ranks the palette by
+  relevance to a natural-language query via the same pluggable `SkillScorer` seam POC 8/12/17/20
+  share (lexical by default, the POC 20 embedding a drop-in) — and **curates the library with POC
+  18**: each hit carries the skill's lifecycle state, a retired skill is dropped, and a degraded one
+  is de-ranked (score halved).
+- **`SkillCuration`** — the library curation (offline): seeds each skill as an `ACTIVE` baseline
+  (its live content hash, an assumed-passing score) and re-derives its lifecycle via POC 18's
+  `LifecycleManager` from the recorded state, the live content hash, and the latest measured
+  pass-rate — retirement is terminal, promotion is from incubation.
+- **`NlAuthoringController`** — the author pane (endpoint-gated): `POST /api/compile` compiles a
+  description into a draft via POC 2's `NlCompileRunner` and shows its goal shape + `DraftQuality`
+  verdict.
+- **`EvalController`** — the eval/refinement pane (endpoint-gated): `POST /api/eval` runs a POC 5
+  eval over tasks against a picked skill and, on failure, offers a POC 9 prompt rewrite + re-score.
+- **`CurationController`** — the curate re-eval (endpoint-gated): `POST /api/curate` re-scores a
+  skill's live pass-rate with POC 18's `LiveEvalRunner` and moves it through the lifecycle,
+  returning the before → after transition, the two drift signals, and POC 18's verdict.
 - **`static/index.html`** — the canvas: a skill palette, a drag-and-drop stage, SVG wires, and a
-  live status badge. A connection "snaps" (blue) only when `/api/canvas` reports it
-  type-compatible, and renders red with the reason otherwise; the chain and validation recompute on
-  every move, and an Export button writes the composite pack.
+  live status badge, plus a right-hand column with the Author, Eval/refine, and Retrieval panes
+  (each retrieval hit shows a colored lifecycle badge + a "re-eval + curate" affordance). A
+  connection "snaps" (blue) only when `/api/canvas` reports it type-compatible, and renders red
+  with the reason otherwise; the chain and validation recompute on every move, and an Export button
+  writes the composite pack.
 
 Run: `SERVER_PORT=18080 mvn -pl poc/poc-15-composer-ui spring-boot:run`, then open
-`http://localhost:18080/`. Offline, `CanvasControllerTest` (a standalone `MockMvc`) pins the four
-REST behaviours. See `docs/04-poc-run-results.md` §5.
+`http://localhost:18080/` (the author / eval / curate panes also need the `OPENAI_CUSTOM_*`
+endpoint env vars). Offline, eighteen standalone-`MockMvc` tests (`CanvasControllerTest`,
+`RetrievalControllerTest`, `NlAuthoringControllerTest`, `EvalControllerTest`,
+`CurationControllerTest`) pin the REST behaviours, and `SkillCurationTest` pins the pure curation
+state machine. See `docs/04-poc-run-results.md` §5.
 
 ## What it proves
 

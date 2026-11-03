@@ -4,7 +4,7 @@ type: "index"
 status: "active"
 language: "default"
 last_commit: "c5d2a7ae320c1b61c26a8cfc4a3c69824da1a04b"
-updated_at: "2026-11-01"
+updated_at: "2026-11-03"
 ---
 
 # Embabel Smith
@@ -52,12 +52,15 @@ Full orientation: [[getting-started]].
 It is a research/POC vehicle for the **"skills, not agents"** paradigm on Embabel. The thesis (see
 `docs/03-embabel-skills-agent-builder-design.md`): Embabel *already* is a skills runtime — a
 **skill** is just an **exported goal** (`export: true`), and the platform's non-LLM **GOAP**
-planner *is* the skill router. The sixteen POCs prove the load-bearing facts (YAML ingestion
+planner *is* the skill router. The twenty POCs prove the load-bearing facts (YAML ingestion
 without compilation, NL→draft compilation, deterministic builder structure, skill composition, CLI
 invocation, retrieval, eval-guided refinement, trust tiers, progressive disclosure, semantic
-retrieval at scale, remote/MCP invocation, the skill Composer, and the remote-action bridge).
+retrieval at scale, remote/MCP invocation, the skill Composer, the visual builder UI, the
+remote-action bridge, GLiNER2 skill classification, skill lifecycle / drift detection, small-LLM
+skill selection, and the real semantic `EmbeddingService`).
 All three Phase 1 skills-layer components doc 03 lists (registry, composer, runtime adapter) are
-built; a real semantic `EmbeddingService` is the remaining **out-of-scope** piece.
+built, and every hypothesis gap doc 03 §2 lists — including a real semantic `EmbeddingService`
+(POC 20) — is now closed.
 See [[exported-goal-as-skill]] and [[what-the-pocs-prove]].
 
 ## 4. What happens when I run it?
@@ -78,7 +81,9 @@ Three entry points matter:
   [[skill-composer]].
 - **Build a skill in the browser (POC 15):** the visual builder UI — a drag-and-drop canvas that
   loads the skill palette, snaps only type-compatible connections, live-validates the chain, and
-  exports the composite over REST. See [[skill-composer]].
+  exports the composite over REST — plus a curation-aware **retrieval pane** (POC 18 lifecycle), an
+  **author pane** (POC 2), an **eval/refinement pane** (POC 9), and a **curate re-eval** (POC 18).
+  See [[skill-composer]].
 
 ## 5. Where is data saved?
 
@@ -100,10 +105,11 @@ Three entry points matter:
   [[builder-pipeline]].
 - `poc/poc-2-nl-compile` (POC 2), `poc/poc-4-skill-format` (POC 4), `poc/poc-5-eval` (POC 5) — see
   [[architecture]].
-- `poc/poc-6`…`poc-16` — the skills-first extensions: composition, runtime adapter, retrieval,
+- `poc/poc-6`…`poc-20` — the skills-first extensions: composition, runtime adapter, retrieval,
   eval-guided refinement, trust tiers, progressive disclosure, semantic retrieval at scale,
-  remote/MCP invocation, the skill Composer, the visual builder UI, and the remote-action bridge.
-  See [[what-the-pocs-prove]].
+  remote/MCP invocation, the skill Composer, the visual builder UI, the remote-action bridge,
+  GLiNER2 skill classification, skill lifecycle / drift detection, small-LLM skill selection, and
+  the real semantic `EmbeddingService`. See [[what-the-pocs-prove]].
 
 ## 7. What should I avoid breaking?
 

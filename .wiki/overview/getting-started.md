@@ -8,13 +8,13 @@ source_paths:
   - "pom.xml"
   - "run-loop.sh"
   - "poc/poc-1-no-code-runtime/src/main/resources/application.yml"
-updated_at: "2026-11-01"
+updated_at: "2026-11-03"
 ---
 
 # Get started
 
 A smart newcomer's first ten minutes. This is codebase orientation, not a duplicate of `README.md`
-(which carries the per-POC command table for all eleven POCs).
+(which carries the per-POC command table for all twenty POCs).
 
 ## The one command that always works
 
