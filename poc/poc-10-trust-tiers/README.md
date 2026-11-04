@@ -47,4 +47,41 @@ The tier allowlist is offline; the guardrail demo is endpoint-gated:
 mvn -pl poc/poc-10-trust-tiers spring-boot:run
 ```
 
+## Measured results (shared — security, C12 / C18)
+
+POC 10 (runtime trust tiers + guardrail) and POC 21 (install-time static scan) are the two halves
+of the same security hypothesis. This results section is **shared across their READMEs**
+(identical in each); the consolidated read is in `docs/04-poc-run-results.md` §7.3.
+
+**Runtime tier policy (POC 10):**
+
+| skill | declared tool groups | T1_COMMUNITY | T3_PARTNER |
+| --- | --- | --- | --- |
+| `shell-runner` | `[shell]` | REFUSED (disallowed `[shell]`) | ALLOWED |
+| `explainer` | `[]` | ALLOWED | ALLOWED |
+
+**Install-time scan (POC 21):**
+
+| pack | verdict | minimum tier | findings |
+| --- | --- | --- | --- |
+| `explainer` / `reference-heavy` / `compose-extract` / `compose-explain` | SAFE | T1_COMMUNITY | (clean) |
+| `shell-runner` | REVIEW | T3_PARTNER | high-privilege tool (`shell`) + `UserInput → shell` chain |
+| synthetic malicious pack | BLOCK | T3_PARTNER | prompt-injection + secret-exfil (2 criticals) + network + high-priv + chain |
+
+The scanner's tier mapping agrees with the runtime policy: its "load at T3+" is exactly what POC 10
+enforces. Both halves share the same honest limit — a normalized pattern matcher over declared
+content, not a semantic detector.
+
+## Conclusion
+
+Against the hypothesis (claim C12): **proven.** The per-tier allowlist refused the `shell` skill
+under `T1_COMMUNITY` and allowed it under `T3_PARTNER` (a plain skill is allowed under `T1`), and a
+globally-registered user-input guardrail let a clean run through while **blocking** a prompt-
+injection — including obfuscated variants — with a CRITICAL-severity
+`GuardRailViolationException`. The honest limits: the guardrail is a normalized pattern matcher,
+not a semantic detector (a novel rephrasing outside the pattern set can slip through), and a
+blocking (CRITICAL) guardrail triggers platform retries before the violation surfaces (~5× over
+~4 min live) — a latency cost. POC 21 is the install-time complement; see the shared results
+above.
+
 See `docs/04-poc-run-results.md`.

@@ -66,4 +66,31 @@ BUILDER_TOPIC="how a coffee machine works" \
     mvn -pl poc/poc-13-remote-mcp spring-boot:run
 ```
 
+## Measured results (shared — runtime bridges, C11 / C16)
+
+POCs 7, 13, and 16 prove the three runtime bridges doc 03 §2.3 names — the "normal agent
+harness". This results section is **shared across their READMEs** (identical in each); the
+consolidated read is in `docs/04-poc-run-results.md` §7.2.
+
+| bridge | POC | live evidence | LLM calls in the plan |
+| --- | --- | --- | --- |
+| shell (local CLI) | POC 7 | `runCommand` → `{"stdout":"Linux"}`; goal achieved | 1 (action body) |
+| MCP (remote tool) | POC 13 | `explainTopic` invoked over Streamable HTTP by a separate client | 1 (action body) |
+| remote action (sidecar) | POC 16 | `remoteDigest` executed over HTTP to a separate process; plan in ~0.13 s | 0 |
+
+All three: the same GOAP planner plans over, and executes, an action that runs outside the LLM —
+in a local CLI, a remote MCP server, or a separate sidecar process.
+
+## Conclusion
+
+Against the hypothesis (claim C11, remote half): **proven.** An `@Action` + `@AchievesGoal` method
+annotated `@Export(remote = true)` is auto-published as an MCP tool over Streamable HTTP with no
+manual registration, and a separate MCP client (official Java SDK) invoked it over a genuine HTTP
+round-trip — the server-side GOAP planner formulated the plan, executed the action, called the
+LLM, and returned a real explanation to the client. Two live-only details: the goal method needs
+**both** `@Action` and `@AchievesGoal` to register as a goal, and the tool's input schema mirrors
+the `UserInput` type, so the call must supply both `content` and `timestamp`. With POC 7 (shell)
+and POC 16 (remote action), all three of doc 03 §2.3's runtime bridges are now proven — see the
+shared results above.
+
 See `docs/04-poc-run-results.md`.

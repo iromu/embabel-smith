@@ -37,4 +37,13 @@ Endpoint-gated:
 mvn -pl poc/poc-9-quality-refinement spring-boot:run
 ```
 
+## Conclusion
+
+Against the hypothesis (claim C9 — "LLM-authored skills are good"): **negative at the source,
+proven fix.** The raw NL draft is still weak (POC 2/3 measure it with the `DraftQuality`
+classifier), but the eval-guided refinement loop repairs it end-to-end: a deliberately weak
+tagline skill scores **0%** on two tasks, the LLM rewrite adds "the tagline must explicitly
+include the brand name", and the re-score is **100%**. This is the SkillAxe loop (doc 03 §5)
+working, and the same loop powers the POC 15 eval/refinement pane.
+
 See `docs/04-poc-run-results.md`.

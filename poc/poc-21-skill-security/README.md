@@ -60,4 +60,44 @@ mvn -pl poc/poc-21-skill-security exec:java
 
 It scans the sample skill-packs (`explainer`, `shell-runner`, `reference-heavy`, `compose-extract`,
 `compose-explain`) plus a synthetic malicious pack, printing each pack's verdict, minimum tier, and
-findings. See `docs/04-poc-run-results.md`.
+findings.
+
+## Measured results (shared — security, C12 / C18)
+
+POC 10 (runtime trust tiers + guardrail) and POC 21 (install-time static scan) are the two halves
+of the same security hypothesis. This results section is **shared across their READMEs**
+(identical in each); the consolidated read is in `docs/04-poc-run-results.md` §7.3.
+
+**Runtime tier policy (POC 10):**
+
+| skill | declared tool groups | T1_COMMUNITY | T3_PARTNER |
+| --- | --- | --- | --- |
+| `shell-runner` | `[shell]` | REFUSED (disallowed `[shell]`) | ALLOWED |
+| `explainer` | `[]` | ALLOWED | ALLOWED |
+
+**Install-time scan (POC 21):**
+
+| pack | verdict | minimum tier | findings |
+| --- | --- | --- | --- |
+| `explainer` / `reference-heavy` / `compose-extract` / `compose-explain` | SAFE | T1_COMMUNITY | (clean) |
+| `shell-runner` | REVIEW | T3_PARTNER | high-privilege tool (`shell`) + `UserInput → shell` chain |
+| synthetic malicious pack | BLOCK | T3_PARTNER | prompt-injection + secret-exfil (2 criticals) + network + high-priv + chain |
+
+The scanner's tier mapping agrees with the runtime policy: its "load at T3+" is exactly what POC 10
+enforces. Both halves share the same honest limit — a normalized pattern matcher over declared
+content, not a semantic detector.
+
+## Conclusion
+
+Against the hypothesis (claim C18 — "skills are vetted before install"): **proven.** The static
+scanner vets a pack *before* it is loaded: the benign sample packs scan **SAFE** at `T1`;
+`shell-runner` scans **REVIEW** at `T3_PARTNER` (high-privilege tool + untrusted-input-to-shell
+chain); the synthetic malicious pack (injection + API-key exfil + `curl` to a URL + `shell`) is
+**BLOCK**ed with two criticals. Each pack maps to the minimum POC 10 trust tier whose allowlist
+covers its tool groups, so the install-time verdict and the runtime policy agree. The honest limit
+— shared with POC 10's guardrail — is that it is a normalized pattern matcher over the pack's
+*declared* prompts and tool groups, not a semantic detector, and a capability smuggled through a
+bundled `scripts/` file is beyond a static YAML scan. See the shared results above for the runtime
+half (POC 10).
+
+See `docs/04-poc-run-results.md`.

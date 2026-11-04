@@ -57,20 +57,59 @@ Docker daemon before Spring starts, failing with a clear, actionable error other
 container is started at app start and stopped at app shutdown; if it is already running, the
 app just connects (re-run the benchmark without reloading the model).
 
-## Measured (2026-11-03, CPU)
+## Measured results (shared — skill selection, C10)
+
+POCs 8, 12, 17, 19, and 20 test the same hypothesis — **skill selection at scale** (claim C10) —
+on the same scenario, with different techniques. This results section is **shared across their
+READMEs** (identical in each); the consolidated read is in `docs/04-poc-run-results.md` §7.1.
+
+**Small scale (POC 8 — 14 same-typed skills, lexical):** Precision@1 **100%**; the target stays
+top-1 as same-verb distractors are added (growth curve).
+
+**Distinct scale (POC 12/20 — 191 same-typed skills, full-library P@1):**
+
+| method | P@1 (191 distinct) |
+| --- | --- |
+| lexical (word TF) | 100% |
+| dense (feature hash) | 100% |
+| embedding (MiniLM, real) | 100% |
+
+**Under shadowing (POC 12/20 — 281 skills incl. 90 same-topic near-duplicates, full-library P@1):**
+
+| method | P@1 (281, shadowing) |
+| --- | --- |
+| lexical (word TF) | 17% |
+| dense (feature hash) | 0% |
+| embedding (MiniLM, real) | 33% |
+
+**On the 6-target candidate sets (POC 17/19 — matching vs strict variants):**
 
 | method | matching@1 | strict@1 |
 | --- | --- | --- |
-| transformer (GLiNER2) | **83%** | **100%** |
 | lexical (word TF) | 17% | 33% |
 | dense (feature hash) | 0% | 0% |
+| transformer (GLiNER2) | 83% | **100%** |
 | llm-id (Qwen3-0.6B) | 0% | 50% |
 | llm-ood (Qwen3-0.6B) | 50% | 67% |
 
-The small LLM **beats text similarity decisively** (50–67% vs 0–33%) but **does not beat the
-transformer classifier** (100%/83%). The striking result: the **free-form OOD prompt outperforms
-the model's own trained decision format** (67% vs 50% strict). Two caveats keep that reading
-honest: the ID parser is strict (first character must be the letter — the contract answer is
-one token + EOS), while the OOD parser also accepts a number anywhere or the skill's name; and
+**Shared reading:** retrieval is clean while skills are distinct (100% at every scale);
+near-duplicate shadowing collapses text-similarity (lexical 17%, dense 0%), and no text-similarity
+index cures it. Methods that score by *meaning* — a zero-shot transformer (GLiNER2, the best:
+strict 100%), a fine-tuned 0.6B LLM, and a real embedding index — all beat text-similarity
+decisively, but the near-duplicates are near-identical in *meaning* too, so none fully cures the
+collapse on its own. The real fix is library **curation** (dedup / lifecycle — POC 18, applied in
+the POC 15 retrieval pane).
+
+## Conclusion
+
+Against the hypothesis (claim C10, at scale — a second remedy): **proven, with a caveat.** The
+0.6B decision-tuned LLM **beats text similarity decisively** (50–67% vs 0–33%) but **does not
+beat the transformer classifier** (100%/83%). The striking result: the **free-form OOD prompt
+outperforms the model's own trained decision format** (67% vs 50% strict). Two caveats keep that
+reading honest: the ID parser is strict (first character must be the letter — the contract answer
+is one token + EOS), while the OOD parser also accepts a number anywhere or the skill's name; and
 the model's 84.9% was measured on short-option tasks, whereas these options are full skill
-descriptions. Both effects push the ID column down relative to OOD.
+descriptions. Both effects push the ID column down relative to OOD (see the shared results
+above). The POC also introduces the **docker-gated** runtime category and the self-contained
+serving pattern: the model runs in a `llama.cpp` container whose lifecycle Spring Boot Dev
+Services manages from the module's `compose.yml`.

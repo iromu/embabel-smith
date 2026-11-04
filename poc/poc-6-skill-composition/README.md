@@ -40,4 +40,12 @@ BUILDER_TARGET_GOAL=explainerDone BUILDER_INPUT="Explain how a coffee machine wo
     mvn -pl poc/poc-6-skill-composition spring-boot:run
 ```
 
+## Conclusion
+
+Against the hypothesis (claim C8): **proven.** Two independent skill-packs load into one platform
+and the non-LLM GOAP planner chains an action from each — `extractTopic` → `writeExplainer`
+through the shared `TopicBrief` — with no orchestration code (live: goal achieved in ~14–22 s
+across runs). A skill-pack is therefore a *composition primitive*, not just a leaf; POC 14's
+Composer generalizes this to a type-checked canvas with composite export.
+
 See `docs/04-poc-run-results.md`.

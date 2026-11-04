@@ -52,4 +52,19 @@ mvn -pl poc/poc-18-skill-lifecycle spring-boot:run
 
 The content-hash, drift-detection, and lifecycle halves are pinned by offline tests
 (`SkillContentHashTest`, `DriftDetectorTest`, `LifecycleManagerTest`) — `mvn test` stays green
-without a model. See `docs/04-poc-run-results.md`.
+without a model.
+
+## Conclusion
+
+Against the hypothesis (claim C17 — the last hypothesis gap, doc 03 §1 "Skill decay /
+lifecycle"): **proven, gap closed.** A skill's contract is its eval pass-rate, and drift is
+detectable from two independent signals — content hash divergence and pass-rate drop — that drive
+the `incubating → active → degraded → retired` lifecycle. Live: the healthy tagline variant
+scored **100%**, the regressed variant **0%**, and the proactive re-eval correctly retired it
+("score collapsed; the skill's contract is violated"); a silent prompt edit (content drift only)
+moved it to DEGRADED for re-evaluation. The deterministic half (hash / drift / state machine) is
+repeatable and offline-pinned; the live re-eval scores behaviour, so its verdict varies with the
+model's in-domain adherence. This lifecycle is now applied end-to-end in the POC 15 retrieval
+pane (retired dropped, degraded de-ranked).
+
+See `docs/04-poc-run-results.md`.

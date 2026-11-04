@@ -40,4 +40,13 @@ BUILDER_OUTPUT_DIR="$PWD/built-skills" \
     mvn -pl poc/poc-3-builder-agent spring-boot:run
 ```
 
+## Conclusion
+
+Against the hypothesis (claims C4 / C5): **proven.** The builder is one GOAP-planned, code-backed
+agent — no orchestration — and the loop is end-to-end: description → draft → validated pack on
+disk. The validate-before-write invariant held in every run: an invalid draft is never written, and
+`normalizeGoalOutput` repaired a live `NO_OP_GOAL` raw draft to `HEALTHY` before the pack was
+written. The residual weakness is the LLM's action-body quality (claim C9), which POC 9's
+eval-guided refinement loop repairs.
+
 See `docs/04-poc-run-results.md` and `.wiki/risks/validate-before-write.md`.

@@ -33,4 +33,12 @@ Offline (no endpoint):
 mvn -pl poc/poc-11-progressive-disclosure exec:java
 ```
 
+## Conclusion
+
+Against the hypothesis (claim C13): **proven.** The plan context stays **constant at 280 chars**
+while the bundled reference grows 3.1 KB → 313.1 KB (×100), whereas the eager (inlined) prompt
+grows 3,469 → 320,863 chars — the eager/progressive ratio climbs 13.2× → 1,220×. Loading on
+demand, not eagerly, is what keeps context cost flat as on-disk knowledge grows unbounded — the
+context-cost model of doc 03 §4.2, measured.
+
 See `docs/04-poc-run-results.md`.

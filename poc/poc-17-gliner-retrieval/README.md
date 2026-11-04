@@ -70,22 +70,60 @@ the six `ScaleSkillLibrary` targets, in two candidate-set variants: **matching**
 near-duplicates, directly comparable to POC 12) and **strict** (excluding the near-exact duplicate —
 the meaningful shadowing signal).
 
-## Measured results
+## Measured results (shared — skill selection, C10)
 
-Run 2026-11-02 (Java 21, ONNX Runtime 1.27.0 CPU, INT8 `onnx_quantized` variant):
+POCs 8, 12, 17, 19, and 20 test the same hypothesis — **skill selection at scale** (claim C10) —
+on the same scenario, with different techniques. This results section is **shared across their
+READMEs** (identical in each); the consolidated read is in `docs/04-poc-run-results.md` §7.1.
+
+**Small scale (POC 8 — 14 same-typed skills, lexical):** Precision@1 **100%**; the target stays
+top-1 as same-verb distractors are added (growth curve).
+
+**Distinct scale (POC 12/20 — 191 same-typed skills, full-library P@1):**
+
+| method | P@1 (191 distinct) |
+| --- | --- |
+| lexical (word TF) | 100% |
+| dense (feature hash) | 100% |
+| embedding (MiniLM, real) | 100% |
+
+**Under shadowing (POC 12/20 — 281 skills incl. 90 same-topic near-duplicates, full-library P@1):**
+
+| method | P@1 (281, shadowing) |
+| --- | --- |
+| lexical (word TF) | 17% |
+| dense (feature hash) | 0% |
+| embedding (MiniLM, real) | 33% |
+
+**On the 6-target candidate sets (POC 17/19 — matching vs strict variants):**
 
 | method | matching@1 | strict@1 |
 | --- | --- | --- |
-| **transformer (GLiNER2)** | **83%** | **100%** |
 | lexical (word TF) | 17% | 33% |
 | dense (feature hash) | 0% | 0% |
+| transformer (GLiNER2) | 83% | **100%** |
+| llm-id (Qwen3-0.6B) | 0% | 50% |
+| llm-ood (Qwen3-0.6B) | 50% | 67% |
 
-The transformer breaks the shadowing tie that text-similarity cannot: with the degenerate near-exact
-duplicate removed (**strict**), it selects the canonical skill for all six targets (**100%**), while
-lexical and dense collapse (33% / 0%). In the POC-12-comparable **matching** set — which includes the
-near-exact `v0` duplicate, a genuinely ambiguous choice — the transformer still leads (**83%** = 5/6).
-This is the mechanism the POC set out to test: a model that *understands* meaning, not one that
-matches hashed n-grams.
+**Shared reading:** retrieval is clean while skills are distinct (100% at every scale);
+near-duplicate shadowing collapses text-similarity (lexical 17%, dense 0%), and no text-similarity
+index cures it. Methods that score by *meaning* — a zero-shot transformer (GLiNER2, the best:
+strict 100%), a fine-tuned 0.6B LLM, and a real embedding index — all beat text-similarity
+decisively, but the near-duplicates are near-identical in *meaning* too, so none fully cures the
+collapse on its own. The real fix is library **curation** (dedup / lifecycle — POC 18, applied in
+the POC 15 retrieval pane).
+
+## Conclusion
+
+Against the hypothesis (claim C10, at scale — the remedy): **proven.** The GLiNER2 transformer
+**breaks the shadowing tie** that text-similarity cannot: with the degenerate near-exact duplicate
+removed (**strict**) it selects the canonical skill for all six targets (**100%**), while lexical
+and dense collapse (33% / 0%); in the POC-12-comparable **matching** set — which includes the
+near-exact `v0` duplicate, a genuinely ambiguous choice — it still leads (**83%** = 5/6). This is
+the mechanism the POC set out to test: a model that *understands* meaning, not one that matches
+hashed n-grams (see the shared results above). It also introduces the **local-model-gated**
+runtime category — the benchmark runs only when the one-time ONNX bundle is present, and the
+offline tests mock the classifier so the build stays green.
 
 ## Tests
 

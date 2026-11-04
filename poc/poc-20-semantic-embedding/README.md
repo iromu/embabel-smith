@@ -74,28 +74,60 @@ It prints a Precision@1 comparison table for the three methods (lexical / dense 
 POC 12's scenario: the **core** 191 distinct-topic library, the **full** 281 library (with 90
 same-topic near-duplicates), the growth curve, and per-target top-1.
 
-## Measured results
+## Measured results (shared — skill selection, C10)
 
-Run 2026-11-03 (Java 21, ONNX Runtime 1.27.0 CPU, INT8-quantized MiniLM):
+POCs 8, 12, 17, 19, and 20 test the same hypothesis — **skill selection at scale** (claim C10) —
+on the same scenario, with different techniques. This results section is **shared across their
+READMEs** (identical in each); the consolidated read is in `docs/04-poc-run-results.md` §7.1.
 
-| method | core@1 (191 distinct) | full@1 (281, shadowing) |
+**Small scale (POC 8 — 14 same-typed skills, lexical):** Precision@1 **100%**; the target stays
+top-1 as same-verb distractors are added (growth curve).
+
+**Distinct scale (POC 12/20 — 191 same-typed skills, full-library P@1):**
+
+| method | P@1 (191 distinct) |
+| --- | --- |
+| lexical (word TF) | 100% |
+| dense (feature hash) | 100% |
+| embedding (MiniLM, real) | 100% |
+
+**Under shadowing (POC 12/20 — 281 skills incl. 90 same-topic near-duplicates, full-library P@1):**
+
+| method | P@1 (281, shadowing) |
+| --- | --- |
+| lexical (word TF) | 17% |
+| dense (feature hash) | 0% |
+| embedding (MiniLM, real) | 33% |
+
+**On the 6-target candidate sets (POC 17/19 — matching vs strict variants):**
+
+| method | matching@1 | strict@1 |
 | --- | --- | --- |
-| lexical (word TF) | 100% | 17% |
-| dense (feature hash) | 100% | 0% |
-| **embedding (MiniLM)** | **100%** | **33%** |
+| lexical (word TF) | 17% | 33% |
+| dense (feature hash) | 0% | 0% |
+| transformer (GLiNER2) | 83% | **100%** |
+| llm-id (Qwen3-0.6B) | 0% | 50% |
+| llm-ood (Qwen3-0.6B) | 50% | 67% |
 
-Two findings:
+**Shared reading:** retrieval is clean while skills are distinct (100% at every scale);
+near-duplicate shadowing collapses text-similarity (lexical 17%, dense 0%), and no text-similarity
+index cures it. Methods that score by *meaning* — a zero-shot transformer (GLiNER2, the best:
+strict 100%), a fine-tuned 0.6B LLM, and a real embedding index — all beat text-similarity
+decisively, but the near-duplicates are near-identical in *meaning* too, so none fully cures the
+collapse on its own. The real fix is library **curation** (dedup / lifecycle — POC 18, applied in
+the POC 15 retrieval pane).
 
-1. **A real `EmbeddingService` now exists and retrieves cleanly at the distinct scale.** At 191
-   distinct-topic skills the MiniLM index hits **100%** Precision@1 — the doc 03 §2.1 gap is closed
-   with a genuine transformer index, not a stand-in.
-2. **A real embedding beats text-similarity under shadowing, but does not fully cure it.** At full
-   scale the transformer index scores **33%** — better than lexical (**17%**) and dense feature-hashing
-   (**0%**) — because it scores by *meaning*, not hashed n-grams. But it still gets shadowed on 4 of
-   the 6 targets (the near-duplicates are near-identical in *meaning* too, so the canonical skill is
-   not the unique best match). This confirms POC 12's conclusion: the fundamental fix for shadowing
-   is library **curation** (dedup / lifecycle — POC 18), not just a better embedding; a real
-   `EmbeddingService` improves the signal but shares the near-duplicate ambiguity.
+## Conclusion
+
+Against the hypothesis (claim C10 — the last retrieval gap): **proven, with the shared limit.**
+A genuine `EmbeddingService` now exists and **retrieves cleanly at the distinct scale** (100% at
+191 distinct-topic skills — the doc 03 §2.1 gap closed with a real transformer index, not a
+stand-in). Under shadowing it **beats text-similarity** (33% vs lexical 17% / dense 0%) because it
+scores by *meaning*, but it still gets shadowed on 4 of the 6 targets — the near-duplicates are
+near-identical in *meaning* too, so the canonical skill is not the unique best match. This confirms
+POC 12's conclusion: the fundamental fix for shadowing is library **curation** (dedup / lifecycle —
+POC 18), not just a better embedding (see the shared results above). The run is
+**local-model-gated** (one-time ONNX download; offline tests use a deterministic stub embedder).
 
 ## Tests
 

@@ -203,4 +203,19 @@ built with no `Ai`/`AgentPlatform` (the offline paths never reach the model).
 unknown skill, and a known skill without an endpoint (clear, named configuration error) — built with
 no `AgentPlatform` (the offline paths return before any model call).
 
+## Conclusion
+
+Against the hypothesis (claim C15 — "the builder UI is the missing piece"): **proven.** A real,
+browsable drag-and-drop canvas loads the skill palette, snaps only type-compatible connections,
+live-validates the chain, and exports the composite skill-pack over REST — the same model POC 14
+proves runs end-to-end. Every pane delegates to a proven POC, so the pixels drive proven logic:
+the **retrieval pane** (the POC 8/12/17/20 `SkillScorer` seam, POC 18 curation-aware — live: a
+score-collapsed skill was retired and dropped from results, a half-passing one de-ranked), the
+**author pane** (POC 2 — live: compiled a description to a draft and surfaced the `DraftQuality`
+verdict, which caught a `VOID_GOAL` degenerate draft on one run), the **eval/refinement pane**
+(POC 5/9 — live: 0.0 → 1.0 on a deliberately-failing task), and the **curate re-eval** (POC 18 —
+endpoint-gated). The honest limit of the live halves: a curate re-eval scores *behaviour*, so its
+verdict is only as stable as the model's in-domain adherence (the same out-of-domain re-eval
+retired a skill in one run and held it `STABLE` in the next).
+
 See `docs/04-poc-run-results.md`.

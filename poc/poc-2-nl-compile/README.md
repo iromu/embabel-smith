@@ -35,4 +35,14 @@ BUILDER_DESCRIPTION="A skill that explains a topic in plain language and posts i
     mvn -pl poc/poc-2-nl-compile spring-boot:run
 ```
 
+## Conclusion
+
+Against the hypothesis (claim C4): **proven, low quality at the source.** The NL → draft path
+works — a plain-language description compiles to a draft with ≥1 action, an exported goal, and the
+intermediate types — but the raw draft is the weak part: the same description has produced a
+`HEALTHY` draft in one run and a `VOID_GOAL` degenerate draft in the next, so the `DraftQuality`
+classifier (POC 2/3) measures it, and only POC 3's `normalizeGoalOutput` plus POC 9's
+eval-guided refinement repair it. The compiler is a measurement problem with a proven fix, not a
+broken path.
+
 See `docs/04-poc-run-results.md`.

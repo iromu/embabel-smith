@@ -45,4 +45,14 @@ BUILDER_INPUT="Explain how a coffee machine works" BUILDER_PLANNER=GOAP \
     mvn -pl poc/poc-1-no-code-runtime spring-boot:run
 ```
 
+## Conclusion
+
+Against the hypothesis (claims C1 / C2): **proven.** The skill-pack is ingested at runtime with
+zero compilation — `YmlStepSpecRepository` + `StepSpecAgentScopeBuilder.deploy()` load it into the
+live GOAP planner — and the single general-purpose agent plans over the exported goal and returns
+its output with no sub-agents and no orchestration code. The full loop (describe → build →
+validate → run) runs end-to-end on this runtime (POC 3 builds the pack; `./run-loop.sh` chains the
+two). The one honest limit: the plan is deterministic (non-LLM), but the action bodies are LLM
+calls, so the goal output varies run-to-run.
+
 See `docs/04-poc-run-results.md` for the full run evidence.

@@ -64,4 +64,15 @@ Paths are overridable via `COMPOSE_PACK_A`, `COMPOSE_PACK_B`, `COMPOSE_NAME`, an
 `COMPOSE_OUTPUT_DIR` (the composite is written to `COMPOSE_OUTPUT_DIR/<name>`, default
 `target/composed/compose-composite`).
 
+## Conclusion
+
+Against the hypothesis (claim C14): **proven.** Skills are nodes on a canvas whose connections are
+type-checked (an edge is valid only when the source's output type is one of the target's external
+inputs); a valid canvas is a single entry→exit chain; and the canvas exports as a **single new
+composite skill-pack** — the union of the component skills' steps and intermediate types under one
+new exported goal — that re-validates cleanly (0 issues) and runs end-to-end through the no-code
+runtime (the GOAP planner chains `extractTopic → writeExplainer` from the one pack; live: goal
+achieved in ~12.5–16.1 s). This closes the last Phase 1 component doc 03 lists; POC 15 puts the
+browser pixels on this same model.
+
 See `docs/04-poc-run-results.md`.

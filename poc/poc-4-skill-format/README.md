@@ -33,4 +33,12 @@ BUILDER_PACK_DIR="$PWD/skill-packs/explainer" BUILDER_INPUT="Explain how a coffe
     mvn -pl poc/poc-4-skill-format spring-boot:run
 ```
 
+## Conclusion
+
+Against the hypothesis (claims C2 / C3): **proven.** An exported goal is a callable skill — loaded
+on demand and planned over its action chain — and a goal declared `export: false` is not exposed.
+The `manifest/goal/steps/types` folder round-trips losslessly, so a skill-pack is a portable,
+versioned, lossless package: the same folder shape as both the SKILL.md-folder paradigm and the
+production realm format.
+
 See `docs/skill-pack-format.md` and `docs/04-poc-run-results.md`.

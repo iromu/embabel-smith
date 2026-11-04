@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.embabel.smith</groupId>
+        <artifactId>embabel-smith-poc</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>poc-22-unified-ui</artifactId>
+    <name>poc-22-unified-ui</name>
+    <description>
+        POC 22: the unified builder UI (doc 01's "missing piece"). A Spring Boot web app plus a
+        typed, component-based, unit-tested Vue 3 + Quasar + TypeScript SPA (Vite build, Vitest
+        tests) that exposes the full set of proven POC capabilities — run, author, compose,
+        retrieve, eval, lifecycle, security, trust, remote, scale — over a thin REST surface. Each
+        controller delegates to a proven POC class (the POC 15 pattern); no new agent/skill logic.
+        The default build depends only on the light + remote POC modules; the heavy scorers
+        (POC 17/19/20) plug in via the shared SkillScorer seam and are opt-in.
+    </description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.embabel.smith</groupId>
+            <artifactId>smith-common</artifactId>
+        </dependency>
+        <!-- Light POCs: run (1), NL compile (2), eval/refine (9), trust (10), retrieval (12),
+             composer (14), lifecycle (18), security (21). -->
+        <dependency>
+            <groupId>com.embabel.smith</groupId>
+            <artifactId>poc-1-no-code-runtime</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.embabel.smith</groupId>
+            <artifactId>poc-2-nl-compile</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.embabel.smith</groupId>
+            <artifactId>poc-9-quality-refinement</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.embabel.smith</groupId>
+            <artifactId>poc-10-trust-tiers</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.embabel.smith</groupId>
+            <artifactId>poc-12-semantic-retrieval</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.embabel.smith</groupId>
+            <artifactId>poc-14-composer</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.embabel.smith</groupId>
+            <artifactId>poc-18-skill-lifecycle</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.embabel.smith</groupId>
+            <artifactId>poc-21-skill-security</artifactId>
+        </dependency>
+        <!-- Remote transports: the MCP server (13) and the RestAction sidecar (16). -->
+        <dependency>
+            <groupId>com.embabel.smith</groupId>
+            <artifactId>poc-13-remote-mcp</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.embabel.smith</groupId>
+            <artifactId>poc-16-remote-action</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>

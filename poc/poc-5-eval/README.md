@@ -46,4 +46,14 @@ BUILDER_PACK_DIR="$PWD/skill-packs/explainer" BUILDER_EVAL_RUNS=1 \
     mvn -pl poc/poc-5-eval spring-boot:run
 ```
 
+## Conclusion
+
+Against the hypothesis (claim C6): **proven, and stable.** The LLM eval harness scores a goal-type
+skill (composite **1.0** over the explainer's tasks), and the score is a repeatable signal: 5 runs
+of the same skill + tasks gave per-run composites `[1.0 ×5]` — mean 1.0, range 0.0, stdev 0.0,
+`STABLE` — because the non-LLM scoring is deterministic and the noise comes only from the LLM's
+outputs, which for a well-behaved skill is none. What remains unmeasured is stability on a *weak*
+skill, whose outputs vary more (its score would read as a distribution, not a point). The
+failing-task → revised-prompt path is the stretch goal POC 9 turns into the full refinement loop.
+
 See `docs/04-poc-run-results.md`.
