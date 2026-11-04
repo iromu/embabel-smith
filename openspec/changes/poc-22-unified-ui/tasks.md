@@ -26,10 +26,10 @@
 
 ## 5. Quasar panes + component tests
 
-- [ ] 5.1 Implement the offline panes (Compose, Retrieve, Security, Trust, Scale) as thin `.vue` SFCs over `canvas/model.ts` + `api/client.ts`; verify `npx vue-tsc --noEmit` passes
-- [ ] 5.2 Implement the endpoint-gated panes (Run, Author, Eval, Lifecycle) with the endpoint-not-configured state; verify `npx vue-tsc --noEmit` passes
-- [ ] 5.3 Implement the Remote pane with the backing-process-not-running state; verify `npx vue-tsc --noEmit` passes
-- [ ] 5.4 Add component tests (Vitest + `@vue/test-utils`) for 2-3 representative panes (Compose, Retrieve, one endpoint-gated pane) that mount the SFC, fill inputs, and assert the API is called + the result rendered; verify `npx vitest run` (component suite) passes
+- [x] 5.1 Implement the offline panes (Compose, Retrieve, Security, Trust, Scale) as thin `.vue` SFCs over `canvas/model.ts` + `api/client.ts`; verify `npx vue-tsc --noEmit` passes
+- [x] 5.2 Implement the endpoint-gated panes (Run, Author, Eval, Lifecycle) with the endpoint-not-configured state; verify `npx vue-tsc --noEmit` passes
+- [x] 5.3 Implement the Remote pane with the backing-process-not-running state; verify `npx vue-tsc --noEmit` passes
+- [x] 5.4 Add component tests (Vitest + `@vue/test-utils`) for 2-3 representative panes (Compose, Retrieve, one endpoint-gated pane) that mount the SFC, fill inputs, and assert the API is called + the result rendered; verify `npx vitest run` (component suite) passes
 
 ## 6. Build + serving wiring
 
