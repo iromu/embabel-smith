@@ -90,3 +90,11 @@ export const curate = (req: CurateRequest): Promise<CurateResponse> =>
 // ---- Remote (POC 13/16) ----------------------------------------------------
 export const invokeRemote = (req: RemoteRequest): Promise<RemoteResponse> =>
   post<RemoteResponse>('/api/remote', req)
+
+/**
+ * True when a pane's error is the "no model endpoint configured" gating message (the endpoint-gated
+ * panes render a dedicated, non-error state for it rather than a generic failure).
+ */
+export function isEndpointNotConfigured(message: string | null | undefined): boolean {
+  return message?.includes('No resolvable model endpoint') ?? false
+}
