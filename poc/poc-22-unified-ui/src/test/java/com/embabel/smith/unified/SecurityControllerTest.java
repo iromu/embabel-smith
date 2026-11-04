@@ -6,6 +6,8 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import java.util.List;
+
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -32,9 +34,9 @@ class SecurityControllerTest {
                 .content("{\"skillName\":\"shell-runner\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.error").isEmpty())
-                .andExpect(jsonPath("$.verdict").value(org.hamcrest.Matchers.in("REVIEW", "BLOCK")))
+                .andExpect(jsonPath("$.verdict").value(org.hamcrest.Matchers.isIn(List.of("REVIEW", "BLOCK"))))
                 .andExpect(jsonPath("$.recommendedTier")
-                        .value(org.hamcrest.Matchers.in("T3_PARTNER", "T4_PLATFORM")))
+                        .value(org.hamcrest.Matchers.isIn(List.of("T3_PARTNER", "T4_PLATFORM"))))
                 .andExpect(jsonPath("$.findings[?(@.category=='HIGH_PRIVILEGE_TOOL')]").exists());
     }
 
@@ -45,7 +47,7 @@ class SecurityControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.error").isEmpty())
                 .andExpect(jsonPath("$.verdict")
-                        .value(org.hamcrest.Matchers.in("SAFE", "REVIEW", "BLOCK")))
+                        .value(org.hamcrest.Matchers.isIn(List.of("SAFE", "REVIEW", "BLOCK"))))
                 .andExpect(jsonPath("$.summary").exists());
     }
 

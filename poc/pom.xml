@@ -41,5 +41,6 @@
         <module>poc-19-small-llm-selector</module>
         <module>poc-20-semantic-embedding</module>
         <module>poc-21-skill-security</module>
+        <module>poc-22-unified-ui</module>
     </modules>
 </project>

@@ -2,15 +2,15 @@
 
 ## 1. Scaffold the module
 
-- [ ] 1.1 Create `poc/poc-22-unified-ui/` (pom.xml, `src/main/java`, `src/main/resources`, `frontend/`) and register it in `poc/pom.xml`; verify `mvn -pl poc/poc-22-unified-ui -q validate` passes and the module appears in the reactor
-- [ ] 1.2 Add dependencies to the pom — the light POCs (poc-1, poc-2, poc-9, poc-10, poc-12, poc-14, poc-18, poc-21), the remote POCs (poc-13, poc-16), `smith-common`, and `spring-boot-starter-web` / `-test`; verify `mvn -pl poc/poc-22-unified-ui -q dependency:resolve` succeeds (the heavy scorers poc-17/19/20 are NOT added by default — they are opt-in, see 7.3)
-- [ ] 1.3 Scaffold the frontend (Vite + Vue 3 + Quasar + TS + Vitest) under `frontend/` with `vite.config.ts` (build outDir → `../src/main/resources/static`; dev proxy `/api` → `:18080`), `tsconfig.json`, `index.html`, `src/main.ts`, `src/App.vue` (Quasar layout + nav), `src/router.ts` (10 routes); verify `npm run build` emits `src/main/resources/static/` and `npx vue-tsc --noEmit` passes
-- [ ] 1.4 Add `poc/poc-22-unified-ui/README.md` with a mermaid diagram of the architecture (SPA → thin REST → proven POC modules); verify the mermaid block parses (the repo's headless-mermaid check)
+- [x] 1.1 Create `poc/poc-22-unified-ui/` (pom.xml, `src/main/java`, `src/main/resources`, `frontend/`) and register it in `poc/pom.xml`; verify `mvn -pl poc/poc-22-unified-ui -q validate` passes and the module appears in the reactor
+- [x] 1.2 Add dependencies to the pom — the light POCs (poc-1, poc-2, poc-9, poc-10, poc-12, poc-14, poc-18, poc-21), the remote POCs (poc-13, poc-16), `smith-common`, and `spring-boot-starter-web` / `-test`; verify `mvn -pl poc/poc-22-unified-ui -q dependency:resolve` succeeds (the heavy scorers poc-17/19/20 are NOT added by default — they are opt-in, see 7.3)
+- [x] 1.3 Scaffold the frontend (Vite + Vue 3 + Quasar + TS + Vitest) under `frontend/` with `vite.config.ts` (build outDir → `../src/main/resources/static`; dev proxy `/api` → `:18080`), `tsconfig.json`, `index.html`, `src/main.ts`, `src/App.vue` (Quasar layout + nav), `src/router.ts` (10 routes); verify `npm run build` emits `src/main/resources/static/` and `npx vue-tsc --noEmit` passes
+- [x] 1.4 Add `poc/poc-22-unified-ui/README.md` with a mermaid diagram of the architecture (SPA → thin REST → proven POC modules); verify the mermaid block parses (the repo's headless-mermaid check)
 
 ## 2. Canvas model (pure, unit-tested)
 
-- [ ] 2.1 Implement `frontend/src/canvas/model.ts` — the type-checked snap rule + chain validation as pure functions (`{nodes, edges, skills} → {valid, issues, chain}`), mirroring POC 14's edge type-check; verify with unit tests that a type-compatible edge is valid and a type-incompatible edge is flagged with the reason
-- [ ] 2.2 Add unit tests for chain composition (a valid single chain, disconnected nodes, a cycle) in `frontend/src/__tests__/canvas.model.test.ts`; verify `npx vitest run canvas.model` passes
+- [x] 2.1 Implement `frontend/src/canvas/model.ts` — the type-checked snap rule + chain validation as pure functions (`{nodes, edges, skills} → {valid, issues, chain}`), mirroring POC 14's edge type-check; verify with unit tests that a type-compatible edge is valid and a type-incompatible edge is flagged with the reason
+- [x] 2.2 Add unit tests for chain composition (a valid single chain, disconnected nodes, a cycle) in `frontend/src/__tests__/canvas.model.test.ts`; verify `npx vitest run canvas.model` passes
 
 ## 3. Backend thin controllers + DTOs
 

@@ -1,5 +1,5 @@
 # Embabel Smith POC — Conclusions vs. the Theory
-*Run 2026-11-02, full re-run 2026-11-03 (Java 25 / GraalVM CE, target Java 21 · Spring Boot 4.1.1 · Embabel 1.5.3) · POC 1–21*
+*Run 2026-11-02, full re-runs 2026-11-03 ×2 + 2026-11-04 (Java 25 / GraalVM CE, target Java 21 · Spring Boot 4.1.1 · Embabel 1.5.3) · POC 1–21*
 
 This page concludes the POC run **against the hypothesis laid out in docs 01–03**: what the POCs
 actually proved, what they did not, and which POCs are still missing. The run now covers **all
@@ -10,9 +10,17 @@ disclosure, **semantic retrieval at scale**, **remote / MCP invocation**, the **
 classification**, **skill lifecycle / drift detection**, **small-LLM skill selection**, the
 **real semantic `EmbeddingService`**, and **install-time skill security / vulnerability scanning**).
 The raw run evidence (the green loop, the offline baseline, the defects fixed) is kept in §5 as
-support. The full suite was **re-run on 2026-11-03** and every POC remains green with consistent
-numbers (the retrieval / transformer / embedding / small-LLM tables reproduce to the same
-percentages as the 2026-11-02 run).
+support. The full suite was **re-run twice on 2026-11-03 and again on 2026-11-04** (this page's
+latest evidence, the 2026-11-04 re-run) and every POC remains green with consistent numbers: the
+offline POCs reproduce to the last digit, and the retrieval / transformer / embedding / small-LLM
+tables reproduce to the same percentages as the 2026-11-02 run. The only run-to-run variation is
+LLM timing and LLM output — the full loop's wall time (11.5 s on 2026-11-04 vs 32.7 s the prior
+evening), the raw NL draft (`NO_OP_GOAL`→HEALTHY in the builder, and a `VOID_GOAL` from the POC 15
+author pane this run), and the POC 15 live curate re-eval (score collapse → `RETIRED` in the
+2026-11-03 morning run, stable at 1.0 in the 2026-11-03 evening run because the model answered
+the out-of-domain tasks directly). The 2026-11-04 re-run confirms the suite has **converged**:
+all 21 POCs green, every claim C1–C18 mapped, and no new gap or fixable caveat surfaced (the §4
+caveats remain honest limits — LLM behaviour, pattern-matcher bounds, inherent shadowing).
 
 ---
 
@@ -343,16 +351,20 @@ is now built (POC 20)** — what remains is wiring it (and the other POCs) into 
    bridges (shell → POC 7, MCP → POC 13, remote action → POC 16). **POC 20 now builds the real
    semantic `EmbeddingService`** doc 03 §2.1 names as the missing layer (a genuine ONNX
    sentence-encoder behind the `SkillScorer` seam), so every doc 03 §1/§2 component is now built.
-   What is **not** yet done: (a) the real embedding improves the shadowing signal (33%) but does not
-   cure the near-duplicate collapse on its own (the fix is curation — POC 18); and (b) the POC 15
-   canvas now has a **retrieval pane** (the POC 8/12/20 `SkillScorer` seam — lexical by default, the
-   POC 20 embedding a drop-in — now **POC 18 curation-aware**: it stamps each hit with the skill's
-   lifecycle state, drops retired skills, and de-ranks degraded ones), an **NL-authoring pane** (POC
-   2/3 — compile a description to a draft and show its `DraftQuality` verdict, endpoint-gated), an
-   **eval/refinement pane** (POC 5/9 — run an eval over tasks and, on failure, offer a prompt rewrite
-   + re-score, endpoint-gated), and a **curate re-eval** (POC 18 — re-score a skill's live pass-rate
-   and move it through the lifecycle, endpoint-gated), so a skill can be described, routed,
-   checked/refined, and curated on the same surface.
+   What is **not** done: (a) the real embedding improves the shadowing signal (33%) but does not
+   cure the near-duplicate collapse on its own — that is inherent (near-duplicates are
+   near-identical in *meaning* too), and the fix is library **curation** (dedup / lifecycle, POC
+   18), which the POC 15 canvas now **applies** end-to-end. The builder UI's panes are all wired
+   and live-verified (§5): a **retrieval pane** (the POC 8/12/20 `SkillScorer` seam — lexical by
+   default, the POC 20 embedding a drop-in — **POC 18 curation-aware**: it stamps each hit with the
+   skill's lifecycle state, drops retired skills, and de-ranks degraded ones), an **NL-authoring
+   pane** (POC 2/3 — compile a description to a draft and show its `DraftQuality` verdict,
+   endpoint-gated), an **eval/refinement pane** (POC 5/9 — run an eval over tasks and, on failure,
+   offer a prompt rewrite + re-score, endpoint-gated), and a **curate re-eval** (POC 18 — re-score
+   a skill's live pass-rate and move it through the lifecycle, endpoint-gated), so a skill can be
+   described, routed, checked/refined, and curated on the same surface. Out of POC scope (not
+   hypothesis claims C1–C18) are the doc 03 §3 convenience panes — a single-skill **Editor**, a
+   **Planner Advisor**, a **Runtime Bridges** config pane, and a **Trust & Security** pane.
 2. **LLM-authored skill quality is still weak at the source — now measured** (C9). The NL compiler
    still emits weak or degenerate drafts — a `void` goal (plan STUCKs), a no-op `UserInput→UserInput`
    goal (trivially "achieved" with no output), a scalar goal, or an *orphan* goal (no action produces
@@ -380,7 +392,13 @@ is now built (POC 20)** — what remains is wiring it (and the other POCs) into 
    signal**. The score is only as noisy as the LLM's outputs; for a well-behaved skill that noise is
    zero, so "eval scores are meaningful" (doc 01 §5) is now backed by measurement. What remains
    unmeasured is stability on a *weak* skill (whose LLM outputs vary more) — there the score would
-   read as a distribution rather than a point.
+   read as a distribution rather than a point. The second 2026-11-03 re-run now shows that
+   run-to-run LLM variation *does* move a live score: the POC 15 curate re-eval of `reference-heavy`
+   over the same out-of-domain tasks retired it (pass-rate 1.00 → 0.00) in the morning run but
+   held it `STABLE` at 1.0 in the evening run, because the model answered those tasks directly the
+   second time. A live re-eval therefore scores *behaviour*, and its verdict is only as stable as
+   the model's in-domain adherence — the deterministic half (hash / drift / state machine, POC 18)
+   is what is repeatable.
 5. **The guardrail is a normalized pattern matcher, not a semantic detector** (C12 caveat). POC 10's
    guardrail now normalizes the input (lowercase, punctuation/whitespace stripped) and matches a set
    of known injection phrases, so it catches the obfuscated variants a plain substring match missed —
@@ -409,9 +427,9 @@ is now built (POC 20)** — what remains is wiring it (and the other POCs) into 
 ## 5. Run evidence (support)
 
 - **Offline baseline:** `mvn test` green across all modules — **211 tests, 0 failures, 0 errors**
-  (re-run 2026-11-03; +11 from POC 21's security scanner, +10 from POC 20, +3 from the POC 15
-  retrieval pane, +2 from the POC 15 author pane, +3 from the POC 15 eval/refinement pane, +12 from
-  the POC 15 library curation).
+  (re-run ×2 on 2026-11-03 + 2026-11-04, all green; +11 from POC 21's security scanner, +10 from
+  POC 20, +3 from the POC 15 retrieval pane, +2 from the POC 15 author pane, +3 from the POC 15
+  eval/refinement pane, +12 from the POC 15 library curation).
   Coverage: format round-trip, validation,
   **draft-quality classifier (POC 2/3 caveat #2)**, builder normalization, writer idempotency,
   composition wiring, shell tool, lexical retrieval, **200+ scale retrieval (POC 12)**,
@@ -431,17 +449,20 @@ is now built (POC 20)** — what remains is wiring it (and the other POCs) into 
   (a single `UserInput → BackgroundMessage` step — the LLM named it `explainTopic` this run; the name
   and step count vary run-to-run) and the no-code runtime ran it over *"Explain how a coffee machine
   works"*, producing a coherent goal output in ~14 s on the 2026-11-03 re-run
-  (`goal … achieved in PT13.72S`; ~30 s on the original 2026-11-02 run — the loop is
+  (`goal … achieved in PT13.72S` on the 2026-11-03 re-run; ~30 s on the original 2026-11-02 run;
+  `PT32.7S` on the second 2026-11-03 re-run, which hit one LLM parse retry — the loop is
   endpoint-LLM-bound, so wall time varies with the model).
 - **Draft-quality measurement (POC 2/3, caveat #2): live.** The `DraftQuality` classifier now reports
   a draft's goal shape. POC 2 (raw compile) printed **HEALTHY** for one LLM call (goal output `Message`,
-  produced by the action). POC 3 (builder) showed the other side of the same coin on the *same*
-  description: the LLM produced a **NO_OP_GOAL** raw draft (*"the goal echoes its input (UserInput) and
-  is trivially satisfied with no output"*), and the builder's `normalizeGoalOutput` repaired it —
-  **`raw=NO_OP_GOAL → normalized=HEALTHY`** — before writing the pack to disk. The same description
-  yielding a healthy draft in one run and a degenerate one in the next is the "weak at source" problem
-  made concrete; six offline tests (`DraftQualityTest`) pin every degenerate verdict (void, no-op,
-  scalar, orphan, no-goal).
+  produced by the action) — and **`VOID_GOAL` (DEGENERATE)** on the second 2026-11-03 re-run of the
+  *same* description (goal output `void`, which never registers in the GOAP world state), so the
+  classifier caught a fresh degenerate shape on a re-run. POC 3 (builder) showed the other side of the
+  same coin on the *same* description in both re-runs: the LLM produced a **NO_OP_GOAL** raw draft
+  (*"the goal echoes its input (UserInput) and is trivially satisfied with no output"*), and the
+  builder's `normalizeGoalOutput` repaired it — **`raw=NO_OP_GOAL → normalized=HEALTHY`** — before
+  writing the pack to disk. The same description yielding a healthy draft in one run and a degenerate
+  one in the next is the "weak at source" problem made concrete; six offline tests (`DraftQualityTest`)
+  pin every degenerate verdict (void, no-op, scalar, orphan, no-goal).
 - **Composition (POC 6): GREEN.** Two independent packs — `compose-extract`
   (`UserInput → TopicBrief`) and `compose-explain` (`TopicBrief → BackgroundMessage`) — composed
   over goal `explainerDone`; the GOAP plan chained `extractTopic` → `writeExplainer` through the
@@ -506,7 +527,8 @@ is now built (POC 20)** — what remains is wiring it (and the other POCs) into 
   cleanly (0 issues)**. The exported composite then runs **live** through the no-code runtime
   (`BUILDER_PACK_DIR=target/composed/compose-composite`): the GOAP planner chains
   `extractTopic → writeExplainer` from the single pack — `goal compose-compositeGoal achieved in
-  PT12.5S` — and returns a coherent explanation of *"how a coffee machine works"*. Offline, four
+  PT12.5S` (first 2026-11-03 re-run; `PT16.1S` on the second) — and returns a coherent explanation
+  of *"how a coffee machine works"*. Offline, four
   canvas tests pin the edge type-check / entry-exit / disconnected-node cases and two exporter tests
   pin the composite's shape and clean re-validation.
 - **Visual skill-chain editor (POC 15): GREEN (live web app) + offline.** The Spring Boot app boots
@@ -550,7 +572,14 @@ is now built (POC 20)** — what remains is wiring it (and the other POCs) into 
   next retrieval **de-ranked it** (its score halved, so it fell from 1st to 3rd, below the ACTIVE
   `explainer` / `compose-extract`) while still surfacing it. (The curate re-eval deploys the skill as
   a throwaway agent, so it only runs skills whose actions use the built-in `UserInput` /
-  `BackgroundMessage` types — POC 18's `LiveEvalRunner` registers exactly those.)
+  `BackgroundMessage` types — POC 18's `LiveEvalRunner` registers exactly those.) On the second
+  2026-11-03 re-run the *same* out-of-domain curate re-eval of `reference-heavy` returned
+  **STABLE** (`before: ACTIVE, after: ACTIVE, baselineScore: 1.0, currentScore: 1.0`) instead of
+  retiring it: the model answered the out-of-domain tasks directly (its output still contained the
+  `mustContain` substrings), so the live pass-rate held at 1.0. The transition machinery is
+  unchanged and correct (the `RETIRED` / `DEGRADED` demos above are the recorded live evidence);
+  what varies run-to-run is the LLM's willingness to stay in-domain — the honest limit of a live
+  re-eval, which scores behaviour, not intent.
   Offline, eighteen standalone-`MockMvc` tests (`CanvasControllerTest` + `RetrievalControllerTest` +
   `NlAuthoringControllerTest` + `EvalControllerTest` + `CurationControllerTest`) pin the REST
   behaviours — palette listing, valid-chain acceptance, type-incompatible rejection, composite export,
@@ -572,7 +601,8 @@ is now built (POC 20)** — what remains is wiring it (and the other POCs) into 
   catalog), `GET /api/v1/types` (empty — the action uses the built-in `UserInput`/`BackgroundMessage`),
   and `POST /api/v1/actions/execute`. The agent pulls the action in as a `RestAction`
   (`RestServer.agentScope(platform)`), a GOAP plan is formulated over it, and the plan executes the
-  action **over HTTP to the sidecar**. Live: the plan `remoteDigest` ran in `PT0.127S`, the sidecar
+  action **over HTTP to the sidecar**. Live: the plan `remoteDigest` ran in `PT0.123S` (second
+  2026-11-03 re-run; `PT0.127S` on the first), the sidecar
   returned `"Digested on the remote sidecar (no LLM): 9 words, 44 chars. Input began: \"Explain\""`,
   and the goal was achieved — the whole plan with **no LLM call** (the endpoint is only for platform
   boot). Offline, four `RemoteActionSidecarTest` tests pin the catalog (input var `userInput`, output
@@ -688,6 +718,37 @@ is now built (POC 20)** — what remains is wiring it (and the other POCs) into 
   injection→BLOCK, secret-exfil→BLOCK, network→REVIEW, untrusted-input-to-shell flagged (and *not*
   flagged when the shell step doesn't read `UserInput`), the combined malicious pack→BLOCK, and the
   canonical explainer→SAFE — no model.
+- **Second full re-run (evening 2026-11-03): all 21 POCs green, tables reproduce.** Every gate was
+  available (LiteLLM endpoint up, Docker daemon up, both ONNX bundles + the GGUF + the `llama.cpp`
+  image present, port 18080 free), so nothing was skipped. The offline POCs (8, 11, 12, 14, 21)
+  reproduced to the last digit; the transformer / embedding / small-LLM tables (POC 17: 83%/100%,
+  POC 20: 100% core / 17%-0%-33% full, POC 19: the five-method table) reproduced to the same
+  percentages; POC 9 (0% → 100%), POC 10 (injection blocked after ~5 retries), POC 13 (MCP
+  `PROVEN`), POC 18 (100% → 0% → `RETIRED`), and POC 5 (composite 1.0, 5 runs range 0.0 → `STABLE`)
+  all reproduced. The only new data points are LLM-variation, not verdict changes: the full loop's
+  wall time (`PT32.7S`, one parse retry), POC 2's raw draft (`VOID_GOAL` this run vs `HEALTHY` the
+  prior), and the POC 15 live curate re-eval (STABLE at 1.0 this run vs `RETIRED` the prior — see
+  the POC 15 entry above).
+- **Third full re-run (2026-11-04): all 21 POCs green, tables reproduce.** Every gate was available
+  (LiteLLM endpoint up serving `Qwen-instruct`, Docker daemon up, all three model bundles present —
+  the POC 17 GLiNER2 INT8 bundle, the POC 20 MiniLM ONNX, the POC 19 Q8_0 GGUF — and port 18080
+  free), so nothing was skipped. The offline baseline is **211 tests, 0 failures, 0 errors**; the
+  offline POCs (8: P@1 100%; 11: 13.19×→1,220.01×; 12: 100% core / 17%-0% full; 14: composite 0
+  issues; 21: SAFE/REVIEW/BLOCK) reproduce to the last digit; the model tables reproduce to the same
+  percentages (POC 17: 83%/100%, POC 20: 100% core / 17%-0%-33% full, POC 19: the five-method table).
+  The endpoint-gated POCs all reproduced: the full loop (builder `raw=NO_OP_GOAL →
+  normalized=HEALTHY`, no-code runtime PT11.5S, a coherent coffee-machine explanation), POC 7
+  (`uname -s` → `Linux`, PT7.9S), POC 6 (composition PT21.7S), POC 5 (composite 1.0, 5 runs range
+  0.0 → `STABLE`), POC 9 (0% → 100%), POC 10 (T1 REFUSED `[shell]` / T3 ALLOWED; clean achieved;
+  injection blocked, CRITICAL, retried 5×), POC 13 (MCP `explainTopic` PT46S, `PROVEN`), POC 16
+  (remote sidecar PT0.13S, no LLM), POC 18 (100% → 0% → `RETIRED`), and POC 15's live surface
+  (5-skill palette; retrieval `compose-explain` 0.186 → `compose-extract` 0.151 → `explainer`
+  0.126, all `ACTIVE`; canvas valid-chain accepted and the reversed edge rejected with the type
+  reason; the author pane compiled to a `VOID_GOAL` degenerate draft this run and surfaced the
+  `DraftQuality` verdict). The only new data points are LLM-variation, not verdict changes — the
+  full loop's wall time (11.5 s, faster than the prior 32.7 s) and the POC 15 author pane's raw
+  draft (`VOID_GOAL` this run). **No new gap or fixable caveat surfaced** — the suite has
+  converged (see the §4 note).
 - **Two transient failures, both green on retry.** POC 5 first failed with
   `Could not find artifact poc-1-no-code-runtime` (a build-ordering issue — the cross-POC dependency
   wasn't installed); after `mvn install` it ran clean (**eval composite 1.0**, both cases pass). POC 9
@@ -804,7 +865,106 @@ drift (POC 18), the real semantic `EmbeddingService` (POC 20), and **install-tim
 
 ---
 
-## 7. How to re-run
+## 7. Shared results by hypothesis area
+
+Some hypothesis areas are tested by **multiple POCs with different techniques** on the same
+scenario. Their results are shared: each POC's `README.md` carries the same consolidated
+"Measured results (shared — …)" section, and this page is the consolidated read. Each POC's
+verdict against the hypothesis is in its `README.md` **"Conclusion"** section.
+
+### 7.1 Skill selection at scale (C10) — POC 8 / 12 / 17 / 19 / 20
+
+Five POCs, one scenario, five techniques — lexical (POC 8), dense feature-hashing (POC 12),
+GLiNER2 zero-shot transformer (POC 17), 0.6B fine-tuned LLM (POC 19), and a real MiniLM
+embedding (POC 20):
+
+**Small scale (POC 8 — 14 same-typed skills, lexical):** Precision@1 **100%**; the target stays
+top-1 as same-verb distractors are added (growth curve).
+
+**Distinct scale (POC 12/20 — 191 same-typed skills, full-library P@1):**
+
+| method | P@1 (191 distinct) |
+| --- | --- |
+| lexical (word TF) | 100% |
+| dense (feature hash) | 100% |
+| embedding (MiniLM, real) | 100% |
+
+**Under shadowing (POC 12/20 — 281 skills incl. 90 same-topic near-duplicates, full-library P@1):**
+
+| method | P@1 (281, shadowing) |
+| --- | --- |
+| lexical (word TF) | 17% |
+| dense (feature hash) | 0% |
+| embedding (MiniLM, real) | 33% |
+
+**On the 6-target candidate sets (POC 17/19 — matching vs strict variants):**
+
+| method | matching@1 | strict@1 |
+| --- | --- | --- |
+| lexical (word TF) | 17% | 33% |
+| dense (feature hash) | 0% | 0% |
+| transformer (GLiNER2) | 83% | **100%** |
+| llm-id (Qwen3-0.6B) | 0% | 50% |
+| llm-ood (Qwen3-0.6B) | 50% | 67% |
+
+**Shared reading:** retrieval is clean while skills are distinct (100% at every scale);
+near-duplicate shadowing collapses text-similarity (lexical 17%, dense 0%), and no text-similarity
+index cures it. Methods that score by *meaning* — a zero-shot transformer (GLiNER2, the best:
+strict 100%), a fine-tuned 0.6B LLM, and a real embedding index — all beat text-similarity
+decisively, but the near-duplicates are near-identical in *meaning* too, so none fully cures the
+collapse on its own. The real fix is library **curation** (dedup / lifecycle — POC 18, applied in
+the POC 15 retrieval pane). Raw run evidence: §5 (the POC 8 / 12 / 17 / 19 / 20 entries). Shared
+sections: [`poc/poc-8-retrieval`](poc/poc-8-retrieval/README.md) ·
+[`poc/poc-12-semantic-retrieval`](poc/poc-12-semantic-retrieval/README.md) ·
+[`poc/poc-17-gliner-retrieval`](poc/poc-17-gliner-retrieval/README.md) ·
+[`poc/poc-19-small-llm-selector`](poc/poc-19-small-llm-selector/README.md) ·
+[`poc/poc-20-semantic-embedding`](poc/poc-20-semantic-embedding/README.md).
+
+### 7.2 Runtime bridges (C11 / C16) — POC 7 / 13 / 16
+
+The three runtime bridges doc 03 §2.3 names — the "normal agent harness":
+
+| bridge | POC | live evidence | LLM calls in the plan |
+| --- | --- | --- | --- |
+| shell (local CLI) | POC 7 | `runCommand` → `{"stdout":"Linux"}`; goal achieved | 1 (action body) |
+| MCP (remote tool) | POC 13 | `explainTopic` invoked over Streamable HTTP by a separate client | 1 (action body) |
+| remote action (sidecar) | POC 16 | `remoteDigest` executed over HTTP to a separate process; plan in ~0.13 s | 0 |
+
+All three: the same GOAP planner plans over, and executes, an action that runs outside the LLM —
+in a local CLI, a remote MCP server, or a separate sidecar process. Shared sections:
+[`poc/poc-7-runtime-adapter`](poc/poc-7-runtime-adapter/README.md) ·
+[`poc/poc-13-remote-mcp`](poc/poc-13-remote-mcp/README.md) ·
+[`poc/poc-16-remote-action`](poc/poc-16-remote-action/README.md).
+
+### 7.3 Security (C12 / C18) — POC 10 / 21
+
+Runtime trust tiers + guardrail (POC 10) and install-time static scan (POC 21) — the two halves
+of the same security hypothesis:
+
+**Runtime tier policy (POC 10):**
+
+| skill | declared tool groups | T1_COMMUNITY | T3_PARTNER |
+| --- | --- | --- | --- |
+| `shell-runner` | `[shell]` | REFUSED (disallowed `[shell]`) | ALLOWED |
+| `explainer` | `[]` | ALLOWED | ALLOWED |
+
+**Install-time scan (POC 21):**
+
+| pack | verdict | minimum tier | findings |
+| --- | --- | --- | --- |
+| `explainer` / `reference-heavy` / `compose-extract` / `compose-explain` | SAFE | T1_COMMUNITY | (clean) |
+| `shell-runner` | REVIEW | T3_PARTNER | high-privilege tool (`shell`) + `UserInput → shell` chain |
+| synthetic malicious pack | BLOCK | T3_PARTNER | prompt-injection + secret-exfil (2 criticals) + network + high-priv + chain |
+
+The scanner's tier mapping agrees with the runtime policy: its "load at T3+" is exactly what POC 10
+enforces. Both halves share the same honest limit — a normalized pattern matcher over declared
+content, not a semantic detector. Shared sections:
+[`poc/poc-10-trust-tiers`](poc/poc-10-trust-tiers/README.md) ·
+[`poc/poc-21-skill-security`](poc/poc-21-skill-security/README.md).
+
+---
+
+## 8. How to re-run
 
 ```bash
 mvn install -DskipTests

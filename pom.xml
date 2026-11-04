@@ -155,6 +155,22 @@
                 <artifactId>poc-10-trust-tiers</artifactId>
                 <version>${project.version}</version>
             </dependency>
+            <dependency>
+                <groupId>com.embabel.smith</groupId>
+                <artifactId>poc-21-skill-security</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <!-- Remote transports (POC 22 Remote pane): the RestAction sidecar and the MCP server. -->
+            <dependency>
+                <groupId>com.embabel.smith</groupId>
+                <artifactId>poc-13-remote-mcp</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.embabel.smith</groupId>
+                <artifactId>poc-16-remote-action</artifactId>
+                <version>${project.version}</version>
+            </dependency>
 
             <!-- Jackson (used by smith-common for skill-pack YAML I/O). -->
             <dependency>

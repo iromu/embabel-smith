@@ -29,12 +29,15 @@ class ScaleControllerTest {
     @Test
     void scaleReportsPrecisionAt1AndAGrowthCurve() throws Exception {
         mockMvc.perform(get("/api/scale"))
+                .andDo(r -> System.out.println("DEBUG_BODY=" + r.getResponse().getContentAsString()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.scorer").value("lexical"))
                 .andExpect(jsonPath("$.coreSize").value(org.hamcrest.Matchers.greaterThan(0)))
                 .andExpect(jsonPath("$.fullSize").value(org.hamcrest.Matchers.greaterThan("$.coreSize")))
-                .andExpect(jsonPath("$.coreP1").value(org.hamcrest.Matchers.between(0.0, 1.0)))
-                .andExpect(jsonPath("$.fullP1").value(org.hamcrest.Matchers.between(0.0, 1.0)))
+                .andExpect(jsonPath("$.coreP1").value(org.hamcrest.Matchers.greaterThanOrEqualTo(0.0)))
+                .andExpect(jsonPath("$.coreP1").value(org.hamcrest.Matchers.lessThanOrEqualTo(1.0)))
+                .andExpect(jsonPath("$.fullP1").value(org.hamcrest.Matchers.greaterThanOrEqualTo(0.0)))
+                .andExpect(jsonPath("$.fullP1").value(org.hamcrest.Matchers.lessThanOrEqualTo(1.0)))
                 .andExpect(jsonPath("$.curve").isArray())
                 .andExpect(jsonPath("$.curve.length()").value(org.hamcrest.Matchers.greaterThan(0)));
     }
