@@ -14,7 +14,7 @@
 
 ## 3. Backend thin controllers + DTOs
 
-- [ ] 3.1 Implement the offline panes' controllers + DTOs — Compose (poc-14), Retrieve (poc-12 lexical + poc-18 curation), Security (poc-21), Trust (poc-10), Scale (P@1 table); verify each with a MockMvc test asserting the response shape
+- [x] 3.1 Implement the offline panes' controllers + DTOs — Compose (poc-14), Retrieve (poc-12 lexical + poc-18 curation), Security (poc-21), Trust (poc-10), Scale (P@1 table); verify each with a MockMvc test asserting the response shape
 - [ ] 3.2 Implement the endpoint-gated panes' controllers + DTOs — Run (poc-1 GOAP), Author (poc-2), Eval (poc-9), Lifecycle (poc-18 re-eval) — returning a clear "endpoint not configured" body when the model env vars are absent; verify each with a MockMvc test covering the gated path and a (mocked) endpoint-present path
 - [ ] 3.3 Implement the Remote pane's controller (poc-16 RestAction / poc-13 MCP), gated on sidecar/MCP reachability, returning a "backing process not running" body when down; verify with a MockMvc test covering the down path
 - [ ] 3.4 Implement the scorer-swap wiring so a denser scorer (poc-17/19/20) can replace the lexical default via the `SkillScorer` seam, with the Retrieve response carrying the active scorer name; verify with a test that swapping the scorer changes the reported name and the ranking
