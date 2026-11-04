@@ -21,8 +21,8 @@
 
 ## 4. Frontend API layer (typed, unit-tested)
 
-- [ ] 4.1 Implement `frontend/src/api/types.ts` (mirroring the backend DTOs) and `frontend/src/api/client.ts` (the single `fetch` site, one typed method per pane); verify `npx vue-tsc --noEmit` passes
-- [ ] 4.2 Add unit tests in `frontend/src/__tests__/client.test.ts` mocking `fetch` to assert request shaping and response parsing for a representative set of panes; verify `npx vitest run client` passes
+- [x] 4.1 Implement `frontend/src/api/types.ts` (mirroring the backend DTOs) and `frontend/src/api/client.ts` (the single `fetch` site, one typed method per pane); verify `npx vue-tsc --noEmit` passes
+- [x] 4.2 Add unit tests in `frontend/src/__tests__/client.test.ts` mocking `fetch` to assert request shaping and response parsing for a representative set of panes; verify `npx vitest run client` passes
 
 ## 5. Quasar panes + component tests
 
