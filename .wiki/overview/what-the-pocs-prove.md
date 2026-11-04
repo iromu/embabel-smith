@@ -8,15 +8,15 @@ source_paths:
   - "docs/01-embabel-agent-builder-research.md"
   - "docs/02-agent-skills-research.md"
   - "docs/03-embabel-skills-agent-builder-design.md"
-updated_at: "2026-11-03"
+updated_at: "2026-11-04"
 ---
 
 # What the POCs prove (vs. the theory)
 
-This page is the **conclusion** of the POC run (2026-11-02, re-verified 2026-11-03) against the
-hypothesis in docs 01–03. It answers: what did the twenty POCs actually prove, what did they not,
-and what is still missing. The raw run evidence (green loop, offline baseline, defects fixed) lives
-in `docs/04-poc-run-results.md` §5; this page distills the verdict.
+This page is the **conclusion** of the POC run (2026-11-02, re-verified 2026-11-03 ×2 + 2026-11-04)
+against the hypothesis in docs 01–03. It answers: what did the twenty-one POCs actually prove, what
+did they not, and what is still missing. The raw run evidence (green loop, offline baseline,
+defects fixed) lives in `docs/04-poc-run-results.md` §5; this page distills the verdict.
 
 ## The hypothesis, in one line
 
@@ -42,8 +42,9 @@ The POCs **prove the feasibility core** (the "70% already there") and confirm do
   with retrieval / author / eval-refinement / curate panes) · **the remote-action bridge** (POC 16)
   · **a GLiNER2 transformer breaks the shadowing tie** (POC 17) · **skill lifecycle / drift
   detection** (POC 18) · **small-LLM skill selection + self-contained Docker model serving** (POC
-  19) · **the real semantic `EmbeddingService`** (POC 20) · eval wiring + **score stability** (POC
-  5) · any OpenAI-compatible endpoint · single-agent, no-orchestration execution. All three Phase 1
+  19) · **the real semantic `EmbeddingService`** (POC 20) · **install-time skill security /
+  vulnerability scanning** (POC 21) · eval wiring + **score stability** (POC 5) · any
+  OpenAI-compatible endpoint · single-agent, no-orchestration execution. All three Phase 1
   components doc 03 lists (Registry, Composer, Runtime Adapter) are now built — and the builder UI
   doc 01 names as the missing piece now exists. **All three of doc 03 §2.3's runtime bridges are
   proven** (shell → POC 7, MCP → POC 13, remote action → POC 16).
@@ -81,12 +82,15 @@ The POCs **prove the feasibility core** (the "70% already there") and confirm do
 | POC 18 (skill lifecycle / drift) | a skill's contract is its eval pass-rate; a SkillOps-style proactive re-eval compares content hash + pass-rate against the baseline and moves it through `incubating → active → degraded → retired` (live: 100% → 0% → retired) | content-hash / drift / state-machine half is pure + offline; the live re-eval is endpoint-gated; **applied in the POC 15 canvas** |
 | POC 19 (small-LLM skill selection) | a 0.6B model fine-tuned for single-label decisions, served in a Docker container whose lifecycle Spring Boot Dev Services manages, **beats text similarity** (67%/50%) but trails the GLiNER2 transformer (100%/83%) | **docker-gated** (one-time GGUF download; offline tests stub the endpoint) |
 | POC 20 (real semantic `EmbeddingService`) | a genuine ONNX sentence-encoder (`all-MiniLM-L6-v2`) behind the `SkillScorer` seam retrieves cleanly at the distinct scale (100% at 191) and beats the lexical/dense stand-ins under shadowing (33%) | **local-model-gated** (one-time ONNX download); does not fully cure the near-duplicate collapse — curation (POC 18) is the real fix |
+| [[skill-security-scanning]] (21) | a static scanner vets a pack's declared prompts + tool groups for injection / exfiltration / over-privilege; verdicts `SAFE`/`REVIEW`/`BLOCK` and maps each pack to the minimum POC 10 trust tier | a normalized pattern matcher over declared content, not a semantic detector; does not audit bundled `scripts/` files |
 
 ## Still open
 
-All twenty POCs — and the builder UI — are built, and **every hypothesis gap doc 03 §2 lists is now
-closed**: the runtime bridges (POC 7/13/16), the visual editor (POC 15), skill lifecycle / drift
-(POC 18), and the real semantic `EmbeddingService` (POC 20). The former follow-ups are now done:
+All twenty-one POCs — and the builder UI — are built, and **every hypothesis gap doc 03 §2 lists is
+now closed**: the runtime bridges (POC 7/13/16), the visual editor (POC 15), skill lifecycle /
+drift (POC 18), the real semantic `EmbeddingService` (POC 20), and install-time security scanning
+(POC 21). The 2026-11-04 re-run confirms the suite has **converged**: all 21 POCs green, every
+claim C1–C18 mapped, no new gap or fixable caveat. The former follow-ups are now done:
 
 - **Wiring the other POCs into the POC 15 canvas** — done: a curation-aware **retrieval pane** (the
   POC 8/12/20 `SkillScorer` seam), an **NL-authoring pane** (POC 2/3), an **eval/refinement pane**

@@ -1,5 +1,5 @@
 ---
-title: "Retrieval and skill shadowing (POC 8)"
+title: "Retrieval and skill shadowing (POC 8, POC 12)"
 type: "feature"
 status: "active"
 language: "default"
@@ -8,7 +8,9 @@ source_paths:
   - "poc/poc-8-retrieval/src/main/java/com/embabel/smith/retrieval/RetrievalRunner.java"
   - "poc/poc-8-retrieval/src/main/java/com/embabel/smith/retrieval/LexicalSimilarity.java"
   - "poc/poc-8-retrieval/src/main/java/com/embabel/smith/retrieval/SampleSkillLibrary.java"
-updated_at: "2026-11-01"
+  - "poc/poc-12-semantic-retrieval/src/main/java/com/embabel/smith/retrieval/scale/ScaleRetrievalRunner.java"
+  - "poc/poc-12-semantic-retrieval/src/main/java/com/embabel/smith/retrieval/scale/SkillScorer.java"
+updated_at: "2026-11-04"
 ---
 
 # Retrieval and skill shadowing (POC 8)
@@ -52,8 +54,18 @@ adds four more same-verb entries to stress the pre-filter.
 Over the 14-skill library the lexical retriever hits **Precision@1 100%**, and the
 coffee-explainer stays top-1 as four same-verb distractors are added.
 
-**The 200+ scale is now covered by POC 12** (`poc/poc-12-semantic-retrieval`), which extends this
-pre-filter to a 191→281 same-typed library and compares the lexical baseline against a dense
-feature-hashing retriever (a `SkillScorer` seam that a real `EmbeddingService` plugs into). It is
-clean (P@1 100%) at 191 distinct skills, but near-duplicate (shadowing) skills collapse P@1 for
-**both** retrievers — a library-curation problem, not a retriever problem. See [[what-the-pocs-prove]].
+## The 200+ scale (POC 12)
+
+POC 12 (`poc/poc-12-semantic-retrieval`) extends this pre-filter to a 191→281 same-typed library
+and compares the lexical baseline against a dense feature-hashing retriever (a `SkillScorer` seam
+that a real `EmbeddingService` plugs into). It is clean (P@1 100%) at 191 distinct skills, but
+near-duplicate (shadowing) skills collapse P@1 for **both** retrievers (lexical 17%, dense 0%) —
+a library-curation problem, not a retriever problem.
+
+## The shadowing remedies (POC 17, 19, 20)
+
+Three POCs test **meaning-based** alternatives on the identical candidate sets: a GLiNER2
+transformer (POC 17 — strict 100%), a 0.6B fine-tuned LLM in Docker (POC 19 — 67% free-form), and
+a real MiniLM embedding (POC 20 — 33% full-library). All beat text-similarity decisively; none
+fully cures the collapse. The real fix is library curation ([[skill-lifecycle]]). See
+[[shadowing-remedies]] and [[what-the-pocs-prove]].

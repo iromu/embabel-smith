@@ -3,8 +3,8 @@ title: "Embabel Smith Wiki"
 type: "index"
 status: "active"
 language: "default"
-last_commit: "c5d2a7ae320c1b61c26a8cfc4a3c69824da1a04b"
-updated_at: "2026-11-03"
+last_commit: "3f57a6a7dfa502a6eb590443e66237d806afc4f8"
+updated_at: "2026-11-04"
 ---
 
 # Embabel Smith
@@ -105,11 +105,12 @@ Three entry points matter:
   [[builder-pipeline]].
 - `poc/poc-2-nl-compile` (POC 2), `poc/poc-4-skill-format` (POC 4), `poc/poc-5-eval` (POC 5) — see
   [[architecture]].
-- `poc/poc-6`…`poc-20` — the skills-first extensions: composition, runtime adapter, retrieval,
+- `poc/poc-6`…`poc-21` — the skills-first extensions: composition, runtime adapter, retrieval,
   eval-guided refinement, trust tiers, progressive disclosure, semantic retrieval at scale,
   remote/MCP invocation, the skill Composer, the visual builder UI, the remote-action bridge,
-  GLiNER2 skill classification, skill lifecycle / drift detection, small-LLM skill selection, and
-  the real semantic `EmbeddingService`. See [[what-the-pocs-prove]].
+  GLiNER2 skill classification, skill lifecycle / drift detection, small-LLM skill selection, the
+  real semantic `EmbeddingService`, and install-time security scanning. See
+  [[what-the-pocs-prove]].
 
 ## 7. What should I avoid breaking?
 
@@ -135,8 +136,10 @@ Three entry points matter:
 | How does a skill call a CLI? | [[runtime-adapter]] · `shell-runner/` pack |
 | How does a skill invoke a remote action over HTTP? | [[runtime-adapter]] · `poc/poc-16-remote-action/` |
 | How is a skill scored / refined? | [[eval-scoring]] · [[eval-guided-refinement]] |
-| How are skills retrieved at scale? | [[retrieval-shadowing]] |
-| How are trust tiers enforced? | [[trust-tiers]] |
+| How are skills retrieved at scale? | [[retrieval-shadowing]] · [[shadowing-remedies]] |
+| How are trust tiers enforced? | [[trust-tiers]] · [[skill-security-scanning]] |
+| How is a skill vetted before install? | [[skill-security-scanning]] |
+| How does a skill's lifecycle / drift work? | [[skill-lifecycle]] |
 | How does progressive disclosure bound context? | [[progressive-disclosure]] |
 | What is an "exported goal"? | [[exported-goal-as-skill]] |
 | How does zero-compilation work? | [[no-code-ingestion]] |
@@ -150,6 +153,7 @@ Three entry points matter:
 **Flows** — [[runtime-run]] · [[builder-pipeline]] · [[eval-scoring]] · [[skill-composition]] ·
 [[eval-guided-refinement]]
 **Features** — [[nl-compile]] · [[skill-format-on-demand]] · [[runtime-adapter]] ·
-[[retrieval-shadowing]] · [[trust-tiers]] · [[progressive-disclosure]] · [[skill-composer]]
+[[retrieval-shadowing]] · [[shadowing-remedies]] · [[skill-lifecycle]] · [[trust-tiers]] ·
+[[skill-security-scanning]] · [[progressive-disclosure]] · [[skill-composer]]
 **Risks** — [[validate-before-write]]
 **Reference** — [[validation-codes]] · [[sample-explainer]]

@@ -8,15 +8,15 @@ source_paths:
   - "poc/pom.xml"
   - "docs/04-poc-run-results.md"
   - "openspec/changes/embabel-agent-builder/design.md"
-updated_at: "2026-11-03"
+updated_at: "2026-11-04"
 ---
 
 # Architecture and module map
 
 Embabel Smith is a Maven **multi-module** project (design D1). The parent POM (`pom.xml`)
 centralizes the Embabel version (1.5.3), the `repo.embabel.com` repository, the Spring Boot BOM
-(4.1.1 — the version Embabel 1.5.3 is built against), and the test dependencies. The twenty POCs
-live under a `poc/` aggregator (`poc/pom.xml`); each is independently buildable and runnable, so a
+(4.1.1 — the version Embabel 1.5.3 is built against), and the test dependencies. The POCs live
+under a `poc/` aggregator (`poc/pom.xml`); each is independently buildable and runnable, so a
 failure isolates to one claim.
 
 ```
@@ -42,7 +42,9 @@ embabel-smith/            parent POM (pom packaging)
     ├── poc-17-gliner-retrieval        POC 17 — GLiNER2 transformer skill classification
     ├── poc-18-skill-lifecycle         POC 18 — skill lifecycle / drift detection
     ├── poc-19-small-llm-selector      POC 19 — small-LLM skill selection (Docker-served)
-    └── poc-20-semantic-embedding      POC 20 — the real semantic EmbeddingService
+    ├── poc-20-semantic-embedding      POC 20 — the real semantic EmbeddingService
+    ├── poc-21-skill-security          POC 21 — install-time skill security / vulnerability scanning
+    └── poc-22-unified-ui              POC 22 — the unified builder UI (Vue 3 + Quasar SPA, in progress)
 ```
 
 ## The dependency shape
@@ -64,15 +66,16 @@ format meets Embabel's runtime types; `smith-common` never knows Embabel exists.
 - **POC 4** (`poc-4-skill-format`) — proves the exported-goal-as-skill primitive and on-demand
   loading. See [[skill-format-on-demand]].
 
-POCs 6–20 are independent consumers of the format, each adding one skills-first capability:
+POCs 6–21 are independent consumers of the format, each adding one skills-first capability:
 composition ([[skill-composition]]), CLI invocation ([[runtime-adapter]]), retrieval
 ([[retrieval-shadowing]]), eval-guided refinement ([[eval-guided-refinement]]), trust tiers
 ([[trust-tiers]]), progressive disclosure ([[progressive-disclosure]]), semantic retrieval at scale
 (POC 12), remote/MCP invocation ([[runtime-adapter]]), the skill Composer and the visual builder UI
-([[skill-composer]]), the remote-action bridge ([[runtime-adapter]]), GLiNER2 classification (POC
-17), skill lifecycle / drift (POC 18, applied in the POC 15 canvas), small-LLM selection (POC 19),
-and the real semantic `EmbeddingService` (POC 20). See [[what-the-pocs-prove]] for the per-POC
-verdicts.
+([[skill-composer]]), the remote-action bridge ([[runtime-adapter]]), GLiNER2 classification
+([[shadowing-remedies]]), skill lifecycle / drift ([[skill-lifecycle]], applied in the POC 15
+canvas), small-LLM selection ([[shadowing-remedies]]), the real semantic `EmbeddingService`
+([[shadowing-remedies]]), and install-time security scanning ([[skill-security-scanning]]). See
+[[what-the-pocs-prove]] for the per-POC verdicts.
 
 ## The two "seams"
 

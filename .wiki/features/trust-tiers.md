@@ -1,5 +1,5 @@
 ---
-title: "Trust tiers and guardrails (POC 10)"
+title: "Trust tiers and guardrails (POC 10) + install-time scanning (POC 21)"
 type: "feature"
 status: "active"
 language: "default"
@@ -8,7 +8,8 @@ source_paths:
   - "poc/poc-10-trust-tiers/src/main/java/com/embabel/smith/trust/TrustTierPolicy.java"
   - "poc/poc-10-trust-tiers/src/main/java/com/embabel/smith/trust/InputSanitizerGuardRail.java"
   - "poc/poc-10-trust-tiers/src/main/java/com/embabel/smith/trust/TrustRunner.java"
-updated_at: "2026-11-02"
+  - "poc/poc-21-skill-security/src/main/java/com/embabel/smith/security/SkillSecurityScanner.java"
+updated_at: "2026-11-04"
 ---
 
 # Trust tiers and guardrails (POC 10)
@@ -58,3 +59,11 @@ missed, but a *novel* rephrasing outside the pattern set can still slip through.
 before surfacing. Seven offline tests pin the matcher (classic marker, obfuscated spacing,
 punctuation, other phrases, clean pass). The live run is in `docs/04-poc-run-results.md` §5. See
 [[runtime-adapter]] for the `shell` group this policy gates.
+
+## The install-time complement (POC 21)
+
+POC 21 ([[skill-security-scanning]]) is the **install-time** half of the same security hypothesis:
+a static scanner vets a pack's declared prompts and tool groups *before* it is loaded, and maps
+each pack to the minimum POC 10 trust tier. The scanner's "load at T3+" is exactly what POC 10
+enforces at runtime. Both halves share the same honest limit — a normalized pattern matcher over
+declared content, not a semantic detector. See `docs/04-poc-run-results.md` §7.3.
