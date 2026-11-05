@@ -40,5 +40,5 @@
 
 - [x] 7.1 Boot the app (`SERVER_PORT=18080`) and verify all offline panes work end-to-end with no model endpoint (compose a chain, retrieve, scan a pack, trust-tier check, scale table)
 - [x] 7.2 With the model endpoint configured (the LiteLLM bridge env vars), verify the endpoint-gated panes (Run, Author, Eval, Lifecycle) drive their POCs and render results
-- [ ] 7.3 Verify the heavy-scorer opt-in — add one denser scorer dep (e.g., poc-20 embedding), wire it via the seam, and confirm the Retrieve pane reports it as active and ranks by it
-- [ ] 7.4 Verify the remote gating — with the sidecar down the Remote pane shows "not running"; with it up, invoking the remote action returns its result
+- [x] 7.3 Verify the heavy-scorer opt-in — add one denser scorer dep (e.g., poc-20 embedding), wire it via the seam, and confirm the Retrieve pane reports it as active and ranks by it
+- [x] 7.4 Verify the remote gating — with the sidecar down the Remote pane shows "not running"; with it up, invoking the remote action returns its result

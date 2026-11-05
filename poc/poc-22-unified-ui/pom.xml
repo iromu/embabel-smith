@@ -70,6 +70,12 @@
             <groupId>com.embabel.smith</groupId>
             <artifactId>poc-16-remote-action</artifactId>
         </dependency>
+        <!-- Heavy scorer opt-in (task 7.3): POC 20's real ONNX embedding scorer, wired via the
+             SkillScorer seam behind builder.scorer=embedding. -->
+        <dependency>
+            <groupId>com.embabel.smith</groupId>
+            <artifactId>poc-20-semantic-embedding</artifactId>
+        </dependency>
 
         <dependency>
             <groupId>org.springframework.boot</groupId>

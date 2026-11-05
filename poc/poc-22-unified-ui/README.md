@@ -130,8 +130,16 @@ export OPENAI_CUSTOM_MODELS=... EMBABEL_MODELS_DEFAULT_LLM=...
 ```
 
 `SERVER_PORT` defaults to 18080 to avoid a local service on 8080. The default build depends only on
-the light + remote POC modules; the heavy scorers (POC 17/19/20) are opt-in via the `SkillScorer`
-seam.
+the light + remote POC modules; the heavy scorers are opt-in via the shared `SkillScorer` seam —
+e.g. POC 20's real ONNX embedding scorer (the model bundle from POC 20's one-time download):
+
+```bash
+SERVER_PORT=18080 mvn -pl poc/poc-22-unified-ui spring-boot:run \
+  -Dspring-boot.run.arguments="--builder.scorer=embedding --builder.embedding-model-dir=<absolute path to poc-20 models/all-MiniLM-L6-v2>"
+```
+
+With it active, the Retrieve and Scale responses report the scorer as `embedding (MiniLM)` and
+rank by it; the default remains the offline `lexical` scorer.
 
 ## Tests
 

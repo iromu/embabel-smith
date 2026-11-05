@@ -13,6 +13,9 @@ import com.embabel.smith.composer.SkillNode;
 import com.embabel.smith.lifecycle.LiveEvalRunner;
 import com.embabel.smith.nlcompile.NlCompileRunner;
 import com.embabel.smith.refinement.RefinementRunner;
+import com.embabel.smith.retrieval.embedding.Embedder;
+import com.embabel.smith.retrieval.embedding.MiniLmEmbedder;
+import com.embabel.smith.retrieval.embedding.RealEmbeddingScorer;
 import com.embabel.smith.retrieval.scale.LexicalScorer;
 import com.embabel.smith.runtime.SkillRunner;
 import com.embabel.smith.unified.AuthorController;
@@ -24,9 +27,12 @@ import com.embabel.smith.unified.SkillCatalog;
 import com.embabel.smith.unified.dto.ActionInfo;
 import com.embabel.smith.unified.dto.AuthorDraft;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import java.io.IOException;
+import java.nio.file.Path;
 import java.util.List;
 
 /**
@@ -49,11 +55,27 @@ public class PanesConfiguration {
 
     /**
      * The active retrieval scorer (the shared {@code SkillScorer} seam). Default: the offline lexical
-     * scorer. Swap this bean to wire a denser scorer (POC 17/19/20) without touching the panes.
+     * scorer. Opt-in: {@code builder.scorer=embedding} wires POC 20's real ONNX embedding scorer
+     * without touching the panes — the Retrieve and Scale responses carry the active scorer name.
      */
     @Bean
-    public ScorerBinding scorerBinding() {
+    @ConditionalOnProperty(name = "builder.scorer", havingValue = "lexical", matchIfMissing = true)
+    public ScorerBinding lexicalScorerBinding() {
         return new ScorerBinding(new LexicalScorer(), "lexical");
+    }
+
+    @Bean
+    @ConditionalOnProperty(name = "builder.scorer", havingValue = "embedding")
+    public MiniLmEmbedder miniLmEmbedder(
+            @Value("${builder.embedding-model-dir:poc/poc-20-semantic-embedding/models/all-MiniLM-L6-v2}")
+            String modelDir) throws IOException {
+        return MiniLmEmbedder.load(Path.of(modelDir));
+    }
+
+    @Bean
+    @ConditionalOnProperty(name = "builder.scorer", havingValue = "embedding")
+    public ScorerBinding embeddingScorerBinding(Embedder embedder) {
+        return new ScorerBinding(new RealEmbeddingScorer(embedder), "embedding (MiniLM)");
     }
 
     @Bean
