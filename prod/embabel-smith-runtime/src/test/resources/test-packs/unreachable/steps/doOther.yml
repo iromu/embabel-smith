@@ -1,0 +1,8 @@
+stepType: action
+name: doOther
+description: "Produce an unrelated other thing"
+inputTypeNames:
+  - com.embabel.agent.domain.io.UserInput
+outputTypeName: OtherThing
+prompt: |
+  Describe something. User request: {{userInput.content}}

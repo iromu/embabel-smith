@@ -1,0 +1,8 @@
+name: GhostThing
+description: "A thing no step in this pack produces"
+ownProperties:
+  - name: note
+    type: string
+    description: "A note"
+parents: []
+creationPermitted: true

@@ -1,0 +1,9 @@
+stepType: action
+name: writeExplainer
+description: "Write the explanation from the topic brief"
+inputTypeNames:
+  - TopicBrief
+outputTypeName: com.embabel.agent.spec.model.BackgroundMessage
+prompt: |
+  Write a short explanation about: {{topicBrief.topic}}
+  For the audience: {{topicBrief.audience}}
