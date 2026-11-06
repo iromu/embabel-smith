@@ -68,7 +68,7 @@ public class RefinementLoop {
         if (terminal == null) {
             return pack;
         }
-        String newPrompt = rewriter.rewrite(terminal.prompt(), "Eval failures: " + failures);
+        String newPrompt = rewriter.rewrite(terminal.prompt(), "Eval failures: " + describeFailures(failures));
         ActionStepSpec revised = new ActionStepSpec(
                 terminal.stepType(), terminal.name(), terminal.description(), terminal.inputTypeNames(),
                 terminal.outputTypeName(), newPrompt, terminal.pre(), terminal.post(),
@@ -78,6 +78,24 @@ public class RefinementLoop {
                 .toList();
         SkillPack candidate = new SkillPack(pack.manifest(), pack.goal(), steps, pack.types());
         return validator.validate(candidate).isValid() ? candidate : pack;
+    }
+
+    /**
+     * Describes the failing tasks for the rewriter: one line per task with its input and expected
+     * output (POC 9), falling back to the bare name when the task is not found in the set.
+     */
+    private String describeFailures(List<String> failingTaskNames) {
+        List<String> lines = new ArrayList<>();
+        for (String name : failingTaskNames) {
+            EvalTask task = tasks.stream().filter(t -> t.name().equals(name)).findFirst().orElse(null);
+            if (task == null) {
+                lines.add(name);
+            } else {
+                lines.add(task.name() + ": input '" + task.input()
+                        + "' — expected output to contain '" + task.expected() + "'");
+            }
+        }
+        return String.join("; ", lines);
     }
 
     /** The action whose output is the goal output (the last such step); the last step as a fallback. */

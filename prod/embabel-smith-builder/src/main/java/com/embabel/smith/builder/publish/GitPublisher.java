@@ -59,7 +59,8 @@ public class GitPublisher implements Publisher {
         // An overwrite of an unchanged pack stages nothing; only commit when there is something to commit.
         if (gitExitCode(workDir, "diff", "--cached", "--quiet") != 0) {
             git(workDir, "-c", "user.email=smith-builder@embabel.local", "-c", "user.name=Smith Builder",
-                    "commit", "-m", "publish " + pack.name());
+                    "commit", "-m", "smith: publish " + pack.name()
+                            + " (baseline " + String.format("%.3f", lifecycle.baselinePassRate()) + ")");
         }
 
         boolean pushed = false;

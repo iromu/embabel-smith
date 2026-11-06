@@ -98,7 +98,7 @@ rather than failing the read.
 ## Trace seam
 
 Finding from the task-1.1 spike (live scratch run against the POC 1 `explainer` pack,
-Embabel 1.5.3): the per-step extraction seam is `AgentProcess.history` plus the blackboard.
+Embabel 1.5.4): the per-step extraction seam is `AgentProcess.history` plus the blackboard.
 
 - **`AgentProcess.getHistory()`** — exactly one `ActionInvocation` per executed action, in
   execution order. Each entry carries `actionName`, the action start `timestamp`, and the

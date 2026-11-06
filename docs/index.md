@@ -1,12 +1,12 @@
 # Embabel Agent Builder — Documentation
 
 Documents that research, ground, synthesize, and report a skills-first agent
-builder on the Embabel platform (v1.5.3). Read in order:
+builder on the Embabel platform (v1.5.4). Read in order:
 
 ## Research & design
 
 - [01 — Embabel Agent Builder: Research & Design](01-embabel-agent-builder-research.md) — what Embabel
-  is and already ships: the architecture, the decisive evidence (verified against the 1.5.3 source),
+  is and already ships: the architecture, the decisive evidence (verified against the 1.5.4 source),
   the system design, and implementation code samples. Verdict: feasible — ~70% of the pieces exist;
   the missing piece is the builder UI itself.
 - [02 — Agent Skills Research](02-agent-skills-research.md) — the "skills, not agents" paradigm: an

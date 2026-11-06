@@ -18,7 +18,7 @@
 
 ## 1. Mapping: Agent Skills Literature ↔ Embabel Primitives
 
-| Agent Skills Concept (arXiv:2602.12430, Anthropic, OpenAI) | Embabel Primitive (v1.5.3) | Status |
+| Agent Skills Concept (arXiv:2602.12430, Anthropic, OpenAI) | Embabel Primitive (v1.5.4) | Status |
 |---|---|---|
 | **Skill** = folder with `SKILL.md` (metadata + instructions + scripts) | **Exported Goal** (`export: true`) + **PromptedActionSpec** + **DynamicType** | ✅ Native |
 | **Progressive disclosure** (L1: metadata, L2: instructions, L3: scripts) | **YAML ingestion**: StepSpecRepository loads only referenced specs; DynamicTypes on demand; scripts via `toolGroups`/`remote` | ✅ Native |
@@ -352,7 +352,7 @@ $ embabel-builder test --skill research-web --input "Acme Corp competitors"
 | **3. Scale & Intelligence** | Semantic retrieval, SkillGrad-style self-improvement, SE-GoS graph evolution | (custom) | Vector index, `SkillOptimizer` (LLM rewrites prompts from eval failures), `SkillGraph` |
 | **4. Ecosystem** | Remote skill marketplace, MCP skill server, A2A skill mesh | + `embabel-agent-starter-mcpserver`, A2A | Skill pack registry (git/HTTP), MCP server mode, A2A skill discovery |
 
-**MVP (Phase 0 + 1)** is **buildable today** with Embabel 1.5.3. The "skills, not agents" paradigm is not a research project — it's *how Embabel already works*; the builder just needs to surface it.
+**MVP (Phase 0 + 1)** is **buildable today** with Embabel 1.5.4. The "skills, not agents" paradigm is not a research project — it's *how Embabel already works*; the builder just needs to surface it.
 
 ---
 

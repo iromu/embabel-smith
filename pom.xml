@@ -13,11 +13,14 @@
     <description>
         A skills-first Embabel agent builder: a general-purpose builder agent that emits
         deployable, no-code skill-packs, plus the fixed no-code runtime that ingests them.
-        Greenfield POC multi-module project on Embabel 1.5.3 / Java 21.
+        Greenfield POC multi-module project on Embabel 1.5.4 / Java 21.
     </description>
 
     <properties>
-        <embabel-agent.version>1.5.3</embabel-agent.version>
+        <embabel-agent.version>1.5.4</embabel-agent.version>
+        <!-- Experimental modules (spec/eval/remote) live in embabel-agent-experimental, which has
+             not cut a 1.5.4 release yet — track them on the 1.5.4-SNAPSHOT line (libs-snapshot). -->
+        <embabel-agent-experimental.version>1.5.4-SNAPSHOT</embabel-agent-experimental.version>
         <java.version>21</java.version>
         <maven.compiler.release>21</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -55,6 +58,18 @@
                 <enabled>false</enabled>
             </snapshots>
         </repository>
+        <!-- Embabel experimental modules (spec/eval/remote) — 1.5.4-SNAPSHOT. -->
+        <repository>
+            <id>embabel-snapshots</id>
+            <name>Embabel Snapshots</name>
+            <url>https://repo.embabel.com/artifactory/libs-snapshot</url>
+            <releases>
+                <enabled>false</enabled>
+            </releases>
+            <snapshots>
+                <enabled>true</enabled>
+            </snapshots>
+        </repository>
     </repositories>
 
     <dependencyManagement>
@@ -63,6 +78,20 @@
             <dependency>
                 <groupId>com.embabel.agent</groupId>
                 <artifactId>embabel-agent-starter</artifactId>
+                <version>${embabel-agent.version}</version>
+            </dependency>
+            <!-- Pin the main platform modules to the release version: the 1.5.4-SNAPSHOT
+                 experimental modules (spec/eval/remote) were built against 1.5.3 and would
+                 otherwise drag api/ai back to 1.5.3, which lacks classes the 1.5.4
+                 openai/byok need (e.g. com.embabel.agent.common.http.ClientTimeoutProperties). -->
+            <dependency>
+                <groupId>com.embabel.agent</groupId>
+                <artifactId>embabel-agent-api</artifactId>
+                <version>${embabel-agent.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.embabel.agent</groupId>
+                <artifactId>embabel-agent-ai</artifactId>
                 <version>${embabel-agent.version}</version>
             </dependency>
             <dependency>
@@ -86,19 +115,19 @@
             <dependency>
                 <groupId>com.embabel.agent</groupId>
                 <artifactId>embabel-agent-remote</artifactId>
-                <version>${embabel-agent.version}</version>
+                <version>${embabel-agent-experimental.version}</version>
             </dependency>
             <!-- The no-compilation YAML ingestion engine + NL compiler. -->
             <dependency>
                 <groupId>com.embabel.agent</groupId>
                 <artifactId>embabel-agent-spec</artifactId>
-                <version>${embabel-agent.version}</version>
+                <version>${embabel-agent-experimental.version}</version>
             </dependency>
             <!-- LLM eval harness (conversational-oriented; adapted in poc-5-eval). -->
             <dependency>
                 <groupId>com.embabel.agent</groupId>
                 <artifactId>embabel-agent-eval</artifactId>
-                <version>${embabel-agent.version}</version>
+                <version>${embabel-agent-experimental.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.embabel.agent</groupId>
@@ -242,7 +271,7 @@
             </dependency>
 
             <!-- Import the Spring Boot BOM so the POC modules resolve a consistent
-                 Spring Boot (4.1.1, the version Embabel 1.5.3 is built against). -->
+                 Spring Boot (4.1.1, the version Embabel 1.5.4 is built against). -->
             <dependency>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-dependencies</artifactId>

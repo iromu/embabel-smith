@@ -63,6 +63,8 @@ class BuildCoreTest {
         assertThat(result.isBuilt()).isFalse();
         assertThat(result.stage()).isEqualTo("build");
         assertThat(result.issues()).anyMatch(issue -> issue.contains("NonExistentType"));
+        assertThat(result.draft()).isNotNull();
+        assertThat(result.draft().name()).isEqualTo(result.packName());
         assertThat(library).doesNotExist();
         // Nothing was written to the scratch area either.
         assertThat(java.nio.file.Files.exists(scratch)).isFalse();
@@ -80,6 +82,8 @@ class BuildCoreTest {
         assertThat(result.isBuilt()).isFalse();
         assertThat(result.stage()).isEqualTo("build");
         assertThat(result.issues()).anyMatch(issue -> issue.contains("ambiguous"));
+        assertThat(result.draft()).isNotNull();
+        assertThat(result.draft().name()).isEqualTo(result.packName());
         assertThat(library).doesNotExist();
     }
 }

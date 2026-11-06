@@ -4,7 +4,7 @@ Endpoint-gated tasks are marked **(needs live endpoint)** — they build and sca
 
 ## 1. Foundation (parent POM + `smith-common`)
 
-- [x] 1.1 Create the parent POM (Embabel 1.5.3, Java 21, `repo.embabel.com` repository, OpenAI-custom model config via env vars) and the empty submodule stubs; verify `mvn -q validate` resolves the Embabel dependencies from `repo.embabel.com`
+- [x] 1.1 Create the parent POM (Embabel 1.5.4, Java 21, `repo.embabel.com` repository, OpenAI-custom model config via env vars) and the empty submodule stubs; verify `mvn -q validate` resolves the Embabel dependencies from `repo.embabel.com`
 - [x] 1.2 Implement the skill-pack data model + YAML (de)serialization in `smith-common` (manifest, action-step, goal, type); verify a round-trip test writes then reads back a sample skill-pack losslessly
 - [x] 1.3 Add skill-pack format validation in `smith-common` (layout, exactly-one exported goal, prompt references resolve, type references resolve); verify it accepts a well-formed pack and rejects a pack with a dangling type reference
 - [x] 1.4 Document the skill-pack format in `docs/skill-pack-format.md` and the module map + per-POC run commands in a top-level `README.md`; verify the documented run commands are syntactically valid Maven invocations

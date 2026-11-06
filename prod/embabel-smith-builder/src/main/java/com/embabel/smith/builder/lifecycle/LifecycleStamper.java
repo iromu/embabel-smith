@@ -10,22 +10,21 @@ import java.time.Instant;
 
 /**
  * Stamps the lifecycle sidecar for a published skill-pack (design D4, the POC 18 contract): the
- * content hash, the baseline eval pass-rate, and the initial lifecycle state. A freshly built skill
- * that passed a clean baseline eval is promoted from {@link LifecycleState#INCUBATING} to
- * {@link LifecycleState#ACTIVE} (POC 18's transition for a clean baseline at or above the active
- * threshold); a weaker baseline stays incubating.
+ * content hash, the baseline eval pass-rate, and the initial lifecycle state. The builder always
+ * records the initial state as {@link LifecycleState#INCUBATING}; the {@code incubating → active}
+ * promotion is a later *transition* owned by the studio (change 05, POC 18's
+ * {@code LifecycleManager.transition}), not by the builder.
  */
 public class LifecycleStamper {
 
-    /** The baseline pass-rate at or above which a clean-baseline skill is promoted to ACTIVE (POC 18). */
-    private static final double ACTIVE_THRESHOLD = 0.8;
-
-    /** Computes the lifecycle metadata for a pack at its recorded baseline pass-rate. */
+    /**
+     * Computes the lifecycle metadata for a pack at its recorded baseline pass-rate. The state is
+     * always the initial {@link LifecycleState#INCUBATING}; the baseline pass-rate is recorded but
+     * does not drive the initial state.
+     */
     public LifecycleMetadata stamp(SkillPack pack, double baselinePassRate) {
-        LifecycleState state = baselinePassRate >= ACTIVE_THRESHOLD
-                ? LifecycleState.ACTIVE
-                : LifecycleState.INCUBATING;
-        return new LifecycleMetadata(SkillContentHash.of(pack), baselinePassRate, state, Instant.now().toString());
+        return new LifecycleMetadata(SkillContentHash.of(pack), baselinePassRate,
+                LifecycleState.INCUBATING, Instant.now().toString());
     }
 
     /** Writes the {@code lifecycle.yml} sidecar into the pack directory. */

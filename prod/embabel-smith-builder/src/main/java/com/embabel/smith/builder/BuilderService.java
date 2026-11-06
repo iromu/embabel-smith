@@ -63,12 +63,13 @@ public class BuilderService {
         // 1. Build: compile → validate → write (D5)
         CompiledDraft compiled = builder.compileFromDescription(new UserInput(description));
         if (compiled.hasIssues()) {
-            // The description could not be resolved (ambiguous/unsupported) — report the compiler's issues.
-            return BuildResult.blocked("build", compiled.pack().name(), compiled.issues(), null, null);
+            // The description could not be resolved (ambiguous/unsupported) — report the compiler's issues
+            // and retain the draft for review.
+            return BuildResult.blocked("build", compiled.pack().name(), compiled.issues(), null, null, compiled.pack());
         }
         ValidatedDraft validated = builder.validateDraft(compiled);
         if (!validated.valid()) {
-            return BuildResult.blocked("build", validated.pack().name(), validated.issues(), null, null);
+            return BuildResult.blocked("build", validated.pack().name(), validated.issues(), null, null, validated.pack());
         }
         builder.writeSkillPack(validated);
         SkillPack pack = validated.pack();
@@ -82,7 +83,7 @@ public class BuilderService {
                     List.of("eval score " + String.format("%.3f", outcome.score())
                             + " is below the gate " + options.scoreGate()
                             + "; failing tasks: " + outcome.failingTasks()),
-                    outcome.score(), null);
+                    outcome.score(), null, null);
         }
         SkillPack finalPack = outcome.pack();
 
@@ -93,7 +94,7 @@ public class BuilderService {
                     .map(f -> f.severity() + " " + f.category() + ": " + f.message()
                             + " [" + f.evidence() + "]")
                     .toList();
-            return BuildResult.blocked("security", finalPack.name(), findings, outcome.score(), scan);
+            return BuildResult.blocked("security", finalPack.name(), findings, outcome.score(), scan, null);
         }
 
         // 4. Lifecycle stamp
@@ -105,7 +106,7 @@ public class BuilderService {
                     options.overwrite(), options.push());
             return BuildResult.built(finalPack.name(), outcome.score(), scan, lifecycle, published);
         } catch (CollisionException e) {
-            return BuildResult.blocked("publish", finalPack.name(), List.of(e.getMessage()), outcome.score(), scan);
+            return BuildResult.blocked("publish", finalPack.name(), List.of(e.getMessage()), outcome.score(), scan, null);
         } catch (IOException e) {
             throw new IllegalStateException("Failed to publish pack '" + finalPack.name() + "': " + e.getMessage(), e);
         }

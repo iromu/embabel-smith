@@ -96,7 +96,9 @@ public class BuilderAgent {
         } catch (IOException e) {
             throw new IllegalStateException("Failed to write/re-read the skill-pack at " + dir, e);
         }
-        List<String> issues = toMessages(validator.validate(readBack).issues());
+        // Re-validate the on-disk layout (not just the in-memory read-back) so a layout defect in
+        // the writer is caught (design D5).
+        List<String> issues = toMessages(validator.validate(dir).issues());
         if (!issues.isEmpty()) {
             throw new IllegalStateException("Written pack failed re-validation: " + issues);
         }

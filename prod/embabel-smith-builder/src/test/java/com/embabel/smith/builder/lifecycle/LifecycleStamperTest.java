@@ -13,7 +13,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Offline tests of the lifecycle stamper (task 3.3): the metadata records the content hash, the
- * baseline pass-rate, and the state; a clean baseline promotes to ACTIVE; and the {@code
+ * baseline pass-rate, and the state; the builder always records the initial state as INCUBATING
+ * (the incubating → active promotion is a later transition owned by change 05); and the {@code
  * lifecycle.yml} sidecar carries that content and round-trips.
  */
 class LifecycleStamperTest {
@@ -28,7 +29,7 @@ class LifecycleStamperTest {
 
         assertThat(metadata.contentHash()).isEqualTo(SkillContentHash.of(pack));
         assertThat(metadata.baselinePassRate()).isEqualTo(1.0);
-        assertThat(metadata.state()).isEqualTo(LifecycleState.ACTIVE); // clean baseline >= 0.8
+        assertThat(metadata.state()).isEqualTo(LifecycleState.INCUBATING); // builder always records the initial state
         assertThat(metadata.updatedAt()).isNotBlank();
     }
 
@@ -47,11 +48,11 @@ class LifecycleStamperTest {
 
         String yaml = Files.readString(dir.resolve("lifecycle.yml"));
         assertThat(yaml).contains(metadata.contentHash());
-        assertThat(yaml).contains("ACTIVE");
+        assertThat(yaml).contains("INCUBATING");
 
         LifecycleMetadata read = Yaml.mapper().readValue(yaml, LifecycleMetadata.class);
         assertThat(read.contentHash()).isEqualTo(metadata.contentHash());
         assertThat(read.baselinePassRate()).isEqualTo(1.0);
-        assertThat(read.state()).isEqualTo(LifecycleState.ACTIVE);
+        assertThat(read.state()).isEqualTo(LifecycleState.INCUBATING);
     }
 }

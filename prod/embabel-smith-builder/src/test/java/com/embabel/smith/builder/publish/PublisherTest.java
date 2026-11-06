@@ -75,21 +75,26 @@ class PublisherTest {
             runGit("clone", "--quiet", bare.toString(), verify.toString());
             assertThat(verify.resolve("explainer").resolve("manifest.yml")).isRegularFile();
             assertThat(verify.resolve("explainer").resolve("lifecycle.yml")).isRegularFile();
+
+            // The commit message names the pack and its baseline score (design D3).
+            assertThat(runGit("-C", verify.toString(), "log", "-1", "--pretty=%s"))
+                    .isEqualTo("smith: publish " + pack.name() + " (baseline 1.000)");
         } finally {
             publisher.close();
         }
     }
 
-    private static void runGit(String... args) {
+    private static String runGit(String... args) {
         List<String> command = new java.util.ArrayList<>(List.of("git", "-c", "core.askpass=false"));
         command.addAll(List.of(args));
         try {
             Process process = new ProcessBuilder(command).redirectErrorStream(true).start();
-            String out = new String(process.getErrorStream().readAllBytes(), StandardCharsets.UTF_8);
+            String out = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
             int exit = process.waitFor();
             if (exit != 0) {
                 throw new IllegalStateException("git " + String.join(" ", args) + " failed: " + out);
             }
+            return out.trim();
         } catch (IOException e) {
             throw new IllegalStateException(e);
         } catch (InterruptedException e) {

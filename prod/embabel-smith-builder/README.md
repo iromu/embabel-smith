@@ -64,8 +64,9 @@ the stage in the report.
 3. **Security gate** (`SkillSecurityScanner`). A static scan of the pack's prompts; a
    high-severity (critical) finding — e.g. a prompt-injection marker — blocks at `security`.
 4. **Lifecycle** (`LifecycleStamper`). The pack is stamped with a content hash, the baseline
-   eval pass-rate, a state (`active` when the baseline ≥ 0.8, else `incubating`), and a
-   timestamp, written as a `lifecycle.yml` sidecar next to the pack.
+   eval pass-rate, the initial state `incubating` (the `incubating → active` promotion is a
+   later transition owned by change 05), and a timestamp, written as a `lifecycle.yml`
+   sidecar next to the pack.
 5. **Publish** (`FolderPublisher` / `GitPublisher`). The pack plus its `lifecycle.yml` is
    written to the target source and committed (git) or written (folder).
 
@@ -77,7 +78,7 @@ On success:
 BUILD OK: explain-how-a-coffee-machine-works
   eval score:  1.000
   security:    0 findings
-  lifecycle:   active (hash 9f2c1a…, baseline 1.000)
+  lifecycle:   INCUBATING (hash 9f2c1a…, baseline 1.000)
   published:   /path/to/skill-packs/explain-how-a-coffee-machine-works
 ```
 

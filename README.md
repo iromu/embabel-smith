@@ -2,7 +2,7 @@
 
 A **skills-first Embabel agent builder** — a general-purpose builder agent that emits deployable,
 no-code *skill-packs*, plus the fixed no-code runtime that ingests them. Greenfield POC
-multi-module project on **Embabel 1.5.3 / Java 21**.
+multi-module project on **Embabel 1.5.4 / Java 21**.
 
 The core idea: a builder *agent* turns a natural-language description into a **skill-pack** (a
 pure-data YAML directory), validates it before writing, and emits it. A separate **no-code

@@ -15,7 +15,7 @@ spring:
     mcp:
       server:
         type: SYNC
-        # Streamable HTTP is the default since v1.5.3; endpoint is http://localhost:8080/mcp.
+        # Streamable HTTP is the default since v1.5.4; endpoint is http://localhost:8080/mcp.
         protocol: STREAMABLE
   main:
     banner-mode: off

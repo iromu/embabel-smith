@@ -20,6 +20,7 @@ import picocli.CommandLine.Parameters;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.Callable;
 
@@ -63,13 +64,7 @@ public class BuildCommand implements Callable<Integer> {
     }
 
     /** Test seam: allows substituting the build service. */
-    protected BuilderService newService() {
-        Path scratch;
-        try {
-            scratch = Files.createTempDirectory("smith-builder-scratch-");
-        } catch (IOException e) {
-            throw new IllegalStateException("cannot create builder scratch dir: " + e.getMessage(), e);
-        }
+    protected BuilderService newService(Path scratch) {
         BuilderAgent agent = new BuilderAgent(new DefaultSkillCompiler(ai), platform, scratch.toString());
         InvokerFactory factory = new AgentSkillInvokerFactory(platform);
         PromptRewriter rewriter = new LlmPromptRewriter(baseUrl, apiKey, model);
@@ -87,15 +82,43 @@ public class BuildCommand implements Callable<Integer> {
 
     @Override
     public Integer call() {
+        // The scratch dir is only used by the BuilderAgent write step; delete it once the build is
+        // done so we don't leak a temp dir per invocation.
+        Path scratch;
+        try {
+            scratch = Files.createTempDirectory("smith-builder-scratch-");
+        } catch (IOException e) {
+            System.err.println("cannot create builder scratch dir: " + e.getMessage());
+            return 1;
+        }
         try {
             PublishTarget target = PublishTarget.parse(out);
             BuildOptions options = new BuildOptions(maxRefine, BuildOptions.DEFAULT_SCORE_GATE, overwrite, push);
-            BuildResult result = newService().build(description, target, options);
+            BuildResult result = newService(scratch).build(description, target, options);
             System.out.print(result.report());
             return result.isBuilt() ? 0 : 1;
         } catch (Exception e) {
             System.err.println(e.getMessage() == null ? e.toString() : e.getMessage());
             return 1;
+        } finally {
+            deleteTree(scratch);
+        }
+    }
+
+    private static void deleteTree(Path dir) {
+        if (!Files.exists(dir)) {
+            return;
+        }
+        try (var stream = Files.walk(dir)) {
+            stream.sorted(Comparator.reverseOrder()).forEach(path -> {
+                try {
+                    Files.delete(path);
+                } catch (IOException ignored) {
+                    // best-effort cleanup; ignore failures
+                }
+            });
+        } catch (IOException ignored) {
+            // best-effort cleanup; ignore failures
         }
     }
 }

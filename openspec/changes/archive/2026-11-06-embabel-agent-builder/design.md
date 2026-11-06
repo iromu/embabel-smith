@@ -2,14 +2,14 @@
 
 ## Context
 
-See proposal.md for motivation. The research docs (`docs/embabel-agent-builder-research.md`, `docs/embabel-skills-agent-builder-design.md`) establish the load-bearing facts this design relies on, all verified against Embabel 1.5.3:
+See proposal.md for motivation. The research docs (`docs/embabel-agent-builder-research.md`, `docs/embabel-skills-agent-builder-design.md`) establish the load-bearing facts this design relies on, all verified against Embabel 1.5.4:
 
-- `embabel-agent-spec` is **stable** in 1.5.3 and ingests agents from YAML at runtime (`YmlStepSpecRepository` + `StepSpecAgentScopeBuilder.deploy()`), with no compilation.
+- `embabel-agent-spec` is **stable** in 1.5.4 and ingests agents from YAML at runtime (`YmlStepSpecRepository` + `StepSpecAgentScopeBuilder.deploy()`), with no compilation.
 - `PromptedActionSpec` / `GoalSpec` / `DynamicType` are the YAML-serializable step types; `GoalSpec.export: true` is the "skill" primitive.
 - `DefaultNaturalLanguageCompiler` turns a description into an `AgentCompilationResult` (actions + goal + intermediate types + errors).
 - `embabel-agent-eval` is conversational/chatbot-oriented and needs `AgentInvocation` wiring for goal-type agents (known gap).
 
-Constraints: greenfield project (no existing code); Java 21; Embabel 1.5.3 from `repo.embabel.com`; a live model endpoint is required to *run* (not to scaffold) the POCs.
+Constraints: greenfield project (no existing code); Java 21; Embabel 1.5.4 from `repo.embabel.com`; a live model endpoint is required to *run* (not to scaffold) the POCs.
 
 ## Goals / Non-Goals
 
@@ -26,7 +26,7 @@ Constraints: greenfield project (no existing code); Java 21; Embabel 1.5.3 from 
 
 ### D1 — Maven multi-module layout, POCs as submodules
 ```
-embabel-smith/                 parent POM: embabel 1.5.3, Java 21, repo.embabel.com
+embabel-smith/                 parent POM: embabel 1.5.4, Java 21, repo.embabel.com
 ├── smith-common/              skill-pack data model + YAML I/O (the shared contract)
 └── poc/                       aggregator (embabel-smith-poc); POCs 1-11 as submodules
     ├── poc-1-no-code-runtime/      POC 1: fixed launcher ingests a skill-pack, runs a plan
@@ -73,7 +73,7 @@ Because the NL compiler is model-driven and can emit wrong bindings/schemas, `wr
 
 ## Risks / Trade-offs
 
-- [1.5.3 API may differ from the docs' javap signatures] → POC 1 runs first and verifies the ingest/deploy/run path before anything else; isolate the builder's spec layer behind an interface so a 2.0 shift is contained.
+- [1.5.4 API may differ from the docs' javap signatures] → POC 1 runs first and verifies the ingest/deploy/run path before anything else; isolate the builder's spec layer behind an interface so a 2.0 shift is contained.
 - [NL compilation emits wrong bindings/schemas] → mandatory validate-before-write (D5); drafts surface issues for review instead of silently guessing.
 - [Eval module is chatbot-oriented] → POC 5 proves the `AgentInvocation` adaptation or works around it; rewrite-loop treated as stretch.
 - [No live model endpoint available] → POCs build and scaffold to the pluggable env config (D4); end-to-end runs are gated on an endpoint and reported as such, not assumed.

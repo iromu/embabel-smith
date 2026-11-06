@@ -15,7 +15,7 @@
 # gemini-3.1-pro-preview (free-tier limit 0), gemini-2.5-* (404 for new users).
 embabel:
   models:
-    # default-llm names a ROLE (v1.5.3), resolved per call
+    # default-llm names a ROLE (v1.5.4), resolved per call
     default-llm: ${EMBABEL_MODELS_DEFAULT_LLM:fast}
     default-embedding-model: gemini-embedding-001
     roles:

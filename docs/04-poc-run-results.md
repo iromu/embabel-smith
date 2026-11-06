@@ -1,5 +1,5 @@
 # Embabel Smith POC — Conclusions vs. the Theory
-*Run 2026-11-02, full re-runs 2026-11-03 ×2 + 2026-11-04 (Java 25 / GraalVM CE, target Java 21 · Spring Boot 4.1.1 · Embabel 1.5.3) · POC 1–21*
+*Run 2026-11-02, full re-runs 2026-11-03 ×2 + 2026-11-04 (Java 25 / GraalVM CE, target Java 21 · Spring Boot 4.1.1 · Embabel 1.5.4) · POC 1–21*
 
 This page concludes the POC run **against the hypothesis laid out in docs 01–03**: what the POCs
 actually proved, what they did not, and which POCs are still missing. The run now covers **all

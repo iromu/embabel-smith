@@ -8,14 +8,14 @@ VERDICT (one line): FEASIBLE, not useless. Embabel already ships ~70% of the
 pieces — a stable declarative YAML agent module, an NL→spec LLM compiler, and
 an LLM eval harness. The missing piece is the builder UI itself.
 
-Every claim below was verified against Embabel source (v1.5.3 jars inspected
-with javap, v1.5.3 source read, production "realms" packs inspected) — not from
+Every claim below was verified against Embabel source (v1.5.4 jars inspected
+with javap, v1.5.4 source read, production "realms" packs inspected) — not from
 marketing copy.
 
 ## SECTION 1 — WHAT EMBABEL IS (the concepts the builder maps onto)
 
 Embabel (github.com/embabel/embabel-agent, Apache-2.0, from the creator of
-Spring; stable 1.5.3, Oct 2026; Maven Central + repo.embabel.com) models
+Spring; stable 1.5.4, Oct 2026; Maven Central + repo.embabel.com) models
 agentic flows as:
 
   Actions    steps with typed inputs (IoBindings "name:Type"), typed outputs,
@@ -45,7 +45,7 @@ Execution:
   Subagents: an @Action can spawn nested processes (asSubProcess); in YAML
   terms, exported goals (export: true) become callable tools/skills.
 
-Planners (PlannerType enum — verified in the 1.5.3 jar):
+Planners (PlannerType enum — verified in the 1.5.4 jar):
   GOAP       default; deterministic goal-oriented A* over pre/postconditions.
              Best: business processes with defined outputs.
   UTILITY    picks highest-value available action each step; no fixed goal.
@@ -80,9 +80,9 @@ Guardrails (three orthogonal mechanisms):
 
 ## SECTION 2 — THE DECISIVE EVIDENCE
 
-### 2.1 embabel-agent-spec = the no-compilation ingestion engine (STABLE 1.5.3)
-Verified in the 1.5.3 RELEASE jar (repo.embabel.com libs-release; released
-alongside the 1.5.3 platform — no longer "experimental only"). Contents:
+### 2.1 embabel-agent-spec = the no-compilation ingestion engine (STABLE 1.5.4)
+Verified in the 1.5.4 RELEASE jar (repo.embabel.com libs-release; released
+alongside the 1.5.4 platform — no longer "experimental only"). Contents:
 
   StepSpec (interface): stepType discriminator + emit(context) → Action|Goal.
     Subtypes resolved by short name ("action","goal") or FQCN — extensible
@@ -118,7 +118,7 @@ alongside the 1.5.3 platform — no longer "experimental only"). Contents:
     the platform's available groups; returns AgentCompilationResult with
     errors for review). Prompts: compile_agent/action/goal.jinja in the jar.
 
-  Execution mechanics (read from PromptedActionSpecAction source, v1.5.3):
+  Execution mechanics (read from PromptedActionSpecAction source, v1.5.4):
     - Input binding: blackboard variable = decapitalized type name
       (UserInput → userInput). World-state check: blackboard[variable]
       exists AND satisfiesType(value, type).
@@ -131,7 +131,7 @@ alongside the 1.5.3 platform — no longer "experimental only"). Contents:
       blackboard; property references also feed DynamicType property
       discovery (referencedInputProperties).
 
-  Verified constructor signatures (javap on 1.5.3 jars) — the exact calls a
+  Verified constructor signatures (javap on 1.5.4 jars) — the exact calls a
   launcher/builder must make:
     StepSpecAgentScopeBuilder(String name, AgentPlatform, StepSpecRepository,
         DataDictionary, List<ToolGroupDescription>, List<Tool>)
@@ -445,7 +445,7 @@ Risks:
     compile_*.jinja, test YAMLs), embabel-agent-eval (README: eval job
     YAML, scoring formula), embabel-agent-remote (REST contract),
     embabel-agent-sandbox
-  - 1.5.3 release jars inspected (javap): embabel-agent-spec,
+  - 1.5.4 release jars inspected (javap): embabel-agent-spec,
     embabel-agent-api (ScriptedLlmOperations, IntegrationTestUtils,
     ProcessOptions/PlannerType, DynamicType, ValuePropertyDefinition,
     JvmType, DataDictionary), embabel-agent-openai (custom endpoint
@@ -456,12 +456,12 @@ Risks:
     agent-gen (Meta-Agent), project-creator, me.embabel.com
   - Rod Johnson "Embabel Year-End Update" (Medium): Utility + Supervisor
     planners, @State model
-  - mvnrepository: embabel-agent-api 1.5.3 (Oct 2026), Maven Central
+  - mvnrepository: embabel-agent-api 1.5.4 (Oct 2026), Maven Central
 
 ## SECTION 7 — IMPLEMENTATION RECOMMENDATIONS & CODE SAMPLES
 
 This section provides concrete starting points for each major subsystem.
-All code is compatible with Embabel 1.5.3 and Java 21.
+All code is compatible with Embabel 1.5.4 and Java 21.
 
 ### 7.1 Minimal Launcher (the only compiled Java per runtime)
 This Spring Boot app is the FIXED template — never regenerated per agent.
@@ -811,7 +811,7 @@ The builder writes these files; the user drops the folder into any Embabel runti
 ```xml
 <!-- pom.xml -->
 <properties>
-    <embabel-agent.version>1.5.3</embabel-agent.version>
+    <embabel-agent.version>1.5.4</embabel-agent.version>
     <java.version>21</java.version>
 </properties>
 
