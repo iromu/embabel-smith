@@ -8,15 +8,16 @@ source_paths:
   - "docs/01-embabel-agent-builder-research.md"
   - "docs/02-agent-skills-research.md"
   - "docs/03-embabel-skills-agent-builder-design.md"
-updated_at: "2026-11-04"
+updated_at: "2026-11-06"
 ---
 
 # What the POCs prove (vs. the theory)
 
 This page is the **conclusion** of the POC run (2026-11-02, re-verified 2026-11-03 ×2 + 2026-11-04)
-against the hypothesis in docs 01–03. It answers: what did the twenty-one POCs actually prove, what
-did they not, and what is still missing. The raw run evidence (green loop, offline baseline,
-defects fixed) lives in `docs/04-poc-run-results.md` §5; this page distills the verdict.
+against the hypothesis in docs 01–03. It answers: what did the POCs actually prove, what did they
+not, and what is still missing. The raw run evidence (green loop, offline baseline, defects fixed)
+lives in `docs/04-poc-run-results.md` §5; this page distills the verdict. The POC suite is now
+**frozen evidence** for the [[product-phase]] (the `prod/` modules that extract this proven logic).
 
 ## The hypothesis, in one line
 
@@ -83,6 +84,8 @@ The POCs **prove the feasibility core** (the "70% already there") and confirm do
 | POC 19 (small-LLM skill selection) | a 0.6B model fine-tuned for single-label decisions, served in a Docker container whose lifecycle Spring Boot Dev Services manages, **beats text similarity** (67%/50%) but trails the GLiNER2 transformer (100%/83%) | **docker-gated** (one-time GGUF download; offline tests stub the endpoint) |
 | POC 20 (real semantic `EmbeddingService`) | a genuine ONNX sentence-encoder (`all-MiniLM-L6-v2`) behind the `SkillScorer` seam retrieves cleanly at the distinct scale (100% at 191) and beats the lexical/dense stand-ins under shadowing (33%) | **local-model-gated** (one-time ONNX download); does not fully cure the near-duplicate collapse — curation (POC 18) is the real fix |
 | [[skill-security-scanning]] (21) | a static scanner vets a pack's declared prompts + tool groups for injection / exfiltration / over-privilege; verdicts `SAFE`/`REVIEW`/`BLOCK` and maps each pack to the minimum POC 10 trust tier | a normalized pattern matcher over declared content, not a semantic detector; does not audit bundled `scripts/` files |
+| POC 22 (unified builder UI) | the POC 15 builder UI re-built as a Vue 3 + Quasar SPA over the same REST surface — one app hosting the run, author, compose, retrieve, scale, trust, security, lifecycle, and remote panes | a frontend consolidation; the panes' backend behaviour is the POC 15/18/20 REST controllers it calls |
+| [[shadowing-remedies]] (23) | a **remote** `nomic-embed-text-v2` `EmbeddingService` (OpenAI-compatible endpoint) behind the `SkillScorer` seam: 100% P@1 to 191 distinct and to **1000** generated skills, with steady-state per-query retrieval 0.48 → 1.27 ms (cosine over cached vectors, **zero per-query model calls**) | **endpoint-gated** (offline tests use a stub transport / local `HttpServer`); under shadowing it ties lexical (17%) — the specific embedding model matters, and curation (POC 18) remains the real fix |
 
 ## Still open
 
@@ -100,3 +103,8 @@ claim C1–C18 mapped, no new gap or fixable caveat. The former follow-ups are n
   POC 18's lifecycle state (retired skills dropped, degraded ones de-ranked), and the curate
   re-eval re-scores a skill and moves it through the lifecycle. The pure content-hash / drift /
   state-machine half is offline-testable; the measured score is endpoint-gated.
+
+**The next step is the product phase.** With every hypothesis gap closed, the POCs are frozen
+evidence and the `prod/` modules ([[product-phase]]) extract the proven logic into a working
+product: the `skillsource` module (change 02), the `smith run` runtime (change 03), and the
+`smith build` builder (change 04) are done; the self-improving `studio` (changes 05–06) is next.

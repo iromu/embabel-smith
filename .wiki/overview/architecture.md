@@ -6,22 +6,29 @@ language: "default"
 source_paths:
   - "pom.xml"
   - "poc/pom.xml"
+  - "prod/pom.xml"
   - "docs/04-poc-run-results.md"
   - "openspec/changes/embabel-agent-builder/design.md"
-updated_at: "2026-11-04"
+updated_at: "2026-11-06"
 ---
 
 # Architecture and module map
 
 Embabel Smith is a Maven **multi-module** project (design D1). The parent POM (`pom.xml`)
-centralizes the Embabel version (1.5.3), the `repo.embabel.com` repository, the Spring Boot BOM
-(4.1.1 — the version Embabel 1.5.3 is built against), and the test dependencies. The POCs live
-under a `poc/` aggregator (`poc/pom.xml`); each is independently buildable and runnable, so a
-failure isolates to one claim.
+centralizes the Embabel version (1.5.4), the `repo.embabel.com` repository, the Spring Boot BOM,
+and the test dependencies. There are two top-level trees: the POCs under a `poc/` aggregator
+(`poc/pom.xml`) — each independently buildable and runnable, so a failure isolates to one claim —
+and the product under a `prod/` aggregator (`prod/pom.xml`) — the four product modules that
+extract proven POC logic (see [[product-phase]]).
 
 ```
 embabel-smith/            parent POM (pom packaging)
 ├── smith-common/         the skill-pack FORMAT owner — shared by everyone
+├── prod/                 aggregator for the product modules (extract, never depend on POCs)
+│   ├── embabel-smith-skillsource    folder:/git: skill sources + content hash (change 02)
+│   ├── embabel-smith-runtime        the runtime product: smith run CLI + JSONL trace (change 03)
+│   ├── embabel-smith-builder        the builder product: smith build CLI + pipeline (change 04)
+│   └── embabel-smith-studio         the self-improving studio (empty skeleton, changes 05–06)
 └── poc/                  aggregator for the POC modules
     ├── poc-1-no-code-runtime          POC 1 — keystone: ingest a pack, run a plan
     ├── poc-2-nl-compile               POC 2 — description → draft
@@ -44,7 +51,8 @@ embabel-smith/            parent POM (pom packaging)
     ├── poc-19-small-llm-selector      POC 19 — small-LLM skill selection (Docker-served)
     ├── poc-20-semantic-embedding      POC 20 — the real semantic EmbeddingService
     ├── poc-21-skill-security          POC 21 — install-time skill security / vulnerability scanning
-    └── poc-22-unified-ui              POC 22 — the unified builder UI (Vue 3 + Quasar SPA, in progress)
+    ├── poc-22-unified-ui              POC 22 — the unified builder UI (Vue 3 + Quasar SPA)
+    └── poc-23-remote-embedding-scale  POC 23 — remote embedding selection at scale (to 1000 skills)
 ```
 
 ## The dependency shape
@@ -66,7 +74,7 @@ format meets Embabel's runtime types; `smith-common` never knows Embabel exists.
 - **POC 4** (`poc-4-skill-format`) — proves the exported-goal-as-skill primitive and on-demand
   loading. See [[skill-format-on-demand]].
 
-POCs 6–21 are independent consumers of the format, each adding one skills-first capability:
+POCs 6–23 are independent consumers of the format, each adding one skills-first capability:
 composition ([[skill-composition]]), CLI invocation ([[runtime-adapter]]), retrieval
 ([[retrieval-shadowing]]), eval-guided refinement ([[eval-guided-refinement]]), trust tiers
 ([[trust-tiers]]), progressive disclosure ([[progressive-disclosure]]), semantic retrieval at scale
@@ -74,8 +82,16 @@ composition ([[skill-composition]]), CLI invocation ([[runtime-adapter]]), retri
 ([[skill-composer]]), the remote-action bridge ([[runtime-adapter]]), GLiNER2 classification
 ([[shadowing-remedies]]), skill lifecycle / drift ([[skill-lifecycle]], applied in the POC 15
 canvas), small-LLM selection ([[shadowing-remedies]]), the real semantic `EmbeddingService`
-([[shadowing-remedies]]), and install-time security scanning ([[skill-security-scanning]]). See
-[[what-the-pocs-prove]] for the per-POC verdicts.
+([[shadowing-remedies]]), install-time security scanning ([[skill-security-scanning]]), the unified
+builder UI (POC 22, a Vue 3 + Quasar SPA over the POC 15 REST surface), and remote embedding
+selection at scale (POC 23, [[shadowing-remedies]]). See [[what-the-pocs-prove]] for the per-POC
+verdicts.
+
+**The product modules** (`prod/`) are a *second* set of consumers of the same format, but with a
+harder rule: they depend on `smith-common` and Embabel directly, **never** on a `poc-*` artifact
+(enforced by the enforcer ban in `prod/pom.xml`). `skillsource` is framework-free like
+`smith-common`; `runtime` and `builder` are Spring Boot CLI apps that reuse the same ingest/build
+seams the POCs proved. See [[product-phase]] for the six changes that build them.
 
 ## The two "seams"
 

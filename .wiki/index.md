@@ -3,15 +3,16 @@ title: "Embabel Smith Wiki"
 type: "index"
 status: "active"
 language: "default"
-last_commit: "3f57a6a7dfa502a6eb590443e66237d806afc4f8"
-updated_at: "2026-11-05"
+last_commit: "f6de13b81ed777dc5e67c2fafac044c44187ea7d"
+updated_at: "2026-11-06"
 ---
 
 # Embabel Smith
 
-A **skills-first agent builder** on the Embabel platform (v1.5.3, Java 21). One part *builds* a
-skill; the other part *runs* one. This wiki explains how the pieces fit so a newcomer can orient
-fast and verify claims in code.
+A **skills-first agent builder** on the Embabel platform (v1.5.4, Java 21). One part *builds* a
+skill; the other part *runs* one. The POCs under `poc/` prove the idea end to end; the product
+modules under `prod/` ([[product-phase]]) turn that proven logic into a working builder and runtime.
+This wiki explains how the pieces fit so a newcomer can orient fast and verify claims in code.
 
 ## 1. What is this?
 
@@ -105,12 +106,16 @@ Three entry points matter:
   [[builder-pipeline]].
 - `poc/poc-2-nl-compile` (POC 2), `poc/poc-4-skill-format` (POC 4), `poc/poc-5-eval` (POC 5) — see
   [[architecture]].
-- `poc/poc-6`…`poc-21` — the skills-first extensions: composition, runtime adapter, retrieval,
+- `poc/poc-6`…`poc-23` — the skills-first extensions: composition, runtime adapter, retrieval,
   eval-guided refinement, trust tiers, progressive disclosure, semantic retrieval at scale,
   remote/MCP invocation, the skill Composer, the visual builder UI, the remote-action bridge,
   GLiNER2 skill classification, skill lifecycle / drift detection, small-LLM skill selection, the
-  real semantic `EmbeddingService`, and install-time security scanning. See
-  [[what-the-pocs-prove]].
+  real semantic `EmbeddingService`, install-time security scanning, the unified builder UI (POC 22),
+  and remote embedding selection at scale (POC 23). See [[what-the-pocs-prove]].
+- `prod/` — the **product phase** ([[product-phase]]): `skillsource` (folder/git sources +
+  content hash), the `smith run` runtime (multi-pack ingest + trust tiers + JSONL trace), the
+  `smith build` builder (NL → validated pack → publish), and the `studio` (next). See
+  [[skill-sources]], [[smith-runtime]], and [[smith-builder]].
 
 ## 7. What should I avoid breaking?
 
@@ -143,17 +148,22 @@ Three entry points matter:
 | How does progressive disclosure bound context? | [[progressive-disclosure]] |
 | What is an "exported goal"? | [[exported-goal-as-skill]] |
 | How does zero-compilation work? | [[no-code-ingestion]] |
+| How do the POCs become the product? | [[product-phase]] · `prod/` |
+| How are skill sources (folder/git) resolved? | [[skill-sources]] |
+| How does the `smith run` runtime work (CLI + trace)? | [[smith-runtime]] |
+| How does the `smith build` builder work (pipeline + publish)? | [[smith-builder]] |
 
 ## Page catalog
 
 **Overview** — [[what-is-embabel-smith]] · [[getting-started]] · [[architecture]] ·
-[[what-the-pocs-prove]]
+[[what-the-pocs-prove]] · [[product-phase]]
 **Entities** — [[skill-pack-format]] · [[skill-pack-model]]
 **Concepts** — [[exported-goal-as-skill]] · [[no-code-ingestion]] · [[model-endpoint]]
 **Flows** — [[runtime-run]] · [[builder-pipeline]] · [[eval-scoring]] · [[skill-composition]] ·
 [[eval-guided-refinement]]
 **Features** — [[nl-compile]] · [[skill-format-on-demand]] · [[runtime-adapter]] ·
 [[retrieval-shadowing]] · [[shadowing-remedies]] · [[skill-lifecycle]] · [[trust-tiers]] ·
-[[skill-security-scanning]] · [[progressive-disclosure]] · [[skill-composer]]
+[[skill-security-scanning]] · [[progressive-disclosure]] · [[skill-composer]] · [[skill-sources]] ·
+[[smith-runtime]] · [[smith-builder]]
 **Risks** — [[validate-before-write]]
 **Reference** — [[validation-codes]] · [[sample-explainer]]
