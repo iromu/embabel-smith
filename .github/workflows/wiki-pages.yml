@@ -27,7 +27,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Build the wiki site and publish to gh-pages
-        uses: iromu/wiki-site-action@v1
+        uses: iromu/wiki-site-action@v1.1
         with:
           wiki-dir: .wiki
           publish-branch: gh-pages
