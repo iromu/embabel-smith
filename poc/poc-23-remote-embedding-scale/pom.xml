@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.embabel.smith</groupId>
+        <artifactId>embabel-smith-poc</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>poc-23-remote-embedding-scale</artifactId>
+    <name>poc-23-remote-embedding-scale</name>
+    <description>
+        POC 23: skill selection at scale with a REMOTE EmbeddingService. Runs the real
+        nomic-embed-text-v2 embedding endpoint (an OpenAI-compatible POST /embeddings service,
+        a llama.cpp server proxied by LiteLLM) behind POC 12's SkillScorer seam, on two scenarios:
+        (1) POC 12/20's identical 200+ same-typed shadowing library, so the remote embedding is
+        directly comparable to lexical (POC 8), dense feature-hashing (POC 12), MiniLM (POC 20)
+        and GLiNER2 (POC 17) on claim C10; and (2) a larger generated library, to measure the
+        scaling dimension -- the one-time embedding cost is amortised (one embedding per skill) and
+        per-query retrieval is pure-CPU cosine over cached vectors (O(n), no model call), unlike a
+        per-candidate LLM/transformer selector which needs n model calls per query.
+        Endpoint-gated live run; offline tests use a stub transport so the module stays green
+        without the endpoint.
+    </description>
+
+    <dependencies>
+        <!-- Reuse POC 12's ScaleSkillLibrary (191/281 same-typed scenario), the SkillScorer seam,
+             the ScaleSkillRegistry ranking, the ScaleRetrievalRunner P@1 math, the lexical /
+             feature-hash-dense baselines, SemanticSimilarity.cosine, and SkillEntry (POC 8). -->
+        <dependency>
+            <groupId>com.embabel.smith</groupId>
+            <artifactId>poc-12-semantic-retrieval</artifactId>
+        </dependency>
+
+        <!-- JSON for the OpenAI-compatible embeddings request/response. -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.1.0</version>
+                <configuration>
+                    <mainClass>com.embabel.smith.retrieval.remote.RemoteEmbeddingApp</mainClass>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>

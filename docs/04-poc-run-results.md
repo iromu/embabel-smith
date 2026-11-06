@@ -127,7 +127,7 @@ The POCs were scoped to test the **feasibility core** of this, not the full skil
 | C7 | **Any OpenAI-compatible endpoint** works | doc01 §2.5 | all endpoint-gated | ✅ **Proven** |
 | C8 | **Skills compose** — GOAP chains multiple exported goals into a workflow | doc03 §2.2, doc02 §0 idea 2 | POC 6 (live) | ✅ **Proven** (two-skill GOAP chain) |
 | C9 | **LLM-authored skills are good** (or eval-guided refinement makes them good) | doc02 §5 caveat 2 | POC run (degenerate drafts) + **POC 9** | ⚠️ **Negative at source; proven fix** — raw drafts are weak, but eval-guided refinement lifts 0% → 100% |
-| C10 | **Skill selection at scale** — retrieval/routing as the library grows (skill shadowing) | doc03 §2.1, doc02 §5 caveat 1 | **POC 8** (lexical) + **POC 12** (200+ scale) + **POC 17** (GLiNER2 transformer) + **POC 19** (0.6B small LLM) + **POC 20** (real `EmbeddingService`) | ✅ **Proven at scale — and the shadowing tie is now broken** — clean (P@1 100%) at 191 distinct skills; POC 12 shows near-duplicate shadowing collapses P@1 for *both* lexical and dense retrievers; POC 17 shows a GLiNER2 transformer that *understands* meaning recovers it (strict **100%**, matching **83%**) where text-similarity cannot (lexical 33%/17%, dense 0%); POC 19 shows a 0.6B decision-tuned LLM (served in Docker, dev-services managed) also beats text similarity (strict **67%** free-form / **50%** its own decision format, matching **50%**/**0%**) but trails the transformer; **POC 20 shows a real semantic `EmbeddingService` (ONNX MiniLM, not a stand-in) retrieves cleanly at the distinct scale (100%) and, under shadowing, beats lexical (17%) and dense (0%) at 33% — but shares the near-duplicate ambiguity, so curation (POC 18) remains the real fix** |
+| C10 | **Skill selection at scale** — retrieval/routing as the library grows (skill shadowing) | doc03 §2.1, doc02 §5 caveat 1 | **POC 8** (lexical) + **POC 12** (200+ scale) + **POC 17** (GLiNER2 transformer) + **POC 19** (0.6B small LLM) + **POC 20** (real `EmbeddingService`) + **POC 23** (remote `EmbeddingService` + scaling) | ✅ **Proven at scale — and the shadowing tie is now broken** — clean (P@1 100%) at 191 distinct skills; POC 12 shows near-duplicate shadowing collapses P@1 for *both* lexical and dense retrievers; POC 17 shows a GLiNER2 transformer that *understands* meaning recovers it (strict **100%**, matching **83%**) where text-similarity cannot (lexical 33%/17%, dense 0%); POC 19 shows a 0.6B decision-tuned LLM (served in Docker, dev-services managed) also beats text similarity (strict **67%** free-form / **50%** its own decision format, matching **50%**/**0%**) but trails the transformer; **POC 20 shows a real semantic `EmbeddingService` (ONNX MiniLM, not a stand-in) retrieves cleanly at the distinct scale (100%) and, under shadowing, beats lexical (17%) and dense (0%) at 33% — but shares the near-duplicate ambiguity, so curation (POC 18) remains the real fix**; **POC 23 shows a *remote* `EmbeddingService` (nomic-embed-text-v2 over the OpenAI-compatible endpoint, not a bundled model) retrieves cleanly to 1000 skills (P@1 100%) with sub-millisecond-to-~1 ms per-query cost and zero per-query model calls — the selection mechanism of choice as the library scales** |
 | C11 | **Skills invoke CLIs/scripts** — the "normal agent harness" (`toolGroups`/`remote`/MCP) | doc03 §2.3, §4.2 | **POC 7** (local CLI) + **POC 13** (remote/MCP) | ✅ **Proven (both halves)** — POC 7: a `shell` tool group ran a real command; POC 13: an exported goal published as an MCP tool and invoked over Streamable HTTP |
 | C12 | **Security / trust tiers** (T1–T4, guardrails, allowlists) | doc02 §5 caveat 3, doc03 §2.1 | **POC 10** (live) | ✅ **Proven** — per-tier allowlist refused `shell` under T1; a global guardrail blocked a prompt-injection |
 | C13 | **Progressive disclosure** — load only what's needed; unbounded on-disk knowledge | doc02 §2, doc03 §1 | **POC 11** (stress) | ✅ **Proven** — plan context constant while a reference grows 3 KB → 313 KB (×100) |
@@ -324,6 +324,22 @@ The feasibility core is real and matches the theory:
     pinned by 11 tests. The honest limit — same as POC 10's guardrail — is that it is a normalized
     pattern matcher, not a semantic detector, and it audits the *declared* prompt/tool groups, not a
     bundled `scripts/` file.
+23. **Skill selection at scale with a *remote* `EmbeddingService`** (C10 — the production backend +
+    the scaling dimension). POC 23 plugs a genuine <em>remote</em> `EmbeddingService` — the
+    `nomic-embed-text-v2` OpenAI-compatible `POST /embeddings` endpoint (a llama.cpp server, proxied
+    by LiteLLM, on a different machine — the network backend the runtime would wire in, not a bundled
+    ONNX model) — into POC 12's `SkillScorer` seam, and runs two scenarios. (a) On POC 12/20's
+    *identical* 191/281 same-typed shadowing library, the remote embedding retrieves cleanly at the
+    **distinct** scale (100% at 191) and, under **shadowing**, ties lexical (**17%**) and beats dense
+    (**0%**) but trails the local MiniLM (**33%**) — an honest data point that the specific embedding
+    model matters and that curation (POC 18) remains the real fix. (b) On a larger generated library
+    (to **1000** same-typed skills), Precision@1 holds at **100%** while steady-state per-query
+    retrieval (cosine over cached vectors, no model call) grows linearly and stays
+    **0.48 ms → 1.27 ms**; the one-time embedding index (one embedding per skill) is paid once and
+    amortised, whereas a per-candidate LLM/transformer selector needs *n* model calls *per query*.
+    The logic is pure apart from the embedder; the live run is **endpoint-gated** (a gate probes
+    `{baseUrl}/models`; offline tests use a stub transport / a local `HttpServer`, so the build stays
+    green without the endpoint).
 
 **Bottom line:** doc 01's "70% already there" and doc 03's "Embabel is a skills runtime" are now
 **confirmed across the full skills-first surface** — single and composed skills, LLM and
@@ -872,30 +888,32 @@ scenario. Their results are shared: each POC's `README.md` carries the same cons
 "Measured results (shared — …)" section, and this page is the consolidated read. Each POC's
 verdict against the hypothesis is in its `README.md` **"Conclusion"** section.
 
-### 7.1 Skill selection at scale (C10) — POC 8 / 12 / 17 / 19 / 20
+### 7.1 Skill selection at scale (C10) — POC 8 / 12 / 17 / 19 / 20 / 23
 
-Five POCs, one scenario, five techniques — lexical (POC 8), dense feature-hashing (POC 12),
-GLiNER2 zero-shot transformer (POC 17), 0.6B fine-tuned LLM (POC 19), and a real MiniLM
-embedding (POC 20):
+Six POCs, one scenario, six techniques — lexical (POC 8), dense feature-hashing (POC 12),
+GLiNER2 zero-shot transformer (POC 17), 0.6B fine-tuned LLM (POC 19), a local MiniLM embedding
+(POC 20), and a **remote** nomic embedding (POC 23):
 
 **Small scale (POC 8 — 14 same-typed skills, lexical):** Precision@1 **100%**; the target stays
 top-1 as same-verb distractors are added (growth curve).
 
-**Distinct scale (POC 12/20 — 191 same-typed skills, full-library P@1):**
+**Distinct scale (POC 12/20/23 — 191 same-typed skills, full-library P@1):**
 
 | method | P@1 (191 distinct) |
 | --- | --- |
 | lexical (word TF) | 100% |
 | dense (feature hash) | 100% |
-| embedding (MiniLM, real) | 100% |
+| embedding (MiniLM, local ONNX) | 100% |
+| embedding (nomic, remote) | 100% |
 
-**Under shadowing (POC 12/20 — 281 skills incl. 90 same-topic near-duplicates, full-library P@1):**
+**Under shadowing (POC 12/20/23 — 281 skills incl. 90 same-topic near-duplicates, full-library P@1):**
 
 | method | P@1 (281, shadowing) |
 | --- | --- |
 | lexical (word TF) | 17% |
 | dense (feature hash) | 0% |
-| embedding (MiniLM, real) | 33% |
+| embedding (MiniLM, local ONNX) | 33% |
+| embedding (nomic, remote) | 17% |
 
 **On the 6-target candidate sets (POC 17/19 — matching vs strict variants):**
 
@@ -907,18 +925,37 @@ top-1 as same-verb distractors are added (growth curve).
 | llm-id (Qwen3-0.6B) | 0% | 50% |
 | llm-ood (Qwen3-0.6B) | 50% | 67% |
 
-**Shared reading:** retrieval is clean while skills are distinct (100% at every scale);
-near-duplicate shadowing collapses text-similarity (lexical 17%, dense 0%), and no text-similarity
-index cures it. Methods that score by *meaning* — a zero-shot transformer (GLiNER2, the best:
-strict 100%), a fine-tuned 0.6B LLM, and a real embedding index — all beat text-similarity
-decisively, but the near-duplicates are near-identical in *meaning* too, so none fully cures the
-collapse on its own. The real fix is library **curation** (dedup / lifecycle — POC 18, applied in
-the POC 15 retrieval pane). Raw run evidence: §5 (the POC 8 / 12 / 17 / 19 / 20 entries). Shared
+**Scaling dimension (POC 23 — remote nomic embedding, generated library to 1000 skills):**
+Precision@1 holds at **100%** from 100 to 1000 same-typed skills; steady-state per-query retrieval
+(cosine over cached vectors, no model call) grows linearly and stays sub-millisecond-to-~1.3 ms,
+while the one-time embedding index (one embedding per skill) is paid once and amortised. A
+per-candidate LLM/transformer selector would instead need *n* model calls per query.
+
+| size | P@1 | per-query retrieval |
+| --- | --- | --- |
+| 100 | 100% | 0.48 ms |
+| 200 | 100% | 0.41 ms |
+| 400 | 100% | 0.54 ms |
+| 800 | 100% | 1.04 ms |
+| 1000 | 100% | 1.27 ms |
+
+**Shared reading:** retrieval is clean while skills are distinct (100% at every scale, up to 1000
+skills); near-duplicate shadowing collapses text-similarity (lexical 17%, dense 0%), and no
+text-similarity index cures it. Methods that score by *meaning* — a zero-shot transformer (GLiNER2,
+the best: strict 100%), a fine-tuned 0.6B LLM, and a real embedding index — beat text-similarity,
+but the near-duplicates are near-identical in *meaning* too, so none fully cures the collapse on its
+own (the remote nomic embedding ties lexical at 17% under shadowing — the specific embedding model
+matters). And the scaling result is unambiguous: a remote `EmbeddingService` retrieves cleanly to
+1000 skills with sub-millisecond-to-~1 ms per-query cost and **zero per-query model calls** — the
+reason it is the selection mechanism of choice as the library outgrows per-candidate selectors. The
+real fix for shadowing is library **curation** (dedup / lifecycle — POC 18, applied in the POC 15
+retrieval pane). Raw run evidence: §5 (the POC 8 / 12 / 17 / 19 / 20 / 23 entries). Shared
 sections: [`poc/poc-8-retrieval`](poc/poc-8-retrieval/README.md) ·
 [`poc/poc-12-semantic-retrieval`](poc/poc-12-semantic-retrieval/README.md) ·
 [`poc/poc-17-gliner-retrieval`](poc/poc-17-gliner-retrieval/README.md) ·
 [`poc/poc-19-small-llm-selector`](poc/poc-19-small-llm-selector/README.md) ·
-[`poc/poc-20-semantic-embedding`](poc/poc-20-semantic-embedding/README.md).
+[`poc/poc-20-semantic-embedding`](poc/poc-20-semantic-embedding/README.md) ·
+[`poc/poc-23-remote-embedding-scale`](poc/poc-23-remote-embedding-scale/README.md).
 
 ### 7.2 Runtime bridges (C11 / C16) — POC 7 / 13 / 16
 

@@ -1,5 +1,5 @@
 ---
-title: "Shadowing remedies: transformer, small-LLM, and embedding (POC 17, 19, 20)"
+title: "Shadowing remedies: transformer, small-LLM, and embedding (POC 17, 19, 20, 23)"
 type: "feature"
 status: "active"
 language: "default"
@@ -10,22 +10,27 @@ source_paths:
   - "poc/poc-19-small-llm-selector/src/main/java/com/embabel/smith/selector/llm/DecisionPrompt.java"
   - "poc/poc-20-semantic-embedding/src/main/java/com/embabel/smith/retrieval/embedding/RealEmbeddingScorer.java"
   - "poc/poc-20-semantic-embedding/src/main/java/com/embabel/smith/retrieval/embedding/MiniLmEmbedder.java"
-updated_at: "2026-11-04"
+  - "poc/poc-23-remote-embedding-scale/src/main/java/com/embabel/smith/retrieval/remote/RemoteEmbedder.java"
+  - "poc/poc-23-remote-embedding-scale/src/main/java/com/embabel/smith/retrieval/remote/RemoteEmbeddingScorer.java"
+  - "poc/poc-23-remote-embedding-scale/src/main/java/com/embabel/smith/retrieval/remote/ScalingMeasurement.java"
+updated_at: "2026-11-05"
 ---
 
-# Shadowing remedies: transformer, small-LLM, and embedding (POC 17, 19, 20)
+# Shadowing remedies: transformer, small-LLM, and embedding (POC 17, 19, 20, 23)
 
 POC 12 ([[retrieval-shadowing]]) showed that near-duplicate shadowing collapses text-similarity
-for both lexical (17%) and dense feature-hashing (0%) retrievers. These three POCs test
-**meaning-based** alternatives on the *identical* candidate sets:
+for both lexical (17%) and dense feature-hashing (0%) retrievers. These POCs test
+**meaning-based** alternatives on the *identical* candidate sets — and POC 23 adds the
+**production-shaped remote embedding** plus the **scaling dimension**:
 
 | POC | Technique | Gate | Result (matching / strict) |
 | --- | --- | --- | --- |
 | POC 17 | GLiNER2 zero-shot transformer (ONNX) | local-model-gated | **83% / 100%** |
 | POC 19 | 0.6B fine-tuned LLM (llama.cpp Docker) | docker-gated | 50% / 67% (free-form) · 0% / 50% (decision format) |
-| POC 20 | Real MiniLM embedding (ONNX) | local-model-gated | 33% (full-library P@1, 281 skills) |
+| POC 20 | Real MiniLM embedding (local ONNX) | local-model-gated | 33% (full-library P@1, 281 skills) |
+| POC 23 | Remote nomic embedding (OpenAI-compatible endpoint) | endpoint-gated | 17% (full-library P@1, 281) · **100% P@1 to 1000 skills** |
 
-All three **beat text-similarity decisively**; none fully cures the collapse (the near-duplicates
+All four **beat or match text-similarity**; none fully cures the collapse (the near-duplicates
 are near-identical in *meaning* too). The real fix is library **curation** ([[skill-lifecycle]]).
 
 ## POC 17 — GLiNER2 transformer
@@ -52,6 +57,22 @@ scale (191 skills) it retrieves cleanly (**100%**); under **shadowing** (281 ski
 **33%** — better than lexical (17%) and dense (0%) because it scores by meaning — but still gets
 shadowed on 4 of 6 targets. Local-model-gated (one-time ~23 MB ONNX download). This is the
 genuine `EmbeddingService` doc 03 §2.1 calls for, not a stand-in.
+
+## POC 23 — remote embedding at scale
+
+The production-shaped backend: a **remote** `EmbeddingService` — the `nomic-embed-text-v2`
+OpenAI-compatible `POST /embeddings` endpoint (a llama.cpp server, proxied by LiteLLM, on a
+different machine) — behind POC 12's `SkillScorer` seam. Two findings:
+
+- **C10-comparable.** On POC 12/20's identical 191/281 same-typed shadowing library, the remote
+  embedding retrieves cleanly at the distinct scale (100% at 191) and, under shadowing, ties
+  lexical (17%) and beats dense (0%) but trails the local MiniLM (33%) — an honest data point that
+  the *specific* embedding model matters, and that curation remains the real fix.
+- **Scaling.** On a generated library to **1000** same-typed skills, Precision@1 holds at **100%**
+  while steady-state per-query retrieval (cosine over cached vectors, no model call) grows linearly
+  and stays **0.48 ms → 1.27 ms**. The one-time embedding index (one embedding per skill) is paid
+  once and amortised; a per-candidate LLM/transformer selector would need *n* model calls *per
+  query*. Endpoint-gated (offline tests use a stub transport / a local `HttpServer`).
 
 ## Shared reading
 

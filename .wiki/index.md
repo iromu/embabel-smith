@@ -4,7 +4,7 @@ type: "index"
 status: "active"
 language: "default"
 last_commit: "3f57a6a7dfa502a6eb590443e66237d806afc4f8"
-updated_at: "2026-11-04"
+updated_at: "2026-11-05"
 ---
 
 # Embabel Smith
