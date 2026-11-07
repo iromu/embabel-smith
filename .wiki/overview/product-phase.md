@@ -10,14 +10,14 @@ source_paths:
   - "prod/embabel-smith-builder/README.md"
   - "prod/embabel-smith-studio/README.md"
   - "openspec/changes/01-product-module-foundation/proposal.md"
-updated_at: "2026-11-06"
+updated_at: "2026-11-07"
 ---
 
 # The product phase
 
 The POCs under `poc/` are **frozen evidence** — each proves one load-bearing claim, nothing more.
 On 2026-11-05 the project moved to the **product phase**: a new `prod/` tree of four modules that
-turn the proven POC logic into a working product — a CLI builder, a CLI runtime, and (next) a
+turn the proven POC logic into a working product — a CLI builder, a CLI runtime, and a
 self-improving studio. The POCs are not deleted; they are the source the product *extracts from*.
 
 ## The extract-don't-depend rule
@@ -35,9 +35,10 @@ their logic against `smith-common` (the format owner) and Embabel directly.
 | `prod/embabel-smith-skillsource` | Skill sources: `folder:` / `git:` URIs, pack discovery, ref pinning, cache, content hash. Shared by runtime (reads) and builder (publishes). | done (change 02) |
 | `prod/embabel-smith-runtime` | The runtime product: `smith run` CLI — ingest packs from a source, run an exported goal, enforce trust tiers, record a JSONL trace. | done (change 03) |
 | `prod/embabel-smith-builder` | The builder product: `smith build` CLI — NL description → validated pack → eval → security gate → lifecycle stamp → publish. | done (change 04) |
-| `prod/embabel-smith-studio` | The self-improving studio: hosts runtime + builder, the self-improvement loop, REST surface, web UI. | empty skeleton (changes 05–06) |
+| `prod/embabel-smith-studio` | The self-improving studio: the self-improvement loop (change 05); REST surface + web UI next (change 06). | loop done (change 05) |
 
-See [[skill-sources]], [[smith-runtime]], and [[smith-builder]] for each module's behaviour.
+See [[skill-sources]], [[smith-runtime]], [[smith-builder]], and [[smith-studio]] for each module's
+behaviour.
 
 ## The six changes
 
@@ -53,7 +54,8 @@ The product is built in six numbered OpenSpec changes under `openspec/changes/` 
    active` promotion and re-eval cycle that owns the lifecycle transitions).
 6. **06-smith-studio-product** — the studio's REST surface and web UI.
 
-Changes 01–04 are implemented and committed; 05 and 06 fill in the `studio` module.
+Changes 01–05 are implemented and committed; 06 (the studio's REST surface and web UI) fills in the
+rest.
 
 ## How it maps to the POCs
 
@@ -64,6 +66,9 @@ Changes 01–04 are implemented and committed; 05 and 06 fill in the `studio` mo
 - `builder` extracts POC 2/3 (build), POC 5 (eval), POC 9 (refine), POC 21 (security gate), and
   POC 18 (lifecycle stamp) into one deterministic pipeline ([[builder-pipeline]],
   [[eval-guided-refinement]], [[skill-security-scanning]]).
+- `studio` runs the self-improvement loop over the runtime's traces: it detects failure / regression
+  / drift, refines the failing steps, gates the candidate (validate → security → re-eval → strict
+  baseline), and republishes through the builder's publishers ([[smith-studio]], [[skill-lifecycle]]).
 
 The format contract is unchanged — the product reads and writes the same YAML skill-packs the POCs
 do ([[skill-pack-format]], [[validate-before-write]]).

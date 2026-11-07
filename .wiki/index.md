@@ -3,8 +3,8 @@ title: "Embabel Smith Wiki"
 type: "index"
 status: "active"
 language: "default"
-last_commit: "f6de13b81ed777dc5e67c2fafac044c44187ea7d"
-updated_at: "2026-11-06"
+last_commit: "4324414f0e9ad6c74955e9fa5039e9c9f43b3a11"
+updated_at: "2026-11-07"
 ---
 
 # Embabel Smith
@@ -114,8 +114,9 @@ Three entry points matter:
   and remote embedding selection at scale (POC 23). See [[what-the-pocs-prove]].
 - `prod/` — the **product phase** ([[product-phase]]): `skillsource` (folder/git sources +
   content hash), the `smith run` runtime (multi-pack ingest + trust tiers + JSONL trace), the
-  `smith build` builder (NL → validated pack → publish), and the `studio` (next). See
-  [[skill-sources]], [[smith-runtime]], and [[smith-builder]].
+  `smith build` builder (NL → validated pack → publish), and the `studio` (the self-improvement
+  loop that rewrites failing steps from traces and republishes on proven improvement). See
+  [[skill-sources]], [[smith-runtime]], [[smith-builder]], and [[smith-studio]].
 
 ## 7. What should I avoid breaking?
 
@@ -152,6 +153,7 @@ Three entry points matter:
 | How are skill sources (folder/git) resolved? | [[skill-sources]] |
 | How does the `smith run` runtime work (CLI + trace)? | [[smith-runtime]] |
 | How does the `smith build` builder work (pipeline + publish)? | [[smith-builder]] |
+| How does a skill self-improve from its traces? | [[smith-studio]] |
 
 ## Page catalog
 
@@ -164,6 +166,6 @@ Three entry points matter:
 **Features** — [[nl-compile]] · [[skill-format-on-demand]] · [[runtime-adapter]] ·
 [[retrieval-shadowing]] · [[shadowing-remedies]] · [[skill-lifecycle]] · [[trust-tiers]] ·
 [[skill-security-scanning]] · [[progressive-disclosure]] · [[skill-composer]] · [[skill-sources]] ·
-[[smith-runtime]] · [[smith-builder]]
+[[smith-runtime]] · [[smith-builder]] · [[smith-studio]]
 **Risks** — [[validate-before-write]]
 **Reference** — [[validation-codes]] · [[sample-explainer]]
