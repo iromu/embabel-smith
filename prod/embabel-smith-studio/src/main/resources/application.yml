@@ -1,0 +1,15 @@
+# The model endpoint is fully env-driven (same convention as the runtime and builder) — nothing is
+# hardcoded here.
+embabel:
+  agent:
+    platform:
+      models:
+        openai:
+          custom:
+            api-key: ${OPENAI_CUSTOM_API_KEY:}
+            base-url: ${OPENAI_CUSTOM_BASE_URL:}
+            models: ${OPENAI_CUSTOM_MODELS:}
+spring:
+  main:
+    web-application-type: none
+    banner-mode: off
