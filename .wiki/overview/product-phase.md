@@ -9,7 +9,8 @@ source_paths:
   - "prod/embabel-smith-runtime/README.md"
   - "prod/embabel-smith-builder/README.md"
   - "prod/embabel-smith-studio/README.md"
-  - "openspec/changes/01-product-module-foundation/proposal.md"
+  - "openspec/changes/archive/2026-11-08-01-product-module-foundation/proposal.md"
+  - "openspec/specs/product-module-layout/spec.md"
 updated_at: "2026-11-08"
 ---
 
@@ -59,7 +60,8 @@ behaviour.
 The product is built in six numbered OpenSpec changes under `openspec/changes/` (01–06):
 
 1. **01-product-module-foundation** — the `prod/` aggregator + the four skeleton modules + the
-   enforcer ban. POCs frozen.
+   enforcer ban. POCs frozen. **Archived 2026-11-08**; its spec is now the main spec
+   `openspec/specs/product-module-layout/spec.md`.
 2. **02-skill-sources-git-folder** — the `skillsource` module (folder + git sources, content hash).
 3. **03-smith-runtime-product** — the runtime: multi-pack ingest, per-run planner, trust tiers,
    JSONL trace.
