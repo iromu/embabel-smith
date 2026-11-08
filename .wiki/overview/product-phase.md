@@ -28,6 +28,20 @@ artifact. This is enforced live by a Maven enforcer `bannedDependencies` rule in
 fails the build. The POCs keep working exactly as before; the product is a clean re-derivation of
 their logic against `smith-common` (the format owner) and Embabel directly.
 
+The ban was verified live (change 01, task 3.3): with a temporary `poc-1-no-code-runtime` dependency
+added to `embabel-smith-skillsource`, the build fails at the `validate` phase naming the banned
+artifact (2026-11-08 re-verification):
+
+```
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-enforcer-plugin:3.6.3:enforce
+        (ban-poc-dependencies) on project embabel-smith-skillsource:
+[ERROR] Rule 0: org.apache.maven.enforcer.rules.dependency.BannedDependencies failed with message:
+[ERROR] com.embabel.smith:embabel-smith-skillsource:jar:0.1.0-SNAPSHOT
+[ERROR]    com.embabel.smith:poc-1-no-code-runtime:jar:0.1.0-SNAPSHOT <--- banned via the exclude/include list
+```
+
+The temporary dependency was removed afterwards; the reactor is green again.
+
 ## The four modules
 
 | Module | What it is | Status |
