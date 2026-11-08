@@ -1,15 +1,44 @@
-# The model endpoint is fully env-driven (same convention as the runtime and builder) — nothing is
-# hardcoded here.
+server:
+  port: ${SERVER_PORT:8080}
+
+spring:
+  banner-mode: off
+
+# The model endpoint is fully env-driven (same convention as the runtime and builder) — nothing real
+# is hardcoded here. The platform's OpenAI-custom model bean requires a non-blank API key to
+# instantiate, so the defaults are inert placeholders: with no real endpoint the app still boots and
+# serves the UI, while the studio's own ModelEndpointConfig (which reads the raw env) reports
+# "model not configured" for every model-backed action.
 embabel:
+  # The default LLM must name a registered model or the platform will not boot; the placeholder
+  # matches the placeholder model below, so the two stay coherent when no real endpoint is set.
+  models:
+    default-llm: ${EMBABEL_MODELS_DEFAULT_LLM:studio-no-endpoint}
   agent:
     platform:
       models:
         openai:
           custom:
-            api-key: ${OPENAI_CUSTOM_API_KEY:}
-            base-url: ${OPENAI_CUSTOM_BASE_URL:}
-            models: ${OPENAI_CUSTOM_MODELS:}
-spring:
-  main:
-    web-application-type: none
-    banner-mode: off
+            api-key: ${OPENAI_CUSTOM_API_KEY:sk-studio-no-endpoint}
+            base-url: ${OPENAI_CUSTOM_BASE_URL:http://127.0.0.1:9/v1}
+            models: ${OPENAI_CUSTOM_MODELS:studio-no-endpoint}
+
+# The studio's configuration (change 06).
+smith:
+  studio:
+    # The skill sources the studio offers (comma-separated source URIs: folder:<path> or
+    # git:<url>[@ref]). The panes let the user pick one of these to operate on.
+    sources: ${SMITH_STUDIO_SOURCES:}
+    # The source the self-improvement loop watches and refines (a source URI; defaults to the first
+    # entry of `sources` when unset).
+    improve-source: ${SMITH_STUDIO_IMPROVE_SOURCE:}
+    # The trace store directory (defaults to ~/.smith/traces; the store file is <dir>/runs.jsonl).
+    trace-dir: ${SMITH_STUDIO_TRACE_DIR:}
+    # The git source cache root (defaults to ~/.smith/skill-sources).
+    source-cache-dir: ${SMITH_STUDIO_SOURCE_CACHE_DIR:}
+    loop:
+      # The interval between scheduled loop iterations, in milliseconds (the schedule is off by
+      # default and started from the UI).
+      interval: ${SMITH_STUDIO_LOOP_INTERVAL:60000}
+      # Whether gated candidates are auto-published instead of held for approval (default: hold).
+      auto-publish: ${SMITH_STUDIO_LOOP_AUTO_PUBLISH:false}

@@ -76,4 +76,21 @@ class ApprovalQueueTest {
         assertThatThrownBy(() -> queue.approve("missing", c -> null))
                 .isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    void failedPublishLeavesCandidatePending() {
+        ApprovalQueue queue = new ApprovalQueue();
+        PendingCandidate candidate = TestFixtures.candidate("c1", "extract");
+        queue.enqueue(candidate, false, c -> null);
+
+        RuntimeException boom = new RuntimeException("publish failed");
+        assertThatThrownBy(() -> queue.approve("c1", c -> {
+            throw boom;
+        })).isSameAs(boom);
+
+        // The candidate survives the failed publish: it is still pending and can be retried.
+        assertThat(queue.size()).isEqualTo(1);
+        assertThat(queue.get("c1")).isEqualTo(candidate);
+        assertThat(queue.pending()).containsExactly(candidate);
+    }
 }

@@ -14,6 +14,7 @@ import java.util.Map;
  */
 public final class ApprovalQueue {
 
+    /** Guards {@link #pending}; every method that reads or writes it is synchronized on it. */
     private final Map<String, PendingCandidate> pending = new LinkedHashMap<>();
 
     /**
@@ -21,7 +22,7 @@ public final class ApprovalQueue {
      *
      * @return {@code true} when it was held, {@code false} when it was auto-published immediately
      */
-    public boolean enqueue(PendingCandidate candidate, boolean autoPublish, LoopPublisher publisher) {
+    public synchronized boolean enqueue(PendingCandidate candidate, boolean autoPublish, LoopPublisher publisher) {
         if (autoPublish) {
             publisher.publish(candidate);
             return false;
@@ -31,30 +32,34 @@ public final class ApprovalQueue {
     }
 
     /** The pending candidate with the given id, or {@code null} if it is not pending. */
-    public PendingCandidate get(String id) {
+    public synchronized PendingCandidate get(String id) {
         return pending.get(id);
     }
 
     /** The pending candidates, in enqueue order. */
-    public List<PendingCandidate> pending() {
+    public synchronized List<PendingCandidate> pending() {
         return List.copyOf(new ArrayList<>(pending.values()));
     }
 
-    public int size() {
+    public synchronized int size() {
         return pending.size();
     }
 
     /**
-     * Approves a pending candidate: publishes it and returns the publish result.
+     * Approves a pending candidate: publishes it and returns the publish result. Publishes first and
+     * removes only on success, so a failed publish leaves the candidate pending (recoverable) rather
+     * than silently losing it.
      *
      * @throws IllegalArgumentException if the candidate is not pending
      */
-    public PublishResult approve(String id, LoopPublisher publisher) {
-        PendingCandidate candidate = pending.remove(id);
+    public synchronized PublishResult approve(String id, LoopPublisher publisher) {
+        PendingCandidate candidate = pending.get(id);
         if (candidate == null) {
             throw new IllegalArgumentException("No pending candidate with id " + id);
         }
-        return publisher.publish(candidate);
+        PublishResult result = publisher.publish(candidate);
+        pending.remove(id);
+        return result;
     }
 
     /**
@@ -62,7 +67,7 @@ public final class ApprovalQueue {
      *
      * @throws IllegalArgumentException if the candidate is not pending
      */
-    public void reject(String id) {
+    public synchronized void reject(String id) {
         if (pending.remove(id) == null) {
             throw new IllegalArgumentException("No pending candidate with id " + id);
         }

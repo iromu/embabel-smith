@@ -1,18 +1,123 @@
 # embabel-smith-studio
 
-The self-improving studio product: hosts the runtime and builder, and runs the
-self-improvement loop over the skill source. This module currently holds the loop and its
-tests; the REST surface and web UI are change 06 (`06-smith-studio-product`).
+The self-improving studio product: one Spring Boot web app that runs skills from a source,
+builds new skills, and operates the trace-driven self-improvement loop — with a web UI where
+each of those is a pane. It hosts the production cores from change 03 (runtime), change 04
+(builder), and change 05 (self-improvement loop) behind a REST surface, and serves a Vue 3 +
+Quasar SPA built from the same tree.
+
+## Boot
+
+Build the SPA into the app's `static/` directory, then run the app:
+
+```
+cd prod/embabel-smith-studio/frontend && npm install && npm run build
+cd .. && mvn -pl prod/embabel-smith-studio spring-boot:run
+```
+
+The Vite build emits into `src/main/resources/static`, so the running app serves the UI at `/`
+and the API under `/api`.
+
+### Local port
+
+The default port is `8080` (`SERVER_PORT`). If that port is held by another local service,
+override it. The frontend dev server proxies `/api` to `http://localhost:18080`, so run the app
+on `18080` for the `npm run dev` flow:
+
+```
+SERVER_PORT=18080 mvn -pl prod/embabel-smith-studio spring-boot:run
+```
+
+### Model endpoint (env-driven)
+
+The model endpoint is fully environment-driven — nothing is hardcoded (same convention as the
+runtime and builder):
+
+| Variable | Purpose |
+|---|---|
+| `OPENAI_CUSTOM_BASE_URL` | OpenAI-compatible endpoint (LiteLLM, OpenAI, Ollama, ...) |
+| `OPENAI_CUSTOM_API_KEY` | API key |
+| `OPENAI_CUSTOM_MODELS` | Comma-separated model list exposed to the platform |
+
+### Model-not-configured behavior
+
+The app boots and the UI is reachable **without** a model endpoint configured. Model-backed
+actions (Run, Build, Eval, and loop iterations that re-evaluate) return the structured
+`MODEL_NOT_CONFIGURED` error rather than crashing; the model-backed panes render a dedicated
+"model not configured" banner for it. Offline actions — listing sources and packs, the security
+scan, the trust check, and reading traces — work regardless.
+
+## Configuration
+
+| Property | Env | Default | Purpose |
+|---|---|---|---|
+| `smith.studio.sources` | `SMITH_STUDIO_SOURCES` | — | Comma-separated source URIs the UI offers (`folder:<path>` or `git:<url>[@ref]`). |
+| `smith.studio.improve-source` | `SMITH_STUDIO_IMPROVE_SOURCE` | first of `sources` | The source the loop watches and refines. |
+| `smith.studio.trace-dir` | `SMITH_STUDIO_TRACE_DIR` | `~/.smith/traces` | Trace store dir; the store file is `<dir>/runs.jsonl`. |
+| `smith.studio.source-cache-dir` | `SMITH_STUDIO_SOURCE_CACHE_DIR` | `~/.smith/skill-sources` | Git source cache root. |
+| `smith.studio.loop.interval` | `SMITH_STUDIO_LOOP_INTERVAL` | `60000` | Interval between scheduled iterations (ms); the schedule is **off by default**. |
+| `smith.studio.loop.auto-publish` | `SMITH_STUDIO_LOOP_AUTO_PUBLISH` | `false` | Auto-publish gated candidates instead of holding them. |
+
+## Panes
+
+| Pane | Backed by | Notes |
+|---|---|---|
+| Run | change-03 runtime | Pick a source + goal, submit an input, see the goal output. |
+| Build | change-04 builder | Describe a skill and publish it to a source. |
+| Eval | change-04 builder | Score a skill over its tasks and refine the prompt from failures. |
+| Lifecycle | builder sidecars | Each pack's lifecycle state, baseline, and content-hash drift. |
+| Security | install-time scanner | Static scan of a pack; offline. |
+| Trust | trust-tier policy | Check a skill's tool groups against a trust tier; offline. |
+| Traces | change-03 trace store | A skill's recent runs, most recent first, with per-step drill-down. |
+| Auto-improve | change-05 loop | Loop control, pending candidates with evidence, approve/reject, auto-publish. |
+| Compose / Retrieve / Scale / Remote | — | POC-only panes, kept for reference and disabled in the product. |
+
+## REST surface
+
+| Endpoint | Purpose |
+|---|---|
+| `POST /api/run` | Run a goal (source, goal, input, planner, trust tier). |
+| `POST /api/build` | Build a pack (description, output source). |
+| `POST /api/eval` | Score + refine a skill over its tasks. |
+| `GET /api/sources` | List the configured sources. |
+| `GET /api/packs?source=` | List a source's packs with lifecycle state + drift. |
+| `GET /api/traces?skill=&limit=` | A skill's trace window, most recent first. |
+| `POST /api/security` | Static scan of a pack. |
+| `POST /api/trust` | Trust-tier check for a pack. |
+| `GET /api/improve/candidates` | Pending loop candidates with evidence. |
+| `POST /api/improve/candidates/{id}/approve` | Approve + publish a candidate. |
+| `POST /api/improve/candidates/{id}/reject` | Reject a candidate. |
+| `POST /api/loop/trigger` | Run one on-demand iteration. |
+| `POST /api/loop/start` · `stop` | Start / stop the interval schedule. |
+| `GET /api/loop/status` | Loop schedule + auto-publish state. |
+| `GET` · `PUT` `/api/loop/auto-publish` | Read / set auto-publish. |
+
+The request/response DTOs mirror the TypeScript types in `frontend/src/api/types.ts`;
+`vue-tsc --noEmit` catches a field rename on either side.
+
+## Operating the loop
+
+The interval schedule is **off by default**: on a fresh start no iterations run until the user
+starts the schedule (Auto-improve pane) or triggers one on demand.
+
+- **Trigger** — one iteration now; the pane reports which skills were detected, refined, gated,
+  and published or queued.
+- **Start / Stop** — run iterations at the configured interval until stopped.
+- **Auto-publish** — when on, gated candidates are published immediately; when off (default)
+  they are held in the queue for approval. The loop is always built in hold mode; the toggle is
+  applied at the loop-service layer so it takes effect live.
+- **Approve / Reject** — approve publishes a held candidate and transitions its lifecycle;
+  reject discards it.
 
 ## The self-improvement loop
 
 The loop watches the runtime's traces (change 03) and, for each skill in the source, detects
-that it is failing or drifting, refines it (change 04's builder core), gates the candidate,
-and publishes the approved one back to the source with a lifecycle transition. One pass is
-`ImprovementLoop.runOnce()`; change 06 schedules it and exposes it over REST.
+that it is failing or drifting, refines it (change 04's builder core), gates the candidate, and
+publishes the approved one back to the source with a lifecycle transition. One pass is
+`ImprovementLoop.runOnce()`.
 
-The loop logic is plain Java — no web, no scheduling required to test it. Model calls
-(refine, re-eval) are endpoint-gated.
+The loop logic is plain Java — no web, no scheduling required to test it. Model calls (refine,
+re-eval) are endpoint-gated.
 
 ### Flow
 
@@ -83,8 +188,7 @@ The state is advisory — the runtime enforces trust tiers, not lifecycle state.
 
 The default is **hold**: a gated candidate is queued in the `ApprovalQueue`, not published.
 Approving a candidate publishes it and transitions the lifecycle; rejecting discards it. An
-`autoPublish` mode publishes gated candidates immediately, leaving the queue empty. Change 06
-exposes the queue over REST for the web UI.
+`autoPublish` mode publishes gated candidates immediately, leaving the queue empty.
 
 ### v1 limitations
 
@@ -92,7 +196,22 @@ exposes the queue over REST for the web UI.
   restart loses pending candidates and reprocesses the window from the start.
 - **Advisory lifecycle** — the sidecar state is recorded but not enforced; only the runtime's
   trust tiers are binding.
-- **No scheduling** — `runOnce()` is invoked by a caller; change 06 wires it to a scheduler.
 - **No per-skill error isolation** — a failure while refining, gating, or publishing one skill
   aborts the pass; that skill's watermark is not advanced, so it is retried on the next run, but
   the skills later in the pass wait for the next interval.
+
+## Frontend
+
+The SPA lives in `frontend/` (Vue 3 + Quasar + Vite + TypeScript) and keeps the POC 22
+architecture: pure logic (the `traces/model.ts` and `improve/model.ts` modules, the
+`useSourceSkill` composable) separated from the views, a single `fetch` site in
+`frontend/src/api/client.ts`, and a TypeScript type contract (`frontend/src/api/types.ts`)
+mirroring the REST DTOs.
+
+```
+cd prod/embabel-smith-studio/frontend
+npm install
+npm run typecheck   # vue-tsc --noEmit
+npm test            # vitest
+npm run build       # emit into src/main/resources/static
+```

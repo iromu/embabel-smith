@@ -1,0 +1,200 @@
+/**
+ * The TypeScript side of the TypeScript ↔ backend DTO contract for the studio (change 06).
+ *
+ * Each interface mirrors a `com.embabel.smith.studio.rest.dto` record field-for-field, so a backend
+ * field rename is caught by `vue-tsc --noEmit` (and the client tests) rather than at runtime.
+ */
+
+// ---- Sources / packs -------------------------------------------------------
+export interface SourceInfo {
+  uri: string
+  kind: 'folder' | 'git'
+}
+export interface PackInfo {
+  name: string
+  contentHash: string
+  lifecycleState: string | null
+  baselinePassRate: number | null
+  drift: boolean
+  updatedAt: string | null
+}
+
+// ---- Security --------------------------------------------------------------
+export interface ScanFinding {
+  severity: string
+  category: string
+  message: string
+  evidence: string
+}
+export interface ScanInfo {
+  skillName: string
+  findings: ScanFinding[]
+  verdict: string
+  recommendedTier: string | null
+  summary: string
+}
+
+// ---- Lifecycle / publish ---------------------------------------------------
+export interface LifecycleInfo {
+  contentHash: string
+  baselinePassRate: number
+  state: string
+  updatedAt: string
+}
+export interface PublishInfo {
+  location: string
+  pushed: boolean
+}
+
+// ---- Run (endpoint-gated) --------------------------------------------------
+export interface RunRequest {
+  source: string
+  goal: string
+  input: string
+  planner?: string
+  trustTier?: string
+}
+export interface RunResponse {
+  success: boolean
+  output: string | null
+  error: string | null
+  errorCode: string | null
+  runId: string | null
+}
+
+// ---- Build (endpoint-gated) ------------------------------------------------
+export interface BuildRequest {
+  description: string
+  outputSource: string
+  maxRefine?: number
+  overwrite?: boolean
+  push?: boolean
+}
+export interface BuildResponse {
+  status: 'BUILT' | 'BLOCKED'
+  stage: string
+  packName: string | null
+  score: number | null
+  issues: string[]
+  scan: ScanInfo | null
+  lifecycle: LifecycleInfo | null
+  published: PublishInfo | null
+  errorCode: string | null
+  error: string | null
+}
+
+// ---- Traces ----------------------------------------------------------------
+export interface StepInfo {
+  name: string
+  status: string
+  durationMs: number
+  outputExcerpt: string | null
+}
+export interface TraceInfo {
+  runId: string
+  timestamp: string
+  sourceUri: string | null
+  sourceRef: string | null
+  resolvedAt: string | null
+  pack: string | null
+  goal: string | null
+  input: string | null
+  planner: string | null
+  trustTier: string | null
+  steps: StepInfo[]
+  success: boolean
+  error: string | null
+  outputExcerpt: string | null
+}
+
+// ---- Improvement loop ------------------------------------------------------
+export interface CandidateInfo {
+  id: string
+  skill: string
+  score: number
+  baseline: number
+  diffSummary: string
+  scan: ScanInfo | null
+  evidence: TraceInfo[]
+  proposedState: string
+}
+export interface LoopStatus {
+  running: boolean
+  autoPublish: boolean
+}
+export interface AutoPublishRequest {
+  autoPublish: boolean
+}
+export interface IterationInfo {
+  ran: boolean
+  candidates: number
+  publishedSkills: string[]
+  queuedSkills: string[]
+  autoPublish: boolean
+  errorCode: string | null
+  error: string | null
+}
+export interface ApproveResponse {
+  ok: boolean
+  location: string | null
+  error: string | null
+}
+export interface RejectResponse {
+  ok: boolean
+  error: string | null
+}
+
+// ---- Eval (endpoint-gated) -------------------------------------------------
+export interface EvalTaskDto {
+  name: string
+  input: string
+  expected: string
+}
+export interface EvalRequest {
+  source: string
+  skill: string
+  tasks?: EvalTaskDto[]
+}
+export interface EvalResponse {
+  error: string | null
+  errorCode: string | null
+  skill: string | null
+  score: number | null
+  refinementCount: number
+  failingTasks: string[]
+  passed: boolean
+  revisedPrompt: string | null
+}
+
+// ---- Security / Trust (offline) --------------------------------------------
+export interface SecurityRequest {
+  source: string
+  skill: string
+}
+export interface SecurityResponse {
+  error: string | null
+  scan: ScanInfo | null
+}
+export interface TrustRequest {
+  source: string
+  skill: string
+  tier: string
+}
+export interface TrustResponse {
+  error: string | null
+  skillName: string | null
+  tier: string | null
+  allowed: boolean
+  disallowedGroups: string[]
+  declaredToolGroups: string[]
+}
+
+/**
+ * True when a response is the structured "no model endpoint configured" error — the endpoint-gated
+ * panes (Run, Build, Eval) render a dedicated banner for it rather than a generic failure.
+ */
+export function isModelNotConfigured(response: {
+  errorCode?: string | null
+} | null | undefined): boolean {
+  return response?.errorCode === 'MODEL_NOT_CONFIGURED'
+}
