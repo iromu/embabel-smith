@@ -12,7 +12,7 @@ source_paths:
   - "prod/embabel-smith-studio/src/main/java/com/embabel/smith/studio/improve/ApprovalQueue.java"
   - "prod/embabel-smith-studio/src/main/java/com/embabel/smith/studio/improve/TraceWindowReader.java"
   - "prod/embabel-smith-studio/README.md"
-updated_at: "2026-11-07"
+updated_at: "2026-11-08"
 ---
 
 # The smith studio: the self-improvement loop
@@ -21,8 +21,9 @@ updated_at: "2026-11-07"
 the runtime's traces ([[smith-runtime]]) and, when a skill's recent runs show trouble, rewrites the
 failing steps' prompts and republishes the pack — but only when a candidate **provably beats** the
 current pack's baseline. It reuses the builder's eval, security, and publish machinery
-([[smith-builder]]) rather than reimplementing it. The loop is plain Java (no Spring/web); change
-06 wires it to a scheduler and a REST surface.
+([[smith-builder]]) rather than reimplementing it. The loop itself is plain Java; change 06 exposes
+it as a web product — a REST surface, a Vue UI, and an interval scheduler — see
+[[smith-studio-web]].
 
 ## The pass (`ImprovementLoop.runOnce()`)
 
@@ -49,7 +50,9 @@ For each pack in the source, in one pass:
 
 By default a gated candidate **holds** in an in-memory queue ([[ApprovalQueue]]) with its evidence
 visible; an explicit auto-publish publishes immediately. Rejected candidates are never published,
-and the most recent rejection (with its score) is recorded per skill.
+and the most recent rejection (with its score) is recorded per skill. The queue is thread-safe (the
+scheduler tick and the REST threads can touch it at once), and `approve()` publishes before
+removing, so a failed publish leaves the candidate pending rather than silently losing it.
 
 ## Idempotency
 
@@ -60,9 +63,10 @@ publishes nothing.
 ## v1 limitations
 
 In-memory queue and watermarks (a restart reprocesses the window from the start); advisory
-lifecycle state (only the runtime's trust tiers are binding); no per-skill error isolation (a
-failure in one skill aborts the pass — that skill retries on the next run); and no scheduling (a
-caller invokes `runOnce()`). The model endpoint is env-driven as in the POCs ([[model-endpoint]]).
+lifecycle state (only the runtime's trust tiers are binding); and no per-skill error isolation (a
+failure in one skill aborts the pass — that skill retries on the next run). Scheduling is provided
+by the web layer ([[smith-studio-web]]). The model endpoint is env-driven as in the POCs
+([[model-endpoint]]).
 
 **Tests:** `DetectorTest`, `RefinerTest`, `GateChainTest`, `LifecycleTransitionsTest`,
 `ApprovalQueueTest`, `TraceWindowReaderTest`, `ImprovementLoopTest` (offline) and the

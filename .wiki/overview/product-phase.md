@@ -10,7 +10,7 @@ source_paths:
   - "prod/embabel-smith-builder/README.md"
   - "prod/embabel-smith-studio/README.md"
   - "openspec/changes/01-product-module-foundation/proposal.md"
-updated_at: "2026-11-07"
+updated_at: "2026-11-08"
 ---
 
 # The product phase
@@ -35,7 +35,7 @@ their logic against `smith-common` (the format owner) and Embabel directly.
 | `prod/embabel-smith-skillsource` | Skill sources: `folder:` / `git:` URIs, pack discovery, ref pinning, cache, content hash. Shared by runtime (reads) and builder (publishes). | done (change 02) |
 | `prod/embabel-smith-runtime` | The runtime product: `smith run` CLI — ingest packs from a source, run an exported goal, enforce trust tiers, record a JSONL trace. | done (change 03) |
 | `prod/embabel-smith-builder` | The builder product: `smith build` CLI — NL description → validated pack → eval → security gate → lifecycle stamp → publish. | done (change 04) |
-| `prod/embabel-smith-studio` | The self-improving studio: the self-improvement loop (change 05); REST surface + web UI next (change 06). | loop done (change 05) |
+| `prod/embabel-smith-studio` | The self-improving studio: the self-improvement loop (change 05) exposed as a web product — REST surface + Vue UI + loop scheduling (change 06). | done (change 06) |
 
 See [[skill-sources]], [[smith-runtime]], [[smith-builder]], and [[smith-studio]] for each module's
 behaviour.
@@ -52,10 +52,11 @@ The product is built in six numbered OpenSpec changes under `openspec/changes/` 
 4. **04-smith-builder-product** — the builder: the full build pipeline and publish to a source.
 5. **05-smith-self-improvement-loop** — the studio's self-improvement loop (the `incubating →
    active` promotion and re-eval cycle that owns the lifecycle transitions).
-6. **06-smith-studio-product** — the studio's REST surface and web UI.
+6. **06-smith-studio-product** — the studio's REST surface and web UI (the loop as a Spring Boot
+   app: thin controllers over the production cores, a Vue 3 + Quasar front end, and loop
+   scheduling). See [[smith-studio-web]].
 
-Changes 01–05 are implemented and committed; 06 (the studio's REST surface and web UI) fills in the
-rest.
+All six changes (01–06) are implemented and committed.
 
 ## How it maps to the POCs
 

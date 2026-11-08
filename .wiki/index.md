@@ -3,8 +3,8 @@ title: "Embabel Smith Wiki"
 type: "index"
 status: "active"
 language: "default"
-last_commit: "4324414f0e9ad6c74955e9fa5039e9c9f43b3a11"
-updated_at: "2026-11-07"
+last_commit: "539bd153ad8b51eb76f98c092d70aa618147fafb"
+updated_at: "2026-11-08"
 ---
 
 # Embabel Smith
@@ -115,8 +115,10 @@ Three entry points matter:
 - `prod/` — the **product phase** ([[product-phase]]): `skillsource` (folder/git sources +
   content hash), the `smith run` runtime (multi-pack ingest + trust tiers + JSONL trace), the
   `smith build` builder (NL → validated pack → publish), and the `studio` (the self-improvement
-  loop that rewrites failing steps from traces and republishes on proven improvement). See
-  [[skill-sources]], [[smith-runtime]], [[smith-builder]], and [[smith-studio]].
+  loop that rewrites failing steps from traces and republishes on proven improvement, exposed as a
+  web product: REST surface + Vue UI + loop scheduling). See
+  [[skill-sources]], [[smith-runtime]], [[smith-builder]], [[smith-studio]], and
+  [[smith-studio-web]].
 
 ## 7. What should I avoid breaking?
 
@@ -154,6 +156,7 @@ Three entry points matter:
 | How does the `smith run` runtime work (CLI + trace)? | [[smith-runtime]] |
 | How does the `smith build` builder work (pipeline + publish)? | [[smith-builder]] |
 | How does a skill self-improve from its traces? | [[smith-studio]] |
+| How is the studio exposed as a web product (REST + UI + loop control)? | [[smith-studio-web]] |
 
 ## Page catalog
 
@@ -166,6 +169,6 @@ Three entry points matter:
 **Features** — [[nl-compile]] · [[skill-format-on-demand]] · [[runtime-adapter]] ·
 [[retrieval-shadowing]] · [[shadowing-remedies]] · [[skill-lifecycle]] · [[trust-tiers]] ·
 [[skill-security-scanning]] · [[progressive-disclosure]] · [[skill-composer]] · [[skill-sources]] ·
-[[smith-runtime]] · [[smith-builder]] · [[smith-studio]]
+[[smith-runtime]] · [[smith-builder]] · [[smith-studio]] · [[smith-studio-web]]
 **Risks** — [[validate-before-write]]
 **Reference** — [[validation-codes]] · [[sample-explainer]]
