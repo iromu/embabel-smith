@@ -15,6 +15,7 @@ source_paths:
   - "openspec/specs/skill-runtime/spec.md"
   - "openspec/specs/skill-builder/spec.md"
   - "openspec/specs/self-improvement/spec.md"
+  - "openspec/specs/studio-web/spec.md"
 updated_at: "2026-11-09"
 ---
 
@@ -80,9 +81,10 @@ The product is built in six numbered OpenSpec changes under `openspec/changes/` 
    `openspec/specs/self-improvement/spec.md`.
 6. **06-smith-studio-product** — the studio's REST surface and web UI (the loop as a Spring Boot
    app: thin controllers over the production cores, a Vue 3 + Quasar front end, and loop
-   scheduling). See [[smith-studio-web]].
+   scheduling). **Archived 2026-11-09**; its spec is now the main spec
+   `openspec/specs/studio-web/spec.md`. See [[smith-studio-web]].
 
-All six changes (01–06) are implemented and committed.
+All six changes (01–06) are implemented, committed, and archived — the product phase is complete.
 
 ## How it maps to the POCs
 
