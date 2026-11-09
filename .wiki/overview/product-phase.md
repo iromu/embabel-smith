@@ -11,7 +11,9 @@ source_paths:
   - "prod/embabel-smith-studio/README.md"
   - "openspec/changes/archive/2026-11-08-01-product-module-foundation/proposal.md"
   - "openspec/specs/product-module-layout/spec.md"
-updated_at: "2026-11-08"
+  - "openspec/specs/skill-sources/spec.md"
+  - "openspec/specs/skill-runtime/spec.md"
+updated_at: "2026-11-09"
 ---
 
 # The product phase
@@ -63,8 +65,10 @@ The product is built in six numbered OpenSpec changes under `openspec/changes/` 
    enforcer ban. POCs frozen. **Archived 2026-11-08**; its spec is now the main spec
    `openspec/specs/product-module-layout/spec.md`.
 2. **02-skill-sources-git-folder** — the `skillsource` module (folder + git sources, content hash).
+   **Archived 2026-11-08**; its spec is now the main spec `openspec/specs/skill-sources/spec.md`.
 3. **03-smith-runtime-product** — the runtime: multi-pack ingest, per-run planner, trust tiers,
-   JSONL trace.
+   JSONL trace. **Archived 2026-11-09**; its spec is now the main spec
+   `openspec/specs/skill-runtime/spec.md`.
 4. **04-smith-builder-product** — the builder: the full build pipeline and publish to a source.
 5. **05-smith-self-improvement-loop** — the studio's self-improvement loop (the `incubating →
    active` promotion and re-eval cycle that owns the lifecycle transitions).

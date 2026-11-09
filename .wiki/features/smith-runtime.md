@@ -4,12 +4,13 @@ type: "feature"
 status: "active"
 language: "default"
 source_paths:
+  - "prod/embabel-smith-runtime/src/main/java/com/embabel/smith/runtime/SkillRunService.java"
   - "prod/embabel-smith-runtime/src/main/java/com/embabel/smith/runtime/core/RuntimeCore.java"
   - "prod/embabel-smith-runtime/src/main/java/com/embabel/smith/runtime/cli/RunCommand.java"
   - "prod/embabel-smith-runtime/src/main/java/com/embabel/smith/runtime/trace/TraceRecorder.java"
   - "prod/embabel-smith-runtime/src/main/java/com/embabel/smith/runtime/trace/JsonlTraceStore.java"
   - "prod/embabel-smith-runtime/README.md"
-updated_at: "2026-11-06"
+updated_at: "2026-11-09"
 ---
 
 # The smith runtime product (`smith run`)
@@ -43,13 +44,19 @@ without it the CLI exits 1 with a clear configuration error naming the missing v
 
 ## Ingest + run
 
-`RuntimeCore.ingest(source)` reads every pack, builds a shared `DataDictionary` from the built-in
-I/O types plus every pack's intermediate types (deduplicated by name — the shared type is the
-cross-pack composition glue), assembles step specs, and deploys one agent. A source with no packs,
-or two packs exporting the same goal name, is an error. `run(...)` checks the trust tier before
-execution, resolves the planner, and runs the goal. One platform behaviour worth knowing: action
-errors (e.g. a model-call failure) are **rethrown** to the caller rather than recorded on the
-process, so `run()` converts them into a failed `RunOutcome`.
+`SkillRunService` (a plain class — the CLI and the studio both embed it) owns the flow: parse +
+resolve the source, ingest, run, record. `RuntimeCore.ingest(source)` reads every pack, builds a
+shared `DataDictionary` from the built-in I/O types plus every pack's intermediate types
+(deduplicated by name — the shared type is the cross-pack composition glue), assembles step specs,
+and deploys one agent. A source with no packs, or two packs exporting the same goal name, is an
+error. `run(...)` checks the trust tier before execution, resolves the planner, and runs the goal.
+One platform behaviour worth knowing: action errors (e.g. a model-call failure) are **rethrown** to
+the caller rather than recorded on the process, so `run()` converts them into a failed `RunOutcome`.
+
+Every run attempt emits a trace — including ones that fail *before* resolution or ingestion (bad
+source URI, ingestion error, ambiguous goal selection): the record carries the source URI with
+`pack` null. And a trace-write failure never changes the run's result — tracing observes, never
+intervenes (the record is simply dropped).
 
 ## The JSONL trace
 
@@ -75,6 +82,8 @@ findings.
 ## Tests
 
 `RuntimeCoreTest`, `PlannerResolverTest`, `SkillPackTypeMapperTest`, `StepSpecAssemblerTest`,
-`TrustTierPolicyTest`, `RunCommandTest`, and the trace tests (`JsonlTraceStoreTest`,
-`TraceRecordJsonTest`, `TraceRecorderTest`) — offline, using test packs under
-`src/test/resources/test-packs/`. `LiveRunIntegrationTest` is the endpoint-gated live run.
+`TrustTierPolicyTest`, `RunCommandTest`, `SkillRunServiceTest` (pre-resolution / pre-ingestion
+failures still emit a trace; a trace-write failure leaves the outcome unchanged), and the trace
+tests (`JsonlTraceStoreTest`, `TraceRecordJsonTest`, `TraceRecorderTest`) — offline, using test
+packs under `src/test/resources/test-packs/`. `LiveRunIntegrationTest` is the endpoint-gated live
+run.
