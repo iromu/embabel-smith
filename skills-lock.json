@@ -7,6 +7,12 @@
       "skillPath": "skills/ai-meta-comment-review/SKILL.md",
       "computedHash": "b1d1533bae2bc6dcf103ef987acd26e47301b1cccb7d37b240585b3c07eb4b77"
     },
+    "code-review": {
+      "source": "iromu/awesome-qwen",
+      "sourceType": "github",
+      "skillPath": "skills/code-review/SKILL.md",
+      "computedHash": "bb7158fff1ff2a98ad3f1ab638f60db7efaf21dbcfed51cc63a317000f902615"
+    },
     "embabel-agent": {
       "source": "iromu/awesome-qwen",
       "sourceType": "github",
