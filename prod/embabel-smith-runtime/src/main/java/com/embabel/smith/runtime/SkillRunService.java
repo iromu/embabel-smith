@@ -48,19 +48,40 @@ public class SkillRunService {
      */
     public RunResult run(String sourceUri, String goal, String input,
                          String plannerOverride, TrustTier tier) {
-        ResolvedSkillSource resolved = SkillSource.parse(sourceUri).resolve();
-        IngestedSource ingested = core.ingest(resolved);
-        String effectiveGoal = goal == null || goal.isBlank() ? singleGoal(ingested) : goal;
-
+        String effectiveInput = input == null ? "" : input;
+        ResolvedSkillSource resolved = null;
+        IngestedSource ingested = null;
+        String effectiveGoal = goal;
         RunOutcome outcome;
         try {
-            outcome = core.run(ingested, effectiveGoal, input == null ? "" : input, plannerOverride, tier);
-        } catch (GoalNotFoundException | TrustTierBlockedException e) {
+            resolved = SkillSource.parse(sourceUri).resolve();
+            ingested = core.ingest(resolved);
+            effectiveGoal = goal == null || goal.isBlank() ? singleGoal(ingested) : goal;
+            try {
+                outcome = core.run(ingested, effectiveGoal, effectiveInput, plannerOverride, tier);
+            } catch (GoalNotFoundException | TrustTierBlockedException e) {
+                outcome = RunOutcome.failed(e.getMessage());
+            }
+        } catch (RuntimeException e) {
+            // resolution, ingestion, or goal selection failed before the run — still a run attempt
             outcome = RunOutcome.failed(e.getMessage());
         }
 
-        TraceRecord record = recorder.record(ingested, effectiveGoal, input == null ? "" : input, tier, outcome);
+        TraceRecord record = safeRecord(sourceUri, resolved, ingested, effectiveGoal, effectiveInput, tier, outcome);
         return new RunResult(outcome.success(), outcome.output(), outcome.error(), record);
+    }
+
+    /**
+     * Records the run, returning {@code null} when the trace cannot be written — tracing
+     * observes, never intervenes: a trace-write failure must not change the run's result.
+     */
+    private TraceRecord safeRecord(String sourceUri, ResolvedSkillSource resolved, IngestedSource ingested,
+                                   String goal, String input, TrustTier tier, RunOutcome outcome) {
+        try {
+            return recorder.record(sourceUri, resolved, ingested, goal, input, tier, outcome);
+        } catch (RuntimeException e) {
+            return null;
+        }
     }
 
     private String singleGoal(IngestedSource ingested) {
