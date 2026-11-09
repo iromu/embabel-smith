@@ -48,39 +48,51 @@ public class TraceRecorder {
     /** Builds the record for the outcome, appends it to the store, and returns it. */
     public TraceRecord record(IngestedSource ingested, String goal, String input,
                               TrustTier tier, RunOutcome outcome) {
-        TraceRecord record = build(ingested, goal, input, tier, outcome);
+        return record(ingested.source().origin().uri(), ingested.source(), ingested, goal, input, tier, outcome);
+    }
+
+    /**
+     * Builds the record for the outcome, tolerating a run that failed before resolution or
+     * ingestion ({@code resolved}/{@code ingested} may be {@code null}), appends it to the
+     * store, and returns it.
+     */
+    public TraceRecord record(String sourceUri, ResolvedSkillSource resolved, IngestedSource ingested,
+                              String goal, String input, TrustTier tier, RunOutcome outcome) {
+        TraceRecord record = build(sourceUri, resolved, ingested, goal, input, tier, outcome);
         store.append(record);
         return record;
     }
 
-    TraceRecord build(IngestedSource ingested, String goal, String input,
-                      TrustTier tier, RunOutcome outcome) {
-        ResolvedSkillSource.Origin origin = ingested.source().origin();
+    TraceRecord build(String sourceUri, ResolvedSkillSource resolved, IngestedSource ingested,
+                      String goal, String input, TrustTier tier, RunOutcome outcome) {
+        String uri = resolved != null ? resolved.origin().uri() : sourceUri;
         String ref = null;
         String resolvedAt = null;
-        if (origin.uri().startsWith("git:")) {
-            ref = pinnedRef(origin.uri());
-            resolvedAt = resolvedCommit(origin);
+        if (resolved != null && uri.startsWith("git:")) {
+            ref = pinnedRef(uri);
+            resolvedAt = resolvedCommit(resolved.origin());
         }
 
         TraceRecord.PackRef pack = null;
-        try {
-            SkillPack goalPack = ingested.packForGoal(goal);
-            ResolvedPack resolved = ingested.source().packs().stream()
-                    .filter(candidate -> candidate.name().equals(goalPack.name()))
-                    .findFirst()
-                    .orElse(null);
-            if (resolved != null) {
-                pack = new TraceRecord.PackRef(resolved.name(), resolved.contentHash());
+        if (ingested != null) {
+            try {
+                SkillPack goalPack = ingested.packForGoal(goal);
+                ResolvedPack resolvedPack = ingested.source().packs().stream()
+                        .filter(candidate -> candidate.name().equals(goalPack.name()))
+                        .findFirst()
+                        .orElse(null);
+                if (resolvedPack != null) {
+                    pack = new TraceRecord.PackRef(resolvedPack.name(), resolvedPack.contentHash());
+                }
+            } catch (RuntimeException ignored) {
+                // goal not exported by any pack — the trace records the run without a pack
             }
-        } catch (RuntimeException ignored) {
-            // goal not exported by any pack — the trace records the run without a pack
         }
 
         return new TraceRecord(
                 UUID.randomUUID().toString(),
                 Instant.now(),
-                new TraceRecord.SourceRef(origin.uri(), ref, resolvedAt),
+                new TraceRecord.SourceRef(uri, ref, resolvedAt),
                 pack,
                 goal,
                 input,
@@ -98,9 +110,11 @@ public class TraceRecorder {
             return List.of();
         }
         Map<String, String> stepOutputTypes = new LinkedHashMap<>();
-        for (SkillPack pack : ingested.packs()) {
-            for (ActionStepSpec step : pack.steps()) {
-                stepOutputTypes.putIfAbsent(step.name(), step.outputTypeName());
+        if (ingested != null) {
+            for (SkillPack pack : ingested.packs()) {
+                for (ActionStepSpec step : pack.steps()) {
+                    stepOutputTypes.putIfAbsent(step.name(), step.outputTypeName());
+                }
             }
         }
 
