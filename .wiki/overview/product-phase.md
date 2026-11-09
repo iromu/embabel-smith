@@ -14,6 +14,7 @@ source_paths:
   - "openspec/specs/skill-sources/spec.md"
   - "openspec/specs/skill-runtime/spec.md"
   - "openspec/specs/skill-builder/spec.md"
+  - "openspec/specs/self-improvement/spec.md"
 updated_at: "2026-11-09"
 ---
 
@@ -74,7 +75,9 @@ The product is built in six numbered OpenSpec changes under `openspec/changes/` 
    **Archived 2026-11-09**; its spec is now the main spec
    `openspec/specs/skill-builder/spec.md`.
 5. **05-smith-self-improvement-loop** — the studio's self-improvement loop (the `incubating →
-   active` promotion and re-eval cycle that owns the lifecycle transitions).
+   active` promotion and re-eval cycle that owns the lifecycle transitions). **Archived
+   2026-11-09**; its spec is now the main spec
+   `openspec/specs/self-improvement/spec.md`.
 6. **06-smith-studio-product** — the studio's REST surface and web UI (the loop as a Spring Boot
    app: thin controllers over the production cores, a Vue 3 + Quasar front end, and loop
    scheduling). See [[smith-studio-web]].
