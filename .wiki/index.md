@@ -3,7 +3,7 @@ title: "Embabel Smith Wiki"
 type: "index"
 status: "active"
 language: "default"
-last_commit: "5cadb248f7695ed1aef31b3044dd21b48cc688c8"
+last_commit: "05d0d356d96c6712c83cd575b0064f7a683c8fe6"
 updated_at: "2026-11-09"
 ---
 

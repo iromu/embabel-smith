@@ -13,6 +13,7 @@ source_paths:
   - "openspec/specs/product-module-layout/spec.md"
   - "openspec/specs/skill-sources/spec.md"
   - "openspec/specs/skill-runtime/spec.md"
+  - "openspec/specs/skill-builder/spec.md"
 updated_at: "2026-11-09"
 ---
 
@@ -70,6 +71,8 @@ The product is built in six numbered OpenSpec changes under `openspec/changes/` 
    JSONL trace. **Archived 2026-11-09**; its spec is now the main spec
    `openspec/specs/skill-runtime/spec.md`.
 4. **04-smith-builder-product** — the builder: the full build pipeline and publish to a source.
+   **Archived 2026-11-09**; its spec is now the main spec
+   `openspec/specs/skill-builder/spec.md`.
 5. **05-smith-self-improvement-loop** — the studio's self-improvement loop (the `incubating →
    active` promotion and re-eval cycle that owns the lifecycle transitions).
 6. **06-smith-studio-product** — the studio's REST surface and web UI (the loop as a Spring Boot
