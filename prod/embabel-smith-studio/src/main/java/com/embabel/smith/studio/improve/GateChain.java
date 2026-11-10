@@ -26,7 +26,16 @@ import java.util.List;
  *       than the pack's baseline (design "Beat the baseline is strict").</li>
  * </ol>
  *
- * A rejection names the stage and records the reasons (and, when reached, the score and scan).
+ * <p><b>Failure-fix fallback (the ceiling case).</b> A builder-built pack is stamped at its
+ * build-time score, which the build's score gate pins to the max achievable on the (binary) smoke
+ * task — a baseline the strict re-eval can never beat. When the re-eval score does not beat the
+ * baseline <em>and</em> the candidate was refined from concrete production failures, the gate
+ * instead proves the actual improvement: it re-runs the candidate on those failing inputs and
+ * requires a successful (non-blank) output for each. The strict baseline-beat remains the primary
+ * criterion; the fallback only applies when the trigger was real failures, never for a drift-only
+ * pass.
+ *
+ * <p>A rejection names the stage and records the reasons (and, when reached, the score and scan).
  */
 public class GateChain {
 
@@ -50,7 +59,17 @@ public class GateChain {
         this.evalTasks = List.copyOf(evalTasks);
     }
 
+    /** Runs the gate without triggering failures (a drift-only pass: no failure-fix fallback). */
     public GateResult gate(SkillPack candidate, double baseline) {
+        return gate(candidate, baseline, List.of());
+    }
+
+    /**
+     * Runs the gate with the triggering production failures threaded in. When the strict re-eval
+     * cannot beat the baseline (the ceiling case), the gate proves the actual improvement by
+     * re-running the candidate on {@code failedInputs} and requiring a non-blank output for each.
+     */
+    public GateResult gate(SkillPack candidate, double baseline, List<String> failedInputs) {
         // a. D5 validation (cheap, deterministic)
         var validation = validator.validate(candidate);
         if (!validation.isValid()) {
@@ -72,16 +91,46 @@ public class GateChain {
         // c. re-eval (expensive — only reached by a valid, safe candidate)
         double score = reeval(candidate);
 
+        // d. baseline comparison (strict: must beat the baseline) — the primary criterion
+        if (score > baseline) {
+            return GateResult.pass(score, scan);
+        }
 
-        // d. baseline comparison (strict: must beat the baseline)
-        if (score <= baseline) {
+        // e. failure-fix fallback (the ceiling case): the re-eval cannot beat the baseline AND the
+        //    candidate is already at the ceiling on the eval tasks (score at max — it cannot do
+        //    better), so prove the actual improvement — re-run the candidate on the triggering
+        //    failures and require a successful (non-blank) output for each. A candidate that is
+        //    failing its own eval tasks (score below the ceiling) is broken, not merely at the
+        //    ceiling, and is rejected without the fallback.
+        if (score >= 1.0 && failedInputs != null && !failedInputs.isEmpty()) {
+            List<String> unfixed = failingInputs(candidate, failedInputs);
+            if (unfixed.isEmpty()) {
+                return GateResult.pass(score, scan);
+            }
             List<String> reasons = List.of(
-                    "re-eval " + String.format("%.3f", score)
-                            + " does not beat baseline " + String.format("%.3f", baseline));
+                    "re-eval " + String.format("%.3f", score) + " does not beat baseline "
+                            + String.format("%.3f", baseline) + " and the candidate still fails "
+                            + unfixed.size() + " of " + failedInputs.size() + " triggering input(s)");
             return GateResult.reject("baseline", reasons, score, scan);
         }
 
-        return GateResult.pass(score, scan);
+        List<String> reasons = List.of(
+                "re-eval " + String.format("%.3f", score)
+                        + " does not beat baseline " + String.format("%.3f", baseline));
+        return GateResult.reject("baseline", reasons, score, scan);
+    }
+
+    /** The triggering inputs the candidate still produces no (blank) output for. */
+    private List<String> failingInputs(SkillPack candidate, List<String> failedInputs) {
+        var invoker = invokerFactory.invokerFor(candidate);
+        List<String> unfixed = new ArrayList<>();
+        for (String input : failedInputs) {
+            String output = invoker.invoke(input);
+            if (output == null || output.isBlank()) {
+                unfixed.add(input);
+            }
+        }
+        return unfixed;
     }
 
     /**

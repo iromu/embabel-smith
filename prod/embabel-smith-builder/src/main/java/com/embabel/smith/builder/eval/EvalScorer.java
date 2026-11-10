@@ -39,7 +39,17 @@ public final class EvalScorer {
     }
 
     private static boolean passes(EvalTask task, String output) {
-        return output != null && output.toLowerCase().contains(task.expected().toLowerCase());
+        if (output == null) {
+            return false;
+        }
+        String expected = task.expected();
+        if (expected == null || expected.isBlank()) {
+            // A blank criterion means "the run produced output" (the smoke default): a blank or
+            // missing output does not pass. Without this, contains("") would let any non-null
+            // output — including empty — through and every build would score 1.0.
+            return !output.isBlank();
+        }
+        return output.toLowerCase().contains(expected.toLowerCase());
     }
 
     private static String outputAt(List<String> outputs, int i) {

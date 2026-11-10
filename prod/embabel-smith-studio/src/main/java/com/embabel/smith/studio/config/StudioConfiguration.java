@@ -161,7 +161,7 @@ public class StudioConfiguration {
     }
 
     private static List<EvalTask> defaultEvalTasks() {
-        return List.of(new EvalTask("runs-and-produces-output", "Describe your use case.", ""));
+        return EvalTask.smokeDefault();
     }
 
     /** The model to call: the first of the configured models, falling back to the default LLM. */

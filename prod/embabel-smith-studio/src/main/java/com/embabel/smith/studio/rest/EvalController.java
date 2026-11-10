@@ -65,7 +65,7 @@ public class EvalController {
 
     private static List<EvalTask> toTasks(List<EvalTaskDto> tasks) {
         if (tasks == null || tasks.isEmpty()) {
-            return List.of(new EvalTask("runs-and-produces-output", "Describe your use case.", ""));
+            return EvalTask.smokeDefault();
         }
         return tasks.stream().map(t -> new EvalTask(t.name(), t.input(), t.expected())).toList();
     }

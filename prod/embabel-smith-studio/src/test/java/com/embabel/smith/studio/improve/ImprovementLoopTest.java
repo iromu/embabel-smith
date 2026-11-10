@@ -130,6 +130,28 @@ class ImprovementLoopTest {
     }
 
     @Test
+    void publishPersistsToTheSourceWithPush() throws IOException {
+        SkillPack pack = TestFixtures.pack("extract", "s1", "s2");
+        JsonlTraceStore store = store();
+        store.append(TestFixtures.failedTrace("r1", "extract", "input",
+                TestFixtures.step("s2", "failed", "bad")));
+
+        boolean[] push = {false};
+        ImprovementLoop loop = new ImprovementLoop(source(pack), store,
+                (current, feedback) -> current + " [revised]",
+                passingInvoker, tasks,
+                (p, lifecycle, overwrite, pushFlag) -> {
+                    push[0] = pushFlag;
+                    return new PublishResult(Path.of("/tmp/" + p.name()), pushFlag);
+                },
+                true); // auto-publish
+
+        loop.runOnce();
+
+        assertThat(push[0]).isTrue(); // the loop pushes improvements into the source (git)
+    }
+
+    @Test
     void inFlightSkillIsSkipped() throws IOException {
         SkillPack pack = TestFixtures.pack("extract", "s1", "s2");
         Path root = tmp.resolve("source");

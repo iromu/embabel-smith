@@ -122,10 +122,14 @@ public class LoopService {
         }
     }
 
-    /** Publishes a candidate through the shared publisher (the loop's write path). */
+    /**
+     * Publishes a candidate through the shared publisher (the loop's write path). push=true: an
+     * approved/auto-published candidate must persist into the skill source, so a git source is
+     * pushed (the folder publisher ignores the flag).
+     */
     private PublishResult publish(PendingCandidate candidate) {
         try {
-            return publisher.publish(candidate.candidate(), candidate.proposedLifecycle(), true, false);
+            return publisher.publish(candidate.candidate(), candidate.proposedLifecycle(), true, true);
         } catch (IOException e) {
             throw new UncheckedIOException(
                     "cannot publish candidate for " + candidate.skill(), e);

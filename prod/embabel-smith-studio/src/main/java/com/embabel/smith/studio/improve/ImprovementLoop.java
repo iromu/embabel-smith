@@ -26,6 +26,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -151,7 +152,11 @@ public final class ImprovementLoop {
                 }
                 Refiner.Refinement refinement = refiner.refine(current, detection.failureTraces());
                 if (refinement.changed()) {
-                    GateResult gate = gateChain.gate(refinement.candidate(), sidecar.baselinePassRate());
+                    // Thread the triggering failures into the gate so, when the strict re-eval
+                    // cannot beat the (ceiling) baseline, the gate proves the actual improvement by
+                    // re-running the candidate on those inputs.
+                    GateResult gate = gateChain.gate(refinement.candidate(), sidecar.baselinePassRate(),
+                            failedInputs(detection.failureTraces()));
                     if (gate.gated()) {
                         PendingCandidate candidate = toCandidate(skill, refinement, gate, sidecar, detection);
                         boolean held = queue.enqueue(candidate, autoPublish, this::publishCandidate);
@@ -201,9 +206,22 @@ public final class ImprovementLoop {
                 detection.failureTraces(), diff);
     }
 
+    /** The distinct, non-blank inputs of the triggering failure traces (empty when none). */
+    private static List<String> failedInputs(List<TraceRecord> failureTraces) {
+        return failureTraces.stream()
+                .map(TraceRecord::input)
+                .filter(Objects::nonNull)
+                .filter(s -> !s.isBlank())
+                .distinct()
+                .toList();
+    }
+
     private PublishResult publishCandidate(PendingCandidate candidate) {
         try {
-            return publisher.publish(candidate.candidate(), candidate.proposedLifecycle(), true, false);
+            // push=true: the loop writes the improvement back into the skill source, so a git
+            // source must be pushed or the commit dies with the publisher's throwaway clone. The
+            // folder publisher ignores the flag (a local write is already persistent).
+            return publisher.publish(candidate.candidate(), candidate.proposedLifecycle(), true, true);
         } catch (IOException e) {
             throw new UncheckedIOException("cannot publish candidate for " + candidate.skill(), e);
         }

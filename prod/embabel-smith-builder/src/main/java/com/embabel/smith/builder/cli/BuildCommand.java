@@ -72,12 +72,12 @@ public class BuildCommand implements Callable<Integer> {
     }
 
     /**
-     * The default eval task set: a single "the skill runs and produces output" case. The task set is
-     * a parameter of the build (design D1); richer acceptance criteria can be supplied by callers
-     * of {@link BuilderService}.
+     * The default eval task set: a single "the skill runs and produces output" case, shared via
+     * {@link EvalTask#smokeDefault()}. The task set is a parameter of the build (design D1); richer
+     * acceptance criteria can be supplied by callers of {@link BuilderService}.
      */
     private static List<EvalTask> defaultEvalTasks() {
-        return List.of(new EvalTask("runs-and-produces-output", "Describe your use case.", ""));
+        return EvalTask.smokeDefault();
     }
 
     @Override

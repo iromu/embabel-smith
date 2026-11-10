@@ -1,6 +1,7 @@
 package com.embabel.smith.studio.rest;
 
 import com.embabel.smith.builder.lifecycle.LifecycleMetadata;
+import com.embabel.smith.builder.lifecycle.SkillContentHash;
 import com.embabel.smith.common.io.SkillPackReader;
 import com.embabel.smith.common.io.Yaml;
 import com.embabel.smith.common.model.SkillPack;
@@ -49,12 +50,16 @@ public class SourceService {
         List<PackInfo> packs = new ArrayList<>();
         for (ResolvedPack pack : resolved.packs()) {
             LifecycleMetadata sidecar = readSidecar(pack.root());
-            boolean drift = sidecar != null
-                    && sidecar.contentHash() != null
-                    && !sidecar.contentHash().equals(pack.contentHash());
+            // The sidecar records the pack's semantic content hash (SkillContentHash) — the same
+            // scheme the builder stamps and the loop compares — so both the displayed hash and the
+            // drift flag are assessed on that, not on ResolvedPack's raw file-bytes hash, which
+            // never matches the sidecar.
+            String hash = contentHashOf(pack.root());
+            boolean drift = sidecar != null && sidecar.contentHash() != null
+                    && hash != null && !hash.equals(sidecar.contentHash());
             packs.add(new PackInfo(
                     pack.name(),
-                    pack.contentHash(),
+                    hash != null ? hash : pack.contentHash(),
                     sidecar == null ? null : sidecar.state().name(),
                     sidecar == null ? null : sidecar.baselinePassRate(),
                     drift,
@@ -84,6 +89,15 @@ public class SourceService {
         }
         SkillSource source = Sources.parse(sourceUri, cacheRoot);
         return source.resolve();
+    }
+
+    /** The pack's semantic content hash, or {@code null} when the pack cannot be read. */
+    private String contentHashOf(Path root) {
+        try {
+            return SkillContentHash.of(reader.read(root));
+        } catch (IOException e) {
+            return null;
+        }
     }
 
     /** The pack's lifecycle sidecar, or {@code null} when it has none. */
