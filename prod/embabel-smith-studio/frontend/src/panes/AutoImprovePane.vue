@@ -1,13 +1,11 @@
 <template>
   <q-page padding>
     <q-card flat bordered class="q-pa-md">
-      <q-card-section>
-        <div class="text-h5">Auto-improve</div>
-        <p class="text-grey-7">
-          Operate the trace-driven self-improvement loop: schedule it, trigger an iteration, and
-          review the gated candidates it produces.
-        </p>
-      </q-card-section>
+      <PageHeader
+        icon="autorenew"
+        title="Auto-improve"
+        description="Operate the trace-driven self-improvement loop: schedule it, trigger an iteration, and review the gated candidates it produces."
+      />
 
       <q-separator />
 
@@ -126,6 +124,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 
+import PageHeader from '../components/PageHeader.vue'
 import {
   approveCandidate,
   getAutoPublish,

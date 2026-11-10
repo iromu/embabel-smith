@@ -5,6 +5,15 @@
  * field rename is caught by `vue-tsc --noEmit` (and the client tests) rather than at runtime.
  */
 
+import type { ComposePack } from '../compose/model'
+
+// ---- Global status ---------------------------------------------------------
+export interface StatusInfo {
+  configured: boolean
+  model: string | null
+  error: string | null
+}
+
 // ---- Sources / packs -------------------------------------------------------
 export interface SourceInfo {
   uri: string
@@ -80,6 +89,22 @@ export interface BuildResponse {
   lifecycle: LifecycleInfo | null
   published: PublishInfo | null
   errorCode: string | null
+  error: string | null
+}
+
+// ---- Compose (offline) -----------------------------------------------------
+export interface ComposeRequest {
+  source: string
+  pack: ComposePack
+  overwrite?: boolean
+  push?: boolean
+}
+export interface ComposeResponse {
+  ok: boolean
+  packName: string | null
+  goal: string | null
+  published: PublishInfo | null
+  lifecycle: LifecycleInfo | null
   error: string | null
 }
 

@@ -1,30 +1,31 @@
 <template>
   <q-page padding>
     <q-card flat bordered class="q-pa-md">
-      <q-card-section>
-        <div class="text-h5">Eval</div>
-        <p class="text-grey-7">Score a skill over its tasks and refine the prompt from failures.</p>
-      </q-card-section>
+      <PageHeader
+        icon="grade"
+        title="Eval"
+        description="Score a skill over its tasks and refine the prompt from failures."
+      />
 
       <q-separator />
 
       <q-card-section>
         <div class="row q-gutter-sm items-center">
-          <q-input
+          <q-select
             v-model="source"
             label="Source"
             dense
-            style="width: 280px"
+            :options="sourceOptions"
+            style="width: 320px"
             data-test="eval-source"
-            :hint="sourceHint"
           />
-          <q-input
+          <q-select
             v-model="skill"
             label="Skill"
             dense
-            style="width: 240px"
+            :options="skillOptions"
+            style="width: 260px"
             data-test="eval-skill"
-            :hint="skillHint"
           />
           <q-btn label="Evaluate" color="primary" icon="grade" @click="doEval" data-test="eval-btn" />
         </div>
@@ -62,18 +63,17 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 
+import PageHeader from '../components/PageHeader.vue'
 import { evaluate } from '../api/client'
 import { isModelNotConfigured } from '../api/types'
 import type { EvalResponse } from '../api/types'
 import { useSourceSkill } from '../composables/useSourceSkill'
 
-const { source, skills, skill, sources, loading } = useSourceSkill()
+const { source, skill, sourceOptions, skillOptions } = useSourceSkill()
 const result = ref<EvalResponse | null>(null)
 const error = ref<string | null>(null)
 const last = ref<EvalResponse | null>(null)
 
-const sourceHint = computed(() => sources.value.map((s) => s.uri).join(', '))
-const skillHint = computed(() => (loading.value ? 'loading…' : skills.value.map((s) => s.name).join(', ')))
 const noEndpoint = computed(() => isModelNotConfigured(last.value))
 
 async function doEval() {

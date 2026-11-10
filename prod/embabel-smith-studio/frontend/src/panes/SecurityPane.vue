@@ -1,30 +1,31 @@
 <template>
   <q-page padding>
     <q-card flat bordered class="q-pa-md">
-      <q-card-section>
-        <div class="text-h5">Security</div>
-        <p class="text-grey-7">Scan a skill-pack at install time; pure static analysis, offline.</p>
-      </q-card-section>
+      <PageHeader
+        icon="security"
+        title="Security"
+        description="Scan a skill-pack at install time; pure static analysis, offline."
+      />
 
       <q-separator />
 
       <q-card-section>
         <div class="row q-gutter-sm items-center">
-          <q-input
+          <q-select
             v-model="source"
             label="Source"
             dense
-            style="width: 280px"
+            :options="sourceOptions"
+            style="width: 320px"
             data-test="security-source"
-            :hint="sourceHint"
           />
-          <q-input
+          <q-select
             v-model="skill"
             label="Skill"
             dense
-            style="width: 240px"
+            :options="skillOptions"
+            style="width: 260px"
             data-test="security-skill"
-            :hint="skillHint"
           />
           <q-btn label="Scan" color="primary" icon="security" @click="doScan" data-test="security-btn" />
         </div>
@@ -60,18 +61,16 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { ref } from 'vue'
 
+import PageHeader from '../components/PageHeader.vue'
 import { scan } from '../api/client'
 import type { ScanInfo } from '../api/types'
 import { useSourceSkill } from '../composables/useSourceSkill'
 
-const { source, skills, skill, sources, loading } = useSourceSkill()
+const { source, skill, sourceOptions, skillOptions } = useSourceSkill()
 const result = ref<ScanInfo | null>(null)
 const error = ref<string | null>(null)
-
-const sourceHint = computed(() => sources.value.map((s) => s.uri).join(', '))
-const skillHint = computed(() => (loading.value ? 'loading…' : skills.value.map((s) => s.name).join(', ')))
 
 function verdictColor(v: string): string {
   return v === 'SAFE' ? 'positive' : v === 'REVIEW' ? 'warning' : 'negative'

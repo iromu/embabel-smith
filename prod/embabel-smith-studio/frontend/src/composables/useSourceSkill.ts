@@ -4,8 +4,8 @@
  * trivially unit-testable and shared by every pane that needs a source + skill.
  */
 
-import { onMounted, ref, watch } from 'vue'
-import type { Ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
+import type { ComputedRef, Ref } from 'vue'
 
 import { listPacks, listSources } from '../api/client'
 import type { PackInfo, SourceInfo } from '../api/types'
@@ -16,6 +16,8 @@ export interface SourceSkillState {
   skills: Ref<PackInfo[]>
   skill: Ref<string>
   loading: Ref<boolean>
+  sourceOptions: ComputedRef<string[]>
+  skillOptions: ComputedRef<string[]>
   loadSources: () => Promise<void>
   loadSkills: () => Promise<void>
 }
@@ -26,6 +28,9 @@ export function useSourceSkill(): SourceSkillState {
   const skills = ref<PackInfo[]>([])
   const skill = ref('')
   const loading = ref(false)
+
+  const sourceOptions = computed(() => sources.value.map((s) => s.uri))
+  const skillOptions = computed(() => skills.value.map((s) => s.name))
 
   async function loadSources() {
     sources.value = await listSources()
@@ -59,5 +64,15 @@ export function useSourceSkill(): SourceSkillState {
     void loadSources()
   })
 
-  return { sources, source, skills, skill, loading, loadSources, loadSkills }
+  return {
+    sources,
+    source,
+    skills,
+    skill,
+    loading,
+    sourceOptions,
+    skillOptions,
+    loadSources,
+    loadSkills,
+  }
 }

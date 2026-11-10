@@ -28,8 +28,10 @@ vi.mock('../api/client', async (importOriginal) => {
     ...actual,
     listSources: vi.fn(),
     listPacks: vi.fn(),
+    listGoals: vi.fn(),
     run: vi.fn(),
     scan: vi.fn(),
+    compose: vi.fn(),
     loopStatus: vi.fn(),
     listCandidates: vi.fn(),
     getAutoPublish: vi.fn(),
@@ -39,8 +41,10 @@ vi.mock('../api/client', async (importOriginal) => {
 
 const listSources = api.listSources as Mock
 const listPacks = api.listPacks as Mock
+const listGoals = api.listGoals as Mock
 const run = api.run as Mock
 const scan = api.scan as Mock
+const compose = api.compose as Mock
 const loopStatus = api.loopStatus as Mock
 const listCandidates = api.listCandidates as Mock
 const getAutoPublish = api.getAutoPublish as Mock
@@ -61,6 +65,18 @@ function mountPane(component: Component) {
   )
 }
 
+/**
+ * Pick an option in a q-select (the panes use selects for source/skill). The select is located by
+ * its unique label prop; its v-model is set by emitting update:modelValue, then flushed so the
+ * pane's ref updates.
+ */
+async function selectOption(wrapper: ReturnType<typeof mountPane>, label: string, value: string) {
+  const select = wrapper.findAllComponents({ name: 'QSelect' }).find((s) => s.props('label') === label)
+  if (!select) throw new Error(`no q-select with label="${label}"`)
+  select.vm.$emit('update:modelValue', value)
+  await flushPromises()
+}
+
 /** Seed the shared source/skill picker state used by the studio panes. */
 function seedSources() {
   listSources.mockResolvedValue([{ uri: 'folder:/s', kind: 'folder' }])
@@ -79,6 +95,7 @@ function seedSources() {
 describe('RunPane (endpoint-gated)', () => {
   it('shows the model-not-configured banner when the endpoint is unset', async () => {
     seedSources()
+    listGoals.mockResolvedValue(['explainerDone'])
     run.mockResolvedValue({
       success: false,
       output: null,
@@ -89,14 +106,14 @@ describe('RunPane (endpoint-gated)', () => {
     const wrapper = mountPane(RunPane)
     await flushPromises()
 
-    await wrapper.find('[data-test="run-goal"]').setValue('alpha')
-    await flushPromises()
+    await selectOption(wrapper, 'Goal', 'explainerDone')
     await wrapper.find('[data-test="run-input"]').setValue('hi')
     await wrapper.find('[data-test="run-btn"]').trigger('click')
     await flushPromises()
 
+    expect(listGoals).toHaveBeenCalledWith('folder:/s')
     expect(run).toHaveBeenCalledWith(
-      expect.objectContaining({ source: 'folder:/s', goal: 'alpha', input: 'hi' }),
+      expect.objectContaining({ source: 'folder:/s', goal: 'explainerDone', input: 'hi' }),
     )
     expect(wrapper.find('[data-test="run-no-endpoint"]').exists()).toBe(true)
   })
@@ -147,8 +164,7 @@ describe('SecurityPane', () => {
     const wrapper = mountPane(SecurityPane)
     await flushPromises()
 
-    await wrapper.find('[data-test="security-skill"]').setValue('alpha')
-    await flushPromises()
+    await selectOption(wrapper, 'Skill', 'alpha')
     await wrapper.find('[data-test="security-btn"]').trigger('click')
     await flushPromises()
 
@@ -157,11 +173,56 @@ describe('SecurityPane', () => {
   })
 })
 
-describe('POC-only panes are disabled in the product', () => {
-  it('Compose renders the POC-only notice instead of a working canvas', async () => {
+describe('ComposePane (GOAP flow editor)', () => {
+  it('adds steps and a goal, validates a reachable flow, and exports it', async () => {
+    listSources.mockResolvedValue([{ uri: 'folder:/s', kind: 'folder' }])
+    compose.mockResolvedValue({
+      ok: true,
+      packName: 'goal',
+      goal: 'goal',
+      published: { location: '/s/goal', pushed: false },
+      lifecycle: {
+        contentHash: 'h',
+        baselinePassRate: 0,
+        state: 'INCUBATING',
+        updatedAt: 'now',
+      },
+      error: null,
+    })
     const wrapper = mountPane(ComposePane)
     await flushPromises()
-    expect(wrapper.find('[data-test="poc-only-notice"]').exists()).toBe(true)
-    expect(wrapper.find('[data-test="poc-only-notice"]').text()).toContain('not backed by the studio')
+
+    // Add a step (auto-selected) and point its output at the goal's default type.
+    await wrapper.find('[data-test="compose-add-step"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('[data-test="compose-step-name"]').exists()).toBe(true)
+    await wrapper.find('[data-test="compose-step-output"]').setValue('Result')
+    await flushPromises()
+
+    // Add the goal, then validate — the step now produces the goal's type.
+    await wrapper.find('[data-test="compose-add-goal"]').trigger('click')
+    await flushPromises()
+    await wrapper.find('[data-test="compose-validate"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('[data-test="compose-valid"]').exists()).toBe(true)
+
+    // Export to the source.
+    await wrapper.find('[data-test="compose-export"]').trigger('click')
+    await flushPromises()
+    expect(compose).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source: 'folder:/s',
+        pack: expect.objectContaining({
+          goal: expect.objectContaining({ outputTypeName: 'Result', export: true }),
+          steps: [
+            expect.objectContaining({
+              outputTypeName: 'Result',
+              inputTypeNames: ['UserInput'],
+            }),
+          ],
+        }),
+      }),
+    )
+    expect(wrapper.find('[data-test="compose-exported"]').exists()).toBe(true)
   })
 })

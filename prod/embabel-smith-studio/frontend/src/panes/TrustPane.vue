@@ -1,38 +1,39 @@
 <template>
   <q-page padding>
     <q-card flat bordered class="q-pa-md">
-      <q-card-section>
-        <div class="text-h5">Trust</div>
-        <p class="text-grey-7">Check whether a skill's declared tool-groups are allowed under a trust tier.</p>
-      </q-card-section>
+      <PageHeader
+        icon="verified_user"
+        title="Trust"
+        description="Check whether a skill's declared tool-groups are allowed under a trust tier."
+      />
 
       <q-separator />
 
       <q-card-section>
         <div class="row q-gutter-sm items-center">
-          <q-input
+          <q-select
             v-model="source"
             label="Source"
             dense
-            style="width: 280px"
+            :options="sourceOptions"
+            style="width: 320px"
             data-test="trust-source"
-            :hint="sourceHint"
           />
-          <q-input
+          <q-select
             v-model="skill"
             label="Skill"
             dense
-            style="width: 240px"
+            :options="skillOptions"
+            style="width: 260px"
             data-test="trust-skill"
-            :hint="skillHint"
           />
-          <q-input
+          <q-select
             v-model="tier"
             label="Tier"
             dense
+            :options="tiers"
             style="width: 160px"
             data-test="trust-tier"
-            hint="STANDARD / HIGH"
           />
           <q-btn label="Check" color="primary" icon="verified_user" @click="doCheck" data-test="trust-btn" />
         </div>
@@ -59,19 +60,18 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { ref } from 'vue'
 
+import PageHeader from '../components/PageHeader.vue'
 import { checkTrust } from '../api/client'
 import type { TrustResponse } from '../api/types'
 import { useSourceSkill } from '../composables/useSourceSkill'
 
-const { source, skills, skill, sources, loading } = useSourceSkill()
+const { source, skill, sourceOptions, skillOptions } = useSourceSkill()
 const tier = ref('STANDARD')
+const tiers = ['STANDARD', 'HIGH']
 const result = ref<TrustResponse | null>(null)
 const error = ref<string | null>(null)
-
-const sourceHint = computed(() => sources.value.map((s) => s.uri).join(', '))
-const skillHint = computed(() => (loading.value ? 'loading…' : skills.value.map((s) => s.name).join(', ')))
 
 async function doCheck() {
   if (source.value === '' || skill.value === '') {

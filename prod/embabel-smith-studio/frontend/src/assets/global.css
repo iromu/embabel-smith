@@ -1,0 +1,258 @@
+/* Embabel Smith Studio — global theme on top of Quasar (dark mode).
+   A modern "developer tool" dark look: slate surfaces, indigo primary, Inter type,
+   subtle depth, and consistent spacing. Quasar dark mode is enabled via `body--dark`. */
+
+:root {
+  --app-bg: #0f172a;
+  --surface: #1e293b;
+  --surface-2: #172033;
+  --border: #2b3a4f;
+  --nav-bg: #0b1120;
+  --nav-text: #94a3b8;
+  --nav-text-strong: #e2e8f0;
+  --nav-hover: rgba(148, 163, 184, 0.12);
+  --nav-active: #4f46e5;
+  --text-strong: #e2e8f0;
+  --text-muted: #94a3b8;
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.35), 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+
+html,
+body {
+  font-family: 'Inter', -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  background: var(--app-bg);
+  color: var(--text-strong);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* ---------------------------------------------------------------- Sidebar ---- */
+.studio-drawer {
+  background: var(--nav-bg) !important;
+  border-right: 1px solid var(--border) !important;
+}
+
+.studio-drawer-body {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.studio-brand {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 20px 18px 16px;
+}
+
+.studio-logo {
+  width: 34px;
+  height: 34px;
+  flex: none;
+  border-radius: 9px;
+  box-shadow: 0 2px 10px rgba(79, 70, 229, 0.55);
+}
+
+.studio-brand-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: #f8fafc;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+}
+
+.studio-brand-tag {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--nav-text);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.studio-nav {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 2px 12px 8px;
+}
+
+.studio-nav-group {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: #64748b;
+  padding: 15px 10px 6px;
+}
+
+.studio-nav-item {
+  border-radius: 9px;
+  margin: 2px 0;
+  padding: 0 10px !important;
+  color: var(--nav-text);
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.studio-nav-item .q-icon {
+  color: var(--nav-text);
+  font-size: 20px;
+}
+
+.studio-nav-item:hover {
+  background: var(--nav-hover);
+  color: var(--nav-text-strong);
+}
+
+.studio-nav-item.q-router-link--active {
+  background: var(--nav-active);
+  color: #fff !important;
+  box-shadow: 0 1px 6px rgba(79, 70, 229, 0.55);
+}
+
+.studio-nav-item.q-router-link--active .q-icon {
+  color: #fff;
+}
+
+.studio-nav-item.q-router-link--active:hover {
+  background: #4338ca;
+}
+
+.studio-drawer-footer {
+  flex: none;
+  padding: 12px 16px;
+  border-top: 1px solid rgba(148, 163, 184, 0.16);
+  font-size: 12px;
+  color: var(--nav-text);
+}
+
+/* ---------------------------------------------------------------- Header ---- */
+.studio-header {
+  background: var(--app-bg);
+  border-bottom: 1px solid var(--border);
+  box-shadow: none;
+}
+
+.studio-crumbs {
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+}
+
+.studio-crumbs-root {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.studio-crumbs-current {
+  color: var(--text-strong);
+  font-weight: 600;
+}
+
+/* --------------------------------------------------------------- Content ---- */
+.q-page {
+  background: var(--app-bg);
+}
+
+/* Cards: dark surface, crisp border, soft shadow, rounded. */
+.q-card--bordered {
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 12px !important;
+  box-shadow: var(--shadow-card);
+}
+
+/* The main pane card sits on the app background, so give it a touch more presence. */
+.q-page > .q-card {
+  border-radius: 14px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4), 0 8px 28px rgba(0, 0, 0, 0.28);
+}
+
+/* Nested output / code blocks read as a darker inset surface. */
+.q-card .bg-grey-1 {
+  background: var(--surface-2) !important;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+/* Pane title + the description line directly beneath it. `.text-h5` is only ever
+   the pane title in this app. */
+.q-page .q-card .text-h5 {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  color: var(--text-strong);
+}
+
+.q-page .q-card .text-h5 + p.text-grey-7 {
+  color: var(--text-muted);
+  margin: 4px 0 0;
+  max-width: 62ch;
+}
+
+/* Pane header (PageHeader): an indigo icon tile beside the title + description. */
+.pane-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.pane-head-icon {
+  width: 42px;
+  height: 42px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 11px;
+  background: rgba(79, 70, 229, 0.16);
+  border: 1px solid rgba(79, 70, 229, 0.3);
+  color: #a5b4fc;
+}
+
+.pane-head-text .text-h5 {
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text-strong);
+}
+
+.pane-head-text .text-grey-7 {
+  color: var(--text-muted);
+  margin: 3px 0 0;
+  max-width: 60ch;
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+
+/* Form fields: reinforce the dark surface + border to match the cards. */
+.q-field {
+  --q-field-border-color: var(--border);
+  --q-field-focus-color: var(--nav-active);
+}
+
+.q-field__label {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+/* Code / output blocks. */
+.q-card pre {
+  font-family: 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-strong);
+}
+
+/* Buttons: slightly more rounded, tighter. */
+.q-btn {
+  border-radius: 8px;
+  font-weight: 600;
+}
+
+/* List items (Lifecycle, Traces, candidates): hover affordance + softer dividers. */
+.q-item {
+  transition: background 0.1s ease;
+}
+
+.q-item:hover {
+  background: rgba(148, 163, 184, 0.06);
+}

@@ -1,10 +1,11 @@
 <template>
   <q-page padding>
     <q-card flat bordered class="q-pa-md">
-      <q-card-section>
-        <div class="text-h5">Build</div>
-        <p class="text-grey-7">Describe a skill and publish it to a source through the builder (compile → eval → security → lifecycle).</p>
-      </q-card-section>
+      <PageHeader
+        icon="edit"
+        title="Build"
+        description="Describe a skill and publish it to a source through the builder (compile → eval → security → lifecycle)."
+      />
 
       <q-separator />
 
@@ -14,16 +15,16 @@
             v-model="description"
             label="Describe the skill"
             dense
-            style="min-width: 360px"
+            style="flex: 1; min-width: 320px"
             data-test="build-description"
           />
-          <q-input
+          <q-select
             v-model="outputSource"
             label="Publish to (source)"
             dense
-            style="width: 280px"
+            :options="sources"
+            style="width: 320px"
             data-test="build-output"
-            :hint="sourceHint"
           />
           <q-btn label="Build" color="primary" icon="edit" @click="doBuild" data-test="build-btn" />
         </div>
@@ -68,6 +69,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 
+import PageHeader from '../components/PageHeader.vue'
 import { build, listSources } from '../api/client'
 import { isModelNotConfigured } from '../api/types'
 import type { BuildResponse } from '../api/types'
@@ -80,7 +82,6 @@ const report = ref<BuildResponse | null>(null)
 const error = ref<string | null>(null)
 const last = ref<BuildResponse | null>(null)
 
-const sourceHint = computed(() => sources.value.join(', '))
 const noEndpoint = computed(() => isModelNotConfigured(last.value))
 
 function verdictColor(v: string): string {

@@ -7,7 +7,12 @@ import { quasar, transformAssetUrls } from '@quasar/vite-plugin'
 export default defineConfig({
   plugins: [
     vue({ template: { transformAssetUrls } }),
-    quasar(),
+    // Inject the studio palette before Quasar's own (all `!default`) variables. An absolute
+    // path is required: the import is prepended to Quasar's own stylesheet, so relative paths
+    // resolve against node_modules and fail.
+    quasar({
+      sassVariables: fileURLToPath(new URL('./src/quasar-variables.sass', import.meta.url)),
+    }),
   ],
   resolve: {
     alias: {

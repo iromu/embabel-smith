@@ -1,42 +1,48 @@
 <template>
   <q-page padding>
     <q-card flat bordered class="q-pa-md">
-      <q-card-section>
-        <div class="text-h5">Run</div>
-        <p class="text-grey-7">Pick a source and a skill, submit an input, and run the goal through the runtime.</p>
-      </q-card-section>
+      <PageHeader
+        icon="play_arrow"
+        title="Run"
+        description="Pick a source and a goal it exports, submit an input, and run it through the runtime."
+      />
 
       <q-separator />
 
       <q-card-section>
-        <div class="row q-gutter-sm items-start">
-          <q-input
-            v-model="source"
-            label="Source"
-            dense
-            style="width: 280px"
-            data-test="run-source"
-            :hint="sourceHint"
-          />
-          <q-input
-            v-model="goal"
-            label="Skill / goal"
-            dense
-            style="width: 240px"
-            data-test="run-goal"
-            :hint="skillHint"
-          />
-          <q-input v-model="input" label="Input" dense style="min-width: 260px" data-test="run-input" />
-          <q-input v-model="planner" label="Planner (optional)" dense style="width: 160px" data-test="run-planner" />
-          <q-input
-            v-model="tier"
-            label="Trust tier"
-            dense
-            style="width: 140px"
-            data-test="run-tier"
-            hint="STANDARD / HIGH"
-          />
-          <q-btn label="Run" color="primary" icon="play_arrow" @click="doRun" data-test="run-btn" />
+        <div class="col q-gutter-y-sm">
+          <div class="row q-gutter-sm items-start">
+            <q-select
+              v-model="source"
+              label="Source"
+              dense
+              :options="sourceOptions"
+              style="width: 320px"
+              data-test="run-source"
+            />
+            <q-select
+              v-model="goal"
+              label="Goal"
+              dense
+              :options="goalOptions"
+              :loading="loadingGoals"
+              style="width: 260px"
+              data-test="run-goal"
+            />
+          </div>
+          <div class="row q-gutter-sm items-start">
+            <q-input v-model="input" label="Input" dense style="flex: 1; min-width: 220px" data-test="run-input" />
+            <q-input v-model="planner" label="Planner (optional)" dense style="width: 180px" data-test="run-planner" />
+            <q-select
+              v-model="tier"
+              label="Trust tier"
+              dense
+              :options="tiers"
+              style="width: 150px"
+              data-test="run-tier"
+            />
+            <q-btn label="Run" color="primary" icon="play_arrow" @click="doRun" data-test="run-btn" />
+          </div>
         </div>
       </q-card-section>
 
@@ -54,22 +60,26 @@
             <pre class="text-body2" style="white-space: pre-wrap; margin: 0">{{ output }}</pre>
           </q-card>
         </div>
-        <div v-else class="text-grey-6">Pick a source, a skill, and an input, then run it.</div>
+        <div v-else class="text-grey-6">Pick a source and a goal, enter an input, then run it.</div>
       </q-card-section>
     </q-card>
   </q-page>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 
-import { run } from '../api/client'
+import PageHeader from '../components/PageHeader.vue'
+import { listGoals, run } from '../api/client'
 import { isModelNotConfigured } from '../api/types'
 import type { RunResponse } from '../api/types'
 import { useSourceSkill } from '../composables/useSourceSkill'
 
-const { source, skills, skill, sources, loading } = useSourceSkill()
-const goal = skill
+const { source, sourceOptions } = useSourceSkill()
+const goal = ref('')
+const goals = ref<string[]>([])
+const goalOptions = computed(() => goals.value)
+const loadingGoals = ref(false)
 const input = ref('')
 const planner = ref('')
 const tier = ref('STANDARD')
@@ -77,9 +87,28 @@ const output = ref<string | null>(null)
 const error = ref<string | null>(null)
 const last = ref<RunResponse | null>(null)
 
-const sourceHint = computed(() => sources.value.map((s) => s.uri).join(', '))
-const skillHint = computed(() => (loading.value ? 'loading…' : skills.value.map((s) => s.name).join(', ')))
+const tiers = ['STANDARD', 'HIGH']
 const noEndpoint = computed(() => isModelNotConfigured(last.value))
+
+// The run is addressed by goal, not pack name. Load the selected source's exported goals and
+// auto-select it when the source exports exactly one (mirroring the runtime's single-goal default).
+watch(
+  source,
+  async (s) => {
+    goal.value = ''
+    goals.value = []
+    if (!s) return
+    loadingGoals.value = true
+    try {
+      goals.value = await listGoals(s)
+      if (goals.value.length === 1) goal.value = goals.value[0]
+    } catch {
+      goals.value = []
+    } finally {
+      loadingGoals.value = false
+    }
+  },
+)
 
 async function doRun() {
   if (source.value === '' || goal.value === '') {

@@ -1,30 +1,31 @@
 <template>
   <q-page padding>
     <q-card flat bordered class="q-pa-md">
-      <q-card-section>
-        <div class="text-h5">Traces</div>
-        <p class="text-grey-7">A skill's recent runs, most recent first, with per-step drill-down.</p>
-      </q-card-section>
+      <PageHeader
+        icon="history"
+        title="Traces"
+        description="A skill's recent runs, most recent first, with per-step drill-down."
+      />
 
       <q-separator />
 
       <q-card-section>
         <div class="row q-gutter-sm items-center">
-          <q-input
+          <q-select
             v-model="source"
             label="Source"
             dense
-            style="width: 280px"
+            :options="sourceOptions"
+            style="width: 320px"
             data-test="traces-source"
-            :hint="sourceHint"
           />
-          <q-input
+          <q-select
             v-model="skill"
             label="Skill"
             dense
-            style="width: 240px"
+            :options="skillOptions"
+            style="width: 260px"
             data-test="traces-skill"
-            :hint="skillHint"
           />
           <q-btn label="Load" color="primary" icon="history" @click="loadTraces" data-test="traces-btn" />
         </div>
@@ -127,9 +128,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { ref } from 'vue'
 import type { QTableColumn } from 'quasar'
 
+import PageHeader from '../components/PageHeader.vue'
 import { traces } from '../api/client'
 import type { TraceInfo } from '../api/types'
 import { useSourceSkill } from '../composables/useSourceSkill'
@@ -141,14 +143,11 @@ import {
   stepStatusColor,
 } from '../traces/model'
 
-const { source, skills, skill, sources, loading } = useSourceSkill()
+const { source, skill, sourceOptions, skillOptions } = useSourceSkill()
 const traceRows = ref<TraceInfo[]>([])
 const error = ref<string | null>(null)
 const stepsOpen = ref(false)
 const selectedTrace = ref<TraceInfo | null>(null)
-
-const sourceHint = computed(() => sources.value.map((s) => s.uri).join(', '))
-const skillHint = computed(() => (loading.value ? 'loading…' : skills.value.map((s) => s.name).join(', ')))
 
 const columns: QTableColumn<TraceInfo>[] = [
   { name: 'runId', label: 'Run', field: 'runId', align: 'left' },

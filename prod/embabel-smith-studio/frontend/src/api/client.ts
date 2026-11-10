@@ -10,6 +10,8 @@ import type {
   BuildRequest,
   BuildResponse,
   CandidateInfo,
+  ComposeRequest,
+  ComposeResponse,
   EvalRequest,
   EvalResponse,
   IterationInfo,
@@ -21,6 +23,7 @@ import type {
   SecurityRequest,
   SecurityResponse,
   SourceInfo,
+  StatusInfo,
   TraceInfo,
   TrustRequest,
   TrustResponse,
@@ -55,10 +58,17 @@ function put<T>(path: string, body: unknown): Promise<T> {
   })
 }
 
-// ---- Sources / packs (offline) ---------------------------------------------
+// ---- Global status ---------------------------------------------------------
+/** Whether a model endpoint is resolvable, and which default model it would use. */
+export const getStatus = (): Promise<StatusInfo> => get<StatusInfo>('/api/status')
+
+// ---- Sources / packs / goals (offline) -------------------------------------
 export const listSources = (): Promise<SourceInfo[]> => get<SourceInfo[]>('/api/sources')
 export const listPacks = (source: string): Promise<PackInfo[]> =>
   get<PackInfo[]>(`/api/packs?source=${encodeURIComponent(source)}`)
+/** The goal names a source's packs export — the Run pane runs a goal, not a pack name. */
+export const listGoals = (source: string): Promise<string[]> =>
+  get<string[]>(`/api/goals?source=${encodeURIComponent(source)}`)
 
 // ---- Run (endpoint-gated) ---------------------------------------------------
 export const run = (req: RunRequest): Promise<RunResponse> => post<RunResponse>('/api/run', req)
@@ -66,6 +76,10 @@ export const run = (req: RunRequest): Promise<RunResponse> => post<RunResponse>(
 // ---- Build (endpoint-gated) -------------------------------------------------
 export const build = (req: BuildRequest): Promise<BuildResponse> =>
   post<BuildResponse>('/api/build', req)
+
+// ---- Compose (offline) ------------------------------------------------------
+export const compose = (req: ComposeRequest): Promise<ComposeResponse> =>
+  post<ComposeResponse>('/api/compose', req)
 
 // ---- Eval (endpoint-gated) --------------------------------------------------
 export const evaluate = (req: EvalRequest): Promise<EvalResponse> =>

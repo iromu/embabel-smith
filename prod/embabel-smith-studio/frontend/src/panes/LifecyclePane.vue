@@ -1,22 +1,23 @@
 <template>
   <q-page padding>
     <q-card flat bordered class="q-pa-md">
-      <q-card-section>
-        <div class="text-h5">Lifecycle</div>
-        <p class="text-grey-7">Each pack's lifecycle state, baseline pass-rate, and content-hash drift status.</p>
-      </q-card-section>
+      <PageHeader
+        icon="cycle"
+        title="Lifecycle"
+        description="Each pack's lifecycle state, baseline pass-rate, and content-hash drift status."
+      />
 
       <q-separator />
 
       <q-card-section>
         <div class="row q-gutter-sm items-center">
-          <q-input
+          <q-select
             v-model="source"
             label="Source"
             dense
+            :options="sourceOptions"
             style="width: 320px"
             data-test="lifecycle-source"
-            :hint="sourceHint"
           />
           <q-btn label="Refresh" color="primary" icon="refresh" @click="loadSkills" data-test="lifecycle-refresh" />
         </div>
@@ -58,15 +59,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { ref } from 'vue'
 
+import PageHeader from '../components/PageHeader.vue'
 import { useSourceSkill } from '../composables/useSourceSkill'
 import { lifecycleColor } from '../improve/model'
 
-const { source, skills, sources, loading, loadSkills } = useSourceSkill()
+const { source, skills, sourceOptions, loading, loadSkills } = useSourceSkill()
 const error = ref<string | null>(null)
-
-const sourceHint = computed(() => sources.value.map((s) => s.uri).join(', '))
 
 function shortHash(hash: string): string {
   return hash.length <= 12 ? hash : hash.slice(0, 12)
