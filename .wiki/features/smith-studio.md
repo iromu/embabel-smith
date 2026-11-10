@@ -12,7 +12,7 @@ source_paths:
   - "prod/embabel-smith-studio/src/main/java/com/embabel/smith/studio/improve/ApprovalQueue.java"
   - "prod/embabel-smith-studio/src/main/java/com/embabel/smith/studio/improve/TraceWindowReader.java"
   - "prod/embabel-smith-studio/README.md"
-updated_at: "2026-11-08"
+updated_at: "2026-11-10"
 ---
 
 # The smith studio: the self-improvement loop
@@ -41,6 +41,14 @@ For each pack in the source, in one pass:
 4. **Gate** ([[GateChain]]) — cheap-first: D5 validation ([[validate-before-write]]) → security scan
    ([[skill-security-scanning]]) → re-eval ([[eval-scoring]]) → **strict** beat-the-baseline
    (`score > baseline`; equal is not progress). A broken or unsafe candidate spends no eval budget.
+   **Ceiling fallback:** a builder-built pack is stamped at the build's max score on the (binary)
+   smoke task — a baseline the strict re-eval can never beat. When a candidate is already at the
+   ceiling on its own eval tasks yet still cannot beat a ceiling baseline, and it was refined from
+   concrete production failures, the gate instead proves the actual improvement: it re-runs the
+   candidate on those failing inputs and requires an output that is non-blank *and different from
+   the recorded failure* (reproducing the same output excerpt is not a fix). The strict
+   baseline-beat remains the primary criterion; the fallback never applies to a drift-only pass or
+   to a candidate failing its own eval tasks.
 5. **Publish + lifecycle** — a gated candidate is published through the builder's folder/git
    publishers and the sidecar is updated ([[skill-lifecycle]]): `incubating → active` on the first
    proven improvement, `active → degraded` on regression, `degraded → retired` on sustained

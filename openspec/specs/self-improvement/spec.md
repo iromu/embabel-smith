@@ -34,7 +34,7 @@ When a skill is queued, the loop SHALL build a candidate pack by rewriting the p
 ### Requirement: Candidate must beat the baseline
 A candidate SHALL be eligible for publication only if its re-evaluation pass-rate is strictly greater than the pack's current baseline pass-rate, and it passes validation (D5) and the security scan (no high-severity findings).
 
-**Ceiling fallback.** A builder-built pack is stamped at its build-time score, which the build's score gate pins to the maximum achievable on the (binary) smoke task — a baseline the strict re-eval can never beat. When a candidate is already at the ceiling on its own eval tasks (re-eval at the maximum pass-rate) yet still cannot beat a ceiling baseline, and it was refined from concrete production failures, the gate instead proves the actual improvement: it re-runs the candidate on those failing inputs and requires a successful (non-blank) output for each. The strict baseline-beat remains the primary criterion; the fallback applies only in this ceiling case and never to a drift-only pass or to a candidate that is failing its own eval tasks.
+**Ceiling fallback.** A builder-built pack is stamped at its build-time score, which the build's score gate pins to the maximum achievable on the (binary) smoke task — a baseline the strict re-eval can never beat. When a candidate is already at the ceiling on its own eval tasks (re-eval at the maximum pass-rate) yet still cannot beat a ceiling baseline, and it was refined from concrete production failures, the gate instead proves the actual improvement: it re-runs the candidate on those failing inputs and requires an output for each that is non-blank <em>and different from the recorded failure</em> (a candidate that merely reproduces the same output excerpt has not corrected the defect). The strict baseline-beat remains the primary criterion; the fallback applies only in this ceiling case and never to a drift-only pass or to a candidate that is failing its own eval tasks.
 
 #### Scenario: Better candidate passes the gate
 - **WHEN** a candidate's re-eval beats the baseline and it validates and scans clean
@@ -47,6 +47,10 @@ A candidate SHALL be eligible for publication only if its re-evaluation pass-rat
 #### Scenario: Ceiling baseline with an unfixed failure is rejected
 - **WHEN** a candidate is at the ceiling on its eval tasks but still produces no output on a triggering failure
 - **THEN** it is rejected with the unfixed inputs recorded, and the current pack is untouched
+
+#### Scenario: Ceiling baseline with a reproduced failure is rejected
+- **WHEN** a candidate is at the ceiling on its eval tasks and produces non-blank output on a triggering failure, but the output merely reproduces the recorded failure (the same output excerpt)
+- **THEN** it is rejected — repeating the defect is not a fix — and the current pack is untouched
 
 #### Scenario: Equal-or-worse candidate is rejected
 - **WHEN** a candidate's re-eval does not beat the baseline (and the ceiling fallback does not apply)

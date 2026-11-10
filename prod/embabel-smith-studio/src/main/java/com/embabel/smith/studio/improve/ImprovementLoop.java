@@ -26,7 +26,6 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -206,12 +205,15 @@ public final class ImprovementLoop {
                 detection.failureTraces(), diff);
     }
 
-    /** The distinct, non-blank inputs of the triggering failure traces (empty when none). */
-    private static List<String> failedInputs(List<TraceRecord> failureTraces) {
+    /**
+     * The triggering failures as gate inputs: each with the failed input and the (possibly
+     * truncated) output excerpt the runtime recorded, so the gate can require an output that is
+     * both non-blank and different from the recorded failure. Distinct, non-blank inputs only.
+     */
+    private static List<GateChain.FailedInput> failedInputs(List<TraceRecord> failureTraces) {
         return failureTraces.stream()
-                .map(TraceRecord::input)
-                .filter(Objects::nonNull)
-                .filter(s -> !s.isBlank())
+                .filter(t -> t.input() != null && !t.input().isBlank())
+                .map(t -> new GateChain.FailedInput(t.input(), t.outputExcerpt()))
                 .distinct()
                 .toList();
     }

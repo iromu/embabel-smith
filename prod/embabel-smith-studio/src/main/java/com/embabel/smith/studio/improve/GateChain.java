@@ -67,9 +67,11 @@ public class GateChain {
     /**
      * Runs the gate with the triggering production failures threaded in. When the strict re-eval
      * cannot beat the baseline (the ceiling case), the gate proves the actual improvement by
-     * re-running the candidate on {@code failedInputs} and requiring a non-blank output for each.
+     * re-running the candidate on each triggering failure and requiring an output that is both
+     * non-blank and <em>different</em> from the recorded failure (a candidate that reproduces the
+     * same truncated output has not fixed anything).
      */
-    public GateResult gate(SkillPack candidate, double baseline, List<String> failedInputs) {
+    public GateResult gate(SkillPack candidate, double baseline, List<FailedInput> failedInputs) {
         // a. D5 validation (cheap, deterministic)
         var validation = validator.validate(candidate);
         if (!validation.isValid()) {
@@ -120,17 +122,34 @@ public class GateChain {
         return GateResult.reject("baseline", reasons, score, scan);
     }
 
-    /** The triggering inputs the candidate still produces no (blank) output for. */
-    private List<String> failingInputs(SkillPack candidate, List<String> failedInputs) {
+    /**
+     * The triggering inputs the candidate has not fixed: those for which it produces no (blank)
+     * output, or output that merely reproduces the recorded failure (the same truncated output
+     * excerpt, so the candidate is repeating the defect rather than correcting it).
+     */
+    private List<String> failingInputs(SkillPack candidate, List<FailedInput> failedInputs) {
         var invoker = invokerFactory.invokerFor(candidate);
         List<String> unfixed = new ArrayList<>();
-        for (String input : failedInputs) {
-            String output = invoker.invoke(input);
+        for (FailedInput failure : failedInputs) {
+            String output = invoker.invoke(failure.input());
             if (output == null || output.isBlank()) {
-                unfixed.add(input);
+                unfixed.add(failure.input());
+                continue;
+            }
+            String failed = failure.failedOutput();
+            if (failed != null && !failed.isBlank() && output.startsWith(failed)) {
+                unfixed.add(failure.input());
             }
         }
         return unfixed;
+    }
+
+    /**
+     * A triggering production failure: the input that failed and the (possibly truncated) output
+     * excerpt the runtime recorded for it. The gate re-runs the candidate on the input and requires
+     * an output that is non-blank and does not merely reproduce {@code failedOutput}.
+     */
+    public record FailedInput(String input, String failedOutput) {
     }
 
     /**

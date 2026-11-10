@@ -92,8 +92,26 @@ class GateChainTest {
         List<EvalTask> tasks = List.of(new EvalTask("t1", "in", "pass")); // score 1.0
         GateChain gate = new GateChain(factory, tasks);
 
-        GateResult result = gate.gate(pack, 1.0, List.of("a failing input"));
+        GateResult result = gate.gate(pack, 1.0,
+                List.of(new GateChain.FailedInput("a failing input", null)));
         assertThat(result.gated()).isTrue(); // failure fixed -> gate passes despite the ceiling
+    }
+
+    @Test
+    void ceilingBaselineRejectsWhenOutputReproducesTheFailure() {
+        // The re-eval (1.0 — the ceiling) cannot beat the ceiling baseline (1.0). The candidate
+        // produces non-blank output on the triggering input, but it merely reproduces the recorded
+        // failure (the same output excerpt) -> the gate rejects: repeating the defect is not a fix.
+        SkillPack pack = TestFixtures.pack("extract", "s1");
+        InvokerFactory factory = p -> input -> input.equals("bad") ? "boom" : "pass";
+        List<EvalTask> tasks = List.of(new EvalTask("t1", "in", "pass")); // score 1.0
+        GateChain gate = new GateChain(factory, tasks);
+
+        GateResult result = gate.gate(pack, 1.0,
+                List.of(new GateChain.FailedInput("bad", "boom")));
+        assertThat(result.gated()).isFalse();
+        assertThat(result.stage()).isEqualTo("baseline");
+        assertThat(result.reasons()).anyMatch(r -> r.contains("still fails"));
     }
 
     @Test
@@ -105,7 +123,8 @@ class GateChainTest {
         List<EvalTask> tasks = List.of(new EvalTask("t1", "in", "pass")); // score 1.0
         GateChain gate = new GateChain(factory, tasks);
 
-        GateResult result = gate.gate(pack, 1.0, List.of("bad"));
+        GateResult result = gate.gate(pack, 1.0,
+                List.of(new GateChain.FailedInput("bad", null)));
         assertThat(result.gated()).isFalse();
         assertThat(result.stage()).isEqualTo("baseline");
         assertThat(result.reasons()).anyMatch(r -> r.contains("still fails"));
@@ -120,7 +139,8 @@ class GateChainTest {
         List<EvalTask> tasks = List.of(new EvalTask("t1", "in", "pass"), new EvalTask("t2", "in", "fail"));
         GateChain gate = new GateChain(factory, tasks);
 
-        GateResult result = gate.gate(pack, 1.0, List.of("a failing input"));
+        GateResult result = gate.gate(pack, 1.0,
+                List.of(new GateChain.FailedInput("a failing input", null)));
         assertThat(result.gated()).isFalse();
         assertThat(result.stage()).isEqualTo("baseline");
         assertThat(result.reasons()).noneMatch(r -> r.contains("still fails")); // no fallback run
@@ -135,7 +155,8 @@ class GateChainTest {
         List<EvalTask> tasks = List.of(new EvalTask("t1", "in", "pass"));
         GateChain gate = new GateChain(factory, tasks);
 
-        GateResult result = gate.gate(pack, 0.5, List.of("a failing input"));
+        GateResult result = gate.gate(pack, 0.5,
+                List.of(new GateChain.FailedInput("a failing input", null)));
         assertThat(result.gated()).isTrue();
         assertThat(result.score()).isEqualTo(1.0);
     }
