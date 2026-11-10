@@ -68,6 +68,27 @@ public class SourceService {
         return packs;
     }
 
+    /**
+     * The goal names a source's packs export (the Run pane's goal picker): each pack exports the
+     * goal named in its goal spec, and the run is addressed by goal, not pack name. Packs that
+     * cannot be read, or carry no goal, contribute none.
+     */
+    public List<String> listGoals(String sourceUri) {
+        ResolvedSkillSource resolved = resolve(sourceUri);
+        List<String> goals = new ArrayList<>();
+        for (ResolvedPack pack : resolved.packs()) {
+            try {
+                SkillPack read = reader.read(pack.root());
+                if (read.goal() != null) {
+                    goals.add(read.goal().name());
+                }
+            } catch (IOException e) {
+                // an unreadable pack exports no goal to offer
+            }
+        }
+        return goals;
+    }
+
     /** Reads the named pack from a source (for the Security / Trust / Eval panes). */
     public SkillPack readPack(String sourceUri, String skillName) {
         ResolvedSkillSource resolved = resolve(sourceUri);

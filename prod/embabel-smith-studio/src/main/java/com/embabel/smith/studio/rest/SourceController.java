@@ -33,4 +33,10 @@ public class SourceController {
     public List<PackInfo> packs(@RequestParam("source") String source) {
         return sourceService.listPacks(source);
     }
+
+    /** The goal names a source's packs export — the Run pane runs a goal, not a pack name. */
+    @GetMapping("/api/goals")
+    public List<String> goals(@RequestParam("source") String source) {
+        return sourceService.listGoals(source);
+    }
 }

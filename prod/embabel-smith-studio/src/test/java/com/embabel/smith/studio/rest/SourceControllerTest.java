@@ -72,6 +72,16 @@ class SourceControllerTest {
         assertThat(packs.get(0).lifecycleState()).isEqualTo("ACTIVE");
     }
 
+    @Test
+    void listsGoalsExportedByPacks(@TempDir Path tmp) {
+        RestTestFixtures.writePack(tmp, RestTestFixtures.pack("alpha", "s1"));
+        RestTestFixtures.writePack(tmp, RestTestFixtures.pack("beta", "s1"));
+
+        SourceController controller = new SourceController(new SourceService("folder:" + tmp, ""));
+        // Each pack exports the goal named in its goal spec; the Run pane runs a goal, not a pack.
+        assertThat(controller.goals("folder:" + tmp)).containsExactlyInAnyOrder("alpha", "beta");
+    }
+
     private static void writeSidecar(Path packDir, String hash, LifecycleState state, double baseline)
             throws Exception {
         LifecycleMetadata metadata =
