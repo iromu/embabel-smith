@@ -2,7 +2,9 @@ server:
   port: ${SERVER_PORT:8080}
 
 spring:
-  banner-mode: off
+  main:
+    web-application-type: SERVLET
+    banner-mode: off
 
 # The model endpoint is fully env-driven (same convention as the runtime and builder) — nothing real
 # is hardcoded here. The platform's OpenAI-custom model bean requires a non-blank API key to
