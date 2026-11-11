@@ -12,8 +12,12 @@ import type {
   CandidateInfo,
   ComposeRequest,
   ComposeResponse,
+  DiscoverRequest,
+  DiscoverResponse,
   EvalRequest,
   EvalResponse,
+  GenerateRequest,
+  GenerateResponse,
   IterationInfo,
   LoopStatus,
   PackInfo,
@@ -22,6 +26,8 @@ import type {
   RunResponse,
   SecurityRequest,
   SecurityResponse,
+  SimulateRequest,
+  SimulateResponse,
   SourceInfo,
   StatusInfo,
   TraceInfo,
@@ -80,6 +86,14 @@ export const build = (req: BuildRequest): Promise<BuildResponse> =>
 // ---- Compose (offline) ------------------------------------------------------
 export const compose = (req: ComposeRequest): Promise<ComposeResponse> =>
   post<ComposeResponse>('/api/compose', req)
+
+// ---- Generate / Simulate / Discover (the author-a-process workspace) --------
+export const generate = (req: GenerateRequest): Promise<GenerateResponse> =>
+  post<GenerateResponse>('/api/generate', req)
+export const simulate = (req: SimulateRequest): Promise<SimulateResponse> =>
+  post<SimulateResponse>('/api/simulate', req)
+export const discover = (req: DiscoverRequest): Promise<DiscoverResponse> =>
+  post<DiscoverResponse>('/api/discover', req)
 
 // ---- Eval (endpoint-gated) --------------------------------------------------
 export const evaluate = (req: EvalRequest): Promise<EvalResponse> =>

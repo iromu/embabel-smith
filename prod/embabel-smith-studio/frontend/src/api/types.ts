@@ -108,6 +108,49 @@ export interface ComposeResponse {
   error: string | null
 }
 
+// ---- Generate (endpoint-gated) ---------------------------------------------
+export interface GenerateRequest {
+  blueprint?: string
+  path?: string
+}
+export interface GenerateResponse {
+  pack: ComposePack | null
+  issues: string[] | null
+  error: string | null
+  errorCode: string | null
+}
+
+// ---- Simulate (endpoint-gated) ---------------------------------------------
+export interface SimulateStep {
+  name: string
+  status: string
+  durationMs: number
+  outputExcerpt: string | null
+}
+export interface SimulateRequest {
+  pack: ComposePack
+  input?: string
+}
+export interface SimulateResponse {
+  success: boolean
+  output: string | null
+  error: string | null
+  errorCode: string | null
+  steps: SimulateStep[]
+}
+
+// ---- Discover / ingest -----------------------------------------------------
+export interface DiscoverRequest {
+  path?: string
+  url?: string
+}
+export interface DiscoverResponse {
+  sourceType: string | null
+  location: string | null
+  docs: Record<string, string> | null
+  error: string | null
+}
+
 // ---- Traces ----------------------------------------------------------------
 export interface StepInfo {
   name: string

@@ -1,0 +1,54 @@
+# Extract the Business Process from This Codebase
+
+Analyse the entire codebase and reconstruct the business processes and workflows implemented by the application.
+
+## Objective
+
+Explain what the application does, how people use it, and what processes it follows, without describing its technical implementation.
+
+## Include
+
+1. **Purpose:** What problem does the application solve?
+2. **Actors:** Who interacts with the application?
+3. **Processes:** What are the main business processes?
+4. **Workflows:** Describe each process step by step.
+5. **Decision points:** What conditions change the workflow?
+6. **Business rules:** What rules govern each process?
+7. **States and transitions:** What stages can an operation or business object go through?
+8. **Exceptions:** What happens when something fails or an unexpected situation occurs?
+9. **Inputs and outputs:** What information enters and what results are produced?
+10. **External interactions:** What other organisations, services or systems participate?
+
+## Exclusions
+
+Do not describe:
+- Programming languages or frameworks.
+- Classes, functions, modules or files.
+- APIs, database schemas or infrastructure.
+- Internal algorithms or implementation mechanisms.
+- Technical architecture.
+
+Translate implementation details into business concepts.
+
+For example:
+- Instead of describing a database update, explain that an order is marked as confirmed.
+- Instead of describing an API call, explain that the application requests payment authorisation.
+- Instead of describing a background worker, explain that the system automatically processes pending applications.
+
+## Deliverables
+
+Produce:
+
+- `BUSINESS_OVERVIEW.md`
+- `ACTORS_AND_ROLES.md`
+- `BUSINESS_PROCESSES.md`
+- `WORKFLOWS.md`
+- `BUSINESS_RULES.md`
+- `STATES_AND_TRANSITIONS.md`
+- `EXCEPTIONS_AND_EDGE_CASES.md`
+
+Use Mermaid flowcharts and sequence diagrams where useful.
+
+Base every statement on evidence found in the codebase. Distinguish confirmed behaviour from assumptions and unresolved questions.
+
+Write for a business analyst, product owner or someone trying to understand the application without knowing how to program.

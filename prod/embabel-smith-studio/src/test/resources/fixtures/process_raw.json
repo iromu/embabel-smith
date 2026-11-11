@@ -1,0 +1,202 @@
+{
+ "manifest": {
+  "name": "trading_agents_analysis",
+  "version": "1.0.0"
+ },
+ "goal": {
+  "stepType": "goal",
+  "name": "final_investment_decision",
+  "description": "The final investment rating, executive summary, and thesis for the instrument, produced by the Portfolio Manager after all analysis and debate stages are complete.",
+  "outputTypeName": "FinalDecision",
+  "export": true,
+  "exported": true
+ },
+ "steps": [
+  {
+   "stepType": "action",
+   "name": "market_technical_analysis",
+   "description": "Analyzes price action and technical indicators to produce a detailed technical report grounded in verified data.",
+   "inputTypeNames": [
+    "UserInput"
+   ],
+   "outputTypeName": "TechnicalReport",
+   "prompt": "You are the Market/Technical Analyst. Based on the user's request for {{ user_input }} (instrument, date, and configuration), analyze the price action and technical indicators. Produce a detailed technical report that includes exact price levels, trend, momentum, volatility, and volume claims. Ensure all claims are grounded in the verified price snapshot available for the specified date. If data is unavailable, state it explicitly rather than estimating.",
+   "pre": [],
+   "post": [],
+   "toolGroups": []
+  },
+  {
+   "stepType": "action",
+   "name": "sentiment_analysis",
+   "description": "Evaluates retail and community mood from news headlines and social chatter to produce a structured sentiment read.",
+   "inputTypeNames": [
+    "UserInput"
+   ],
+   "outputTypeName": "SentimentReport",
+   "prompt": "You are the Sentiment Analyst. Based on the user's request for {{ user_input }}, analyze retail and community mood using news headlines and social media chatter. Produce a structured sentiment read including a six-level band (Bullish to Bearish), a 0-10 score, a confidence level, and a narrative explanation. Note that social feeds may not be fully point-in-time for historical dates.",
+   "pre": [],
+   "post": [],
+   "toolGroups": []
+  },
+  {
+   "stepType": "action",
+   "name": "news_macro_analysis",
+   "description": "Reviews company news, global macro headlines, and economic indicators to assess the current state of the world relevant to trading.",
+   "inputTypeNames": [
+    "UserInput"
+   ],
+   "outputTypeName": "NewsMacroReport",
+   "prompt": "You are the News/Macro Analyst. Based on the user's request for {{ user_input }}, analyze company-specific news, global/macro headlines, macroeconomic indicators, and market-implied probabilities. Produce a report on the current state of the world relevant to trading this instrument. Distinguish between core news and optional enrichment data like macro indicators.",
+   "pre": [],
+   "post": [],
+   "toolGroups": []
+  },
+  {
+   "stepType": "action",
+   "name": "fundamentals_analysis",
+   "description": "Examines the company's financial statements, profile, and insider trading to assess fundamental health.",
+   "inputTypeNames": [
+    "UserInput"
+   ],
+   "outputTypeName": "FundamentalsReport",
+   "prompt": "You are the Fundamentals Analyst. Based on the user's request for {{ user_input }}, analyze the company's financial health using its profile, income statement, balance sheet, cash flow, and insider trading data. For US filers, use SEC filings 'as filed' with filing dates to ensure point-in-time integrity. If the instrument is crypto or data is unavailable, state that fundamentals are not applicable or unavailable.",
+   "pre": [],
+   "post": [],
+   "toolGroups": []
+  },
+  {
+   "stepType": "action",
+   "name": "research_debate",
+   "description": "Facilitates an adversarial debate between Bull and Bear researchers to weigh the case for and against the investment.",
+   "inputTypeNames": [
+    "TechnicalReport",
+    "SentimentReport",
+    "NewsMacroReport",
+    "FundamentalsReport"
+   ],
+   "outputTypeName": "ResearchDebateRecord",
+   "prompt": "You are the Research Team facilitator. Using the reports from the analysts: Technical Report ({{ technical_report }}), Sentiment Report ({{ sentiment_report }}), News/Macro Report ({{ news_macro_report }}), and Fundamentals Report ({{ fundamentals_report }}), conduct a bull/bear debate. The Bull researcher argues for investing, and the Bear researcher argues against, rebutting each other over multiple rounds. Weigh the arguments on their merits, ensuring conflict does not automatically lead to a Hold. Produce a record of the debate highlighting the strongest points from both sides.",
+   "pre": [],
+   "post": [],
+   "toolGroups": []
+  },
+  {
+   "stepType": "action",
+   "name": "investment_plan_formulation",
+   "description": "Weighs the research debate and issues a structured investment plan with a five-level recommendation.",
+   "inputTypeNames": [
+    "ResearchDebateRecord"
+   ],
+   "outputTypeName": "InvestmentPlan",
+   "prompt": "You are the Research Manager. Based on the Research Debate Record ({{ research_debate_record }}), weigh the bull and bear arguments. Issue a structured investment plan that includes a five-level recommendation (Buy, Overweight, Hold, Underweight, Sell), a rationale explaining why one side is stronger, and concrete strategic actions. Commit to the stronger side; use Hold only if evidence is balanced or too thin.",
+   "pre": [],
+   "post": [],
+   "toolGroups": []
+  },
+  {
+   "stepType": "action",
+   "name": "transaction_proposal",
+   "description": "Converts the investment plan into a concrete transaction proposal with entry, stop-loss, and sizing.",
+   "inputTypeNames": [
+    "InvestmentPlan",
+    "TechnicalReport",
+    "UserInput"
+   ],
+   "outputTypeName": "TransactionProposal",
+   "prompt": "You are the Trader. Convert the Investment Plan ({{ investment_plan }}) into a concrete transaction proposal. Use the Technical Report ({{ technical_report }}) to ground entry prices and stop-losses in actual price structure. Consider the User Input ({{ user_input }}) for any provided holdings to determine position sizing. Propose an action (Buy, Hold, Sell), reasoning, entry price, stop-loss, and position size. Ensure prices are absolute values, not percentages.",
+   "pre": [],
+   "post": [],
+   "toolGroups": []
+  },
+  {
+   "stepType": "action",
+   "name": "risk_debate",
+   "description": "Debates the risk of the transaction from aggressive, conservative, and neutral stances.",
+   "inputTypeNames": [
+    "TransactionProposal",
+    "TechnicalReport",
+    "SentimentReport",
+    "NewsMacroReport",
+    "FundamentalsReport",
+    "UserInput"
+   ],
+   "outputTypeName": "RiskDebateRecord",
+   "prompt": "You are the Risk Team. Debate the Transaction Proposal ({{ transaction_proposal }}) from three stances: Aggressive (high reward/risk), Conservative (capital protection), and Neutral (balanced). Use the analyst reports (Technical: {{ technical_report }}, Sentiment: {{ sentiment_report }}, News/Macro: {{ news_macro_report }}, Fundamentals: {{ fundamentals_report }}) and User Input ({{ user_input }}) as context. Challenge each other's views on the risk of the proposed transaction. Produce a record of the risk debate.",
+   "pre": [],
+   "post": [],
+   "toolGroups": []
+  },
+  {
+   "stepType": "action",
+   "name": "portfolio_manager_decision",
+   "description": "Issues the final five-level rating, executive summary, and investment thesis based on all prior inputs.",
+   "inputTypeNames": [
+    "InvestmentPlan",
+    "TransactionProposal",
+    "RiskDebateRecord",
+    "UserInput"
+   ],
+   "outputTypeName": "FinalDecision",
+   "prompt": "You are the Portfolio Manager. You are the final gate. Review the Investment Plan ({{ investment_plan }}), the Transaction Proposal ({{ transaction_proposal }}), and the Risk Debate Record ({{ risk_debate_record }}). Also consider any lessons from past decisions implied by the User Input ({{ user_input }}). Issue the final decision: a five-level rating (Buy, Overweight, Hold, Underweight, Sell), an executive summary, an investment thesis detailing the deciding evidence, and optionally a target price and time horizon. Ensure the rating is clearly readable and consistent with the strength of the case.",
+   "pre": [],
+   "post": [],
+   "toolGroups": []
+  }
+ ],
+ "types": [
+  {
+   "name": "TechnicalReport",
+   "description": "A detailed report on price action and technical indicators.",
+   "ownProperties": [],
+   "parents": []
+  },
+  {
+   "name": "SentimentReport",
+   "description": "A structured read of retail and community sentiment.",
+   "ownProperties": [],
+   "parents": []
+  },
+  {
+   "name": "NewsMacroReport",
+   "description": "A report on company news and macroeconomic conditions.",
+   "ownProperties": [],
+   "parents": []
+  },
+  {
+   "name": "FundamentalsReport",
+   "description": "A report on the company's financial health and statements.",
+   "ownProperties": [],
+   "parents": []
+  },
+  {
+   "name": "ResearchDebateRecord",
+   "description": "The record of the bull/bear debate arguments.",
+   "ownProperties": [],
+   "parents": []
+  },
+  {
+   "name": "InvestmentPlan",
+   "description": "The Research Manager's structured plan with a five-level recommendation.",
+   "ownProperties": [],
+   "parents": []
+  },
+  {
+   "name": "TransactionProposal",
+   "description": "The Trader's concrete proposal for entry, exit, and sizing.",
+   "ownProperties": [],
+   "parents": []
+  },
+  {
+   "name": "RiskDebateRecord",
+   "description": "The record of the risk team's debate on the transaction.",
+   "ownProperties": [],
+   "parents": []
+  },
+  {
+   "name": "FinalDecision",
+   "description": "The Portfolio Manager's final rating, summary, and thesis.",
+   "ownProperties": [],
+   "parents": []
+  }
+ ]
+}

@@ -128,6 +128,12 @@ interface NavPane {
 
 const navGroups: { label: string; items: NavPane[] }[] = [
   {
+    label: 'Studio',
+    items: [
+      { to: '/', label: 'Author a process', icon: 'account_tree' },
+    ],
+  },
+  {
     label: 'Run & Build',
     items: [
       { to: '/run', label: 'Run', icon: 'play_arrow' },

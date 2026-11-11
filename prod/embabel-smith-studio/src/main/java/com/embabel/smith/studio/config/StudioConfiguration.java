@@ -17,22 +17,37 @@ import com.embabel.smith.builder.publish.GitPublisher;
 import com.embabel.smith.builder.publish.PublishTarget;
 import com.embabel.smith.builder.publish.Publisher;
 import com.embabel.smith.common.config.ModelEndpointConfig;
+import com.embabel.smith.common.io.SkillPackWriter;
+import com.embabel.smith.common.model.SkillPack;
 import com.embabel.smith.runtime.SkillRunService;
+import com.embabel.smith.runtime.core.TrustTier;
 import com.embabel.smith.runtime.trace.JsonlTraceStore;
 import com.embabel.smith.skillsource.GitSkillSource;
 import com.embabel.smith.skillsource.SkillSource;
+import com.embabel.smith.studio.generate.BlueprintLoader;
+import com.embabel.smith.studio.generate.FlowPromptCaller;
+import com.embabel.smith.studio.generate.FlowValidator;
+import com.embabel.smith.studio.generate.LlmFlowPromptCaller;
+import com.embabel.smith.studio.discover.BusinessProcessDiscovery;
+import com.embabel.smith.studio.generate.ProcessFlowGenerator;
 import com.embabel.smith.studio.improve.ImprovementLoop;
 import com.embabel.smith.studio.loop.LoopSchedulerState;
 import com.embabel.smith.studio.rest.BuildController;
 import com.embabel.smith.studio.rest.EvalController;
+import com.embabel.smith.studio.rest.GenerateController;
 import com.embabel.smith.studio.rest.RunController;
+import com.embabel.smith.studio.rest.SimulateController;
 import com.embabel.smith.studio.rest.Sources;
+import com.embabel.smith.studio.rest.dto.GenerateResponse;
+import com.embabel.smith.studio.rest.dto.SimulateResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -88,6 +103,72 @@ public class StudioConfiguration {
     @Bean
     public BuildController.BuildFn buildFn(BuilderService builderService) {
         return builderService::build;
+    }
+
+    /** Resolves a generate blueprint from a description or a path to business-process docs. */
+    @Bean
+    public BlueprintLoader blueprintLoader() {
+        return new BlueprintLoader();
+    }
+
+    /** The generation core: the process-to-flow prompt plus the endpoint-gated model caller. */
+    @Bean
+    public ProcessFlowGenerator processFlowGenerator(ModelEndpointConfig endpoint) {
+        FlowPromptCaller caller =
+                new LlmFlowPromptCaller(endpoint.baseUrl(), endpoint.apiKey(), model(endpoint));
+        return new ProcessFlowGenerator(caller, loadPrompt("process_to_flow.jinja"));
+    }
+
+    /** The workspace's model-dependent generation: blueprint to a generated pack plus flow issues. */
+    @Bean
+    public GenerateController.GenerateFn generateFn(ProcessFlowGenerator generator) {
+        return blueprint -> {
+            try {
+                SkillPack pack = generator.generate(blueprint);
+                return GenerateResponse.of(pack, FlowValidator.issues(pack));
+            } catch (Exception e) {
+                String message = e.getMessage() == null ? e.toString() : e.getMessage();
+                return GenerateResponse.failed("Generation failed: " + message);
+            }
+        };
+    }
+
+    /** Reads a prompt template from the classpath {@code prompts/} directory. */
+    private static String loadPrompt(String name) {
+        try (InputStream in = StudioConfiguration.class.getResourceAsStream("/prompts/" + name)) {
+            if (in == null) {
+                throw new IllegalStateException("prompt resource not found: /prompts/" + name);
+            }
+            return new String(in.readAllBytes(), StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new IllegalStateException("Failed to load prompt " + name + ": " + e.getMessage(), e);
+        }
+    }
+
+    /** The workspace's dry-run: write the pack to a temp folder and run it through the run service. */
+    @Bean
+    public SimulateController.SimulateFn simulateFn(SkillRunService runService) {
+        SkillPackWriter writer = new SkillPackWriter();
+        return (pack, input) -> {
+            try {
+                // A folder source scans immediate subdirectories for packs, so the pack must live in
+                // its own named subdirectory, not at the folder root.
+                Path tmp = Files.createTempDirectory("smith-simulate-");
+                String name = pack.name() == null || pack.name().isBlank() ? "pack" : pack.name();
+                writer.write(pack, tmp.resolve(name));
+                SkillRunService.RunResult result =
+                        runService.run("folder:" + tmp, pack.goal().name(), input, "GOAP", TrustTier.STANDARD);
+                return SimulateResponse.of(result);
+            } catch (IOException e) {
+                throw new IllegalStateException("Simulate setup failed: " + e.getMessage(), e);
+            }
+        };
+    }
+
+    /** Loads business-process docs from a path or repo URL for the discovery/ingest step. */
+    @Bean
+    public BusinessProcessDiscovery businessProcessDiscovery() {
+        return new BusinessProcessDiscovery();
     }
 
     /** The Eval pane's model-dependent evaluation: a bounded eval → refine loop over the tasks. */

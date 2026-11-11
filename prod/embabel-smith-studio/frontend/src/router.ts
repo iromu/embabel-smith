@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
+import ProcessWorkspace from './panes/ProcessWorkspace.vue'
 import RunPane from './panes/RunPane.vue'
 import AuthorPane from './panes/AuthorPane.vue'
 import ComposePane from './panes/ComposePane.vue'
@@ -16,7 +17,8 @@ import ScalePane from './panes/ScalePane.vue'
 export const router = createRouter({
   history: createWebHistory(),
   routes: [
-    { path: '/', redirect: '/run' },
+    { path: '/', name: 'process', component: ProcessWorkspace },
+    { path: '/process', name: 'process-alt', component: ProcessWorkspace },
     { path: '/run', name: 'run', component: RunPane },
     { path: '/author', name: 'author', component: AuthorPane },
     { path: '/compose', name: 'compose', component: ComposePane },
