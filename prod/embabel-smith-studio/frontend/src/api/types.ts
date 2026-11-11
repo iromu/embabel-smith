@@ -151,6 +151,43 @@ export interface DiscoverResponse {
   error: string | null
 }
 
+// ---- Extract (endpoint-gated) ----------------------------------------------
+export interface ExtractRequest {
+  path?: string
+  url?: string
+}
+export interface ExtractResponse {
+  description: string | null
+  error: string | null
+  errorCode: string | null
+}
+
+// ---- Durable store ---------------------------------------------------------
+export interface StoredPackInfo {
+  name: string
+  goal: string | null
+  steps: number
+  savedAt: string | null
+}
+export interface StoredPackResponse {
+  pack: ComposePack | null
+  error: string | null
+}
+export interface SavePackRequest {
+  pack: ComposePack
+}
+export interface SavePackResponse {
+  ok: boolean
+  name: string | null
+  error: string | null
+}
+export interface DiscoveryRecord {
+  timestamp: string
+  sourceType: string
+  location: string
+  docCount: number
+}
+
 // ---- Traces ----------------------------------------------------------------
 export interface StepInfo {
   name: string

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import * as api from '../api/client'
+import type { ComposePack } from '../compose/model'
 
 interface Call {
   url: string
@@ -214,6 +215,65 @@ describe('api/client — the single fetch site', () => {
     expect(calls[5].url).toBe('/api/loop/auto-publish')
     expect(calls[5].init?.method).toBe('PUT')
     expect(bodyOf(calls[5])).toEqual({ autoPublish: true })
+  })
+
+  it('extract POSTs the docs source and parses the endpoint-gated description', async () => {
+    const { calls } = stubFetch({ description: '# Business Overview', error: null, errorCode: null })
+    const res = await api.extract({ path: '/docs' })
+    expect(calls[0].url).toBe('/api/extract')
+    expect(calls[0].init?.method).toBe('POST')
+    expect(bodyOf(calls[0])).toEqual({ path: '/docs' })
+    expect(res.description).toBe('# Business Overview')
+    expect(res.errorCode).toBeNull()
+  })
+
+  it('extract surfaces the MODEL_NOT_CONFIGURED error', async () => {
+    stubFetch({ description: null, error: 'No endpoint', errorCode: 'MODEL_NOT_CONFIGURED' })
+    const res = await api.extract({ url: 'https://x/repo' })
+    expect(res.errorCode).toBe('MODEL_NOT_CONFIGURED')
+  })
+
+  it('listStoredPacks GETs /api/store/packs and parses the list', async () => {
+    const { calls } = stubFetch([
+      { name: 'alpha', goal: 'alpha_goal', steps: 3, savedAt: '2026-01-01T00:00:00Z' },
+    ])
+    const packs = await api.listStoredPacks()
+    expect(calls[0].url).toBe('/api/store/packs')
+    expect(packs[0].name).toBe('alpha')
+    expect(packs[0].steps).toBe(3)
+  })
+
+  it('loadStoredPack GETs /api/store/packs/{name} with the name encoded', async () => {
+    const { calls } = stubFetch({ pack: { manifest: { name: 'a b', version: '1.0.0' } }, error: null })
+    const res = await api.loadStoredPack('a b')
+    expect(calls[0].url).toBe(`/api/store/packs/${encodeURIComponent('a b')}`)
+    expect(res.error).toBeNull()
+  })
+
+  it('savePack POSTs the pack and parses the save result', async () => {
+    const { calls } = stubFetch({ ok: true, name: 'alpha', error: null })
+    const pack: ComposePack = {
+      manifest: { name: 'alpha', version: '1.0.0' },
+      goal: { stepType: 'goal', name: 'alpha', description: 'd', outputTypeName: 'Final', export: true },
+      steps: [],
+      types: [],
+    }
+    const res = await api.savePack({ pack })
+    expect(calls[0].url).toBe('/api/store/packs')
+    expect(calls[0].init?.method).toBe('POST')
+    expect(bodyOf(calls[0])).toEqual({ pack })
+    expect(res.ok).toBe(true)
+    expect(res.name).toBe('alpha')
+  })
+
+  it('listDiscoveries GETs /api/store/discoveries and parses the history', async () => {
+    const { calls } = stubFetch([
+      { timestamp: '2026-01-01T00:00:00Z', sourceType: 'folder', location: '/docs', docCount: 2 },
+    ])
+    const history = await api.listDiscoveries()
+    expect(calls[0].url).toBe('/api/store/discoveries')
+    expect(history[0].location).toBe('/docs')
+    expect(history[0].docCount).toBe(2)
   })
 
   it('throws when the endpoint returns a non-2xx status', async () => {

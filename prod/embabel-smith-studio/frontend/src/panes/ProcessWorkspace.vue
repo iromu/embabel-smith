@@ -60,6 +60,15 @@
                 data-test="pw-load"
               />
               <q-btn
+                label="Extract process"
+                icon="summarize"
+                outline
+                :disable="sourceKind === 'text'"
+                :loading="extracting"
+                @click="doExtract"
+                data-test="pw-extract"
+              />
+              <q-btn
                 label="Generate flow"
                 icon="auto_awesome"
                 color="primary"
@@ -90,6 +99,23 @@
           </div>
           <div class="text-caption text-grey-6 q-mt-xs">
             from {{ discovered.sourceType }}: {{ discovered.location }}
+          </div>
+        </q-expansion-item>
+
+        <div v-if="extractError" class="text-negative text-caption q-mt-sm" data-test="pw-extract-error">
+          {{ extractError }}
+        </div>
+        <q-expansion-item
+          v-if="extracted"
+          class="q-mt-sm"
+          icon="summarize"
+          label="Extracted process (used as the generation blueprint)"
+          expanded
+          dense
+          data-test="pw-extracted"
+        >
+          <div class="text-caption" style="white-space: pre-wrap; max-height: 320px; overflow: auto" data-test="pw-extracted-body">
+            {{ extracted }}
           </div>
         </q-expansion-item>
       </q-card-section>
@@ -284,6 +310,14 @@
           />
           <q-checkbox v-model="overwrite" label="Overwrite" dense />
           <q-btn
+            label="Save"
+            icon="save"
+            outline
+            :disable="nodes.length === 0"
+            @click="doSave"
+            data-test="pw-save"
+          />
+          <q-btn
             label="Publish pack"
             icon="upload"
             color="primary"
@@ -299,6 +333,60 @@
           Published pack '{{ publishResult.packName }}' (goal '{{ publishResult.goal }}') to
           {{ publishResult.published?.location }}
         </div>
+        <div v-if="saveError" class="text-negative text-caption q-mt-sm" data-test="pw-save-error">
+          {{ saveError }}
+        </div>
+        <div v-else-if="saveResult" class="text-positive text-caption q-mt-sm" data-test="pw-saved">
+          Saved pack '{{ saveResult }}' to the studio library.
+        </div>
+
+        <q-separator class="q-my-md" />
+
+        <div class="row q-col-gutter-md" data-test="pw-library">
+          <div class="col">
+            <div class="text-caption text-grey-7 q-mb-xs">Saved packs</div>
+            <div v-if="storedPacks.length === 0" class="text-grey-6 text-caption">No saved packs yet.</div>
+            <div
+              v-for="p in storedPacks"
+              :key="p.name"
+              class="row items-center no-wrap q-py-xs"
+              data-test="pw-saved-pack"
+            >
+              <q-icon name="inventory_2" size="16px" class="q-mr-sm text-grey-6" />
+              <div class="col">
+                <div class="text-caption">{{ p.name }} <span class="text-grey-6">· {{ p.steps }} steps</span></div>
+                <div class="text-caption text-grey-6 ellipsis">{{ p.goal }}</div>
+              </div>
+              <q-btn
+                label="Load"
+                dense
+                size="sm"
+                outline
+                icon="input"
+                @click="doLoadStored(p.name)"
+                data-test="pw-load-stored"
+              />
+            </div>
+          </div>
+          <div class="col">
+            <div class="text-caption text-grey-7 q-mb-xs">Recent discoveries</div>
+            <div v-if="discoveries.length === 0" class="text-grey-6 text-caption">
+              No discoveries recorded yet.
+            </div>
+            <div
+              v-for="(d, i) in discoveries"
+              :key="i"
+              class="row items-center no-wrap q-py-xs"
+              data-test="pw-discovery"
+            >
+              <q-icon name="folder_open" size="16px" class="q-mr-sm text-grey-6" />
+              <div class="col">
+                <div class="text-caption ellipsis">{{ d.location }}</div>
+                <div class="text-caption text-grey-6">{{ d.sourceType }} · {{ d.docCount }} docs</div>
+              </div>
+            </div>
+          </div>
+        </div>
       </q-card-section>
     </q-card>
   </q-page>
@@ -310,13 +398,26 @@ import { Handle, Position, useVueFlow, VueFlow } from '@vue-flow/core'
 import type { Connection } from '@vue-flow/core'
 
 import PageHeader from '../components/PageHeader.vue'
-import { compose, discover, generate, listSources, simulate } from '../api/client'
+import {
+  compose,
+  discover,
+  extract,
+  generate,
+  listDiscoveries,
+  listSources,
+  listStoredPacks,
+  loadStoredPack,
+  savePack,
+  simulate,
+} from '../api/client'
 import { isModelNotConfigured } from '../api/types'
 import type {
   ComposeResponse,
+  DiscoveryRecord,
   DiscoverResponse,
   SimulateResponse,
   SourceInfo,
+  StoredPackInfo,
 } from '../api/types'
 import {
   assemblePack,
@@ -343,6 +444,9 @@ const autoGenerate = ref(false)
 const loading = ref(false)
 const discovered = ref<DiscoverResponse | null>(null)
 const loadError = ref<string | null>(null)
+const extracting = ref(false)
+const extractError = ref<string | null>(null)
+const extracted = ref<string | null>(null)
 
 // ---- Generation ----
 const generating = ref(false)
@@ -435,6 +539,10 @@ const sourceOptions = computed(() => sources.value.map((s) => s.uri))
 const overwrite = ref(false)
 const publishResult = ref<ComposeResponse | null>(null)
 const publishError = ref<string | null>(null)
+const saveError = ref<string | null>(null)
+const saveResult = ref<string | null>(null)
+const storedPacks = ref<StoredPackInfo[]>([])
+const discoveries = ref<DiscoveryRecord[]>([])
 
 // ---- Progress stages ----
 type StageState = 'pending' | 'active' | 'done'
@@ -464,6 +572,7 @@ async function doLoad() {
       loadError.value = res.error
     } else {
       discovered.value = res
+      void refreshLibrary()
       if (autoGenerate.value) {
         await doGenerate()
       }
@@ -475,13 +584,37 @@ async function doLoad() {
   }
 }
 
+async function doExtract() {
+  extractError.value = null
+  extracted.value = null
+  extracting.value = true
+  try {
+    const req =
+      sourceKind.value === 'url' ? { url: urlInput.value.trim() } : { path: pathInput.value.trim() }
+    const res = await extract(req)
+    if (res.errorCode === 'MODEL_NOT_CONFIGURED') {
+      extractError.value = 'Model not configured: ' + res.error
+    } else if (res.error || !res.description) {
+      extractError.value = res.error ?? 'Extraction returned no description.'
+    } else {
+      extracted.value = res.description
+    }
+  } catch (e) {
+    extractError.value = e instanceof Error ? e.message : String(e)
+  } finally {
+    extracting.value = false
+  }
+}
+
 async function doGenerate() {
   genError.value = null
   simResult.value = null
   generating.value = true
   try {
-    const req =
-      sourceKind.value === 'path'
+    // A previously extracted process is the generation blueprint; otherwise the raw source is.
+    const req = extracted.value
+      ? { blueprint: extracted.value }
+      : sourceKind.value === 'path'
         ? { path: pathInput.value.trim() }
         : sourceKind.value === 'url'
           ? { url: urlInput.value.trim() }
@@ -545,6 +678,54 @@ async function doPublish() {
   }
 }
 
+async function doSave() {
+  if (!goal.value || steps.value.length === 0) return
+  saveError.value = null
+  saveResult.value = null
+  try {
+    const res = await savePack({ pack: assemblePack(goal.value, steps.value) })
+    if (res.error) {
+      saveError.value = res.error
+    } else {
+      saveResult.value = res.name ?? ''
+      await refreshLibrary()
+    }
+  } catch (e) {
+    saveError.value = e instanceof Error ? e.message : String(e)
+  }
+}
+
+async function doLoadStored(name: string) {
+  saveError.value = null
+  try {
+    const res = await loadStoredPack(name)
+    if (res.error || !res.pack) {
+      saveError.value = res.error ?? 'Failed to load pack.'
+      return
+    }
+    const { nodes: n, edges: e } = packToNodes(res.pack)
+    nodes.value = n
+    edges.value = e
+    selected.value = null
+    fitWhenMeasured()
+  } catch (e) {
+    saveError.value = e instanceof Error ? e.message : String(e)
+  }
+}
+
+async function refreshLibrary() {
+  try {
+    storedPacks.value = await listStoredPacks()
+  } catch {
+    storedPacks.value = []
+  }
+  try {
+    discoveries.value = await listDiscoveries()
+  } catch {
+    discoveries.value = []
+  }
+}
+
 onMounted(async () => {
   try {
     sources.value = await listSources()
@@ -552,6 +733,7 @@ onMounted(async () => {
   } catch {
     sources.value = []
   }
+  await refreshLibrary()
 })
 </script>
 

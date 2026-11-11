@@ -12,10 +12,13 @@ import type {
   CandidateInfo,
   ComposeRequest,
   ComposeResponse,
+  DiscoveryRecord,
   DiscoverRequest,
   DiscoverResponse,
   EvalRequest,
   EvalResponse,
+  ExtractRequest,
+  ExtractResponse,
   GenerateRequest,
   GenerateResponse,
   IterationInfo,
@@ -24,12 +27,16 @@ import type {
   RejectResponse,
   RunRequest,
   RunResponse,
+  SavePackRequest,
+  SavePackResponse,
   SecurityRequest,
   SecurityResponse,
   SimulateRequest,
   SimulateResponse,
   SourceInfo,
   StatusInfo,
+  StoredPackInfo,
+  StoredPackResponse,
   TraceInfo,
   TrustRequest,
   TrustResponse,
@@ -94,6 +101,18 @@ export const simulate = (req: SimulateRequest): Promise<SimulateResponse> =>
   post<SimulateResponse>('/api/simulate', req)
 export const discover = (req: DiscoverRequest): Promise<DiscoverResponse> =>
   post<DiscoverResponse>('/api/discover', req)
+export const extract = (req: ExtractRequest): Promise<ExtractResponse> =>
+  post<ExtractResponse>('/api/extract', req)
+
+// ---- Durable store (offline) -----------------------------------------------
+export const listStoredPacks = (): Promise<StoredPackInfo[]> =>
+  get<StoredPackInfo[]>('/api/store/packs')
+export const loadStoredPack = (name: string): Promise<StoredPackResponse> =>
+  get<StoredPackResponse>(`/api/store/packs/${encodeURIComponent(name)}`)
+export const savePack = (req: SavePackRequest): Promise<SavePackResponse> =>
+  post<SavePackResponse>('/api/store/packs', req)
+export const listDiscoveries = (): Promise<DiscoveryRecord[]> =>
+  get<DiscoveryRecord[]>('/api/store/discoveries')
 
 // ---- Eval (endpoint-gated) --------------------------------------------------
 export const evaluate = (req: EvalRequest): Promise<EvalResponse> =>

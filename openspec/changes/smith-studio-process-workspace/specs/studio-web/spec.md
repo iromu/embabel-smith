@@ -87,3 +87,35 @@ a generated pack passes structural validation and is discoverable by the folder 
 #### Scenario: Unrecognised variables are preserved
 - **WHEN** a prompt references a variable that matches no declared input type
 - **THEN** it is left unchanged so the pack still fails validation with a clear issue
+
+### Requirement: Extract a business process from the docs
+The studio SHALL let the user run the model against the loaded business-process documents to
+extract a business-process description (a blueprint) that can feed generation. Extraction reuses
+the model seam and the discovery prompt, and is endpoint-gated. The extracted description becomes
+the generation blueprint.
+
+#### Scenario: Extract from loaded docs
+- **WHEN** the user requests extraction from a docs path or a repository URL
+- **THEN** the model returns a business-process description and the UI shows it as the blueprint
+  that generation will use
+
+#### Scenario: No model endpoint
+- **WHEN** extraction is requested without a configured model endpoint
+- **THEN** the endpoint returns the structured `MODEL_NOT_CONFIGURED` error and the UI shows a
+  "no endpoint" state rather than crashing
+
+### Requirement: Persist generated processes and discovery history
+The studio SHALL persist generated skill-packs and discovery history durably across runs, so
+previously generated packs can be listed and reloaded and prior discoveries can be reviewed.
+
+#### Scenario: Save a generated pack
+- **WHEN** the user saves the current pack
+- **THEN** it is written to the durable store and appears in the saved-packs list
+
+#### Scenario: Reload a saved pack
+- **WHEN** the user loads a saved pack
+- **THEN** the flow is rendered from the persisted pack, identical to what was saved
+
+#### Scenario: Review discovery history
+- **WHEN** the user reviews discovery history
+- **THEN** prior discoveries (source type, location, document count, time) are listed

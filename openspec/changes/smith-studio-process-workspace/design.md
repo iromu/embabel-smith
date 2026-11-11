@@ -49,11 +49,35 @@ Generate and simulate require a model endpoint. Without one they return the stru
 `MODEL_NOT_CONFIGURED` error (not a crash), the app still boots, and the UI shows a "no endpoint"
 state. This matches the existing studio REST contract.
 
+### D8 — Extraction reuses the model seam and the discovery prompt
+Model-based process extraction (task 5.1) is a *second* prompt run, not a new model client. It
+reuses the existing `FlowPromptCaller` seam (the same raw chat-completions call as generation) with
+the `business_process_discovery.jinja` system prompt. The input is the *loaded docs corpus* (the
+`/api/discover` output concatenated), and the output is a business-process description (markdown)
+— not JSON — so no pack parsing is involved. It is a separate endpoint (`POST /api/extract`) from
+generate, endpoint-gated like it, and the extracted description becomes the generation blueprint
+(the UI hands it to `/api/generate` as `blueprint` instead of re-reading the raw docs).
+
+### D9 — The durable store derives packs from disk; history is append-only
+The durable store (task 5.2) roots at a configurable directory (`smith.studio.store-dir`, default
+`~/.smith-studio/store`). Saved packs are full pack directories written by the shared
+`SkillPackWriter` under `<root>/packs/<name>/`; `list` derives each record by reading the pack
+(manifest name, goal, step count, dir mtime) so there is no separate index to drift from. Discovery
+history is an append-only `discovery-history.jsonl` under the root — one record per successful
+`/api/discover` (timestamp, source type, location, doc count). Reading back a saved pack uses the
+shared `SkillPackReader`, so a reloaded pack is byte-identical to what was saved.
+
 ## Testing
 
 - `ProcessFlowGeneratorTest` (offline): the real model answer (with its snake_case vars) is parsed and
   canonicalised into a pack that passes `SkillPackValidator` on disk and is discoverable by
   `FolderSkillSource`; asserts the vars are rewritten and no snake_case remains.
+- `ProcessExtractorTest` (offline): a stub `FlowPromptCaller` returns a fixed description; the
+  extractor returns it verbatim and threads the discovery prompt through as the system message.
+- `ProcessStoreTest` (offline): save → list → load round-trips a pack (the loaded pack equals the
+  saved one); list reflects multiple packs; discovery history appends and returns most-recent-first.
+- Frontend `client.test.ts`: the new `extract`, `listStoredPacks`, `loadStoredPack`, `savePack`, and
+  `listDiscoveries` calls hit the right endpoints and parse the responses.
 - Live E2E (Playwright): home loads → load docs → generate renders the layered flow → simulate
   returns a per-step trace. Layout verified programmatically (node positions + edge count), since the
   environment has no image/vision bridge.

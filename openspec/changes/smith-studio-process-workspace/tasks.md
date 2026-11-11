@@ -32,7 +32,11 @@
 - [x] 4.3 Live E2E (Playwright) on the TradingAgents docs: home → load docs → generate (layered flow) → simulate (per-step trace)
 - [x] 4.4 Fix the simulate "contains no skill-packs" failure (root cause: snake_case prompt vars failed validation → pack excluded); verified end-to-end
 
-## 5. Deferred (out of scope for this pass)
+## 5. Process extraction + durable store
 
-- [ ] 5.1 Model-based process *extraction* via `business_process_discovery.jinja` (discover loads docs; extraction is a follow-up)
-- [ ] 5.2 Durable store for generated packs / discovery history (per-run and ephemeral for now)
+- [x] 5.1 `ProcessExtractor` (discovery prompt over the docs corpus, reusing the `FlowPromptCaller` seam) + `ExtractController` (`POST /api/extract`, endpoint-gated) + `ExtractRequest`/`ExtractResponse`
+- [x] 5.2 Frontend: Extract button, show the extracted description, and hand it off as the generation blueprint
+- [x] 5.3 `ProcessStore` (save/list/load packs; append/list discovery history) + `StoreController` (`GET/POST /api/store/packs`, `GET /api/store/discoveries`)
+- [x] 5.4 Record each discovery on `/api/discover` success; wire the store + extractor beans in `StudioConfiguration`
+- [x] 5.5 Frontend: save the current pack, list + reload saved packs, and show recent discoveries
+- [x] 5.6 Tests: offline `ProcessStoreTest` + `ProcessExtractorTest`; frontend client tests for the new endpoints

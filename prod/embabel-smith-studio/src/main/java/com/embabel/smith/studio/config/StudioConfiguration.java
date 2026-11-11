@@ -29,17 +29,20 @@ import com.embabel.smith.studio.generate.FlowPromptCaller;
 import com.embabel.smith.studio.generate.FlowValidator;
 import com.embabel.smith.studio.generate.LlmFlowPromptCaller;
 import com.embabel.smith.studio.discover.BusinessProcessDiscovery;
+import com.embabel.smith.studio.generate.ProcessExtractor;
 import com.embabel.smith.studio.generate.ProcessFlowGenerator;
 import com.embabel.smith.studio.improve.ImprovementLoop;
 import com.embabel.smith.studio.loop.LoopSchedulerState;
 import com.embabel.smith.studio.rest.BuildController;
 import com.embabel.smith.studio.rest.EvalController;
+import com.embabel.smith.studio.rest.ExtractController;
 import com.embabel.smith.studio.rest.GenerateController;
 import com.embabel.smith.studio.rest.RunController;
 import com.embabel.smith.studio.rest.SimulateController;
 import com.embabel.smith.studio.rest.Sources;
 import com.embabel.smith.studio.rest.dto.GenerateResponse;
 import com.embabel.smith.studio.rest.dto.SimulateResponse;
+import com.embabel.smith.studio.store.ProcessStore;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -131,6 +134,29 @@ public class StudioConfiguration {
                 return GenerateResponse.failed("Generation failed: " + message);
             }
         };
+    }
+
+    /** The durable store for generated packs and discovery history. */
+    @Bean
+    public ProcessStore processStore(@Value("${smith.studio.store-dir:}") String storeDir)
+            throws IOException {
+        Path root = storeRoot(storeDir);
+        Files.createDirectories(root);
+        return new ProcessStore(root);
+    }
+
+    /** The model-based process extraction: the discovery prompt plus the endpoint-gated model caller. */
+    @Bean
+    public ProcessExtractor processExtractor(ModelEndpointConfig endpoint) {
+        FlowPromptCaller caller =
+                new LlmFlowPromptCaller(endpoint.baseUrl(), endpoint.apiKey(), model(endpoint));
+        return new ProcessExtractor(caller, loadPrompt("business_process_discovery.jinja"));
+    }
+
+    /** The workspace's model-based extraction: a docs corpus to a business-process description. */
+    @Bean
+    public ExtractController.ExtractFn extractFn(ProcessExtractor extractor) {
+        return extractor::extract;
     }
 
     /** Reads a prompt template from the classpath {@code prompts/} directory. */
@@ -278,6 +304,14 @@ public class StudioConfiguration {
             return GitSkillSource.defaultCacheRoot();
         }
         return expandHome(configured.trim());
+    }
+
+    /** The durable store root: a configured dir, or a persistent home-dir default. */
+    private static Path storeRoot(String configured) {
+        if (configured != null && !configured.isBlank()) {
+            return expandHome(configured.trim());
+        }
+        return Path.of(System.getProperty("user.home"), ".smith-studio", "store");
     }
 
     private static Path expandHome(String p) {
