@@ -2,7 +2,7 @@ package com.embabel.smith.unified.dto;
 
 /**
  * The result of a run (POC 1): the goal output, or a clear error. {@link #error} is non-null when
- * the run could not happen (no skill selected, an unknown skill, no endpoint configured, or the plan
+ * the run could not happen (no spec selected, an unknown spec, no endpoint configured, or the plan
  * failed) — in which case {@link #output} is null.
  */
 public record RunResponse(String error, String output) {

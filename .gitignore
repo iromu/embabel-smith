@@ -3,7 +3,7 @@
 .pi
 .idea
 target
-built-skills
+built-specs
 .poc-runs
 node_modules
 poc/poc-17-gliner-retrieval/models/

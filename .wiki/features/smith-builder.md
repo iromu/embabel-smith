@@ -7,7 +7,7 @@ source_paths:
   - "prod/embabel-smith-builder/src/main/java/com/embabel/smith/builder/BuilderService.java"
   - "prod/embabel-smith-builder/src/main/java/com/embabel/smith/builder/core/BuilderAgent.java"
   - "prod/embabel-smith-builder/src/main/java/com/embabel/smith/builder/eval/RefinementLoop.java"
-  - "prod/embabel-smith-builder/src/main/java/com/embabel/smith/builder/security/SkillSecurityScanner.java"
+  - "prod/embabel-smith-builder/src/main/java/com/embabel/smith/builder/security/AgentSpecSecurityScanner.java"
   - "prod/embabel-smith-builder/src/main/java/com/embabel/smith/builder/publish/GitPublisher.java"
   - "prod/embabel-smith-builder/README.md"
 updated_at: "2026-11-06"
@@ -16,7 +16,7 @@ updated_at: "2026-11-06"
 # The smith builder product (`smith build`)
 
 `prod/embabel-smith-builder` is the product's builder: it takes a natural-language description and
-produces a **published, validated** skill-pack through a deterministic pipeline. It extracts the
+produces a **published, validated** agent spec through a deterministic pipeline. It extracts the
 proven POC logic — POC 2/3 (build), POC 5 (eval), POC 9 (refine), POC 21 (security), POC 18
 (lifecycle) — into one pipeline that ends in a publish to a `folder:` or `git:` source. Non-launcher
 packages are plain classes (no Spring) so the studio product (change 05) can reuse `BuilderService`
@@ -28,9 +28,9 @@ and the stages directly. It never depends on a `poc-*` artifact ([[product-phase
 smith build "<description>" --out <source-uri> [--max-refine <n>] [--overwrite] [--push]
 ```
 
-- `<description>` (required) — the natural-language description of the skill.
+- `<description>` (required) — the natural-language description of the spec.
 - `--out` (required) — source URI to publish to: `folder:<path>` or `git:<url>[@ref]`
-  ([[skill-sources]]).
+  ([[spec-sources]]).
 - `--max-refine` — max refinement rounds (default **3**).
 - `--overwrite` — replace an existing same-named pack instead of colliding.
 - `--push` — push the git commit to the remote (default: **local commit only**).
@@ -51,11 +51,11 @@ names the stage in the report. Nothing is published when a gate fails.
    task set; the score is the fraction of passing tasks. Below the gate (default **1.0**) the
    terminal action's prompt is rewritten and the loop repeats, up to `--max-refine`. A rewrite that
    fails validation is discarded. Still below the gate → block at `eval` ([[eval-guided-refinement]]).
-3. **Security gate** (`SkillSecurityScanner`). A static scan of the pack's prompts; a
-   high-severity (critical) finding blocks at `security` ([[skill-security-scanning]]).
+3. **Security gate** (`AgentSpecSecurityScanner`). A static scan of the pack's prompts; a
+   high-severity (critical) finding blocks at `security` ([[spec-security-scanning]]).
 4. **Lifecycle** (`LifecycleStamper`). The pack is stamped with a content hash, the baseline eval
    pass-rate, the initial state `incubating` (the `incubating → active` promotion is owned by
-   change 05), and a timestamp, written as a `lifecycle.yml` sidecar ([[skill-lifecycle]]).
+   change 05), and a timestamp, written as a `lifecycle.yml` sidecar ([[spec-lifecycle]]).
 5. **Publish** (`FolderPublisher` / `GitPublisher`). The pack + `lifecycle.yml` is written to the
    target and committed (git) or written (folder).
 
@@ -74,5 +74,5 @@ publish path on success; on a block it names the stage and the reasons.
 ## Tests
 
 Offline tests cover the `BuilderAgent` compile/validate/write, the `RefinementLoop`, the
-`SkillSecurityScanner` verdicts, the `LifecycleStamper`, and the publishers (collision, no-push).
+`AgentSpecSecurityScanner` verdicts, the `LifecycleStamper`, and the publishers (collision, no-push).
 The live build (which calls the model) is endpoint-gated.

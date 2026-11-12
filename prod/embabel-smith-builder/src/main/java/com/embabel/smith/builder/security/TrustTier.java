@@ -4,7 +4,7 @@ import java.util.Set;
 
 /**
  * The trust tiers from doc 03 §2.1 (and the survey's §6). Each tier allows a set of tool-group
- * roles; a skill may only run under a tier whose allowlist covers every tool group the skill
+ * roles; a spec may only run under a tier whose allowlist covers every tool group the spec
  * declares. {@code T4} allows everything. Extracted from POC 10 so the builder's pre-publish
  * scanner is self-contained.
  */

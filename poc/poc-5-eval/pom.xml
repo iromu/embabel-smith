@@ -14,8 +14,8 @@
     <name>poc-5-eval</name>
     <description>
         POC 5: de-risks the eval/rewrite path. Adapts embabel-agent-eval (conversational-oriented)
-        to a goal-type (non-chat) skill via AgentInvocation, produces a composite score for the
-        generated skill, and (stretch) rewrites a failing task's prompt and re-validates.
+        to a goal-type (non-chat) spec via AgentInvocation, produces a composite score for the
+        generated spec, and (stretch) rewrites a failing task's prompt and re-validates.
     </description>
 
     <dependencies>

@@ -1,7 +1,7 @@
 # embabel-smith-builder
 
 The standalone builder product: takes a natural-language description and produces a published,
-validated skill-pack. The build is a deterministic pipeline — compile → validate → write, then
+validated agent spec. The build is a deterministic pipeline — compile → validate → write, then
 eval → bounded refine, then a static security gate, then lifecycle metadata — ending in a publish
 to a `folder:` or `git:` source (local commit, no push by default). Exposes a picocli
 `smith build` CLI.
@@ -17,7 +17,7 @@ depends on a `poc-*` artifact (enforced by the `prod` enforcer rule).
 smith build "<description>" --out <source-uri> [--max-refine <n>] [--overwrite] [--push]
 ```
 
-- `<description>` (required) — the natural-language description of the skill to build.
+- `<description>` (required) — the natural-language description of the spec to build.
 - `--out` (required) — source URI to publish to: `folder:<path>` or `git:<url>[@ref]`.
 - `--max-refine` — maximum refinement rounds (default **3**).
 - `--overwrite` — replace an existing same-named pack in the target instead of colliding.
@@ -30,7 +30,7 @@ blocked build prints the stage and the reasons it stopped to stdout and exits **
 Example:
 
 ```
-smith build "explain how a coffee machine works" --out folder:skill-packs
+smith build "explain how a coffee machine works" --out folder:./agent-specs
 ```
 
 ### Model endpoint (env-driven)
@@ -61,7 +61,7 @@ the stage in the report.
    (default **1.0**, i.e. all tasks must pass) the terminal action's prompt is rewritten and the
    loop repeats, up to `--max-refine` rounds. A rewrite that fails validation is discarded.
    Still below the gate after the bound → block at `eval`.
-3. **Security gate** (`SkillSecurityScanner`). A static scan of the pack's prompts; a
+3. **Security gate** (`AgentSpecSecurityScanner`). A static scan of the pack's prompts; a
    high-severity (critical) finding — e.g. a prompt-injection marker — blocks at `security`.
 4. **Lifecycle** (`LifecycleStamper`). The pack is stamped with a content hash, the baseline
    eval pass-rate, the initial state `incubating` (the `incubating → active` promotion is a
@@ -79,20 +79,20 @@ BUILD OK: explain-how-a-coffee-machine-works
   eval score:  1.000
   security:    0 findings
   lifecycle:   INCUBATING (hash 9f2c1a…, baseline 1.000)
-  published:   /path/to/skill-packs/explain-how-a-coffee-machine-works
+  published:   /path/to/agent-specs/explain-how-a-coffee-machine-works
 ```
 
 When blocked:
 
 ```
-BUILD BLOCKED at security (malicious-skill)
+BUILD BLOCKED at security (malicious-spec)
   - INJECTION — prompt-injection marker in action 'say'
 ```
 
 ## Publish semantics
 
 The target is a `folder:` or `git:` source URI (same grammar as the runtime's sources, see
-`embabel-smith-skillsource`):
+`embabel-smith-specsource`):
 
 - **`folder:<path>`** — the pack is written to `<path>/<pack-name>/` (manifest, goal, steps,
   types, plus the `lifecycle.yml` sidecar). A same-named pack already in the folder is a

@@ -13,10 +13,10 @@
     <artifactId>poc-15-composer-ui</artifactId>
     <name>poc-15-composer-ui</name>
     <description>
-        POC 15: the visual skill-chain editor (doc 03 §2.2). A small Spring Boot web app that serves
+        POC 15: the visual spec-chain editor (doc 03 §2.2). A small Spring Boot web app that serves
         a drag-and-drop canvas and exposes REST endpoints wrapping POC 14's proven composer model:
-        list the available skills, validate a canvas (type-checked edges + the composed chain), and
-        export it as a composite skill-pack. The drag-and-drop "snap" is POC 14's edge type-check.
+        list the available specs, validate a canvas (type-checked edges + the composed chain), and
+        export it as a composite agent spec. The drag-and-drop "snap" is POC 14's edge type-check.
         Fully offline — no model endpoint.
     </description>
 
@@ -43,7 +43,7 @@
         </dependency>
         <dependency>
             <groupId>com.embabel.smith</groupId>
-            <artifactId>poc-18-skill-lifecycle</artifactId>
+            <artifactId>poc-18-agent-spec-lifecycle</artifactId>
         </dependency>
 
         <dependency>

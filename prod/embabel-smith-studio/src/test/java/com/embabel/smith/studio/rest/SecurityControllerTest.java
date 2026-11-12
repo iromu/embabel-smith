@@ -20,20 +20,20 @@ class SecurityControllerTest {
         SecurityResponse response =
                 controller.scan(new SecurityRequest("folder:" + tmp, "summarizer"));
         assertThat(response.error()).isNull();
-        assertThat(response.scan().skillName()).isEqualTo("summarizer");
+        assertThat(response.scan().specName()).isEqualTo("summarizer");
         assertThat(response.scan().verdict()).isIn("SAFE", "REVIEW", "BLOCK");
         assertThat(response.scan().summary()).isNotBlank();
     }
 
     @Test
-    void returnsErrorWhenNoSourceOrSkill() {
+    void returnsErrorWhenNoSourceOrSpec() {
         SecurityController controller = new SecurityController(new SourceService("", ""));
         SecurityResponse response = controller.scan(new SecurityRequest("", ""));
-        assertThat(response.error()).contains("No source or skill");
+        assertThat(response.error()).contains("No source or spec");
     }
 
     @Test
-    void returnsErrorForUnknownSkill(@TempDir Path tmp) {
+    void returnsErrorForUnknownSpec(@TempDir Path tmp) {
         SecurityController controller =
                 new SecurityController(new SourceService("folder:" + tmp, ""));
         SecurityResponse response =

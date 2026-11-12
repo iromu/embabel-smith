@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.embabel.smith</groupId>
+        <artifactId>embabel-smith-poc</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>poc-21-agent-spec-security</artifactId>
+    <name>poc-21-agent-spec-security</name>
+    <description>
+        POC 21: spec security / vulnerability scanning. An install-time static scanner that vets an
+        agent spec before it is loaded, covering doc 02 caveat 3 (26.1% of community specs carry
+        vulnerabilities; "trivially simple" prompt injection; audit instructions that reach untrusted
+        network sources before installing). It is the install-time complement to POC 10's runtime
+        trust tiers: it flags prompt-injection text in a spec's own prompt, over-privileged tool
+        groups, network references, and secret-exfiltration patterns, and reports a risk verdict plus
+        the minimum POC 10 trust tier at which the spec is safe to load. Fully offline (pure static
+        analysis over the agent-spec model; no model endpoint).
+    </description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.embabel.smith</groupId>
+            <artifactId>smith-common</artifactId>
+        </dependency>
+        <!-- Reuse POC 10's proven TrustTier + TrustTierPolicy so the scanner's recommended tier is
+             exactly the tier POC 10 enforces at runtime. -->
+        <dependency>
+            <groupId>com.embabel.smith</groupId>
+            <artifactId>poc-10-trust-tiers</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.1.0</version>
+                <configuration>
+                    <mainClass>com.embabel.smith.security.SpecSecurityApp</mainClass>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>

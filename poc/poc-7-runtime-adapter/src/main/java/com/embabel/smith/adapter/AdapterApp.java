@@ -11,8 +11,8 @@ import java.nio.file.Path;
 import java.util.List;
 
 /**
- * The skill runtime adapter launcher (POC 7). Boots an Embabel {@link AgentPlatform} (which
- * registers the {@code shell} tool group bean), ingests a CLI skill-pack, and runs it so the skill
+ * The spec runtime adapter launcher (POC 7). Boots an Embabel {@link AgentPlatform} (which
+ * registers the {@code shell} tool group bean), ingests a CLI agent spec, and runs it so the spec
  * executes a real command via the injected shell tool. The model endpoint is fully env-driven.
  *
  * <p>Run (with a live OpenAI-compatible endpoint):
@@ -21,7 +21,7 @@ import java.util.List;
  *   export OPENAI_CUSTOM_API_KEY=sk-...
  *   export OPENAI_CUSTOM_MODELS=my-model
  *   export EMBABEL_MODELS_DEFAULT_LLM=my-model
- *   BUILDER_PACK_DIR="$PWD/skill-packs/shell-runner" \
+ *   BUILDER_PACK_DIR="$PWD/agent-specs/shell-runner" \
  *   BUILDER_INPUT="Run the command: uname -s, and report the result" \
  *       mvn -pl poc/poc-7-runtime-adapter spring-boot:run
  * </pre>
@@ -39,7 +39,7 @@ public class AdapterApp implements CommandLineRunner {
                       @Value("${OPENAI_CUSTOM_API_KEY:}") String apiKey,
                       @Value("${OPENAI_CUSTOM_MODELS:}") String models,
                       @Value("${EMBABEL_MODELS_DEFAULT_LLM:}") String defaultLlm,
-                      @Value("${builder.pack-dir:skill-packs/shell-runner}") Path packDir,
+                      @Value("${builder.pack-dir:agent-specs/shell-runner}") Path packDir,
                       @Value("${builder.input:}") String input) {
         this.platform = platform;
         this.endpoint = new ModelEndpointConfig(baseUrl, apiKey, models, defaultLlm);
@@ -67,12 +67,12 @@ public class AdapterApp implements CommandLineRunner {
                 .toList();
         System.out.println("=== Registered tool groups: " + available + " ===");
         if (!available.contains(ShellToolGroup.ROLE)) {
-            System.out.println("WARNING: the 'shell' tool group is not registered; the skill will run without shell access.");
+            System.out.println("WARNING: the 'shell' tool group is not registered; the spec will run without shell access.");
         }
 
-        System.out.println("=== Running CLI skill over: " + input + " ===");
+        System.out.println("=== Running CLI spec over: " + input + " ===");
         String result = new AdapterRunner(platform).run(packDir, input);
-        System.out.println("=== Skill output ===");
+        System.out.println("=== Spec output ===");
         System.out.println(result);
     }
 }

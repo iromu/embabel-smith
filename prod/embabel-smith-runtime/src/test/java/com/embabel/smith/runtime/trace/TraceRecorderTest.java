@@ -6,7 +6,7 @@ import com.embabel.smith.runtime.core.IngestedSource;
 import com.embabel.smith.runtime.core.RunOutcome;
 import com.embabel.smith.runtime.core.RuntimeCore;
 import com.embabel.smith.runtime.core.TrustTier;
-import com.embabel.smith.skillsource.ResolvedSkillSource;
+import com.embabel.smith.specsource.ResolvedSpecSource;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -38,7 +38,7 @@ class TraceRecorderTest {
         JsonlTraceStore store = new JsonlTraceStore(tmp.resolve("traces/runs.jsonl"));
         TraceRecorder recorder = new TraceRecorder(store);
         RuntimeCore core = new RuntimeCore(platform);
-        ResolvedSkillSource resolved = TestPacks.resolve(TestPacks.library(tmp, "unreachable"));
+        ResolvedSpecSource resolved = TestPacks.resolve(TestPacks.library(tmp, "unreachable"));
         IngestedSource ingested = core.ingest(resolved);
         RunOutcome outcome = core.run(ingested, "ghostDone", "any input", null, TrustTier.STANDARD);
 

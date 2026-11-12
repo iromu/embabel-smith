@@ -3,7 +3,7 @@
     <q-card flat bordered class="q-pa-md">
       <q-card-section>
         <div class="text-h5">Eval</div>
-        <p class="text-grey-7">POC 9 — score a skill over tasks, and refine the prompt from failures.</p>
+        <p class="text-grey-7">POC 9 — score a spec over tasks, and refine the prompt from failures.</p>
       </q-card-section>
 
       <q-separator />
@@ -11,12 +11,12 @@
       <q-card-section>
         <div class="row q-gutter-sm items-center">
           <q-input
-            v-model="skillName"
-            label="Skill to evaluate"
+            v-model="specName"
+            label="Spec to evaluate"
             dense
             style="min-width: 320px"
-            data-test="eval-skill"
-            :hint="skillNames.join(', ') || 'loading…'"
+            data-test="eval-spec"
+            :hint="specNames.join(', ') || 'loading…'"
           />
           <q-btn label="Evaluate" color="primary" icon="grade" @click="doEval" data-test="eval-btn" />
         </div>
@@ -31,7 +31,7 @@
         <div v-if="noEndpoint" class="text-warning" data-test="eval-no-endpoint">
           <q-badge color="warning" label="endpoint not configured" />
           <div class="q-mt-sm text-grey-7">
-            Set the model endpoint (OPENAI_CUSTOM_BASE_URL / _API_KEY / _MODELS) to evaluate a skill.
+            Set the model endpoint (OPENAI_CUSTOM_BASE_URL / _API_KEY / _MODELS) to evaluate a spec.
           </div>
         </div>
         <div v-else-if="error" class="text-negative" data-test="eval-error">{{ error }}</div>
@@ -55,7 +55,7 @@
             failing: {{ result.failingInputs.join(', ') }}
           </div>
         </div>
-        <div v-else class="text-grey-6">Pick a skill and evaluate it.</div>
+        <div v-else class="text-grey-6">Pick a spec and evaluate it.</div>
       </q-card-section>
     </q-card>
   </q-page>
@@ -64,25 +64,25 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 
-import { evaluate, isEndpointNotConfigured, listSkills } from '../api/client'
+import { evaluate, isEndpointNotConfigured, listSpecs } from '../api/client'
 import type { EvalResponse } from '../api/types'
 
-const skillName = ref('')
-const skills = ref<string[]>([])
+const specName = ref('')
+const specs = ref<string[]>([])
 const result = ref<EvalResponse | null>(null)
 const error = ref<string | null>(null)
 
-const skillNames = computed(() => skills.value)
+const specNames = computed(() => specs.value)
 const noEndpoint = computed(() => isEndpointNotConfigured(error.value))
 
 async function doEval() {
-  if (!skillName.value.trim()) {
+  if (!specName.value.trim()) {
     return
   }
   error.value = null
   result.value = null
   try {
-    const res = await evaluate({ skillName: skillName.value.trim() })
+    const res = await evaluate({ specName: specName.value.trim() })
     if (res.error) {
       error.value = res.error
     } else {
@@ -94,6 +94,6 @@ async function doEval() {
 }
 
 onMounted(async () => {
-  skills.value = (await listSkills()).map((s) => s.name)
+  specs.value = (await listSpecs()).map((s) => s.name)
 })
 </script>

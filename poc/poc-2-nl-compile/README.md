@@ -1,11 +1,11 @@
 # POC 2 — NL-compile (description → draft)
 
-De-risks the **natural-language → skill-draft** path: a plain-language description is compiled into
-a draft skill (actions + goal + intermediate types) by Embabel's `NaturalLanguageCompiler`.
+De-risks the **natural-language → spec-draft** path: a plain-language description is compiled into
+a draft spec (actions + goal + intermediate types) by Embabel's `NaturalLanguageCompiler`.
 
 ## What it proves
 
-- **A skill can be authored from a natural-language description (C4).** `compileAgent` returns an
+- **A spec can be authored from a natural-language description (C4).** `compileAgent` returns an
   `AgentCompilationResult` with ≥1 action, an exported goal, and the intermediate types the chain
   requires.
 - An ambiguous description yields a draft **plus explicit issues to review**, not a silently-wrong
@@ -31,7 +31,7 @@ context and reports the resulting actions, goal, types, and any issues.
 Endpoint-gated:
 
 ```bash
-BUILDER_DESCRIPTION="A skill that explains a topic in plain language and posts it as a background message" \
+BUILDER_DESCRIPTION="A spec that explains a topic in plain language and posts it as a background message" \
     mvn -pl poc/poc-2-nl-compile spring-boot:run
 ```
 

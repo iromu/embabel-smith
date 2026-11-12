@@ -16,11 +16,11 @@ import com.embabel.agent.domain.io.UserInput;
 import com.embabel.agent.spec.StepSpecAgentScopeBuilder;
 import com.embabel.agent.spec.model.BackgroundMessage;
 import com.embabel.agent.spec.yml.YmlStepSpecRepository;
-import com.embabel.smith.common.io.SkillPackReader;
+import com.embabel.smith.common.io.AgentSpecReader;
 import com.embabel.smith.common.model.DynamicTypeDef;
 import com.embabel.smith.common.model.PropertyDef;
-import com.embabel.smith.common.model.SkillPack;
-import com.embabel.smith.common.validation.SkillPackValidator;
+import com.embabel.smith.common.model.AgentSpec;
+import com.embabel.smith.common.validation.AgentSpecValidator;
 import com.embabel.smith.common.validation.ValidationResult;
 
 import java.io.IOException;
@@ -33,7 +33,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Runs a skill-pack and reports the outcome, distinguishing a normal goal achievement from a run
+ * Runs a agent spec and reports the outcome, distinguishing a normal goal achievement from a run
  * that was blocked (e.g. by a global guardrail). Reused for the endpoint-gated guardrail
  * demonstration in {@link TrustApp}.
  */
@@ -46,8 +46,8 @@ public class TrustRunner {
     }
 
     private final AgentPlatform platform;
-    private final SkillPackReader reader = new SkillPackReader();
-    private final SkillPackValidator validator = new SkillPackValidator();
+    private final AgentSpecReader reader = new AgentSpecReader();
+    private final AgentSpecValidator validator = new AgentSpecValidator();
 
     public TrustRunner(AgentPlatform platform) {
         this.platform = platform;
@@ -71,10 +71,10 @@ public class TrustRunner {
     }
 
     private AgentProcess deployAndRun(Path packDir, String input) throws IOException {
-        SkillPack pack = reader.read(packDir);
+        AgentSpec pack = reader.read(packDir);
         ValidationResult result = validator.validate(packDir);
         if (!result.isValid()) {
-            throw new IllegalStateException("Skill-pack failed validation: " + result.issues());
+            throw new IllegalStateException("Spec-pack failed validation: " + result.issues());
         }
 
         DataDictionary types = platform.plus(
@@ -99,7 +99,7 @@ public class TrustRunner {
                 List.of(),
                 List.of());
         AgentScope scope = builder.deploy();
-        Agent agent = scope.createAgent("trust-agent", "skill", "trust-tier skill: " + pack.name());
+        Agent agent = scope.createAgent("trust-agent", "spec", "trust-tier spec: " + pack.name());
         platform.deploy(agent);
 
         return platform.runAgentFrom(
@@ -108,7 +108,7 @@ public class TrustRunner {
                 Map.of("userInput", new UserInput(input)));
     }
 
-    private List<DomainType> runtimeTypes(SkillPack pack) {
+    private List<DomainType> runtimeTypes(AgentSpec pack) {
         List<DomainType> types = new ArrayList<>();
         types.add(new JvmType(UserInput.class));
         types.add(new JvmType(BackgroundMessage.class));

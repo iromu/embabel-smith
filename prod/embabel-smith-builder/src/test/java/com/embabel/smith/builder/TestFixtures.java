@@ -18,7 +18,7 @@ public final class TestFixtures {
     private TestFixtures() {
     }
 
-    /** A coherent single-step skill: {@code UserInput -> say -> BackgroundMessage}. */
+    /** A coherent single-step spec: {@code UserInput -> say -> BackgroundMessage}. */
     public static AgentCompilationResult coherent(String name) {
         PromptedActionSpec say = new PromptedActionSpec(
                 "say",
@@ -38,7 +38,7 @@ public final class TestFixtures {
                 false,
                 false,
                 "action");
-        GoalSpec goal = new GoalSpec(name, "A single-step skill", "BackgroundMessage", true, "goal");
+        GoalSpec goal = new GoalSpec(name, "A single-step spec", "BackgroundMessage", true, "goal");
         return new AgentCompilationResult(List.of(say), goal, List.of(), List.of());
     }
 
@@ -99,6 +99,6 @@ public final class TestFixtures {
         return new AgentCompilationResult(
                 base.getActions(), base.getGoal(), base.getIntermediateTypes(),
                 List.of(new CompilationError(
-                        "ambiguous goal: cannot determine the skill's intent", "compiler", null)));
+                        "ambiguous goal: cannot determine the spec's intent", "compiler", null)));
     }
 }

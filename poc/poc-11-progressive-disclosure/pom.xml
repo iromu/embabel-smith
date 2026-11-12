@@ -13,7 +13,7 @@
     <artifactId>poc-11-progressive-disclosure</artifactId>
     <name>poc-11-progressive-disclosure</name>
     <description>
-        POC 11: progressive-disclosure stress test. A skill-pack with a large bundled reference is
+        POC 11: progressive-disclosure stress test. An agent spec with a large bundled reference is
         measured two ways: the plan context (what the GOAP planner loads) stays bounded regardless of
         the reference size, whereas inlining the reference into the action prompt grows the execution
         context with it. Fully offline.

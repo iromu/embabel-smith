@@ -4,7 +4,7 @@ type: "feature"
 status: "active"
 language: "default"
 source_paths:
-  - "prod/embabel-smith-runtime/src/main/java/com/embabel/smith/runtime/SkillRunService.java"
+  - "prod/embabel-smith-runtime/src/main/java/com/embabel/smith/runtime/AgentSpecRunService.java"
   - "prod/embabel-smith-runtime/src/main/java/com/embabel/smith/runtime/core/RuntimeCore.java"
   - "prod/embabel-smith-runtime/src/main/java/com/embabel/smith/runtime/cli/RunCommand.java"
   - "prod/embabel-smith-runtime/src/main/java/com/embabel/smith/runtime/trace/TraceRecorder.java"
@@ -15,8 +15,8 @@ updated_at: "2026-11-09"
 
 # The smith runtime product (`smith run`)
 
-`prod/embabel-smith-runtime` is the product's runtime: it ingests skill-packs from a source
-(`folder:` or `git:` URI, see [[skill-sources]]), runs an exported goal over them, enforces trust
+`prod/embabel-smith-runtime` is the product's runtime: it ingests agent specs from a source
+(`folder:` or `git:` URI, see [[spec-sources]]), runs an exported goal over them, enforces trust
 tiers, and records every run as a JSONL trace. It extracts POC 1's no-code ingest + run and
 generalizes it to **multi-pack** (POC 6), adding POC 10's trust tiers and a per-run trace.
 Everything executed is *data* (the pack YAML): ingestion deploys the packs' step specs onto the
@@ -44,7 +44,7 @@ without it the CLI exits 1 with a clear configuration error naming the missing v
 
 ## Ingest + run
 
-`SkillRunService` (a plain class — the CLI and the studio both embed it) owns the flow: parse +
+`AgentSpecRunService` (a plain class — the CLI and the studio both embed it) owns the flow: parse +
 resolve the source, ingest, run, record. `RuntimeCore.ingest(source)` reads every pack, builds a
 shared `DataDictionary` from the built-in I/O types plus every pack's intermediate types
 (deduplicated by name — the shared type is the cross-pack composition glue), assembles step specs,
@@ -81,8 +81,8 @@ findings.
 
 ## Tests
 
-`RuntimeCoreTest`, `PlannerResolverTest`, `SkillPackTypeMapperTest`, `StepSpecAssemblerTest`,
-`TrustTierPolicyTest`, `RunCommandTest`, `SkillRunServiceTest` (pre-resolution / pre-ingestion
+`RuntimeCoreTest`, `PlannerResolverTest`, `AgentSpecTypeMapperTest`, `StepSpecAssemblerTest`,
+`TrustTierPolicyTest`, `RunCommandTest`, `AgentSpecRunServiceTest` (pre-resolution / pre-ingestion
 failures still emit a trace; a trace-write failure leaves the outcome unchanged), and the trace
 tests (`JsonlTraceStoreTest`, `TraceRecordJsonTest`, `TraceRecorderTest`) — offline, using test
 packs under `src/test/resources/test-packs/`. `LiveRunIntegrationTest` is the endpoint-gated live

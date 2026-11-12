@@ -13,9 +13,9 @@ class PublishTargetTest {
 
     @Test
     void parsesFolderSource() {
-        PublishTarget target = PublishTarget.parse("folder:/tmp/built-skills");
+        PublishTarget target = PublishTarget.parse("folder:/tmp/built-specs");
         assertThat(target.type()).isEqualTo(PublishTarget.Type.FOLDER);
-        assertThat(target.location()).isEqualTo("/tmp/built-skills");
+        assertThat(target.location()).isEqualTo("/tmp/built-specs");
         assertThat(target.ref()).isNull();
     }
 

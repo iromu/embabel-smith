@@ -5,7 +5,7 @@ import static com.embabel.smith.selector.llm.DecisionPrompt.Format.OOD;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.embabel.smith.retrieval.SkillEntry;
+import com.embabel.smith.retrieval.SpecEntry;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -21,12 +21,12 @@ import java.util.concurrent.atomic.AtomicReference;
 
 class LlmSelectorTest {
 
-    private static final List<SkillEntry> THREE = List.of(
-            new SkillEntry("http-client", "http-client", "A reusable HTTP client wrapper for REST calls.",
+    private static final List<SpecEntry> THREE = List.of(
+            new SpecEntry("http-client", "http-client", "A reusable HTTP client wrapper for REST calls.",
                     List.of("UserInput"), "HttpResponse"),
-            new SkillEntry("retry-policy", "retry-policy", "Adds retry-with-backoff behaviour to failing operations.",
+            new SpecEntry("retry-policy", "retry-policy", "Adds retry-with-backoff behaviour to failing operations.",
                     List.of("Operation"), "Operation"),
-            new SkillEntry("http-mock", "http-mock", "Stubs outgoing HTTP calls in tests.",
+            new SpecEntry("http-mock", "http-mock", "Stubs outgoing HTTP calls in tests.",
                     List.of("TestContext"), "MockServer"));
 
     private HttpServer server;
@@ -79,7 +79,7 @@ class LlmSelectorTest {
         modelReply = "2";
         LlmSelector selector = new LlmSelector(baseUrl, "test-model", OOD);
         assertThat(selector.select("Add retries to the HTTP client", THREE)).isEqualTo("retry-policy");
-        assertThat(lastRequestBody.get()).contains("Reply with only the number of the best skill");
+        assertThat(lastRequestBody.get()).contains("Reply with only the number of the best spec");
     }
 
     @Test

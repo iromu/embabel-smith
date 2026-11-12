@@ -19,8 +19,8 @@ import com.embabel.smith.builder.publish.PublishTarget;
 import com.embabel.smith.builder.publish.Publisher;
 import com.embabel.smith.builder.security.ScanReport;
 import com.embabel.smith.builder.security.ScanVerdict;
-import com.embabel.smith.builder.security.SkillSecurityScanner;
-import com.embabel.smith.common.model.SkillPack;
+import com.embabel.smith.builder.security.AgentSpecSecurityScanner;
+import com.embabel.smith.common.model.AgentSpec;
 
 import java.io.IOException;
 import java.util.List;
@@ -33,7 +33,7 @@ import java.util.List;
  * <pre>
  *   1. BuilderAgent   — compile → validate → write (D5: an invalid draft is never written)
  *   2. RefinementLoop — score the built pack, rewrite prompts from failures, re-validate (bounded)
- *   3. SkillSecurityScanner — static, offline; a critical finding blocks the build
+ *   3. AgentSpecSecurityScanner — static, offline; a critical finding blocks the build
  *   4. LifecycleStamper — content hash + baseline pass-rate + state, written as lifecycle.yml
  *   5. Publisher      — FolderPublisher | GitPublisher (collision gate; no push by default)
  * </pre>
@@ -48,7 +48,7 @@ public class BuilderService {
     private final PromptRewriter rewriter;
     private final List<EvalTask> evalTasks;
 
-    private final SkillSecurityScanner scanner = new SkillSecurityScanner();
+    private final AgentSpecSecurityScanner scanner = new AgentSpecSecurityScanner();
     private final LifecycleStamper stamper = new LifecycleStamper();
 
     public BuilderService(BuilderAgent builder, InvokerFactory invokerFactory,
@@ -71,8 +71,8 @@ public class BuilderService {
         if (!validated.valid()) {
             return BuildResult.blocked("build", validated.pack().name(), validated.issues(), null, null, validated.pack());
         }
-        builder.writeSkillPack(validated);
-        SkillPack pack = validated.pack();
+        builder.writeAgentSpec(validated);
+        AgentSpec pack = validated.pack();
 
         // 2. Eval + bounded refinement (score gate)
         RefinementLoop loop = new RefinementLoop(invokerFactory, rewriter, evalTasks,
@@ -85,7 +85,7 @@ public class BuilderService {
                             + "; failing tasks: " + outcome.failingTasks()),
                     outcome.score(), null, null);
         }
-        SkillPack finalPack = outcome.pack();
+        AgentSpec finalPack = outcome.pack();
 
         // 3. Security gate (static, offline)
         ScanReport scan = scanner.scan(finalPack);

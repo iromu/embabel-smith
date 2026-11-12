@@ -1,6 +1,6 @@
 package com.embabel.smith.retrieval.remote;
 
-import com.embabel.smith.retrieval.SkillEntry;
+import com.embabel.smith.retrieval.SpecEntry;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -21,8 +21,8 @@ class RemoteEmbeddingScorerTest {
             return new double[]{1, 0}; // the query
         });
         RemoteEmbeddingScorer scorer = new RemoteEmbeddingScorer(embedder);
-        SkillEntry match = entry("match");
-        SkillEntry other = entry("other");
+        SpecEntry match = entry("match");
+        SpecEntry other = entry("other");
         assertThat(scorer.score("q", match)).isGreaterThan(scorer.score("q", other));
     }
 
@@ -30,7 +30,7 @@ class RemoteEmbeddingScorerTest {
     void memoisesSoRepeatedScoringDoesNotReEmbed() {
         RemoteEmbedder embedder = StubEmbedding.embedder(text -> new double[]{1, 0});
         RemoteEmbeddingScorer scorer = new RemoteEmbeddingScorer(embedder);
-        SkillEntry e = entry("e");
+        SpecEntry e = entry("e");
         scorer.score("q", e);
         long afterFirst = embedder.requestCount(); // query + entry = 2 distinct texts
         assertThat(afterFirst).isEqualTo(2);
@@ -40,7 +40,7 @@ class RemoteEmbeddingScorerTest {
         assertThat(embedder.requestCount()).isEqualTo(afterFirst);
     }
 
-    private static SkillEntry entry(String name) {
-        return new SkillEntry(name, name, name, List.of("UserInput"), "BackgroundMessage");
+    private static SpecEntry entry(String name) {
+        return new SpecEntry(name, name, name, List.of("UserInput"), "BackgroundMessage");
     }
 }

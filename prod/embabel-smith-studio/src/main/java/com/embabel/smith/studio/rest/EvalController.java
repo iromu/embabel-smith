@@ -4,7 +4,7 @@ import com.embabel.smith.builder.eval.EvalTask;
 import com.embabel.smith.builder.eval.RefinementOutcome;
 import com.embabel.smith.common.config.ModelEndpointConfig;
 import com.embabel.smith.common.model.ActionStepSpec;
-import com.embabel.smith.common.model.SkillPack;
+import com.embabel.smith.common.model.AgentSpec;
 import com.embabel.smith.studio.rest.dto.EvalRequest;
 import com.embabel.smith.studio.rest.dto.EvalResponse;
 import com.embabel.smith.studio.rest.dto.EvalTaskDto;
@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 /**
- * The Eval pane (change 06): evaluate a skill from a source over a task set through the change-04
+ * The Eval pane (change 06): evaluate a spec from a source over a task set through the change-04
  * builder's bounded eval → refine loop. Endpoint-gated — without a configured model endpoint it
  * returns the structured {@code MODEL_NOT_CONFIGURED} error before any evaluation. The evaluation is
  * behind the {@link EvalFn} seam so the endpoint-present path is testable with a stub.
@@ -26,7 +26,7 @@ public class EvalController {
     /** The model-dependent evaluation: a pack and its tasks to a refinement outcome. */
     @FunctionalInterface
     public interface EvalFn {
-        RefinementOutcome eval(SkillPack pack, List<EvalTask> tasks);
+        RefinementOutcome eval(AgentSpec pack, List<EvalTask> tasks);
     }
 
     private final EvalFn evaluator;
@@ -42,20 +42,20 @@ public class EvalController {
     @PostMapping("/api/eval")
     public EvalResponse eval(@RequestBody EvalRequest request) {
         if (request.source() == null || request.source().isBlank()
-                || request.skill() == null || request.skill().isBlank()) {
-            return EvalResponse.error("No source or skill selected; pick one to evaluate.");
+                || request.spec() == null || request.spec().isBlank()) {
+            return EvalResponse.error("No source or spec selected; pick one to evaluate.");
         }
         String configError = endpoint.configError();
         if (configError != null) {
             return EvalResponse.noEndpoint(configError);
         }
         try {
-            SkillPack pack = sourceService.readPack(request.source(), request.skill());
+            AgentSpec pack = sourceService.readPack(request.source(), request.spec());
             List<EvalTask> tasks = toTasks(request.tasks());
             RefinementOutcome outcome = evaluator.eval(pack, tasks);
             String revisedPrompt = outcome.refinementCount() > 0
                     ? terminalPrompt(outcome.pack()) : null;
-            return EvalResponse.ok(request.skill(), outcome.score(), outcome.refinementCount(),
+            return EvalResponse.ok(request.spec(), outcome.score(), outcome.refinementCount(),
                     outcome.failingTasks(), outcome.passed(), revisedPrompt);
         } catch (Exception e) {
             String message = e.getMessage() == null ? e.toString() : e.getMessage();
@@ -71,7 +71,7 @@ public class EvalController {
     }
 
     /** The terminal action's prompt (the one producing the goal output); the last step as fallback. */
-    private static String terminalPrompt(SkillPack pack) {
+    private static String terminalPrompt(AgentSpec pack) {
         String goalOutput = pack.goal() == null ? null : pack.goal().outputTypeName();
         ActionStepSpec terminal = pack.steps().stream()
                 .filter(s -> goalOutput != null && goalOutput.equals(s.outputTypeName()))

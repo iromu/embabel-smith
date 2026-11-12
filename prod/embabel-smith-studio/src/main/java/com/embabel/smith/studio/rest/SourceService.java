@@ -1,14 +1,14 @@
 package com.embabel.smith.studio.rest;
 
 import com.embabel.smith.builder.lifecycle.LifecycleMetadata;
-import com.embabel.smith.builder.lifecycle.SkillContentHash;
-import com.embabel.smith.common.io.SkillPackReader;
+import com.embabel.smith.builder.lifecycle.SpecContentHash;
+import com.embabel.smith.common.io.AgentSpecReader;
 import com.embabel.smith.common.io.Yaml;
-import com.embabel.smith.common.model.SkillPack;
-import com.embabel.smith.skillsource.GitSkillSource;
-import com.embabel.smith.skillsource.ResolvedPack;
-import com.embabel.smith.skillsource.ResolvedSkillSource;
-import com.embabel.smith.skillsource.SkillSource;
+import com.embabel.smith.common.model.AgentSpec;
+import com.embabel.smith.specsource.GitSpecSource;
+import com.embabel.smith.specsource.ResolvedSpec;
+import com.embabel.smith.specsource.ResolvedSpecSource;
+import com.embabel.smith.specsource.SpecSource;
 import com.embabel.smith.studio.rest.dto.PackInfo;
 import com.embabel.smith.studio.rest.dto.SourceInfo;
 import org.springframework.beans.factory.annotation.Value;
@@ -22,7 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * The studio's view over its skill sources (change 06): lists the configured sources, lists the
+ * The studio's view over its spec sources (change 06): lists the configured sources, lists the
  * packs of a source with their lifecycle state and content-hash drift status, and reads a named
  * pack for the Security / Trust / Eval panes. Offline — reads from disk, no model calls.
  */
@@ -31,7 +31,7 @@ public class SourceService {
 
     private final List<String> configuredSources;
     private final Path cacheRoot;
-    private final SkillPackReader reader = new SkillPackReader();
+    private final AgentSpecReader reader = new AgentSpecReader();
 
     public SourceService(@Value("${smith.studio.sources:}") String sources,
                          @Value("${smith.studio.source-cache-dir:}") String cacheDir) {
@@ -46,13 +46,13 @@ public class SourceService {
 
     /** The packs of a source, each with its lifecycle state, baseline, and drift status. */
     public List<PackInfo> listPacks(String sourceUri) {
-        ResolvedSkillSource resolved = resolve(sourceUri);
+        ResolvedSpecSource resolved = resolve(sourceUri);
         List<PackInfo> packs = new ArrayList<>();
-        for (ResolvedPack pack : resolved.packs()) {
+        for (ResolvedSpec pack : resolved.packs()) {
             LifecycleMetadata sidecar = readSidecar(pack.root());
-            // The sidecar records the pack's semantic content hash (SkillContentHash) — the same
+            // The sidecar records the pack's semantic content hash (SpecContentHash) — the same
             // scheme the builder stamps and the loop compares — so both the displayed hash and the
-            // drift flag are assessed on that, not on ResolvedPack's raw file-bytes hash, which
+            // drift flag are assessed on that, not on ResolvedSpec's raw file-bytes hash, which
             // never matches the sidecar.
             String hash = contentHashOf(pack.root());
             boolean drift = sidecar != null && sidecar.contentHash() != null
@@ -74,11 +74,11 @@ public class SourceService {
      * cannot be read, or carry no goal, contribute none.
      */
     public List<String> listGoals(String sourceUri) {
-        ResolvedSkillSource resolved = resolve(sourceUri);
+        ResolvedSpecSource resolved = resolve(sourceUri);
         List<String> goals = new ArrayList<>();
-        for (ResolvedPack pack : resolved.packs()) {
+        for (ResolvedSpec pack : resolved.packs()) {
             try {
-                SkillPack read = reader.read(pack.root());
+                AgentSpec read = reader.read(pack.root());
                 if (read.goal() != null) {
                     goals.add(read.goal().name());
                 }
@@ -90,32 +90,32 @@ public class SourceService {
     }
 
     /** Reads the named pack from a source (for the Security / Trust / Eval panes). */
-    public SkillPack readPack(String sourceUri, String skillName) {
-        ResolvedSkillSource resolved = resolve(sourceUri);
-        for (ResolvedPack pack : resolved.packs()) {
-            if (pack.name().equals(skillName)) {
+    public AgentSpec readPack(String sourceUri, String specName) {
+        ResolvedSpecSource resolved = resolve(sourceUri);
+        for (ResolvedSpec pack : resolved.packs()) {
+            if (pack.name().equals(specName)) {
                 try {
                     return reader.read(pack.root());
                 } catch (IOException e) {
-                    throw new UncheckedIOException("cannot read pack '" + skillName + "'", e);
+                    throw new UncheckedIOException("cannot read pack '" + specName + "'", e);
                 }
             }
         }
-        throw new IllegalArgumentException("skill '" + skillName + "' not found in source " + sourceUri);
+        throw new IllegalArgumentException("spec '" + specName + "' not found in source " + sourceUri);
     }
 
-    private ResolvedSkillSource resolve(String sourceUri) {
+    private ResolvedSpecSource resolve(String sourceUri) {
         if (sourceUri == null || sourceUri.isBlank()) {
             throw new IllegalArgumentException("no source selected");
         }
-        SkillSource source = Sources.parse(sourceUri, cacheRoot);
+        SpecSource source = Sources.parse(sourceUri, cacheRoot);
         return source.resolve();
     }
 
     /** The pack's semantic content hash, or {@code null} when the pack cannot be read. */
     private String contentHashOf(Path root) {
         try {
-            return SkillContentHash.of(reader.read(root));
+            return SpecContentHash.of(reader.read(root));
         } catch (IOException e) {
             return null;
         }
@@ -148,7 +148,7 @@ public class SourceService {
 
     private static Path cacheRoot(String configured) {
         if (configured == null || configured.isBlank()) {
-            return GitSkillSource.defaultCacheRoot();
+            return GitSpecSource.defaultCacheRoot();
         }
         return expandHome(configured.trim());
     }

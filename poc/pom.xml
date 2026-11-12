@@ -16,16 +16,16 @@
     <name>Embabel Smith POCs</name>
     <description>
         Aggregator for the POC modules. Each module is a numbered proof of one aspect of the
-        "skills, not agents" hypothesis (POC 1-11); see docs/04-poc-run-results.md.
+        "specs, not agents" hypothesis (POC 1-11); see docs/04-poc-run-results.md.
     </description>
 
     <modules>
         <module>poc-1-no-code-runtime</module>
         <module>poc-2-nl-compile</module>
         <module>poc-3-builder-agent</module>
-        <module>poc-4-skill-format</module>
+        <module>poc-4-agent-spec-format</module>
         <module>poc-5-eval</module>
-        <module>poc-6-skill-composition</module>
+        <module>poc-6-agent-spec-composition</module>
         <module>poc-7-runtime-adapter</module>
         <module>poc-8-retrieval</module>
         <module>poc-9-quality-refinement</module>
@@ -37,10 +37,10 @@
         <module>poc-15-composer-ui</module>
         <module>poc-16-remote-action</module>
         <module>poc-17-gliner-retrieval</module>
-        <module>poc-18-skill-lifecycle</module>
+        <module>poc-18-agent-spec-lifecycle</module>
         <module>poc-19-small-llm-selector</module>
         <module>poc-20-semantic-embedding</module>
-        <module>poc-21-skill-security</module>
+        <module>poc-21-agent-spec-security</module>
         <module>poc-22-unified-ui</module>
         <module>poc-23-remote-embedding-scale</module>
     </modules>

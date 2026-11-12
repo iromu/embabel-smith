@@ -38,7 +38,7 @@ class NlAuthoringControllerTest {
     @Test
     void aMissingEndpointReturnsAClearConfigError() throws Exception {
         mockMvc.perform(post("/api/compile").contentType(MediaType.APPLICATION_JSON)
-                .content("{\"description\":\"A skill that explains a topic\"}"))
+                .content("{\"description\":\"A spec that explains a topic\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.error")
                         .value(org.hamcrest.Matchers.containsString("OPENAI_CUSTOM_BASE_URL")))

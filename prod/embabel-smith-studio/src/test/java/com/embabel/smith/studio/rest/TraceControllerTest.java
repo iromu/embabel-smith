@@ -12,7 +12,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** Offline tests for the Traces surface: per-skill window, most-recent-first, limit, step drill-down. */
+/** Offline tests for the Traces surface: per-spec window, most-recent-first, limit, step drill-down. */
 class TraceControllerTest {
 
     @Test
@@ -32,7 +32,7 @@ class TraceControllerTest {
     }
 
     @Test
-    void filtersBySkill(@TempDir Path tmp) {
+    void filtersBySpec(@TempDir Path tmp) {
         JsonlTraceStore store = new JsonlTraceStore(tmp.resolve("runs.jsonl"));
         store.append(trace("r1", "summarizer", true));
         store.append(trace("r2", "other", true));
@@ -66,19 +66,19 @@ class TraceControllerTest {
         assertThat(info.error()).isEqualTo("step failed");
     }
 
-    private static TraceRecord trace(String runId, String skill, boolean success) {
+    private static TraceRecord trace(String runId, String spec, boolean success) {
         return new TraceRecord(runId, Instant.now(),
                 new TraceRecord.SourceRef("folder:/tmp", null, null),
-                new TraceRecord.PackRef(skill, "hash"),
-                skill, "input", "GOAP", "STANDARD",
+                new TraceRecord.PackRef(spec, "hash"),
+                spec, "input", "GOAP", "STANDARD",
                 List.of(), success, success ? null : "failed", success ? "ok" : null);
     }
 
-    private static TraceRecord traceWithSteps(String runId, String skill, String error) {
+    private static TraceRecord traceWithSteps(String runId, String spec, String error) {
         return new TraceRecord(runId, Instant.now(),
                 new TraceRecord.SourceRef("folder:/tmp", null, null),
-                new TraceRecord.PackRef(skill, "hash"),
-                skill, "input", "GOAP", "STANDARD",
+                new TraceRecord.PackRef(spec, "hash"),
+                spec, "input", "GOAP", "STANDARD",
                 List.of(new TraceRecord.StepRecord("summarize", "failed", 12, "no output")),
                 false, error, null);
     }

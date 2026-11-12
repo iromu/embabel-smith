@@ -6,7 +6,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
 
 /**
- * A prompt-backed action step — the skill-pack's view of an Embabel {@code PromptedActionSpec}.
+ * A prompt-backed action step — the agent spec's view of an Embabel {@code PromptedActionSpec}.
  *
  * <p>Declared in {@code steps/<name>.yml}. The action declares its input type names, a single
  * output type name, and a Jinja2 prompt template that references its inputs by the

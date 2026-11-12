@@ -1,7 +1,7 @@
 package com.embabel.smith.eval;
 
-import com.embabel.smith.common.model.SkillPack;
-import com.embabel.smith.common.samples.SampleSkillPacks;
+import com.embabel.smith.common.model.AgentSpec;
+import com.embabel.smith.common.samples.SampleAgentSpecs;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -17,7 +17,7 @@ class PromptRewriteLoopTest {
 
     @Test
     void applyRevisedPromptSplicesAndRevalidates() {
-        SkillPack pack = SampleSkillPacks.explainer();
+        AgentSpec pack = SampleAgentSpecs.explainer();
         String revised = "Write a clearer explainer about: {{topicBrief.topic}} for {{topicBrief.audience}}.";
 
         PromptRewriteLoop.RewriteResult result = loop.applyRevisedPrompt(pack, "writeExplainer", revised);
@@ -33,7 +33,7 @@ class PromptRewriteLoopTest {
 
     @Test
     void applyRevisedPromptReportsWhenTheRevisedDraftIsInvalid() {
-        SkillPack pack = SampleSkillPacks.explainer();
+        AgentSpec pack = SampleAgentSpecs.explainer();
         // References a variable not bound by the step's input type (TopicBrief -> topicBrief).
         String revised = "Write about {{nonexistent.topic}}.";
 

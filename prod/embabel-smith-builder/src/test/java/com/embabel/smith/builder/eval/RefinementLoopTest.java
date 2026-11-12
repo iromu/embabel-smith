@@ -2,9 +2,9 @@ package com.embabel.smith.builder.eval;
 
 import com.embabel.smith.common.model.ActionStepSpec;
 import com.embabel.smith.common.model.GoalStepSpec;
-import com.embabel.smith.common.model.SkillPack;
-import com.embabel.smith.common.model.SkillPackManifest;
-import com.embabel.smith.common.samples.SampleSkillPacks;
+import com.embabel.smith.common.model.AgentSpec;
+import com.embabel.smith.common.model.AgentSpecManifest;
+import com.embabel.smith.common.samples.SampleAgentSpecs;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -19,14 +19,14 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class RefinementLoopTest {
 
-    private static final String USER_INPUT = SampleSkillPacks.USER_INPUT;
-    private static final String BACKGROUND_MESSAGE = SampleSkillPacks.BACKGROUND_MESSAGE;
+    private static final String USER_INPUT = SampleAgentSpecs.USER_INPUT;
+    private static final String BACKGROUND_MESSAGE = SampleAgentSpecs.BACKGROUND_MESSAGE;
 
-    private static SkillPack packWithPrompt(String prompt) {
+    private static AgentSpec packWithPrompt(String prompt) {
         ActionStepSpec say = ActionStepSpec.action("say", "Say it",
                 List.of(USER_INPUT), BACKGROUND_MESSAGE, prompt);
-        GoalStepSpec goal = GoalStepSpec.exportedGoal("done", "A single-step skill", BACKGROUND_MESSAGE);
-        return new SkillPack(new SkillPackManifest("test-skill", "1.0.0"), goal, List.of(say), List.of());
+        GoalStepSpec goal = GoalStepSpec.exportedGoal("done", "A single-step spec", BACKGROUND_MESSAGE);
+        return new AgentSpec(new AgentSpecManifest("test-spec", "1.0.0"), goal, List.of(say), List.of());
     }
 
     /** Invoker that fails while the terminal prompt carries the marker, otherwise passes. */

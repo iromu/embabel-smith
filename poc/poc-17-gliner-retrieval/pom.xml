@@ -13,9 +13,9 @@
     <artifactId>poc-17-gliner-retrieval</artifactId>
     <name>poc-17-gliner-retrieval</name>
     <description>
-        POC 17: GLiNER2 transformer skill classification. Runs a real zero-shot transformer
+        POC 17: GLiNER2 transformer spec classification. Runs a real zero-shot transformer
         classifier (GLiNER2 via GLiNER4j over ONNX Runtime) on the same within-topic
-        skill-shadowing scenario POC 12 measured, to test whether a model that understands
+        spec-shadowing scenario POC 12 measured, to test whether a model that understands
         meaning — rather than matching hashed n-grams — breaks the tie that lexical and dense
         text-similarity cannot. A local-model-gated benchmark: the three-method comparison runs
         when the ONNX bundle is present; offline unit tests mock the classifier so the module
@@ -23,7 +23,7 @@
     </description>
 
     <dependencies>
-        <!-- Reuse POC 12's ScaleSkillLibrary (6 targets + near-duplicates) and POC 8/12's
+        <!-- Reuse POC 12's ScaleSpecLibrary (6 targets + near-duplicates) and POC 8/12's
              LexicalSimilarity / SemanticSimilarity as the two baselines. -->
         <dependency>
             <groupId>com.embabel.smith</groupId>

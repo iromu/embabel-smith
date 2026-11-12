@@ -13,8 +13,8 @@
     <artifactId>poc-1-no-code-runtime</artifactId>
     <name>poc-1-no-code-runtime</name>
     <description>
-        POC 1 (keystone): the fixed no-code runtime. Boots an Embabel AgentPlatform, ingests a
-        skill-pack from YAML (YmlStepSpecRepository + StepSpecAgentScopeBuilder.deploy()) with zero
+        POC 1 (keystone): the fixed no-code runtime. Boots an Embabel AgentPlatform, ingests an
+        agent spec from YAML (YmlStepSpecRepository + StepSpecAgentScopeBuilder.deploy()) with zero
         compilation, and runs a plan over the exported goal. Planner is selectable per run; the
         model endpoint is fully env-driven.
     </description>

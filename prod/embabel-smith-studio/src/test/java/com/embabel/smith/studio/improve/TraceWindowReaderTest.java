@@ -32,7 +32,7 @@ class TraceWindowReaderTest {
     }
 
     @Test
-    void windowIsPerSkill() {
+    void windowIsPerSpec() {
         JsonlTraceStore store = new JsonlTraceStore(tmp.resolve("traces.jsonl"));
         store.append(TestFixtures.okTrace("r1", "extract", "in", TestFixtures.step("s1", "completed", "ok")));
         store.append(TestFixtures.okTrace("r2", "summarize", "in", TestFixtures.step("s1", "completed", "ok")));
@@ -44,6 +44,6 @@ class TraceWindowReaderTest {
                 .containsExactly("r1", "r3");
         assertThat(reader.window("summarize").stream().map(TraceRecord::runId).toList())
                 .containsExactly("r2");
-        assertThat(reader.skills()).containsExactly("extract", "summarize");
+        assertThat(reader.specs()).containsExactly("extract", "summarize");
     }
 }

@@ -13,9 +13,9 @@
     <artifactId>poc-7-runtime-adapter</artifactId>
     <name>poc-7-runtime-adapter</name>
     <description>
-        POC 7: skill runtime adapter (CLI / script invocation). A skill-pack action declares
+        POC 7: spec runtime adapter (CLI / script invocation). An agent-spec action declares
         toolGroups: [shell]; the platform injects a self-published shell tool group under that role
-        so the skill runs a real CLI with no orchestration code — the "normal agent harness" promise
+        so the spec runs a real CLI with no orchestration code — the "normal agent harness" promise
         (doc 03 §2.3 / §4.2). The model endpoint is fully env-driven.
     </description>
 

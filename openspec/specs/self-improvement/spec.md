@@ -1,19 +1,19 @@
 # self-improvement Specification
 
 ## Purpose
-The trace-driven self-improvement loop: watch the runtime's traces, detect skills that are failing or drifting, refine them from their own failure evidence, prove the improvement with a re-evaluation and the standard gates, and publish the improved pack back into the skill source with a lifecycle transition. The loop is what makes the runtime+builder product improve itself.
+The trace-driven self-improvement loop: watch the runtime's traces, detect specs that are failing or drifting, refine them from their own failure evidence, prove the improvement with a re-evaluation and the standard gates, and publish the improved pack back into the spec source with a lifecycle transition. The loop is what makes the runtime+builder product improve itself.
 
 ## Requirements
 
 ### Requirement: Detection triggers
-The loop SHALL consider a skill for improvement when any of: (a) its recent traces contain failed runs whose failure is not a trust-tier block; (b) a live re-evaluation scores below the pack's baseline pass-rate; (c) the pack's content hash differs from the hash recorded in its lifecycle sidecar (content drift).
+The loop SHALL consider a spec for improvement when any of: (a) its recent traces contain failed runs whose failure is not a trust-tier block; (b) a live re-evaluation scores below the pack's baseline pass-rate; (c) the pack's content hash differs from the hash recorded in its lifecycle sidecar (content drift).
 
 #### Scenario: Failed runs trigger refinement
-- **WHEN** a skill's recent traces contain failed runs with step-level failures
-- **THEN** the loop queues that skill for improvement
+- **WHEN** a spec's recent traces contain failed runs with step-level failures
+- **THEN** the loop queues that spec for improvement
 
 #### Scenario: Tier blocks are not fixable
-- **WHEN** a skill's failed runs failed solely because a step was blocked by the trust tier
+- **WHEN** a spec's failed runs failed solely because a step was blocked by the trust tier
 - **THEN** the loop does NOT queue a refinement for them (refinement cannot change tier policy)
 
 #### Scenario: Content drift triggers re-evaluation
@@ -21,7 +21,7 @@ The loop SHALL consider a skill for improvement when any of: (a) its recent trac
 - **THEN** the loop re-evaluates the pack against its baseline before deciding anything
 
 ### Requirement: Candidate refinement from traces
-When a skill is queued, the loop SHALL build a candidate pack by rewriting the prompts of the steps implicated in the failures, using the failure traces as evidence (POC 9 pattern), and SHALL leave steps without failure evidence unchanged.
+When a spec is queued, the loop SHALL build a candidate pack by rewriting the prompts of the steps implicated in the failures, using the failure traces as evidence (POC 9 pattern), and SHALL leave steps without failure evidence unchanged.
 
 #### Scenario: Only failing steps change
 - **WHEN** a candidate is built from traces where only step `s2` failed
@@ -61,7 +61,7 @@ A candidate SHALL be eligible for publication only if its re-evaluation pass-rat
 - **THEN** it is rejected and the finding is recorded
 
 ### Requirement: Publication updates the source and lifecycle
-On publication (approved or auto), the loop SHALL write the candidate pack into the skill source (reusing the builder's folder/git publishers) and SHALL update the lifecycle sidecar: new content hash, new baseline pass-rate, and the state transition per the POC 18 state machine (`incubating → active` on first proven improvement; `active → degraded` on regression; `degraded → retired` on sustained regression).
+On publication (approved or auto), the loop SHALL write the candidate pack into the spec source (reusing the builder's folder/git publishers) and SHALL update the lifecycle sidecar: new content hash, new baseline pass-rate, and the state transition per the POC 18 state machine (`incubating → active` on first proven improvement; `active → degraded` on regression; `degraded → retired` on sustained regression).
 
 #### Scenario: Improvement publishes and activates
 - **WHEN** an `incubating` pack's gated candidate is published
@@ -95,10 +95,10 @@ By default, gated candidates SHALL be held in a pending queue requiring explicit
 - **THEN** it is discarded with the rejection recorded; the current pack is untouched
 
 ### Requirement: Loop scheduling is idempotent
-The loop SHALL run on demand and on a fixed interval, SHALL track a per-skill watermark (last processed trace), and SHALL have at most one active improvement in flight per skill.
+The loop SHALL run on demand and on a fixed interval, SHALL track a per-spec watermark (last processed trace), and SHALL have at most one active improvement in flight per spec.
 
 #### Scenario: No duplicate work
-- **WHEN** the loop fires while an improvement for skill `s` is still in flight
+- **WHEN** the loop fires while an improvement for spec `s` is still in flight
 - **THEN** it skips `s` for this iteration
 
 #### Scenario: Watermark avoids reprocessing
@@ -106,8 +106,8 @@ The loop SHALL run on demand and on a fixed interval, SHALL track a per-skill wa
 - **THEN** traces already processed are not reprocessed in the next iteration
 
 ### Requirement: Trace retention
-The loop SHALL operate on a rolling window of the most recent traces per skill (default 200), not the full history.
+The loop SHALL operate on a rolling window of the most recent traces per spec (default 200), not the full history.
 
 #### Scenario: Window bounds the input
-- **WHEN** a skill has more traces than the window size
+- **WHEN** a spec has more traces than the window size
 - **THEN** only the most recent window's worth inform its improvement decision

@@ -73,9 +73,9 @@ import PageHeader from '../components/PageHeader.vue'
 import { listGoals, run } from '../api/client'
 import { isModelNotConfigured } from '../api/types'
 import type { RunResponse } from '../api/types'
-import { useSourceSkill } from '../composables/useSourceSkill'
+import { useSourceSpec } from '../composables/useSourceSpec'
 
-const { source, sourceOptions } = useSourceSkill()
+const { source, sourceOptions } = useSourceSpec()
 const goal = ref('')
 const goals = ref<string[]>([])
 const goalOptions = computed(() => goals.value)

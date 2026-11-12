@@ -25,7 +25,7 @@ mvn -q verify
 Builds every module and runs every **offline** test. This needs no model endpoint and no network
 beyond Maven's first-time dependency fetch (Embabel 1.5.3 comes from `repo.embabel.com`, declared
 in the parent `pom.xml`). A green `mvn -q verify` is the project's baseline: it proves the format
-round-trips, validation, the builder's validate/write steps, eval scoring, the skill-format
+round-trips, validation, the builder's validate/write steps, eval scoring, the spec-format
 surface, the retrieval benchmark, the progressive-disclosure measurement, and the trust-tier
 allowlist all behave.
 
@@ -45,12 +45,12 @@ Then install the modules once so sibling artifacts resolve, and run a single mod
 
 ```bash
 mvn install -DskipTests
-BUILDER_PACK_DIR="$PWD/skill-packs/explainer" \
+BUILDER_PACK_DIR="$PWD/agent-specs/explainer" \
 BUILDER_INPUT="Explain how a coffee machine works" BUILDER_PLANNER=GOAP \
     mvn -pl poc/poc-1-no-code-runtime spring-boot:run
 ```
 
-Expected successful output: `=== Skill output ===` followed by the explainer text the model
+Expected successful output: `=== Spec output ===` followed by the explainer text the model
 produced. If you skipped the env vars, you get a **clear configuration error** naming the missing
 variables — that is intended, not a bug. See [[model-endpoint]].
 
@@ -62,33 +62,33 @@ does not resolve from the module's working directory).
 
 ## The full build → run loop
 
-`run-loop.sh` chains the two endpoint-gated steps into one command: it builds a skill with the
+`run-loop.sh` chains the two endpoint-gated steps into one command: it builds a spec with the
 builder, captures the written pack path, and runs that pack in the no-code runtime.
 
 ```bash
-./run-loop.sh "A skill that explains a topic in plain language and posts it as a background message" \
+./run-loop.sh "An agent that explains a topic in plain language and posts it as a background message" \
               "Explain how a coffee machine works"
 ```
 
 It fails fast with a clear message if the endpoint env vars are unset, and surfaces the builder's
-output if the built draft fails validation (design D5 — an invalid skill is never written).
+output if the built draft fails validation (design D5 — an invalid spec is never written).
 
 ## First files to read (in order)
 
 1. `README.md` — module table + per-POC run commands.
-2. `docs/skill-pack-format.md` — the on-disk contract. See [[skill-pack-format]].
-3. `skill-packs/explainer/` — the concrete sample pack (manifest, goal, two steps, one type).
-4. `poc/poc-1-no-code-runtime/src/main/java/com/embabel/smith/runtime/SkillRunner.java` — the
+2. `docs/agent-spec-format.md` — the on-disk contract. See [[agent-spec-format]].
+3. `agent-specs/explainer/` — the concrete sample pack (manifest, goal, two steps, one type).
+4. `poc/poc-1-no-code-runtime/src/main/java/com/embabel/smith/runtime/SpecRunner.java` — the
    keystone run path. See [[runtime-run]].
 
 ## One safe first change
 
-Edit the prompt in `skill-packs/explainer/steps/writeExplainer.yml` (e.g. change the word count)
+Edit the prompt in `agent-specs/explainer/steps/writeExplainer.yml` (e.g. change the word count)
 and re-run POC 1. You change **data only** — no code, no build, and the validator still passes
 because the prompt references (`{{topicBrief.topic}}` etc.) are unchanged.
 
 ## One tempting dangerous change
 
-Removing the guard in `poc/poc-3-builder-agent/.../BuilderAgent.java` where `writeSkillPack` throws
+Removing the guard in `poc/poc-3-builder-agent/.../BuilderAgent.java` where `writeAgentSpec` throws
 on an invalid `ValidatedDraft`. That guard is the whole safety case for "generate with no code" —
 see [[validate-before-write]]. Don't remove it to make a test pass.

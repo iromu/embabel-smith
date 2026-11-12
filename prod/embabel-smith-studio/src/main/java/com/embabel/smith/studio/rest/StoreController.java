@@ -1,6 +1,6 @@
 package com.embabel.smith.studio.rest;
 
-import com.embabel.smith.common.model.SkillPack;
+import com.embabel.smith.common.model.AgentSpec;
 import com.embabel.smith.studio.rest.dto.DiscoveryRecordDto;
 import com.embabel.smith.studio.rest.dto.SavePackRequest;
 import com.embabel.smith.studio.rest.dto.SavePackResponse;
@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 /**
- * The workspace's durable store surface: save, list, and reload generated skill-packs, and review
+ * The workspace's durable store surface: save, list, and reload generated agent specs, and review
  * the discovery history. Offline — no model call.
  */
 @RestController
@@ -37,7 +37,7 @@ public class StoreController {
 
     @GetMapping("/api/store/packs/{name}")
     public StoredPackResponse loadPack(@PathVariable("name") String name) {
-        SkillPack pack = store.loadPack(name);
+        AgentSpec pack = store.loadPack(name);
         if (pack == null) {
             return StoredPackResponse.failed("No saved pack named '" + name + "'.");
         }
@@ -46,7 +46,7 @@ public class StoreController {
 
     @PostMapping("/api/store/packs")
     public SavePackResponse savePack(@RequestBody SavePackRequest request) {
-        SkillPack pack = request.pack();
+        AgentSpec pack = request.pack();
         if (pack == null || pack.name() == null || pack.name().isBlank()) {
             return SavePackResponse.failed("No pack to save.");
         }

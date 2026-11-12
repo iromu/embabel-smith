@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Offline structural check (POC 13): the skill's goal is annotated to be exported as a remote MCP
+ * Offline structural check (POC 13): the spec's goal is annotated to be exported as a remote MCP
  * tool. The actual MCP round-trip (server + client over Streamable HTTP) is exercised by the live
  * run, not here — it needs a live web server and endpoint.
  */

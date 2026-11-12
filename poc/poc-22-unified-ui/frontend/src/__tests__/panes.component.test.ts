@@ -25,7 +25,7 @@ vi.mock('../api/client', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../api/client')>()
   return {
     ...actual,
-    listSkills: vi.fn(),
+    listSpecs: vi.fn(),
     compose: vi.fn(),
     retrieve: vi.fn(),
     run: vi.fn(),
@@ -33,7 +33,7 @@ vi.mock('../api/client', async (importOriginal) => {
 })
 
 // The mocked bindings, typed as Mocks so the assertions typecheck.
-const listSkills = api.listSkills as Mock
+const listSpecs = api.listSpecs as Mock
 const compose = api.compose as Mock
 const retrieve = api.retrieve as Mock
 const run = api.run as Mock
@@ -81,7 +81,7 @@ describe('RetrievePane', () => {
 
 describe('RunPane (endpoint-gated)', () => {
   it('shows the not-configured state when no endpoint is set', async () => {
-    listSkills.mockResolvedValue([
+    listSpecs.mockResolvedValue([
       { name: 'compose-extract', externalInputTypes: ['UserInput'], outputType: 'BackgroundMessage' },
     ])
     run.mockResolvedValue({
@@ -90,18 +90,18 @@ describe('RunPane (endpoint-gated)', () => {
     })
     const wrapper = mountPane(RunPane)
     await flushPromises()
-    await wrapper.find('[data-test="run-skill"]').setValue('compose-extract')
+    await wrapper.find('[data-test="run-spec"]').setValue('compose-extract')
     await wrapper.find('[data-test="run-btn"]').trigger('click')
     await flushPromises()
 
-    expect(run).toHaveBeenCalledWith({ skillName: 'compose-extract', input: '' })
+    expect(run).toHaveBeenCalledWith({ specName: 'compose-extract', input: '' })
     expect(wrapper.find('[data-test="run-no-endpoint"]').exists()).toBe(true)
   })
 })
 
 describe('ComposePane', () => {
-  it('adds skills, snaps a type-compatible edge, and exports the composite', async () => {
-    listSkills.mockResolvedValue([
+  it('adds specs, snaps a type-compatible edge, and exports the composite', async () => {
+    listSpecs.mockResolvedValue([
       { name: 'compose-extract', externalInputTypes: ['UserInput'], outputType: 'TopicBrief' },
       { name: 'compose-explain', externalInputTypes: ['TopicBrief'], outputType: 'BackgroundMessage' },
     ])
@@ -115,9 +115,9 @@ describe('ComposePane', () => {
     const wrapper = mountPane(ComposePane)
     await flushPromises()
 
-    await wrapper.find('[data-test="compose-skill-input"]').setValue('compose-extract')
+    await wrapper.find('[data-test="compose-spec-input"]').setValue('compose-extract')
     await wrapper.find('[data-test="compose-add-btn"]').trigger('click')
-    await wrapper.find('[data-test="compose-skill-input"]').setValue('compose-explain')
+    await wrapper.find('[data-test="compose-spec-input"]').setValue('compose-explain')
     await wrapper.find('[data-test="compose-add-btn"]').trigger('click')
 
     await wrapper.find('[data-test="compose-from"]').setValue('compose-extract')

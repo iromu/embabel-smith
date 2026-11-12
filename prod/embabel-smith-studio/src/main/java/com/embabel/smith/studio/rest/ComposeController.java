@@ -8,7 +8,7 @@ import com.embabel.smith.builder.publish.GitPublisher;
 import com.embabel.smith.builder.publish.PublishResult;
 import com.embabel.smith.builder.publish.PublishTarget;
 import com.embabel.smith.builder.publish.Publisher;
-import com.embabel.smith.common.model.SkillPack;
+import com.embabel.smith.common.model.AgentSpec;
 import com.embabel.smith.studio.rest.dto.ComposeRequest;
 import com.embabel.smith.studio.rest.dto.ComposeResponse;
 import com.embabel.smith.studio.rest.dto.LifecycleInfo;
@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * The Compose pane (change 07): export an assembled GOAP flow — a goal plus its action steps, wired
- * by type names — as a skill-pack to a source. Unlike the Author pane's builder, no model is in the
+ * by type names — as a agent spec to a source. Unlike the Author pane's builder, no model is in the
  * loop: the client has already authored the pack in the graph editor, so this endpoint only
  * validates its shape and writes it. A fresh pack is stamped {@code INCUBATING} with a 0.0 baseline
  * (not yet eval'd) and published through the same folder/git publishers the builder uses, so the
@@ -36,7 +36,7 @@ public class ComposeController {
         if (validationError != null) {
             return ComposeResponse.failed(validationError);
         }
-        SkillPack pack = request.pack();
+        AgentSpec pack = request.pack();
         try {
             PublishTarget target = PublishTarget.parse(request.source());
             LifecycleMetadata lifecycle = stamper.stamp(pack, 0.0);
@@ -64,7 +64,7 @@ public class ComposeController {
         if (request.source() == null || request.source().isBlank()) {
             return "No source provided; pick where to publish the pack.";
         }
-        SkillPack pack = request.pack();
+        AgentSpec pack = request.pack();
         if (pack == null) {
             return "No pack provided; author a goal and at least one step.";
         }

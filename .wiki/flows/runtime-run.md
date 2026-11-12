@@ -5,29 +5,29 @@ status: "active"
 language: "default"
 source_paths:
   - "poc/poc-1-no-code-runtime/src/main/java/com/embabel/smith/runtime/NoCodeRuntime.java"
-  - "poc/poc-1-no-code-runtime/src/main/java/com/embabel/smith/runtime/SkillRunner.java"
+  - "poc/poc-1-no-code-runtime/src/main/java/com/embabel/smith/runtime/SpecRunner.java"
   - "poc/poc-1-no-code-runtime/src/main/java/com/embabel/smith/runtime/PlannerResolver.java"
 updated_at: "2026-11-01"
 ---
 
 # Runtime run flow (POC 1)
 
-POC 1 is the **keystone**: the fixed no-code runtime ingests a skill-pack from YAML with zero
+POC 1 is the **keystone**: the fixed no-code runtime ingests an agent spec from YAML with zero
 compilation and runs a plan over its exported goal. `NoCodeRuntime` is the Spring Boot launcher;
-`SkillRunner` does the work. Entry point:
-`poc/poc-1-no-code-runtime/src/main/java/com/embabel/smith/runtime/SkillRunner.java`.
+`SpecRunner` does the work. Entry point:
+`poc/poc-1-no-code-runtime/src/main/java/com/embabel/smith/runtime/SpecRunner.java`.
 
 ## Step by step
 
 1. **Check the endpoint.** `NoCodeRuntime.run()` first calls
    `ModelEndpointConfig.configError()` and throws if unresolvable — the clear-configuration-error
    contract. See [[model-endpoint]].
-2. **Load and validate.** `SkillRunner.run()` reads the pack with `SkillPackReader` and validates
-   it with `SkillPackValidator`. An invalid pack throws before anything runs. See
-   [[skill-pack-format]] and [[validation-codes]].
-3. **Register the types.** `SkillPackTypeMapper.allRuntimeTypes(pack)` maps the pack's
+2. **Load and validate.** `SpecRunner.run()` reads the pack with `AgentSpecReader` and validates
+   it with `AgentSpecValidator`. An invalid pack throws before anything runs. See
+   [[agent-spec-format]] and [[validation-codes]].
+3. **Register the types.** `AgentSpecTypeMapper.allRuntimeTypes(pack)` maps the pack's
    `DynamicTypeDef`s to Embabel `DynamicType`s (plus the built-in `UserInput` /
-   `BackgroundMessage`), registered via `DataDictionary.fromDomainTypes("skill-types", …)`. See
+   `BackgroundMessage`), registered via `DataDictionary.fromDomainTypes("spec-types", …)`. See
    [[no-code-ingestion]].
 4. **Assemble the flat step directory.** `StepSpecAssembler` copies `goal.yml` and every
    `steps/*.yml` into a fresh temp directory so `YmlStepSpecRepository` can load the goal and its
@@ -44,11 +44,11 @@ compilation and runs a plan over its exported goal. `NoCodeRuntime` is the Sprin
    reproducible.
 8. **Extract the goal output.** `process.lastResult()` is expected to be a `BackgroundMessage`;
    its `content` is returned. If it isn't, the runtime throws with the planner and process status
-   (e.g. the input didn't satisfy the skill's preconditions).
+   (e.g. the input didn't satisfy the spec's preconditions).
 
 ## Why GOAP by default
 
 GOAP (Goal-Oriented Action Planning) plans over typed pre/postconditions without a model, so the
 sequence is deterministic and only the LLM-backed action prompts vary. This keeps the *structure*
 of a run reproducible while the *content* stays model-generated — the same principle the builder
-uses. See [[exported-goal-as-skill]] and [[builder-pipeline]].
+uses. See [[exported-goal-as-spec]] and [[builder-pipeline]].

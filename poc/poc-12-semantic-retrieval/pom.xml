@@ -14,11 +14,11 @@
     <name>poc-12-semantic-retrieval</name>
     <description>
         POC 12: semantic retrieval at scale. Extends POC 8's lexical pre-filter to the 200+ same-typed
-        skill library that doc 02 §3.4 and the "More Skills, Worse Agents?" result (arXiv:2605.24050,
+        spec library that doc 02 §3.4 and the "More Skills, Worse Agents?" result (arXiv:2605.24050,
         up to -21% at 202 skills) describe, and compares the lexical baseline against a denser
         feature-hashing retriever (an offline stand-in for the embedding index doc 03 §2.1 asks for).
         Fully offline and deterministic; it measures selection accuracy as the library grows and as
-        near-duplicate (shadowing) skills accumulate.
+        near-duplicate (shadowing) specs accumulate.
     </description>
 
     <dependencies>

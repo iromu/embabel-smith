@@ -3,10 +3,10 @@ package com.embabel.smith.builder.security;
 import java.util.List;
 
 /**
- * The result of scanning one skill-pack: the ordered findings, the aggregated verdict, and the
- * minimum trust tier at which the skill's declared tool groups are all permitted.
+ * The result of scanning one agent spec: the ordered findings, the aggregated verdict, and the
+ * minimum trust tier at which the spec's declared tool groups are all permitted.
  */
-public record ScanReport(String skillName, List<Finding> findings, ScanVerdict verdict, TrustTier recommendedTier) {
+public record ScanReport(String specName, List<Finding> findings, ScanVerdict verdict, TrustTier recommendedTier) {
 
     public ScanReport {
         findings = findings == null ? List.of() : List.copyOf(findings);

@@ -25,7 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class BuildCoreTest {
 
-    private BuilderService service(SkillCompiler compiler, Path scratch, Path library) {
+    private BuilderService service(AgentSpecCompiler compiler, Path scratch, Path library) {
         BuilderAgent agent = new BuilderAgent(compiler, null, scratch.toString());
         InvokerFactory factory = pack -> input -> "output: " + input;
         PromptRewriter rewriter = (current, feedback) -> current;
@@ -37,7 +37,7 @@ class BuildCoreTest {
     void coherentDescriptionBuildsAndPublishes(@TempDir Path tmp) {
         Path scratch = tmp.resolve("scratch");
         Path library = tmp.resolve("library");
-        SkillCompiler compiler = (name, desc, dd) -> TestFixtures.coherent(name);
+        AgentSpecCompiler compiler = (name, desc, dd) -> TestFixtures.coherent(name);
 
         BuildResult result = service(compiler, scratch, library)
                 .build("explain coffee machines", PublishTarget.parse("folder:" + library), BuildOptions.defaults());
@@ -55,10 +55,10 @@ class BuildCoreTest {
     void invalidDraftWritesNothing(@TempDir Path tmp) {
         Path scratch = tmp.resolve("scratch");
         Path library = tmp.resolve("library");
-        SkillCompiler compiler = (name, desc, dd) -> TestFixtures.dangling(name);
+        AgentSpecCompiler compiler = (name, desc, dd) -> TestFixtures.dangling(name);
 
         BuildResult result = service(compiler, scratch, library)
-                .build("bad skill", PublishTarget.parse("folder:" + library), BuildOptions.defaults());
+                .build("bad spec", PublishTarget.parse("folder:" + library), BuildOptions.defaults());
 
         assertThat(result.isBuilt()).isFalse();
         assertThat(result.stage()).isEqualTo("build");
@@ -74,7 +74,7 @@ class BuildCoreTest {
     void ambiguousDescriptionReturnsIssues(@TempDir Path tmp) {
         Path scratch = tmp.resolve("scratch");
         Path library = tmp.resolve("library");
-        SkillCompiler compiler = (name, desc, dd) -> TestFixtures.ambiguous(name);
+        AgentSpecCompiler compiler = (name, desc, dd) -> TestFixtures.ambiguous(name);
 
         BuildResult result = service(compiler, scratch, library)
                 .build("ambiguous", PublishTarget.parse("folder:" + library), BuildOptions.defaults());

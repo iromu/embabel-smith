@@ -20,19 +20,19 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * {@code LiveEvalRunner} behind the {@link LifecycleController.LiveEvalFn} seam, so the
  * endpoint-present path is stubbed and the no-endpoint path is driven by a real (empty)
  * {@link ModelEndpointConfig}. The pure state-machine half (the transition) runs offline over
- * {@link SkillCuration}.
+ * {@link SpecCuration}.
  */
 class LifecycleControllerTest {
 
     private final ModelEndpointConfig noEndpoint = new ModelEndpointConfig("", "", "", "");
     private final ModelEndpointConfig endpoint = new ModelEndpointConfig("http://x", "key", "gpt", "gpt");
-    private SkillCatalog catalog;
-    private SkillCuration curation;
+    private SpecCatalog catalog;
+    private SpecCuration curation;
 
     @BeforeEach
     void setUp() {
-        catalog = new SkillCatalog("");
-        curation = new SkillCuration(catalog);
+        catalog = new SpecCatalog("");
+        curation = new SpecCuration(catalog);
     }
 
     private MockMvc with(LifecycleController.LiveEvalFn fn, ModelEndpointConfig ep) {
@@ -44,20 +44,20 @@ class LifecycleControllerTest {
     void noEndpointIsReportedClearly() throws Exception {
         MockMvc mvc = with((s, t) -> 0.0, noEndpoint);
         mvc.perform(post("/api/curate").contentType(MediaType.APPLICATION_JSON)
-                .content("{\"skillName\":\"compose-extract\"}"))
+                .content("{\"specName\":\"compose-extract\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.error").value(containsString("No resolvable model endpoint")));
     }
 
     @Test
     void aConfiguredEndpointReEvaluatesAndTransitions() throws Exception {
-        // A high pass-rate keeps the seeded ACTIVE skill surfaced; the response carries the transition.
+        // A high pass-rate keeps the seeded ACTIVE spec surfaced; the response carries the transition.
         MockMvc mvc = with((s, t) -> 0.95, endpoint);
         mvc.perform(post("/api/curate").contentType(MediaType.APPLICATION_JSON)
-                .content("{\"skillName\":\"compose-extract\"}"))
+                .content("{\"specName\":\"compose-extract\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.error").isEmpty())
-                .andExpect(jsonPath("$.skillName").value("compose-extract"))
+                .andExpect(jsonPath("$.specName").value("compose-extract"))
                 .andExpect(jsonPath("$.before").value("ACTIVE"))
                 .andExpect(jsonPath("$.after").value(isIn(List.of("INCUBATING", "ACTIVE", "DEGRADED", "RETIRED"))))
                 .andExpect(jsonPath("$.currentScore").value(0.95))
@@ -65,10 +65,10 @@ class LifecycleControllerTest {
     }
 
     @Test
-    void noSkillSelectedIsRejected() throws Exception {
+    void noSpecSelectedIsRejected() throws Exception {
         MockMvc mvc = with((s, t) -> 0.0, endpoint);
-        mvc.perform(post("/api/curate").contentType(MediaType.APPLICATION_JSON).content("{\"skillName\":\"\"}"))
+        mvc.perform(post("/api/curate").contentType(MediaType.APPLICATION_JSON).content("{\"specName\":\"\"}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.error").value(containsString("No skill selected")));
+                .andExpect(jsonPath("$.error").value(containsString("No spec selected")));
     }
 }

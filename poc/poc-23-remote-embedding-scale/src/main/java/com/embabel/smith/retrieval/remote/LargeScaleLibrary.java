@@ -1,20 +1,20 @@
 package com.embabel.smith.retrieval.remote;
 
-import com.embabel.smith.common.samples.SampleSkillPacks;
-import com.embabel.smith.retrieval.SkillEntry;
-import com.embabel.smith.retrieval.scale.ScaleSkillLibrary;
+import com.embabel.smith.common.samples.SampleAgentSpecs;
+import com.embabel.smith.retrieval.SpecEntry;
+import com.embabel.smith.retrieval.scale.ScaleSpecLibrary;
 
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * A <em>larger</em> same-typed skill library for the scaling dimension (POC 23). POC 12/20's
- * {@link ScaleSkillLibrary} tops out at 281 skills; this generator produces a configurable, larger
- * library (default well past a thousand) of {@code UserInput -> BackgroundMessage} skills with
+ * A <em>larger</em> same-typed spec library for the scaling dimension (POC 23). POC 12/20's
+ * {@link ScaleSpecLibrary} tops out at 281 specs; this generator produces a configurable, larger
+ * library (default well past a thousand) of {@code UserInput -> BackgroundMessage} specs with
  * distinct topics, so the scaling curve (retrieval latency and one-time embedding cost as the
  * library grows) is measurable beyond the shared C10 scenario.
  *
- * <p>Every skill is the same type, so a type-based (GOAP) router cannot disambiguate — only the
+ * <p>Every spec is the same type, so a type-based (GOAP) router cannot disambiguate — only the
  * descriptions do, exactly as in POC 12. The topics are generated from two cycling word lists, so
  * they stay distinct (clean retrieval) while the library size grows.
  */
@@ -23,8 +23,8 @@ public final class LargeScaleLibrary {
     private LargeScaleLibrary() {
     }
 
-    public static final String USER_INPUT = SampleSkillPacks.USER_INPUT;
-    public static final String BACKGROUND_MESSAGE = SampleSkillPacks.BACKGROUND_MESSAGE;
+    public static final String USER_INPUT = SampleAgentSpecs.USER_INPUT;
+    public static final String BACKGROUND_MESSAGE = SampleAgentSpecs.BACKGROUND_MESSAGE;
 
     /** One verb family: a description template and a matching query template over the same topic. */
     private record Family(String key, String template, String queryTemplate) {
@@ -58,12 +58,12 @@ public final class LargeScaleLibrary {
     };
 
     /**
-     * Generate exactly {@code totalSize} distinct-topic skills, round-robin across the six
+     * Generate exactly {@code totalSize} distinct-topic specs, round-robin across the six
      * families so the count is exact (not rounded down to a multiple of the family count). The
-     * first skill of each family (topic 0) is that family's canonical benchmark target.
+     * first spec of each family (topic 0) is that family's canonical benchmark target.
      */
-    public static List<SkillEntry> generate(int totalSize) {
-        List<SkillEntry> all = new ArrayList<>(totalSize);
+    public static List<SpecEntry> generate(int totalSize) {
+        List<SpecEntry> all = new ArrayList<>(totalSize);
         for (int p = 0; p < totalSize; p++) {
             Family family = FAMILIES.get(p % FAMILIES.size());
             all.add(entry(family, topic(p / FAMILIES.size())));
@@ -73,14 +73,14 @@ public final class LargeScaleLibrary {
 
     /**
      * The six benchmark queries, one per family. Each maps to that family's canonical target — the
-     * first generated skill, whose description the query mirrors, so the target is the unique best
+     * first generated spec, whose description the query mirrors, so the target is the unique best
      * match in a distinct-topic library.
      */
-    public static List<ScaleSkillLibrary.QueryTarget> benchmark() {
-        List<ScaleSkillLibrary.QueryTarget> targets = new ArrayList<>();
+    public static List<ScaleSpecLibrary.QueryTarget> benchmark() {
+        List<ScaleSpecLibrary.QueryTarget> targets = new ArrayList<>();
         for (Family f : FAMILIES) {
             String topic = topic(0);
-            targets.add(new ScaleSkillLibrary.QueryTarget(f.queryTemplate.formatted(topic), entry(f, topic).id()));
+            targets.add(new ScaleSpecLibrary.QueryTarget(f.queryTemplate.formatted(topic), entry(f, topic).id()));
         }
         return targets;
     }
@@ -89,9 +89,9 @@ public final class LargeScaleLibrary {
         return ADJ[i % ADJ.length] + " " + NOUN[(i / ADJ.length) % NOUN.length];
     }
 
-    private static SkillEntry entry(Family f, String topic) {
+    private static SpecEntry entry(Family f, String topic) {
         String id = f.key() + "-" + slug(topic);
-        return new SkillEntry(id, id, f.template().formatted(topic), List.of(USER_INPUT), BACKGROUND_MESSAGE);
+        return new SpecEntry(id, id, f.template().formatted(topic), List.of(USER_INPUT), BACKGROUND_MESSAGE);
     }
 
     private static String slug(String topic) {

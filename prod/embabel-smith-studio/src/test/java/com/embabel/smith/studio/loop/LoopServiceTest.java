@@ -7,8 +7,8 @@ import com.embabel.smith.builder.publish.Publisher;
 import com.embabel.smith.common.config.ModelEndpointConfig;
 import com.embabel.smith.common.model.ActionStepSpec;
 import com.embabel.smith.common.model.GoalStepSpec;
-import com.embabel.smith.common.model.SkillPack;
-import com.embabel.smith.common.model.SkillPackManifest;
+import com.embabel.smith.common.model.AgentSpec;
+import com.embabel.smith.common.model.AgentSpecManifest;
 import com.embabel.smith.studio.improve.ApprovalQueue;
 import com.embabel.smith.studio.improve.ImprovementLoop;
 import com.embabel.smith.studio.improve.PendingCandidate;
@@ -55,16 +55,16 @@ class LoopServiceTest {
         return new ModelEndpointConfig("", "", "", "");
     }
 
-    private static PendingCandidate candidate(String id, String skill) {
-        SkillPack pack = new SkillPack(
-                new SkillPackManifest(skill, "1.0.0"),
-                GoalStepSpec.exportedGoal(skill, "goal " + skill, "BackgroundMessage"),
+    private static PendingCandidate candidate(String id, String spec) {
+        AgentSpec pack = new AgentSpec(
+                new AgentSpecManifest(spec, "1.0.0"),
+                GoalStepSpec.exportedGoal(spec, "goal " + spec, "BackgroundMessage"),
                 List.of(ActionStepSpec.action("s1", "step s1", List.of("UserInput"),
                         "BackgroundMessage", "do it")),
                 List.of());
         LifecycleMetadata lifecycle = new LifecycleMetadata("hash", 1.0, LifecycleState.ACTIVE,
                 "2026-01-01T00:00:00Z");
-        return new PendingCandidate(id, skill, pack, lifecycle, 1.0, 0.5, null, List.of(), "rewrote s1");
+        return new PendingCandidate(id, spec, pack, lifecycle, 1.0, 0.5, null, List.of(), "rewrote s1");
     }
 
     @Test
@@ -93,8 +93,8 @@ class LoopServiceTest {
 
         assertThat(info.ran()).isTrue();
         assertThat(info.candidates()).isEqualTo(1);
-        assertThat(info.publishedSkills()).containsExactly("extract");
-        assertThat(info.queuedSkills()).isEmpty();
+        assertThat(info.publishedSpecs()).containsExactly("extract");
+        assertThat(info.queuedSpecs()).isEmpty();
         // The loop pushes improvements into the source (a git source's commit must survive the
         // publisher's throwaway clone); the folder publisher ignores the flag.
         verify(publisher).publish(any(), any(), anyBoolean(), eq(true));
@@ -113,8 +113,8 @@ class LoopServiceTest {
 
         IterationInfo info = service.trigger();
 
-        assertThat(info.publishedSkills()).isEmpty();
-        assertThat(info.queuedSkills()).containsExactly("extract"); // left pending for a manual decision
+        assertThat(info.publishedSpecs()).isEmpty();
+        assertThat(info.queuedSpecs()).containsExactly("extract"); // left pending for a manual decision
         assertThat(queue.size()).isEqualTo(1);
     }
 
@@ -126,8 +126,8 @@ class LoopServiceTest {
 
         IterationInfo info = service.trigger();
 
-        assertThat(info.publishedSkills()).isEmpty();
-        assertThat(info.queuedSkills()).containsExactly("extract");
+        assertThat(info.publishedSpecs()).isEmpty();
+        assertThat(info.queuedSpecs()).containsExactly("extract");
         verify(publisher, never()).publish(any(), any(), anyBoolean(), anyBoolean());
     }
 

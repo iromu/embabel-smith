@@ -4,7 +4,7 @@
       <PageHeader
         icon="grade"
         title="Eval"
-        description="Score a skill over its tasks and refine the prompt from failures."
+        description="Score a spec over its tasks and refine the prompt from failures."
       />
 
       <q-separator />
@@ -20,12 +20,12 @@
             data-test="eval-source"
           />
           <q-select
-            v-model="skill"
-            label="Skill"
+            v-model="spec"
+            label="Spec"
             dense
-            :options="skillOptions"
+            :options="specOptions"
             style="width: 260px"
-            data-test="eval-skill"
+            data-test="eval-spec"
           />
           <q-btn label="Evaluate" color="primary" icon="grade" @click="doEval" data-test="eval-btn" />
         </div>
@@ -54,7 +54,7 @@
             </q-card>
           </div>
         </div>
-        <div v-else class="text-grey-6">Pick a source and a skill, then evaluate it.</div>
+        <div v-else class="text-grey-6">Pick a source and a spec, then evaluate it.</div>
       </q-card-section>
     </q-card>
   </q-page>
@@ -67,9 +67,9 @@ import PageHeader from '../components/PageHeader.vue'
 import { evaluate } from '../api/client'
 import { isModelNotConfigured } from '../api/types'
 import type { EvalResponse } from '../api/types'
-import { useSourceSkill } from '../composables/useSourceSkill'
+import { useSourceSpec } from '../composables/useSourceSpec'
 
-const { source, skill, sourceOptions, skillOptions } = useSourceSkill()
+const { source, spec, sourceOptions, specOptions } = useSourceSpec()
 const result = ref<EvalResponse | null>(null)
 const error = ref<string | null>(null)
 const last = ref<EvalResponse | null>(null)
@@ -77,13 +77,13 @@ const last = ref<EvalResponse | null>(null)
 const noEndpoint = computed(() => isModelNotConfigured(last.value))
 
 async function doEval() {
-  if (source.value === '' || skill.value === '') {
+  if (source.value === '' || spec.value === '') {
     return
   }
   error.value = null
   result.value = null
   try {
-    const res = await evaluate({ source: source.value, skill: skill.value })
+    const res = await evaluate({ source: source.value, spec: spec.value })
     last.value = res
     if (res.error) {
       error.value = res.error

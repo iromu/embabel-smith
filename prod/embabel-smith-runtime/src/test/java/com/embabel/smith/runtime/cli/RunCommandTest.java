@@ -1,6 +1,6 @@
 package com.embabel.smith.runtime.cli;
 
-import com.embabel.smith.runtime.SkillRunService;
+import com.embabel.smith.runtime.AgentSpecRunService;
 import com.embabel.smith.runtime.core.GoalNotFoundException;
 import com.embabel.smith.runtime.core.TrustTier;
 import com.embabel.smith.runtime.trace.TraceRecord;
@@ -25,7 +25,7 @@ class RunCommandTest {
     private final PrintStream originalOut = System.out;
     private final PrintStream originalErr = System.err;
 
-    private SkillRunService.RunResult nextResult;
+    private AgentSpecRunService.RunResult nextResult;
     private RuntimeException nextException;
     private Path seenTraceFile;
     private String seenSource;
@@ -46,14 +46,14 @@ class RunCommandTest {
         System.setErr(originalErr);
     }
 
-    private RunCommand stubCommand(SkillRunService.RunResult result, RuntimeException exception) {
+    private RunCommand stubCommand(AgentSpecRunService.RunResult result, RuntimeException exception) {
         nextResult = result;
         nextException = exception;
         return new RunCommand(null) {
             @Override
-            protected SkillRunService newService(Path traceFile) {
+            protected AgentSpecRunService newService(Path traceFile) {
                 seenTraceFile = traceFile;
-                return new SkillRunService(null) {
+                return new AgentSpecRunService(null) {
                     @Override
                     public RunResult run(String sourceUri, String goal, String input,
                                         String planner, TrustTier tier) {
@@ -72,8 +72,8 @@ class RunCommandTest {
         };
     }
 
-    private static SkillRunService.RunResult result(boolean success, String output, String error) {
-        return new SkillRunService.RunResult(success, output, error,
+    private static AgentSpecRunService.RunResult result(boolean success, String output, String error) {
+        return new AgentSpecRunService.RunResult(success, output, error,
                 new TraceRecord("id", Instant.now(), null, null, "g", "i", "GOAP",
                         "standard", List.of(), success, error, output));
     }

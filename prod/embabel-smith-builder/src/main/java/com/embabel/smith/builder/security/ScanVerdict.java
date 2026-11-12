@@ -1,7 +1,7 @@
 package com.embabel.smith.builder.security;
 
 /**
- * The overall pre-publish verdict for a scanned skill-pack.
+ * The overall pre-publish verdict for a scanned agent spec.
  */
 public enum ScanVerdict {
 

@@ -27,16 +27,16 @@ afterEach(() => {
 })
 
 describe('api/client — the single fetch site', () => {
-  it('listSkills GETs /api/skills and parses the palette', async () => {
+  it('listSpecs GETs /api/specs and parses the palette', async () => {
     const { calls } = stubFetch([
       { name: 'compose-extract', externalInputTypes: ['UserInput'], outputType: 'BackgroundMessage' },
     ])
-    const skills = await api.listSkills()
+    const specs = await api.listSpecs()
     expect(calls).toHaveLength(1)
-    expect(calls[0].url).toBe('/api/skills')
+    expect(calls[0].url).toBe('/api/specs')
     expect(calls[0].init?.method).toBeUndefined()
-    expect(skills[0].name).toBe('compose-extract')
-    expect(skills[0].outputType).toBe('BackgroundMessage')
+    expect(specs[0].name).toBe('compose-extract')
+    expect(specs[0].outputType).toBe('BackgroundMessage')
   })
 
   it('retrieve POSTs the query as JSON and parses the ranked results', async () => {
@@ -63,27 +63,27 @@ describe('api/client — the single fetch site', () => {
     expect(res.results[0].state).toBe('ACTIVE')
   })
 
-  it('scan POSTs the skill and parses the verdict + findings', async () => {
+  it('scan POSTs the spec and parses the verdict + findings', async () => {
     const { calls } = stubFetch({
       error: null,
-      skillName: 'shell-runner',
+      specName: 'shell-runner',
       verdict: 'REVIEW',
       recommendedTier: 'T3_PARTNER',
       summary: 'one high-privilege finding',
       findings: [{ severity: 'HIGH', category: 'HIGH_PRIVILEGE_TOOL', message: 'm', evidence: 'e' }],
     })
-    const res = await api.scan({ skillName: 'shell-runner' })
+    const res = await api.scan({ specName: 'shell-runner' })
     expect(calls[0].url).toBe('/api/security')
-    expect(bodyOf(calls[0])).toEqual({ skillName: 'shell-runner' })
+    expect(bodyOf(calls[0])).toEqual({ specName: 'shell-runner' })
     expect(res.verdict).toBe('REVIEW')
     expect(res.findings[0].category).toBe('HIGH_PRIVILEGE_TOOL')
   })
 
   it('run POSTs the request and parses the endpoint-gated response', async () => {
     const { calls } = stubFetch({ error: 'No resolvable model endpoint is configured.', output: null })
-    const res = await api.run({ skillName: 'compose-extract', input: 'hi' })
+    const res = await api.run({ specName: 'compose-extract', input: 'hi' })
     expect(calls[0].url).toBe('/api/run')
-    expect(bodyOf(calls[0])).toEqual({ skillName: 'compose-extract', input: 'hi' })
+    expect(bodyOf(calls[0])).toEqual({ specName: 'compose-extract', input: 'hi' })
     expect(res.output).toBeNull()
     expect(res.error).toContain('No resolvable model endpoint')
   })

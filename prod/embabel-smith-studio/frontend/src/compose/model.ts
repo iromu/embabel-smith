@@ -1,5 +1,5 @@
 /**
- * Pure logic for the Compose pane (change 07): the GOAP-flow graph rules and the skill-pack
+ * Pure logic for the Compose pane (change 07): the GOAP-flow graph rules and the spec-pack
  * assembly. No DOM, no Vue — trivially unit-testable.
  *
  * A flow is a set of action steps plus a single goal. Steps connect into a graph by type name: an
@@ -74,7 +74,7 @@ export function validateFlow(goal: ComposeGoal | null, steps: ComposeStep[]): st
   return problems
 }
 
-// ---- Skill-pack assembly ---------------------------------------------------
+// ---- Agent-spec assembly ---------------------------------------------------
 
 export interface ComposePackManifest {
   name: string
@@ -108,7 +108,7 @@ export interface ComposePack {
 }
 
 /**
- * Assemble the skill-pack the flow exports: the exported goal, the action steps, and a minimal
+ * Assemble the spec-pack the flow exports: the exported goal, the action steps, and a minimal
  * definition for each intermediate type — every produced type except the initial types, which the
  * runtime already knows. The pack name is the goal's name.
  */

@@ -4,7 +4,7 @@ import java.util.Locale;
 
 /**
  * Derives a stable, filesystem-safe pack name from a natural-language description. The same
- * description always yields the same name, so rebuilding the same skill targets the same source
+ * description always yields the same name, so rebuilding the same spec targets the same source
  * location (which is what the collision gate detects).
  */
 public final class PackName {
@@ -19,6 +19,6 @@ public final class PackName {
         if (slug.length() > 40) {
             slug = slug.substring(0, 40).replaceAll("-+$", "");
         }
-        return slug.isEmpty() ? "built-skill" : slug;
+        return slug.isEmpty() ? "built-spec" : slug;
     }
 }

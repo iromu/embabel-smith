@@ -2,8 +2,8 @@ package com.embabel.smith.studio.rest;
 
 import com.embabel.smith.common.model.ActionStepSpec;
 import com.embabel.smith.common.model.GoalStepSpec;
-import com.embabel.smith.common.model.SkillPack;
-import com.embabel.smith.common.model.SkillPackManifest;
+import com.embabel.smith.common.model.AgentSpec;
+import com.embabel.smith.common.model.AgentSpecManifest;
 import com.embabel.smith.studio.rest.dto.ComposeRequest;
 import com.embabel.smith.studio.rest.dto.ComposeResponse;
 import org.junit.jupiter.api.Test;
@@ -24,9 +24,9 @@ class ComposeControllerTest {
     private final ComposeController controller = new ComposeController();
 
     /** A valid flow: a step produces "Result", and the goal wants "Result". */
-    private static SkillPack validPack() {
-        return new SkillPack(
-                new SkillPackManifest("explainer", "1.0.0"),
+    private static AgentSpec validPack() {
+        return new AgentSpec(
+                new AgentSpecManifest("explainer", "1.0.0"),
                 GoalStepSpec.exportedGoal("explainer", "explain something", "Result"),
                 List.of(ActionStepSpec.action("explain", "explain the input",
                         List.of("UserInput"), "Result", "explain {{userInput.content}}")),
@@ -59,8 +59,8 @@ class ComposeControllerTest {
 
     @Test
     void rejectsAnUnexportedGoal() {
-        SkillPack pack = new SkillPack(
-                new SkillPackManifest("x", "1.0.0"),
+        AgentSpec pack = new AgentSpec(
+                new AgentSpecManifest("x", "1.0.0"),
                 new GoalStepSpec(GoalStepSpec.STEP_TYPE, "x", "g", "Result", false),
                 List.of(ActionStepSpec.action("explain", "d", List.of("UserInput"), "Result", "p")),
                 List.of());
@@ -72,8 +72,8 @@ class ComposeControllerTest {
 
     @Test
     void rejectsAFlowWithNoSteps() {
-        SkillPack pack = new SkillPack(
-                new SkillPackManifest("x", "1.0.0"),
+        AgentSpec pack = new AgentSpec(
+                new AgentSpecManifest("x", "1.0.0"),
                 GoalStepSpec.exportedGoal("x", "g", "Result"),
                 List.of(),
                 List.of());
@@ -85,8 +85,8 @@ class ComposeControllerTest {
 
     @Test
     void rejectsAnUnreachableGoal() {
-        SkillPack pack = new SkillPack(
-                new SkillPackManifest("x", "1.0.0"),
+        AgentSpec pack = new AgentSpec(
+                new AgentSpecManifest("x", "1.0.0"),
                 GoalStepSpec.exportedGoal("x", "g", "Wanted"),
                 List.of(ActionStepSpec.action("explain", "d", List.of("UserInput"), "Result", "p")),
                 List.of());

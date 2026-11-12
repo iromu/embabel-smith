@@ -1,6 +1,6 @@
 package com.embabel.smith.retrieval.gliner;
 
-import com.embabel.smith.retrieval.SkillEntry;
+import com.embabel.smith.retrieval.SpecEntry;
 import io.gravitee.lab.gliner4j.GLiNER4jClassifier;
 import io.gravitee.lab.gliner4j.schema.ClassificationLabel;
 import io.gravitee.lab.gliner4j.schema.ClassificationResult;
@@ -10,13 +10,13 @@ import java.util.List;
 /**
  * The GLiNER2 transformer selector — a zero-shot fine-grained classifier over a small candidate
  * set (design D1). It builds one {@link ClassificationLabel} per candidate, asks the classifier to
- * score the query against that label set, and returns the top-scored label's skill id.
+ * score the query against that label set, and returns the top-scored label's spec id.
  *
  * <p>The classifier is injected through the {@link Classifier} seam so the label-building and
  * top-1 logic are testable offline with a stub (no ONNX bundle); {@link #fromModel} wires the real
  * {@link GLiNER4jClassifier} for the gated benchmark run.
  */
-public final class GlinerSelector implements SkillSelector, AutoCloseable {
+public final class GlinerSelector implements SpecSelector, AutoCloseable {
 
     /**
      * The classification seam: score {@code text} against a label set at {@code threshold} and
@@ -56,7 +56,7 @@ public final class GlinerSelector implements SkillSelector, AutoCloseable {
     }
 
     @Override
-    public String select(String query, List<SkillEntry> candidates) {
+    public String select(String query, List<SpecEntry> candidates) {
         if (candidates.isEmpty()) {
             return null;
         }
@@ -64,12 +64,12 @@ public final class GlinerSelector implements SkillSelector, AutoCloseable {
         if (results.isEmpty()) {
             return null;
         }
-        // Results are sorted by confidence descending; the label name is the skill id.
+        // Results are sorted by confidence descending; the label name is the spec id.
         return results.get(0).label();
     }
 
-    /** One label per candidate: name = skill id (so the result maps straight back), description = the skill text. */
-    public static List<ClassificationLabel> labelsFor(List<SkillEntry> candidates) {
+    /** One label per candidate: name = spec id (so the result maps straight back), description = the spec text. */
+    public static List<ClassificationLabel> labelsFor(List<SpecEntry> candidates) {
         return candidates.stream()
                 .map(e -> new ClassificationLabel(e.id(), e.description()))
                 .toList();

@@ -1,14 +1,14 @@
 # POC 1 — No-code runtime (keystone)
 
-The keystone claim: a **YAML skill-pack is ingested at runtime with zero compilation**, and a
+The keystone claim: a **YAML agent spec is ingested at runtime with zero compilation**, and a
 single general-purpose agent plans over its exported goal via GOAP.
 
 ## What it proves
 
-- **No-compilation ingestion (C1).** A skill-pack is loaded through `YmlStepSpecRepository` +
+- **No-compilation ingestion (C1).** A agent spec is loaded through `YmlStepSpecRepository` +
   `StepSpecAgentScopeBuilder.deploy()` into the live GOAP planner — the same `embabel-agent-spec`
   mechanism the vendor's production "realms" use.
-- **An exported goal is a callable skill (C2).** The one `skill-agent` plans over the exported goal
+- **An exported goal is a callable spec (C2).** The one `spec-agent` plans over the exported goal
   and returns its output — no sub-agents, no orchestration code.
 - The planner is selectable per run (default GOAP), and the model endpoint is fully env-driven.
 
@@ -16,10 +16,10 @@ single general-purpose agent plans over its exported goal via GOAP.
 
 ```mermaid
 flowchart LR
-    subgraph pack["skill-pack (pure-data YAML, zero compilation)"]
+    subgraph pack["agent spec (pure-data YAML, zero compilation)"]
         G["goal + steps + types"]
     end
-    YSR["YmlStepSpecRepository<br/>+ SkillPackTypeMapper"]
+    YSR["YmlStepSpecRepository<br/>+ AgentSpecTypeMapper"]
     DEPLOY["StepSpecAgentScopeBuilder.deploy"]
     PLAT["AgentPlatform<br/>GOAP planner"]
     IN["UserInput"]
@@ -30,9 +30,9 @@ flowchart LR
 ```
 
 `NoCodeRuntime` boots an `AgentPlatform`, maps the pack's pure-data `DynamicType`s onto Embabel
-types (`SkillPackTypeMapper`), ingests the `PromptedActionSpec`/`GoalSpec` step specs from YAML
+types (`AgentSpecTypeMapper`), ingests the `PromptedActionSpec`/`GoalSpec` step specs from YAML
 (`StepSpecAssembler`), and runs a plan from a `UserInput` to the goal's `BackgroundMessage` output
-(`SkillRunner`, planner chosen by `PlannerResolver`).
+(`SpecRunner`, planner chosen by `PlannerResolver`).
 
 ## Run it
 
@@ -40,14 +40,14 @@ Endpoint-gated (needs a live OpenAI-compatible endpoint — see the top-level RE
 endpoint"):
 
 ```bash
-BUILDER_PACK_DIR="$PWD/skill-packs/explainer" \
+BUILDER_PACK_DIR="$PWD/agent-specs/explainer" \
 BUILDER_INPUT="Explain how a coffee machine works" BUILDER_PLANNER=GOAP \
     mvn -pl poc/poc-1-no-code-runtime spring-boot:run
 ```
 
 ## Conclusion
 
-Against the hypothesis (claims C1 / C2): **proven.** The skill-pack is ingested at runtime with
+Against the hypothesis (claims C1 / C2): **proven.** The agent spec is ingested at runtime with
 zero compilation — `YmlStepSpecRepository` + `StepSpecAgentScopeBuilder.deploy()` load it into the
 live GOAP planner — and the single general-purpose agent plans over the exported goal and returns
 its output with no sub-agents and no orchestration code. The full loop (describe → build →

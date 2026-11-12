@@ -2,23 +2,23 @@ package com.embabel.smith.studio.improve;
 
 import com.embabel.agent.api.common.Ai;
 import com.embabel.agent.core.AgentPlatform;
-import com.embabel.smith.builder.eval.AgentSkillInvokerFactory;
+import com.embabel.smith.builder.eval.AgentSpecInvokerFactory;
 import com.embabel.smith.builder.eval.EvalTask;
 import com.embabel.smith.builder.eval.LlmPromptRewriter;
 import com.embabel.smith.builder.lifecycle.LifecycleMetadata;
 import com.embabel.smith.builder.lifecycle.LifecycleState;
 import com.embabel.smith.builder.publish.FolderPublisher;
 import com.embabel.smith.builder.publish.PublishTarget;
-import com.embabel.smith.common.io.SkillPackReader;
-import com.embabel.smith.common.io.SkillPackWriter;
+import com.embabel.smith.common.io.AgentSpecReader;
+import com.embabel.smith.common.io.AgentSpecWriter;
 import com.embabel.smith.common.io.Yaml;
 import com.embabel.smith.common.model.ActionStepSpec;
 import com.embabel.smith.common.model.GoalStepSpec;
-import com.embabel.smith.common.model.SkillPack;
-import com.embabel.smith.common.model.SkillPackManifest;
+import com.embabel.smith.common.model.AgentSpec;
+import com.embabel.smith.common.model.AgentSpecManifest;
 import com.embabel.smith.runtime.trace.JsonlTraceStore;
-import com.embabel.smith.skillsource.FolderSkillSource;
-import com.embabel.smith.skillsource.SkillSource;
+import com.embabel.smith.specsource.FolderSpecSource;
+import com.embabel.smith.specsource.SpecSource;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.junit.jupiter.api.io.TempDir;
@@ -50,9 +50,9 @@ class LiveLoopIntegrationTest {
     void oneIterationPublishesAnImprovedPack(@TempDir Path tmp) throws Exception {
         // A live pack in a folder source, with a failing trace to trigger refinement.
         Path sourceRoot = tmp.resolve("source");
-        SkillPack original = livePack();
-        new SkillPackWriter().write(original, sourceRoot.resolve("summarize"));
-        SkillSource source = new FolderSkillSource("folder:" + sourceRoot, sourceRoot);
+        AgentSpec original = livePack();
+        new AgentSpecWriter().write(original, sourceRoot.resolve("summarize"));
+        SpecSource source = new FolderSpecSource("folder:" + sourceRoot, sourceRoot);
 
         JsonlTraceStore store = new JsonlTraceStore(tmp.resolve("traces.jsonl"));
         store.append(TestFixtures.failedTrace("r1", "summarize", "Describe your use case.",
@@ -67,7 +67,7 @@ class LiveLoopIntegrationTest {
         FolderPublisher publisher = new FolderPublisher(PublishTarget.parse("folder:" + sourceRoot));
 
         ImprovementLoop loop = new ImprovementLoop(source, store, rewriter,
-                new AgentSkillInvokerFactory(platform), tasks, publisher, true); // auto-publish
+                new AgentSpecInvokerFactory(platform), tasks, publisher, true); // auto-publish
 
         List<PendingCandidate> held = loop.runOnce();
 
@@ -79,13 +79,13 @@ class LiveLoopIntegrationTest {
         LifecycleMetadata lifecycle = Yaml.mapper().readValue(
                 Files.readString(improved.resolve("lifecycle.yml")), LifecycleMetadata.class);
         assertThat(lifecycle.state()).isEqualTo(LifecycleState.ACTIVE);
-        assertThat(new SkillPackReader().read(improved).step("summarize")).isNotNull();
+        assertThat(new AgentSpecReader().read(improved).step("summarize")).isNotNull();
     }
 
-    /** A realistic single-step summarizer skill, deployable by the runtime (canonical FQN types). */
-    private static SkillPack livePack() {
-        return new SkillPack(
-                new SkillPackManifest("summarize", "1.0.0"),
+    /** A realistic single-step summarizer spec, deployable by the runtime (canonical FQN types). */
+    private static AgentSpec livePack() {
+        return new AgentSpec(
+                new AgentSpecManifest("summarize", "1.0.0"),
                 GoalStepSpec.exportedGoal("summarize", "Summarize an input", BACKGROUND_MESSAGE),
                 List.of(ActionStepSpec.action("summarize", "Summarize the input",
                         List.of(USER_INPUT), BACKGROUND_MESSAGE,

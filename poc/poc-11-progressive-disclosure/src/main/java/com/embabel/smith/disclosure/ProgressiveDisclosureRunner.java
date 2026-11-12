@@ -1,9 +1,9 @@
 package com.embabel.smith.disclosure;
 
-import com.embabel.smith.common.model.SkillPack;
+import com.embabel.smith.common.model.AgentSpec;
 
 /**
- * Measures the context cost of progressive vs. eager disclosure for a skill that ships a bundled
+ * Measures the context cost of progressive vs. eager disclosure for a spec that ships a bundled
  * reference (POC 11). Pure and offline.
  */
 public class ProgressiveDisclosureRunner {
@@ -11,7 +11,7 @@ public class ProgressiveDisclosureRunner {
     private final PlanContextMeter meter = new PlanContextMeter();
 
     /**
-     * The measured context costs for a skill with a bundled reference of {@code referenceChars}.
+     * The measured context costs for a spec with a bundled reference of {@code referenceChars}.
      *
      * @param planContextChars      bounded, independent of the reference (what the planner loads)
      * @param progressivePromptChars base prompt only (reference fetched on demand)
@@ -27,7 +27,7 @@ public class ProgressiveDisclosureRunner {
         }
     }
 
-    public ContextCost measure(SkillPack pack, String reference) {
+    public ContextCost measure(AgentSpec pack, String reference) {
         return new ContextCost(
                 meter.planContextChars(pack),
                 meter.progressivePromptChars(pack),

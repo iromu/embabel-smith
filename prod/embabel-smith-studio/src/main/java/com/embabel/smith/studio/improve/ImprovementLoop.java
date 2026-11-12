@@ -6,17 +6,17 @@ import com.embabel.smith.builder.eval.PromptRewriter;
 import com.embabel.smith.builder.lifecycle.LifecycleMetadata;
 import com.embabel.smith.builder.lifecycle.LifecycleState;
 import com.embabel.smith.builder.lifecycle.LifecycleStamper;
-import com.embabel.smith.builder.lifecycle.SkillContentHash;
+import com.embabel.smith.builder.lifecycle.SpecContentHash;
 import com.embabel.smith.builder.publish.Publisher;
 import com.embabel.smith.builder.publish.PublishResult;
-import com.embabel.smith.common.io.SkillPackReader;
+import com.embabel.smith.common.io.AgentSpecReader;
 import com.embabel.smith.common.io.Yaml;
-import com.embabel.smith.common.model.SkillPack;
+import com.embabel.smith.common.model.AgentSpec;
 import com.embabel.smith.runtime.trace.JsonlTraceStore;
 import com.embabel.smith.runtime.trace.TraceRecord;
-import com.embabel.smith.skillsource.ResolvedPack;
-import com.embabel.smith.skillsource.ResolvedSkillSource;
-import com.embabel.smith.skillsource.SkillSource;
+import com.embabel.smith.specsource.ResolvedSpec;
+import com.embabel.smith.specsource.ResolvedSpecSource;
+import com.embabel.smith.specsource.SpecSource;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -30,12 +30,12 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * The self-improvement loop (change 05): one pass over the skill source that watches the traces
- * (change 03), detects skills that are failing or drifting, refines them (change 04's builder
+ * The self-improvement loop (change 05): one pass over the spec source that watches the traces
+ * (change 03), detects specs that are failing or drifting, refines them (change 04's builder
  * core), gates the candidates (validate → scan → re-eval → beat the baseline), and publishes the
  * approved ones back to the source with a lifecycle transition.
  *
- * <p>Per-skill, the loop:
+ * <p>Per-spec, the loop:
  * <ol>
  *   <li><b>Detect</b> — failed runs (minus trust-tier blocks), content drift, and a live re-eval
  *       below the baseline (regression);</li>
@@ -54,7 +54,7 @@ import java.util.concurrent.atomic.AtomicLong;
  */
 public final class ImprovementLoop {
 
-    private final SkillSource source;
+    private final SpecSource source;
     private final TraceWindowReader traceReader;
     private final Detector detector;
     private final Refiner refiner;
@@ -68,21 +68,21 @@ public final class ImprovementLoop {
     private final Map<String, GateResult> lastRejections = new ConcurrentHashMap<>();
     private final AtomicLong idCounter = new AtomicLong();
 
-    private final SkillPackReader packReader = new SkillPackReader();
+    private final AgentSpecReader packReader = new AgentSpecReader();
     private final LifecycleStamper stamper = new LifecycleStamper();
 
     /**
      * Convenience constructor: builds the default collaborators from a trace store, a prompt
      * rewriter, an invoker factory, and the eval tasks.
      */
-    public ImprovementLoop(SkillSource source, JsonlTraceStore traceStore, PromptRewriter rewriter,
+    public ImprovementLoop(SpecSource source, JsonlTraceStore traceStore, PromptRewriter rewriter,
                            InvokerFactory invokerFactory, List<EvalTask> evalTasks,
                            Publisher publisher, boolean autoPublish) {
         this(source, new TraceWindowReader(traceStore), new Detector(), new Refiner(rewriter),
                 new GateChain(invokerFactory, evalTasks), publisher, autoPublish);
     }
 
-    public ImprovementLoop(SkillSource source, TraceWindowReader traceReader, Detector detector,
+    public ImprovementLoop(SpecSource source, TraceWindowReader traceReader, Detector detector,
                            Refiner refiner, GateChain gateChain, Publisher publisher,
                            boolean autoPublish) {
         this.source = source;
@@ -99,29 +99,29 @@ public final class ImprovementLoop {
         return queue;
     }
 
-    /** The set of skills with an improvement currently in flight. */
+    /** The set of specs with an improvement currently in flight. */
     public InFlightSet inFlight() {
         return inFlight;
     }
 
     /**
-     * Runs one pass over the skill source. Returns the gated candidates produced this pass (held in
+     * Runs one pass over the spec source. Returns the gated candidates produced this pass (held in
      * the queue when {@code autoPublish} is off; empty when auto-published).
      */
     public List<PendingCandidate> runOnce() {
         List<PendingCandidate> produced = new ArrayList<>();
-        ResolvedSkillSource resolved = source.resolve();
-        for (ResolvedPack pack : resolved.packs()) {
-            String skill = pack.name();
-            List<TraceRecord> window = traceReader.window(skill);
+        ResolvedSpecSource resolved = source.resolve();
+        for (ResolvedSpec pack : resolved.packs()) {
+            String spec = pack.name();
+            List<TraceRecord> window = traceReader.window(spec);
             if (window.isEmpty()) {
                 continue;
             }
             TraceRecord latest = window.get(window.size() - 1);
-            if (isCaughtUp(skill, latest.timestamp())) {
+            if (isCaughtUp(spec, latest.timestamp())) {
                 continue; // idempotent: no traces newer than the watermark
             }
-            SkillPack current = readPack(pack.root());
+            AgentSpec current = readPack(pack.root());
             if (current == null) {
                 continue;
             }
@@ -129,24 +129,24 @@ public final class ImprovementLoop {
             if (sidecar.state() == LifecycleState.RETIRED) {
                 // Retired packs are excluded from automatic refinement (design state machine); a
                 // human revives them via an explicit rebuild (change 06).
-                advanceWatermark(skill, latest);
+                advanceWatermark(spec, latest);
                 continue;
             }
-            // At most one active improvement per skill — checked before any (re-)eval spend, so an
-            // in-flight skill is skipped without spending eval budget.
-            if (!inFlight.begin(skill)) {
-                advanceWatermark(skill, latest);
+            // At most one active improvement per spec — checked before any (re-)eval spend, so an
+            // in-flight spec is skipped without spending eval budget.
+            if (!inFlight.begin(spec)) {
+                advanceWatermark(spec, latest);
                 continue;
             }
             try {
-                Detector.Result detection = detect(skill, current, sidecar, window);
+                Detector.Result detection = detect(spec, current, sidecar, window);
                 if (detection.regressed()) {
                     sidecar = LifecycleTransitions.regressed(sidecar);
                     writeSidecar(pack.root(), sidecar);
                 }
                 // A degraded pack that regressed to retired in this pass is no longer refined.
                 if (!detection.queued() || sidecar.state() == LifecycleState.RETIRED) {
-                    advanceWatermark(skill, latest);
+                    advanceWatermark(spec, latest);
                     continue;
                 }
                 Refiner.Refinement refinement = refiner.refine(current, detection.failureTraces());
@@ -157,50 +157,50 @@ public final class ImprovementLoop {
                     GateResult gate = gateChain.gate(refinement.candidate(), sidecar.baselinePassRate(),
                             failedInputs(detection.failureTraces()));
                     if (gate.gated()) {
-                        PendingCandidate candidate = toCandidate(skill, refinement, gate, sidecar, detection);
+                        PendingCandidate candidate = toCandidate(spec, refinement, gate, sidecar, detection);
                         boolean held = queue.enqueue(candidate, autoPublish, this::publishCandidate);
                         if (held) {
                             produced.add(candidate);
                         }
                     } else {
-                        lastRejections.put(skill, gate); // record the rejection with its score
+                        lastRejections.put(spec, gate); // record the rejection with its score
                     }
                 }
-                advanceWatermark(skill, latest);
+                advanceWatermark(spec, latest);
             } finally {
-                inFlight.end(skill);
+                inFlight.end(spec);
             }
         }
         return produced;
     }
 
-    /** The most recent gate rejection for the skill, or null if none. */
-    public GateResult lastRejection(String skill) {
-        return lastRejections.get(skill);
+    /** The most recent gate rejection for the spec, or null if none. */
+    public GateResult lastRejection(String spec) {
+        return lastRejections.get(spec);
     }
 
     /**
-     * The per-skill detection: the cheap triggers (failed runs, content drift) plus the live re-eval
+     * The per-spec detection: the cheap triggers (failed runs, content drift) plus the live re-eval
      * of the pack against its baseline. The re-eval is spent when the pack can regress
      * ({@code active}/{@code degraded}) or when its content has drifted from the sidecar — in both
      * cases the pack must be re-scored before anything is decided.
      */
-    private Detector.Result detect(String skill, SkillPack current, LifecycleMetadata sidecar,
+    private Detector.Result detect(String spec, AgentSpec current, LifecycleMetadata sidecar,
                                   List<TraceRecord> window) {
         boolean regressable = sidecar.state() == LifecycleState.ACTIVE
                 || sidecar.state() == LifecycleState.DEGRADED;
         boolean needsReeval = regressable || Detector.hasDrift(current, sidecar);
         Detector.ReevalHook hook = needsReeval ? s -> gateChain.reeval(current) : null;
-        return detector.detect(skill, current, sidecar, window, hook);
+        return detector.detect(spec, current, sidecar, window, hook);
     }
 
-    private PendingCandidate toCandidate(String skill, Refiner.Refinement refinement, GateResult gate,
+    private PendingCandidate toCandidate(String spec, Refiner.Refinement refinement, GateResult gate,
                                          LifecycleMetadata sidecar, Detector.Result detection) {
         LifecycleState state = LifecycleTransitions.onPublished(sidecar.state());
         LifecycleMetadata proposed = LifecycleTransitions.sidecarFor(refinement.candidate(), gate.score(), state);
         String diff = "rewrote prompts of: " + String.join(", ", refinement.changedSteps());
         return new PendingCandidate(
-                nextId(skill), skill, refinement.candidate(), proposed,
+                nextId(spec), spec, refinement.candidate(), proposed,
                 gate.score(), sidecar.baselinePassRate(), gate.scan(),
                 detection.failureTraces(), diff);
     }
@@ -220,21 +220,21 @@ public final class ImprovementLoop {
 
     private PublishResult publishCandidate(PendingCandidate candidate) {
         try {
-            // push=true: the loop writes the improvement back into the skill source, so a git
+            // push=true: the loop writes the improvement back into the spec source, so a git
             // source must be pushed or the commit dies with the publisher's throwaway clone. The
             // folder publisher ignores the flag (a local write is already persistent).
             return publisher.publish(candidate.candidate(), candidate.proposedLifecycle(), true, true);
         } catch (IOException e) {
-            throw new UncheckedIOException("cannot publish candidate for " + candidate.skill(), e);
+            throw new UncheckedIOException("cannot publish candidate for " + candidate.spec(), e);
         }
     }
 
-    private String nextId(String skill) {
-        return skill + "-" + idCounter.incrementAndGet();
+    private String nextId(String spec) {
+        return spec + "-" + idCounter.incrementAndGet();
     }
 
-    /** The most recent trace for the skill, or {@code null} when the pack cannot be read. */
-    private SkillPack readPack(Path root) {
+    /** The most recent trace for the spec, or {@code null} when the pack cannot be read. */
+    private AgentSpec readPack(Path root) {
         try {
             return packReader.read(root);
         } catch (IOException e) {
@@ -246,7 +246,7 @@ public final class ImprovementLoop {
      * The pack's lifecycle sidecar, or a fresh {@code incubating} sidecar (at the current content
      * hash, no baseline) when the pack has none.
      */
-    private LifecycleMetadata readSidecar(Path root, SkillPack current) {
+    private LifecycleMetadata readSidecar(Path root, AgentSpec current) {
         Path sidecar = root.resolve("lifecycle.yml");
         if (Files.isRegularFile(sidecar)) {
             try {
@@ -255,7 +255,7 @@ public final class ImprovementLoop {
                 // fall through to the default sidecar
             }
         }
-        return new LifecycleMetadata(SkillContentHash.of(current), 0.0, LifecycleState.INCUBATING,
+        return new LifecycleMetadata(SpecContentHash.of(current), 0.0, LifecycleState.INCUBATING,
                 Instant.now().toString());
     }
 
@@ -267,12 +267,12 @@ public final class ImprovementLoop {
         }
     }
 
-    private boolean isCaughtUp(String skill, Instant latest) {
-        Instant last = lastProcessed.get(skill);
+    private boolean isCaughtUp(String spec, Instant latest) {
+        Instant last = lastProcessed.get(spec);
         return last != null && !last.isBefore(latest);
     }
 
-    private void advanceWatermark(String skill, TraceRecord latest) {
-        lastProcessed.put(skill, latest.timestamp());
+    private void advanceWatermark(String spec, TraceRecord latest) {
+        lastProcessed.put(spec, latest.timestamp());
     }
 }

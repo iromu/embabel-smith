@@ -7,7 +7,7 @@ source_paths:
   - "poc/poc-7-runtime-adapter/src/main/java/com/embabel/smith/adapter/AdapterRunner.java"
   - "poc/poc-7-runtime-adapter/src/main/java/com/embabel/smith/adapter/ShellCommandTool.java"
   - "poc/poc-7-runtime-adapter/src/main/java/com/embabel/smith/adapter/ShellToolGroupFactory.java"
-  - "skill-packs/shell-runner/steps/runCli.yml"
+  - "agent-specs/shell-runner/steps/runCli.yml"
   - "poc/poc-13-remote-mcp/src/main/java/com/embabel/smith/remote/RemoteExplainerAgent.java"
   - "poc/poc-13-remote-mcp/src/main/java/com/embabel/smith/remote/RemoteMcpServerApp.java"
   - "poc/poc-16-remote-action/src/main/java/com/embabel/smith/remote/RemoteActionSidecar.java"
@@ -17,11 +17,11 @@ updated_at: "2026-11-02"
 
 # Runtime adapter: CLI + remote/MCP + remote-action invocation (POC 7, POC 13, POC 16)
 
-POC 7 is the **runtime adapter** claim (doc 03 §2.3): a skill-pack is **not** locked to LLM-only
-actions. A skill whose action declares `toolGroups: [shell]` gets the real `shell` tool injected by
-the platform, so the skill can drive the host and run an actual CLI command — no orchestration
+POC 7 is the **runtime adapter** claim (doc 03 §2.3): an agent spec is **not** locked to LLM-only
+actions. A spec whose action declares `toolGroups: [shell]` gets the real `shell` tool injected by
+the platform, so the spec can drive the host and run an actual CLI command — no orchestration
 code. This is the **local-CLI bridge** of the "normal agent harness". POC 13 covers the **remote/MCP
-bridge**: the same exported-goal-as-skill surface, published as an MCP tool and invoked over the
+bridge**: the same exported-goal-as-spec surface, published as an MCP tool and invoked over the
 network. POC 16 covers the **remote-action bridge**: a GOAP plan plans over, and executes over
 HTTP, an action running in a separate sidecar process. All three bridges are now exercised (see
 [[what-the-pocs-prove]]).
@@ -39,10 +39,10 @@ HTTP, an action running in a separate sidecar process. All three bridges are now
   companion method by signature and wraps it with `ToolGroup.Companion.ofTools`. The reflection is
   confined to this one class so the rest of the POC uses the clean `ToolGroup` API.
 
-## The skill that uses it
+## The spec that uses it
 
-`skill-packs/shell-runner/` declares `toolGroups: [shell]` on its `runCli` action (the rest is a
-plain `UserInput → BackgroundMessage` skill). At run time the platform auto-registers the injected
+`agent-specs/shell-runner/` declares `toolGroups: [shell]` on its `runCli` action (the rest is a
+plain `UserInput → BackgroundMessage` spec). At run time the platform auto-registers the injected
 group (`Registered tool groups: [math, shell]`), the action calls `runCommand({"command":"uname
 -s"})`, and the goal returns the real output.
 
@@ -81,13 +81,13 @@ Two things that only surface in the live run:
 
 Endpoint-gated (the server-side action calls the model). Run with a free port (8080 may be taken by
 another local service) and the client pointed at the same port — see `poc/poc-13-remote-mcp/README.md`
-and `docs/04-poc-run-results.md` §5. This is the "consume" side of [[exported-goal-as-skill]] across
+and `docs/04-poc-run-results.md` §5. This is the "consume" side of [[exported-goal-as-spec]] across
 processes.
 
 ## The remote-action half (POC 16)
 
 The third bridge: a GOAP plan plans over, and executes over HTTP, an action running in a **separate
-sidecar process** — the "normal agent harness" where a skill invokes an external worker. Unlike POC
+sidecar process** — the "normal agent harness" where a spec invokes an external worker. Unlike POC
 13 (where the remote side *is* the Embabel agent publishing a goal), here the remote side is plain
 code; `embabel-agent-remote`'s client pulls it in as a `RestAction` and the local GOAP planner drives
 it.

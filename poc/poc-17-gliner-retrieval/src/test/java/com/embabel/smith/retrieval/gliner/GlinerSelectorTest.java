@@ -1,6 +1,6 @@
 package com.embabel.smith.retrieval.gliner;
 
-import com.embabel.smith.retrieval.SkillEntry;
+import com.embabel.smith.retrieval.SpecEntry;
 import io.gravitee.lab.gliner4j.schema.ClassificationLabel;
 import io.gravitee.lab.gliner4j.schema.ClassificationResult;
 import org.junit.jupiter.api.Test;
@@ -12,18 +12,18 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Verifies {@link GlinerSelector} with a stubbed classifier (no model): it builds one label per
- * candidate (name = skill id, description = skill text), passes that label set to the classifier,
- * and returns the top-scored label's skill id — or no selection for an empty candidate set.
+ * candidate (name = spec id, description = spec text), passes that label set to the classifier,
+ * and returns the top-scored label's spec id — or no selection for an empty candidate set.
  */
 class GlinerSelectorTest {
 
-    private static SkillEntry entry(String id, String description) {
-        return new SkillEntry(id, id, description, List.of("UserInput"), "BackgroundMessage");
+    private static SpecEntry entry(String id, String description) {
+        return new SpecEntry(id, id, description, List.of("UserInput"), "BackgroundMessage");
     }
 
     @Test
     void buildsOneLabelPerCandidateWithIdAsNameAndDescriptionAsText() {
-        List<SkillEntry> candidates = List.of(
+        List<SpecEntry> candidates = List.of(
                 entry("coffee-machine", "Explains how a coffee machine works"),
                 entry("toaster", "Explains how a toaster works"));
         assertThat(GlinerSelector.labelsFor(candidates)).containsExactly(
@@ -33,7 +33,7 @@ class GlinerSelectorTest {
 
     @Test
     void passesTheCandidateLabelsToTheClassifier() {
-        List<SkillEntry> candidates = List.of(entry("a", "desc a"), entry("b", "desc b"));
+        List<SpecEntry> candidates = List.of(entry("a", "desc a"), entry("b", "desc b"));
         List<ClassificationLabel> seen = new ArrayList<>();
         GlinerSelector selector = new GlinerSelector((text, labels, threshold) -> {
             seen.addAll(labels);
@@ -49,7 +49,7 @@ class GlinerSelectorTest {
 
     @Test
     void returnsTheTopScoredLabelAsTheSelection() {
-        List<SkillEntry> candidates = List.of(entry("a", "desc a"), entry("b", "desc b"), entry("c", "desc c"));
+        List<SpecEntry> candidates = List.of(entry("a", "desc a"), entry("b", "desc b"), entry("c", "desc c"));
         // The model "prefers" b (highest confidence), then a, then c.
         GlinerSelector selector = new GlinerSelector((text, labels, threshold) -> List.of(
                 new ClassificationResult("b", 0.9f),

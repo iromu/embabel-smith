@@ -21,8 +21,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  *
  * <p>Uses a standalone {@link MockMvc} (spring-test) rather than {@code @WebMvcTest}: the latter lives
  * in the {@code spring-boot-webmvc-test} slice, which is not present in the offline repo at this
- * project's resolved version. A hand-built {@link SkillCatalog} (empty override → walk up to the repo's
- * skill-packs) plus a temp export dir keeps the test hermetic and fully offline.
+ * project's resolved version. A hand-built {@link SpecCatalog} (empty override → walk up to the repo's
+ * agent specs) plus a temp export dir keeps the test hermetic and fully offline.
  */
 class CanvasControllerTest {
 
@@ -33,13 +33,13 @@ class CanvasControllerTest {
 
     @BeforeEach
     void setUp() {
-        SkillCatalog catalog = new SkillCatalog("");
+        SpecCatalog catalog = new SpecCatalog("");
         mockMvc = MockMvcBuilders.standaloneSetup(new CanvasController(catalog, outDir)).build();
     }
 
     @Test
-    void listsTheComposeSkills() throws Exception {
-        mockMvc.perform(get("/api/skills"))
+    void listsTheComposeSpecs() throws Exception {
+        mockMvc.perform(get("/api/specs"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[?(@.name=='compose-extract')]").exists())
                 .andExpect(jsonPath("$[?(@.name=='compose-explain')]").exists());

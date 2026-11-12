@@ -18,11 +18,11 @@ import com.embabel.agent.eval.support.Score;
 import com.embabel.agent.spec.StepSpecAgentScopeBuilder;
 import com.embabel.agent.spec.model.BackgroundMessage;
 import com.embabel.agent.spec.yml.YmlStepSpecRepository;
-import com.embabel.smith.common.io.SkillPackWriter;
+import com.embabel.smith.common.io.AgentSpecWriter;
 import com.embabel.smith.common.model.DynamicTypeDef;
 import com.embabel.smith.common.model.PropertyDef;
-import com.embabel.smith.common.model.SkillPack;
-import com.embabel.smith.common.validation.SkillPackValidator;
+import com.embabel.smith.common.model.AgentSpec;
+import com.embabel.smith.common.validation.AgentSpecValidator;
 import com.embabel.smith.common.validation.ValidationResult;
 
 import java.io.IOException;
@@ -35,8 +35,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * The eval-guided refinement loop (POC 9): evaluate a weak skill, rewrite its prompt from the
- * failing tasks, re-evaluate, and report the before/after composite score. Endpoint-gated (the skill
+ * The eval-guided refinement loop (POC 9): evaluate a weak spec, rewrite its prompt from the
+ * failing tasks, re-evaluate, and report the before/after composite score. Endpoint-gated (the spec
  * runs and the rewrite both call the model); the scoring and re-validation halves are pure.
  */
 public class RefinementRunner {
@@ -62,17 +62,17 @@ public class RefinementRunner {
     private final AgentPlatform platform;
     private final RefinementScorer scorer = new RefinementScorer();
     private final PromptRewriter rewriter = new PromptRewriter();
-    private final SkillPackWriter writer = new SkillPackWriter();
-    private final SkillPackValidator validator = new SkillPackValidator();
+    private final AgentSpecWriter writer = new AgentSpecWriter();
+    private final AgentSpecValidator validator = new AgentSpecValidator();
 
     public RefinementRunner(AgentPlatform platform) {
         this.platform = platform;
     }
 
-    public RefinementOutcome improve(SkillPack pack, String stepName, List<SkillEvalTask> tasks, Endpoint endpoint) {
+    public RefinementOutcome improve(AgentSpec pack, String stepName, List<SpecEvalTask> tasks, Endpoint endpoint) {
         Agent before = deploy(pack, "refine-before");
         FullScores beforeScores = evaluate(before, tasks);
-        List<SkillEvalTask> failing = failingTasks(beforeScores, tasks);
+        List<SpecEvalTask> failing = failingTasks(beforeScores, tasks);
         if (failing.isEmpty()) {
             return new RefinementOutcome(beforeScores.getTotalScore(), beforeScores.getTotalScore(),
                     null, List.of());
@@ -89,10 +89,10 @@ public class RefinementRunner {
         FullScores afterScores = evaluate(after, tasks);
 
         return new RefinementOutcome(beforeScores.getTotalScore(), afterScores.getTotalScore(),
-                revisedPrompt, failing.stream().map(SkillEvalTask::input).toList());
+                revisedPrompt, failing.stream().map(SpecEvalTask::input).toList());
     }
 
-    private FullScores evaluate(Agent agent, List<SkillEvalTask> tasks) {
+    private FullScores evaluate(Agent agent, List<SpecEvalTask> tasks) {
         List<Score> scores = tasks.stream()
                 .map(task -> scorer.scoreOne(invoke(agent, task.input()), task))
                 .toList();
@@ -108,7 +108,7 @@ public class RefinementRunner {
         return last instanceof BackgroundMessage message ? message.getContent() : null;
     }
 
-    private List<SkillEvalTask> failingTasks(FullScores scores, List<SkillEvalTask> tasks) {
+    private List<SpecEvalTask> failingTasks(FullScores scores, List<SpecEvalTask> tasks) {
         return scores.getAssertionScores().stream()
                 .filter(s -> s.getScore() < 1.0)
                 .map(Score::getScored)
@@ -117,10 +117,10 @@ public class RefinementRunner {
                 .toList();
     }
 
-    private Agent deploy(SkillPack pack, String agentName) {
+    private Agent deploy(AgentSpec pack, String agentName) {
         ValidationResult result = validator.validate(pack);
         if (!result.isValid()) {
-            throw new IllegalStateException("Skill-pack failed validation: " + result.issues());
+            throw new IllegalStateException("Spec-pack failed validation: " + result.issues());
         }
         try {
             DataDictionary types = platform.plus(
@@ -134,7 +134,7 @@ public class RefinementRunner {
                     List.of(),
                     List.of());
             AgentScope scope = builder.deploy();
-            Agent agent = scope.createAgent(agentName, "skill", "refinement target: " + pack.name());
+            Agent agent = scope.createAgent(agentName, "spec", "refinement target: " + pack.name());
             platform.deploy(agent);
             return agent;
         } catch (IOException e) {
@@ -142,7 +142,7 @@ public class RefinementRunner {
         }
     }
 
-    private List<DomainType> runtimeTypes(SkillPack pack) {
+    private List<DomainType> runtimeTypes(AgentSpec pack) {
         List<DomainType> types = new ArrayList<>();
         types.add(new JvmType(UserInput.class));
         types.add(new JvmType(BackgroundMessage.class));
@@ -156,7 +156,7 @@ public class RefinementRunner {
         return types;
     }
 
-    private Path assembleStepSpecs(SkillPack pack) throws IOException {
+    private Path assembleStepSpecs(AgentSpec pack) throws IOException {
         Path packDir = writer.write(pack, Files.createTempDirectory("refine-pack-"));
         Path target = Files.createTempDirectory("refine-steps-");
         Files.copy(packDir.resolve("goal.yml"), target.resolve("goal.yml"), COPY);

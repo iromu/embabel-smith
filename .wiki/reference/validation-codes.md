@@ -4,16 +4,16 @@ type: "reference"
 status: "active"
 language: "default"
 source_paths:
-  - "smith-common/src/main/java/com/embabel/smith/common/validation/SkillPackValidator.java"
+  - "smith-common/src/main/java/com/embabel/smith/common/validation/AgentSpecValidator.java"
   - "smith-common/src/main/java/com/embabel/smith/common/validation/ValidationIssue.java"
-  - "smith-common/src/test/java/com/embabel/smith/common/validation/SkillPackValidatorTest.java"
+  - "smith-common/src/test/java/com/embabel/smith/common/validation/AgentSpecValidatorTest.java"
 updated_at: "2026-11-01"
 ---
 
 # Validation issue codes
 
-`SkillPackValidator` (in `smith-common`) is the format's structural gate. Every POC that touches a
-skill-pack runs it before ingesting, building, or writing one. See [[skill-pack-format]] for what
+`AgentSpecValidator` (in `smith-common`) is the format's structural gate. Every POC that touches an
+agent spec runs it before ingesting, building, or writing one. See [[agent-spec-format]] for what
 the checks mean and [[validate-before-write]] for why the builder depends on it.
 
 ## The four checks, in order
@@ -39,8 +39,8 @@ human-readable `message`, and the file/step the issue was found in (or `null` if
 | `LAYOUT_MISSING_STEPS` | `steps/` directory is missing |
 | `LAYOUT_EMPTY_STEPS` | `steps/` contains no action-step files |
 | `LAYOUT_MISSING_TYPES` | `types/` directory is missing |
-| `GOAL_MISSING` | No goal defined; a skill-pack must expose a goal |
-| `GOAL_NOT_EXPORTED` | `goal.yml` does not declare `export: true` — no callable skill exposed |
+| `GOAL_MISSING` | No goal defined; an agent spec must expose a goal |
+| `GOAL_NOT_EXPORTED` | `goal.yml` does not declare `export: true` — no callable spec exposed |
 | `DANGLING_TYPE_REF` | An input/output type is neither framework-provided nor declared in `types/` |
 | `PROMPT_MISSING` | An action has no prompt |
 | `PROMPT_UNDECLARED_INPUT` | A prompt reference is not bound by any declared input type |
@@ -50,14 +50,14 @@ human-readable `message`, and the file/step the issue was found in (or `null` if
 ## Framework types
 
 These built-in Embabel types need not be declared in `types/` (from
-`SkillPackValidator.defaultFrameworkTypes()`): `UserInput`, `SystemInput`, `BackgroundMessage`,
+`AgentSpecValidator.defaultFrameworkTypes()`): `UserInput`, `SystemInput`, `BackgroundMessage`,
 `AssistantMessage` — each accepted by short name or fully-qualified name
 (e.g. `com.embabel.agent.domain.io.UserInput`).
 
 ## How to read a failure
 
-When a POC throws "Skill-pack failed validation: …", the list of `ValidationIssue`s names the
+When a POC throws "Spec-pack failed validation: …", the list of `ValidationIssue`s names the
 `code` and the offending value/file. Fix the pack (data) first; only change the format contract if
 the pack is genuinely well-formed. The behaviour is pinned by
-`smith-common/src/test/java/com/embabel/smith/common/validation/SkillPackValidatorTest.java`
+`smith-common/src/test/java/com/embabel/smith/common/validation/AgentSpecValidatorTest.java`
 (accepts a well-formed pack, rejects a dangling type reference).

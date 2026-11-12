@@ -1,14 +1,14 @@
 package com.embabel.smith.studio.rest.dto;
 
-import com.embabel.smith.common.model.SkillPack;
+import com.embabel.smith.common.model.AgentSpec;
 
 /**
- * The load-a-saved-pack response: the reloaded {@link SkillPack} (serialisable to the frontend's
+ * The load-a-saved-pack response: the reloaded {@link AgentSpec} (serialisable to the frontend's
  * ComposePack shape) or a structured error when no such pack is stored.
  */
-public record StoredPackResponse(SkillPack pack, String error) {
+public record StoredPackResponse(AgentSpec pack, String error) {
 
-    public static StoredPackResponse of(SkillPack pack) {
+    public static StoredPackResponse of(AgentSpec pack) {
         return new StoredPackResponse(pack, null);
     }
 

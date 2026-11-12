@@ -1,7 +1,7 @@
 package com.embabel.smith.retrieval.remote;
 
-import com.embabel.smith.retrieval.SkillEntry;
-import com.embabel.smith.retrieval.scale.ScaleSkillLibrary;
+import com.embabel.smith.retrieval.SpecEntry;
+import com.embabel.smith.retrieval.scale.ScaleSpecLibrary;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -12,8 +12,8 @@ class ScalingMeasurementTest {
 
     @Test
     void sweepReportsOnePointPerSizeInAscendingOrder() {
-        List<SkillEntry> library = LargeScaleLibrary.generate(120);
-        List<ScaleSkillLibrary.QueryTarget> queries = LargeScaleLibrary.benchmark();
+        List<SpecEntry> library = LargeScaleLibrary.generate(120);
+        List<ScaleSpecLibrary.QueryTarget> queries = LargeScaleLibrary.benchmark();
         List<Integer> sizes = List.of(20, 40, 80, 120);
 
         ScalingMeasurement measurement = new ScalingMeasurement();
@@ -36,13 +36,13 @@ class ScalingMeasurementTest {
     void indexEmbeddingsAreAmortisedAcrossSizes() {
         // The shared memoising scorer means the total distinct embeddings across the whole sweep is
         // bounded by (largest size + queries), not the sum of every size.
-        List<SkillEntry> library = LargeScaleLibrary.generate(60);
-        List<ScaleSkillLibrary.QueryTarget> queries = LargeScaleLibrary.benchmark();
+        List<SpecEntry> library = LargeScaleLibrary.generate(60);
+        List<ScaleSpecLibrary.QueryTarget> queries = LargeScaleLibrary.benchmark();
         RemoteEmbedder embedder = StubEmbedding.embedder(StubEmbedding::hashVec);
 
         new ScalingMeasurement().sweep(embedder, library, queries, List.of(20, 40, 60));
 
-        // distinct texts embedded = 60 library skills + 6 benchmark queries, each once
+        // distinct texts embedded = 60 library specs + 6 benchmark queries, each once
         assertThat(embedder.requestCount()).isEqualTo(60 + queries.size());
     }
 }

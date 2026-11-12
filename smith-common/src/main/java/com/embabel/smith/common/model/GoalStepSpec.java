@@ -4,12 +4,11 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
- * The exported goal — the skill-pack's view of an Embabel {@code GoalSpec}.
+ * The exported goal — the agent spec's view of an Embabel {@code GoalSpec}.
  *
- * <p>Declared in {@code goal.yml}. A skill-pack exposes exactly one callable skill, and that
- * skill <em>is</em> this goal: it is marked {@code export: true} and names a single output
- * type. A goal that is not exported does not expose a callable skill, so it is invalid as a
- * skill-pack goal.
+ * <p>Declared in {@code goal.yml}. An agent spec exposes exactly one callable goal: it is
+ * marked {@code export: true} and names a single output type. A goal that is not exported is
+ * not callable, so it is invalid as an agent spec goal.
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record GoalStepSpec(

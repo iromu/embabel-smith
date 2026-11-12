@@ -2,7 +2,7 @@ package com.embabel.smith.studio.improve;
 
 import com.embabel.smith.builder.lifecycle.LifecycleMetadata;
 import com.embabel.smith.builder.security.ScanReport;
-import com.embabel.smith.common.model.SkillPack;
+import com.embabel.smith.common.model.AgentSpec;
 import com.embabel.smith.runtime.trace.TraceRecord;
 
 import java.util.List;
@@ -15,8 +15,8 @@ import java.util.List;
  */
 public record PendingCandidate(
         String id,
-        String skill,
-        SkillPack candidate,
+        String spec,
+        AgentSpec candidate,
         LifecycleMetadata proposedLifecycle,
         double score,
         double baseline,

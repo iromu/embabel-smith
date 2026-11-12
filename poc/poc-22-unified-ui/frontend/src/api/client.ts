@@ -24,7 +24,7 @@ import type {
   ScaleResponse,
   SecurityRequest,
   SecurityResponse,
-  SkillInfo,
+  SpecInfo,
   TrustRequest,
   TrustResponse,
 } from './types'
@@ -51,7 +51,7 @@ function post<T>(path: string, body: unknown): Promise<T> {
 }
 
 // ---- Compose (POC 14) ------------------------------------------------------
-export const listSkills = (): Promise<SkillInfo[]> => get<SkillInfo[]>('/api/skills')
+export const listSpecs = (): Promise<SpecInfo[]> => get<SpecInfo[]>('/api/specs')
 export const validateCanvas = (req: CanvasRequest): Promise<CanvasResponse> =>
   post<CanvasResponse>('/api/canvas', req)
 export const compose = (req: ComposeRequest): Promise<ComposeResponse> =>

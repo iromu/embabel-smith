@@ -36,7 +36,7 @@ export interface ScanFinding {
   evidence: string
 }
 export interface ScanInfo {
-  skillName: string
+  specName: string
   findings: ScanFinding[]
   verdict: string
   recommendedTier: string | null
@@ -215,7 +215,7 @@ export interface TraceInfo {
 // ---- Improvement loop ------------------------------------------------------
 export interface CandidateInfo {
   id: string
-  skill: string
+  spec: string
   score: number
   baseline: number
   diffSummary: string
@@ -233,8 +233,8 @@ export interface AutoPublishRequest {
 export interface IterationInfo {
   ran: boolean
   candidates: number
-  publishedSkills: string[]
-  queuedSkills: string[]
+  publishedSpecs: string[]
+  queuedSpecs: string[]
   autoPublish: boolean
   errorCode: string | null
   error: string | null
@@ -257,13 +257,13 @@ export interface EvalTaskDto {
 }
 export interface EvalRequest {
   source: string
-  skill: string
+  spec: string
   tasks?: EvalTaskDto[]
 }
 export interface EvalResponse {
   error: string | null
   errorCode: string | null
-  skill: string | null
+  spec: string | null
   score: number | null
   refinementCount: number
   failingTasks: string[]
@@ -274,7 +274,7 @@ export interface EvalResponse {
 // ---- Security / Trust (offline) --------------------------------------------
 export interface SecurityRequest {
   source: string
-  skill: string
+  spec: string
 }
 export interface SecurityResponse {
   error: string | null
@@ -282,12 +282,12 @@ export interface SecurityResponse {
 }
 export interface TrustRequest {
   source: string
-  skill: string
+  spec: string
   tier: string
 }
 export interface TrustResponse {
   error: string | null
-  skillName: string | null
+  specName: string | null
   tier: string | null
   allowed: boolean
   disallowedGroups: string[]

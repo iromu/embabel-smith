@@ -11,8 +11,8 @@ embabel:
             base-url: ${OPENAI_CUSTOM_BASE_URL:}
             models: ${OPENAI_CUSTOM_MODELS:}
 builder:
-  # Where the builder writes the skill-packs it produces.
-  output-dir: ${BUILDER_OUTPUT_DIR:./built-skills}
+  # Where the builder writes the agent specs it produces.
+  output-dir: ${BUILDER_OUTPUT_DIR:./built-specs}
 spring:
   main:
     web-application-type: none

@@ -1,22 +1,22 @@
 package com.embabel.smith.studio.improve;
 
 import com.embabel.smith.builder.lifecycle.LifecycleMetadata;
-import com.embabel.smith.builder.lifecycle.SkillContentHash;
-import com.embabel.smith.common.model.SkillPack;
+import com.embabel.smith.builder.lifecycle.SpecContentHash;
+import com.embabel.smith.common.model.AgentSpec;
 import com.embabel.smith.runtime.trace.TraceRecord;
 
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Decides whether a skill needs improvement, and why. It is a pure function of the skill's trace
+ * Decides whether a spec needs improvement, and why. It is a pure function of the spec's trace
  * window, its current pack content, and its lifecycle sidecar — no model calls, so it is fully
  * offline-testable.
  *
  * <p>Three triggers (spec "Detection triggers"):
  * <ul>
  *   <li><b>failed runs</b> — recent traces that failed in a way that is <em>not</em> a trust-tier
- *       block (a tier block is a policy outcome, not a skill defect refinement can fix);</li>
+ *       block (a tier block is a policy outcome, not a spec defect refinement can fix);</li>
  *   <li><b>content drift</b> — the current pack's content hash differs from the sidecar's recorded
  *       hash (the pack changed since its baseline was recorded);</li>
  *   <li><b>below baseline</b> — an injected live re-evaluation scores below the sidecar's baseline
@@ -31,10 +31,10 @@ public final class Detector {
     /** The "live re-eval &lt; baseline" hook: returns the pack's current pass-rate. */
     @FunctionalInterface
     public interface ReevalHook {
-        double score(String skill);
+        double score(String spec);
     }
 
-    /** The detection outcome: whether the skill is queued, whether it regressed, why, and the failure traces to refine from. */
+    /** The detection outcome: whether the spec is queued, whether it regressed, why, and the failure traces to refine from. */
     public record Result(boolean queued, boolean regressed, List<String> reasons,
                          List<TraceRecord> failureTraces) {
 
@@ -44,9 +44,9 @@ public final class Detector {
     }
 
     /** Detects without a live re-eval (the below-baseline trigger is disabled). */
-    public Result detect(String skill, SkillPack current, LifecycleMetadata sidecar,
+    public Result detect(String spec, AgentSpec current, LifecycleMetadata sidecar,
                          List<TraceRecord> window) {
-        return detect(skill, current, sidecar, window, null);
+        return detect(spec, current, sidecar, window, null);
     }
 
     /**
@@ -54,7 +54,7 @@ public final class Detector {
      * {@code null} to disable the below-baseline trigger for this call. The failed-run and
      * content-drift triggers are always evaluated.
      */
-    public Result detect(String skill, SkillPack current, LifecycleMetadata sidecar,
+    public Result detect(String spec, AgentSpec current, LifecycleMetadata sidecar,
                          List<TraceRecord> window, ReevalHook hook) {
         List<String> reasons = new ArrayList<>();
         List<TraceRecord> failures = failedNonTierBlock(window);
@@ -65,7 +65,7 @@ public final class Detector {
         if (hasDrift(current, sidecar)) {
             reasons.add("content drift");
         }
-        if (hook != null && belowBaseline(hook.score(skill), sidecar.baselinePassRate())) {
+        if (hook != null && belowBaseline(hook.score(spec), sidecar.baselinePassRate())) {
             regressed = true;
             reasons.add("below baseline");
         }
@@ -91,7 +91,7 @@ public final class Detector {
         return out;
     }
 
-    /** A failed run caused by the trust-tier gate (a policy block, not a skill defect). */
+    /** A failed run caused by the trust-tier gate (a policy block, not a spec defect). */
     public static boolean isTierBlock(TraceRecord record) {
         return !record.success()
                 && record.error() != null
@@ -99,8 +99,8 @@ public final class Detector {
     }
 
     /** Content drift: the current pack's content hash differs from the sidecar's recorded hash. */
-    public static boolean hasDrift(SkillPack current, LifecycleMetadata sidecar) {
-        return !SkillContentHash.of(current).equals(sidecar.contentHash());
+    public static boolean hasDrift(AgentSpec current, LifecycleMetadata sidecar) {
+        return !SpecContentHash.of(current).equals(sidecar.contentHash());
     }
 
     /** A re-eval that does not reach the baseline (the "re-eval &lt; baseline" trigger). */

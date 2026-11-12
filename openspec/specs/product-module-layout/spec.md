@@ -7,7 +7,7 @@ The production module layout of Embabel Smith: where product code lives, how the
 ## Requirements
 
 ### Requirement: Production modules live under a prod aggregator
-The project SHALL contain a `prod/` Maven aggregator module (`embabel-smith-prod`) registered in the root POM, holding the production modules `embabel-smith-skillsource`, `embabel-smith-runtime`, `embabel-smith-builder`, and `embabel-smith-studio` (folders `prod/embabel-smith-*/`).
+The project SHALL contain a `prod/` Maven aggregator module (`embabel-smith-prod`) registered in the root POM, holding the production modules `embabel-smith-specsource`, `embabel-smith-runtime`, `embabel-smith-builder`, and `embabel-smith-studio` (folders `prod/embabel-smith-*/`).
 
 #### Scenario: Aggregator builds
 - **WHEN** the root build (`mvn verify` from the project root) runs

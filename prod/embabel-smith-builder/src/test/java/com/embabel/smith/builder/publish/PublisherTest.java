@@ -2,8 +2,8 @@ package com.embabel.smith.builder.publish;
 
 import com.embabel.smith.builder.lifecycle.LifecycleMetadata;
 import com.embabel.smith.builder.lifecycle.LifecycleStamper;
-import com.embabel.smith.common.model.SkillPack;
-import com.embabel.smith.common.samples.SampleSkillPacks;
+import com.embabel.smith.common.model.AgentSpec;
+import com.embabel.smith.common.samples.SampleAgentSpecs;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -23,7 +23,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  */
 class PublisherTest {
 
-    private final SkillPack pack = SampleSkillPacks.explainer();
+    private final AgentSpec pack = SampleAgentSpecs.explainer();
     private final LifecycleMetadata lifecycle = new LifecycleStamper().stamp(pack, 1.0);
 
     @Test

@@ -1,9 +1,9 @@
 # embabel-smith-runtime
 
-The runtime product: ingests skill-packs from a source (folder or git URI), runs an exported
+The runtime product: ingests agent specs from a source (folder or git URI), runs an exported
 goal over them, enforces trust tiers, and records every run as a JSONL trace.
 
-Everything executed is *data* (the skill-pack YAML): ingestion deploys the packs' step specs
+Everything executed is *data* (the agent-spec YAML): ingestion deploys the packs' step specs
 onto the Embabel `AgentPlatform`, planning uses a non-model planner (default GOAP), and only
 the action bodies invoke the model.
 
@@ -14,7 +14,7 @@ smith run --source <uri> [--goal <name>] [--input <text>] [--planner <name>]
           [--trust-tier <tier>] [--trace-dir <dir>]
 ```
 
-- `--source` (required) — skill source URI: `folder:<path>` or `git:<url>[@ref]`.
+- `--source` (required) — spec source URI: `folder:<path>` or `git:<url>[@ref]`.
 - `--goal` — goal to run; defaults to the single goal the source exports.
 - `--input` — text bound to the goal's `UserInput`.
 - `--planner` — planner override; defaults to GOAP.
@@ -30,7 +30,7 @@ option, unknown value) exit **2**.
 Example:
 
 ```
-smith run --source folder:skill-packs/explainer \
+smith run --source folder:./agent-specs/explainer \
           --goal briefDone \
           --input "Explain how a coffee machine works"
 ```

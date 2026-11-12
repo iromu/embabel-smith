@@ -54,7 +54,7 @@ covered by `poc/poc-1-no-code-runtime/.../ModelEndpointConfigTest.java`.
 This is the project's central split:
 
 - **Offline** (always runs in CI via `mvn -q verify`): format round-trip, validation, the
-  builder's validate/write steps, the eval scoring/composite, the skill-format surface, planner
+  builder's validate/write steps, the eval scoring/composite, the spec-format surface, planner
   resolution, type mapping, step-spec assembly. These are pure Java and testable without a model.
 - **Endpoint-gated** (requires a live endpoint): anything that actually calls the LLM — the
   builder's `compileFromDescription`, the runtime's goal run, the NL-compile, the eval invocation,

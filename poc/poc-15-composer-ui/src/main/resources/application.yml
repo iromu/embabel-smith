@@ -1,4 +1,4 @@
-# The visual skill-chain editor (POC 15). Offline — no model endpoint.
+# The visual spec-chain editor (POC 15). Offline — no model endpoint.
 # Default port is 18080 to avoid colliding with a local service on 8080; override with SERVER_PORT.
 server:
   port: ${SERVER_PORT:18080}

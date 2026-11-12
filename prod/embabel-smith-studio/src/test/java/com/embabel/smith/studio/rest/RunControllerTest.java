@@ -1,7 +1,7 @@
 package com.embabel.smith.studio.rest;
 
 import com.embabel.smith.common.config.ModelEndpointConfig;
-import com.embabel.smith.runtime.SkillRunService;
+import com.embabel.smith.runtime.AgentSpecRunService;
 import com.embabel.smith.runtime.core.TrustTier;
 import com.embabel.smith.runtime.trace.TraceRecord;
 import com.embabel.smith.studio.rest.dto.RunRequest;
@@ -50,7 +50,7 @@ class RunControllerTest {
         RunController controller = new RunController((src, goal, input, planner, tier) -> {
             seenTier.set(tier);
             seenPlanner.set(planner);
-            return new SkillRunService.RunResult(true, "the output", null, trace("run-1"));
+            return new AgentSpecRunService.RunResult(true, "the output", null, trace("run-1"));
         }, configured());
         RunResponse response = controller.run(
                 new RunRequest("folder:/tmp", "goal", "input", "utility", "HIGH"));
@@ -66,7 +66,7 @@ class RunControllerTest {
         AtomicReference<TrustTier> seenTier = new AtomicReference<>();
         RunController controller = new RunController((src, goal, input, planner, tier) -> {
             seenTier.set(tier);
-            return new SkillRunService.RunResult(true, "ok", null, trace("run-2"));
+            return new AgentSpecRunService.RunResult(true, "ok", null, trace("run-2"));
         }, configured());
         controller.run(new RunRequest("folder:/tmp", "goal", "input", null, null));
         assertThat(seenTier.get()).isEqualTo(TrustTier.STANDARD);
@@ -75,7 +75,7 @@ class RunControllerTest {
     @Test
     void returnsFailureWhenRunFails() {
         RunController controller = new RunController((src, goal, input, planner, tier) ->
-                new SkillRunService.RunResult(false, null, "goal not achieved", trace("run-3")),
+                new AgentSpecRunService.RunResult(false, null, "goal not achieved", trace("run-3")),
                 configured());
         RunResponse response = controller.run(
                 new RunRequest("folder:/tmp", "goal", "input", null, null));

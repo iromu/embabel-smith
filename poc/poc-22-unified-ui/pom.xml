@@ -17,9 +17,9 @@
         typed, component-based, unit-tested Vue 3 + Quasar + TypeScript SPA (Vite build, Vitest
         tests) that exposes the full set of proven POC capabilities — run, author, compose,
         retrieve, eval, lifecycle, security, trust, remote, scale — over a thin REST surface. Each
-        controller delegates to a proven POC class (the POC 15 pattern); no new agent/skill logic.
+        controller delegates to a proven POC class (the POC 15 pattern); no new agent/spec logic.
         The default build depends only on the light + remote POC modules; the heavy scorers
-        (POC 17/19/20) plug in via the shared SkillScorer seam and are opt-in.
+        (POC 17/19/20) plug in via the shared SpecScorer seam and are opt-in.
     </description>
 
     <dependencies>
@@ -55,11 +55,11 @@
         </dependency>
         <dependency>
             <groupId>com.embabel.smith</groupId>
-            <artifactId>poc-18-skill-lifecycle</artifactId>
+            <artifactId>poc-18-agent-spec-lifecycle</artifactId>
         </dependency>
         <dependency>
             <groupId>com.embabel.smith</groupId>
-            <artifactId>poc-21-skill-security</artifactId>
+            <artifactId>poc-21-agent-spec-security</artifactId>
         </dependency>
         <!-- Remote transports: the MCP server (13) and the RestAction sidecar (16). -->
         <dependency>
@@ -71,7 +71,7 @@
             <artifactId>poc-16-remote-action</artifactId>
         </dependency>
         <!-- Heavy scorer opt-in (task 7.3): POC 20's real ONNX embedding scorer, wired via the
-             SkillScorer seam behind builder.scorer=embedding. -->
+             SpecScorer seam behind builder.scorer=embedding. -->
         <dependency>
             <groupId>com.embabel.smith</groupId>
             <artifactId>poc-20-semantic-embedding</artifactId>

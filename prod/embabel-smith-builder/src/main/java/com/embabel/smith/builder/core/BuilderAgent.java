@@ -8,10 +8,10 @@ import com.embabel.agent.core.DataDictionary;
 import com.embabel.agent.domain.io.UserInput;
 import com.embabel.agent.spec.compile.AgentCompilationResult;
 import com.embabel.agent.spec.compile.CompilationError;
-import com.embabel.smith.common.io.SkillPackReader;
-import com.embabel.smith.common.io.SkillPackWriter;
-import com.embabel.smith.common.model.SkillPack;
-import com.embabel.smith.common.validation.SkillPackValidator;
+import com.embabel.smith.common.io.AgentSpecReader;
+import com.embabel.smith.common.io.AgentSpecWriter;
+import com.embabel.smith.common.model.AgentSpec;
+import com.embabel.smith.common.validation.AgentSpecValidator;
 import com.embabel.smith.common.validation.ValidationIssue;
 
 import java.io.IOException;
@@ -20,51 +20,51 @@ import java.util.List;
 
 /**
  * The builder's build component (design D2): a code-backed {@code @Agent} whose single goal is
- * "a validated skill-pack exists on disk" ({@link SkillPackRef}), reached by a deterministic
+ * "a validated agent spec exists on disk" ({@link AgentSpecRef}), reached by a deterministic
  * pipeline of three code-backed actions:
  *
  * <pre>
  *   UserInput --compileFromDescription--> CompiledDraft
  *           --validateDraft-------------> ValidatedDraft
- *           --writeSkillPack------------> SkillPackRef   (goal)
+ *           --writeAgentSpec------------> AgentSpecRef   (goal)
  * </pre>
  *
  * The model is called only inside {@link #compileFromDescription(UserInput)}, and only through the
- * injected {@link SkillCompiler} (endpoint-gated); the validate and write steps are pure Java, so
+ * injected {@link AgentSpecCompiler} (endpoint-gated); the validate and write steps are pure Java, so
  * the pipeline order is deterministic and the offline behaviour is testable. Design D5 is enforced
  * here: an invalid draft is never written.
  *
  * <p>The {@link BuilderService} drives these actions directly (the same order the GOAP planner
  * would take), keeping the pipeline an Embabel agent while staying deterministic and offline-testable.
  */
-@Agent(planner = PlannerType.GOAP, description = "Builds a validated skill-pack from a natural-language description")
+@Agent(planner = PlannerType.GOAP, description = "Builds a validated agent spec from a natural-language description")
 public class BuilderAgent {
 
-    private final SkillCompiler compiler;
+    private final AgentSpecCompiler compiler;
     private final DataDictionary dataDictionary;
     private final Path outputDir;
 
-    private final DraftToSkillPack mapper = new DraftToSkillPack();
-    private final SkillPackValidator validator = new SkillPackValidator();
-    private final SkillPackWriter writer = new SkillPackWriter();
-    private final SkillPackReader reader = new SkillPackReader();
+    private final DraftToAgentSpec mapper = new DraftToAgentSpec();
+    private final AgentSpecValidator validator = new AgentSpecValidator();
+    private final AgentSpecWriter writer = new AgentSpecWriter();
+    private final AgentSpecReader reader = new AgentSpecReader();
 
-    public BuilderAgent(SkillCompiler compiler, DataDictionary dataDictionary, String outputDir) {
+    public BuilderAgent(AgentSpecCompiler compiler, DataDictionary dataDictionary, String outputDir) {
         this.compiler = compiler;
         this.dataDictionary = dataDictionary;
         this.outputDir = Path.of(outputDir);
     }
 
     /**
-     * Compiles a natural-language description into a draft skill via the injected
-     * {@link SkillCompiler}. Endpoint-gated for the production compiler.
+     * Compiles a natural-language description into a draft spec via the injected
+     * {@link AgentSpecCompiler}. Endpoint-gated for the production compiler.
      */
-    @Action(description = "Compile a natural-language description into a draft skill-pack")
+    @Action(description = "Compile a natural-language description into a draft agent spec")
     public CompiledDraft compileFromDescription(UserInput description) {
         String name = PackName.slug(description.getContent());
         AgentCompilationResult result = compiler.compile(name, description.getContent(), dataDictionary);
         List<String> issues = result.getErrors().stream().map(CompilationError::getMessage).toList();
-        SkillPack pack = mapper.toSkillPack(result, name);
+        AgentSpec pack = mapper.toAgentSpec(result, name);
         return new CompiledDraft(name, pack, issues);
     }
 
@@ -82,19 +82,19 @@ public class BuilderAgent {
      * Pure: writes a valid draft to disk and re-validates the written pack (group-1 validation).
      * Refuses to write an invalid draft (design D5).
      */
-    @Action(description = "Write the validated skill-pack to disk")
-    @AchievesGoal(description = "A validated skill-pack exists on disk")
-    public SkillPackRef writeSkillPack(ValidatedDraft draft) {
+    @Action(description = "Write the validated agent spec to disk")
+    @AchievesGoal(description = "A validated agent spec exists on disk")
+    public AgentSpecRef writeAgentSpec(ValidatedDraft draft) {
         if (!draft.valid()) {
             throw new IllegalStateException("Refusing to write an invalid draft: " + draft.issues());
         }
         Path dir = outputDir.resolve(draft.pack().name());
-        SkillPack readBack;
+        AgentSpec readBack;
         try {
             writer.write(draft.pack(), dir);
             readBack = reader.read(dir);
         } catch (IOException e) {
-            throw new IllegalStateException("Failed to write/re-read the skill-pack at " + dir, e);
+            throw new IllegalStateException("Failed to write/re-read the agent spec at " + dir, e);
         }
         // Re-validate the on-disk layout (not just the in-memory read-back) so a layout defect in
         // the writer is caught (design D5).
@@ -102,7 +102,7 @@ public class BuilderAgent {
         if (!issues.isEmpty()) {
             throw new IllegalStateException("Written pack failed re-validation: " + issues);
         }
-        return new SkillPackRef(dir, readBack.name(), readBack.version());
+        return new AgentSpecRef(dir, readBack.name(), readBack.version());
     }
 
     private List<String> toMessages(List<ValidationIssue> issues) {

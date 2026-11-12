@@ -1,21 +1,21 @@
 package com.embabel.smith.retrieval.remote;
 
-import com.embabel.smith.retrieval.SkillEntry;
+import com.embabel.smith.retrieval.SpecEntry;
 import com.embabel.smith.retrieval.scale.LexicalScorer;
 import com.embabel.smith.retrieval.scale.ScaleRetrievalRunner;
-import com.embabel.smith.retrieval.scale.ScaleSkillLibrary;
-import com.embabel.smith.retrieval.scale.ScaleSkillRegistry;
+import com.embabel.smith.retrieval.scale.ScaleSpecLibrary;
+import com.embabel.smith.retrieval.scale.ScaleSpecRegistry;
 import com.embabel.smith.retrieval.scale.SemanticScorer;
-import com.embabel.smith.retrieval.scale.SkillScorer;
+import com.embabel.smith.retrieval.scale.SpecScorer;
 
 import java.io.PrintStream;
 import java.util.Arrays;
 import java.util.List;
 
 /**
- * The remote-embedding skill-selection-at-scale report (POC 23). It plugs a genuine <em>remote</em>
+ * The remote-embedding spec-selection-at-scale report (POC 23). It plugs a genuine <em>remote</em>
  * {@code EmbeddingService} ({@link RemoteEmbedder} — the nomic-embed-text-v2 OpenAI-compatible
- * endpoint) into POC 12's {@link SkillScorer} seam and runs two scenarios:
+ * endpoint) into POC 12's {@link SpecScorer} seam and runs two scenarios:
  *
  * <ol>
  *   <li><b>C10-comparable</b> — POC 12/20's identical 200+ same-typed shadowing library, so the
@@ -69,7 +69,7 @@ public final class RemoteEmbeddingApp {
     public static void run(RemoteEmbedder embedder, String baseUrl, String model,
                            List<Integer> scaleSizes, PrintStream out) {
         List<Integer> sizes = scaleSizes.stream().sorted().toList();
-        out.println("=== POC 23: remote EmbeddingService skill selection at scale ===");
+        out.println("=== POC 23: remote EmbeddingService spec selection at scale ===");
         out.println("Endpoint: " + baseUrl + "   model: " + model);
         out.println();
 
@@ -81,13 +81,13 @@ public final class RemoteEmbeddingApp {
     /** Scenario 1: POC 12/20's identical 200+ same-typed shadowing library, C10-comparable. */
     private static void runC10Comparable(RemoteEmbedder embedder, PrintStream out) {
         ScaleRetrievalRunner runner = new ScaleRetrievalRunner();
-        List<ScaleSkillLibrary.QueryTarget> queries = ScaleSkillLibrary.benchmark();
-        List<SkillEntry> core = ScaleSkillLibrary.core();
-        List<SkillEntry> full = ScaleSkillLibrary.full();
+        List<ScaleSpecLibrary.QueryTarget> queries = ScaleSpecLibrary.benchmark();
+        List<SpecEntry> core = ScaleSpecLibrary.core();
+        List<SpecEntry> full = ScaleSpecLibrary.full();
 
-        SkillScorer lexical = new LexicalScorer();
-        SkillScorer dense = new SemanticScorer();
-        SkillScorer remote = new RemoteEmbeddingScorer(embedder);
+        SpecScorer lexical = new LexicalScorer();
+        SpecScorer dense = new SemanticScorer();
+        SpecScorer remote = new RemoteEmbeddingScorer(embedder);
 
         out.println("-- Scenario 1: C10-comparable (POC 12/20's " + core.size() + "/" + full.size()
                 + " same-typed library) --");
@@ -101,23 +101,23 @@ public final class RemoteEmbeddingApp {
         out.println("  network-backed data point on claim C10.");
     }
 
-    private static void printRow(PrintStream out, ScaleRetrievalRunner runner, List<SkillEntry> core,
-                                 List<SkillEntry> full, List<ScaleSkillLibrary.QueryTarget> queries,
-                                 String label, SkillScorer scorer) {
+    private static void printRow(PrintStream out, ScaleRetrievalRunner runner, List<SpecEntry> core,
+                                 List<SpecEntry> full, List<ScaleSpecLibrary.QueryTarget> queries,
+                                 String label, SpecScorer scorer) {
         out.printf("  %-26s  %5s  %5s%n", label,
-                pct(runner.precisionAt1(new ScaleSkillRegistry(core, scorer), queries)),
-                pct(runner.precisionAt1(new ScaleSkillRegistry(full, scorer), queries)));
+                pct(runner.precisionAt1(new ScaleSpecRegistry(core, scorer), queries)),
+                pct(runner.precisionAt1(new ScaleSpecRegistry(full, scorer), queries)));
     }
 
     /** Scenario 2: the scaling dimension over a larger generated library. */
     private static void runScale(RemoteEmbedder embedder, List<Integer> scaleSizes, PrintStream out) {
         int max = scaleSizes.get(scaleSizes.size() - 1);
-        List<SkillEntry> library = LargeScaleLibrary.generate(max);
-        List<ScaleSkillLibrary.QueryTarget> queries = LargeScaleLibrary.benchmark();
+        List<SpecEntry> library = LargeScaleLibrary.generate(max);
+        List<ScaleSpecLibrary.QueryTarget> queries = LargeScaleLibrary.benchmark();
 
         out.println("-- Scenario 2: scaling dimension (generated " + library.size()
-                + "-skill same-typed library) --");
-        out.println("  Embedding index: each skill embedded ONCE (amortised). Per-query retrieval is");
+                + "-spec same-typed library) --");
+        out.println("  Embedding index: each spec embedded ONCE (amortised). Per-query retrieval is");
         out.println("  pure-CPU cosine over cached vectors -- O(n), no model call. A per-candidate");
         out.println("  LLM/transformer selector would need n model calls PER QUERY.");
         out.println();
@@ -133,7 +133,7 @@ public final class RemoteEmbeddingApp {
         out.println("  Verdict: the one-time embedding cost is the index (n embeddings, paid once);");
         out.println("  steady-state retrieval stays cheap and linear in n with zero per-query model");
         out.println("  calls -- the reason a remote EmbeddingService is the selection mechanism of");
-        out.println("  choice as the skill library scales beyond what per-candidate selectors handle.");
+        out.println("  choice as the spec library scales beyond what per-candidate selectors handle.");
     }
 
     private static List<Integer> parseSizes(String csv) {

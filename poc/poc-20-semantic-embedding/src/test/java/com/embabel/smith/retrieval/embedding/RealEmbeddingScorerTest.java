@@ -1,6 +1,6 @@
 package com.embabel.smith.retrieval.embedding;
 
-import com.embabel.smith.retrieval.SkillEntry;
+import com.embabel.smith.retrieval.SpecEntry;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
@@ -37,8 +37,8 @@ class RealEmbeddingScorerTest {
     void scoreIsTheCosineOfTheQueryAndEntryEmbeddings() {
         CountingEmbedder embedder = new CountingEmbedder();
         RealEmbeddingScorer scorer = new RealEmbeddingScorer(embedder);
-        SkillEntry coffee = entry("s1", "coffee machine explainer");
-        SkillEntry toaster = entry("s2", "toaster explainer");
+        SpecEntry coffee = entry("s1", "coffee machine explainer");
+        SpecEntry toaster = entry("s2", "toaster explainer");
 
         assertThat(scorer.score("q coffee", coffee)).isCloseTo(1.0, within(1e-6));
         assertThat(scorer.score("q coffee", toaster)).isCloseTo(0.0, within(1e-6));
@@ -48,8 +48,8 @@ class RealEmbeddingScorerTest {
     void eachDistinctQueryAndEntryIsEmbeddedOnlyOnce() {
         CountingEmbedder embedder = new CountingEmbedder();
         RealEmbeddingScorer scorer = new RealEmbeddingScorer(embedder);
-        SkillEntry coffee = entry("s1", "coffee machine explainer");
-        SkillEntry toaster = entry("s2", "toaster explainer");
+        SpecEntry coffee = entry("s1", "coffee machine explainer");
+        SpecEntry toaster = entry("s2", "toaster explainer");
 
         for (int i = 0; i < 3; i++) {
             scorer.score("q coffee", coffee);
@@ -61,7 +61,7 @@ class RealEmbeddingScorerTest {
                 "q coffee", "s1 coffee machine explainer", "s2 toaster explainer");
     }
 
-    private static SkillEntry entry(String id, String description) {
-        return new SkillEntry(id, id, description, List.of("UserInput"), "BackgroundMessage");
+    private static SpecEntry entry(String id, String description) {
+        return new SpecEntry(id, id, description, List.of("UserInput"), "BackgroundMessage");
     }
 }

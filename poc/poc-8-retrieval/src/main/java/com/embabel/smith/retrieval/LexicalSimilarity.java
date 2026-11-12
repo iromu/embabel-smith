@@ -10,10 +10,10 @@ import java.util.Map;
  * A deterministic, dependency-free lexical similarity (cosine over term-frequency vectors).
  *
  * <p>This stands in for the embedding-based semantic index that doc 03 §2.1 sketches for a
- * production SkillRegistry. A lexical scorer is enough to demonstrate the <em>shape</em> of the
+ * production SpecRegistry. A lexical scorer is enough to demonstrate the <em>shape</em> of the
  * retrieval problem — narrowing a large same-typed candidate set by relevance — and keeps the POC
  * fully offline and reproducible. Swapping this for an {@code EmbeddingService} is a drop-in change
- * to {@link SkillRegistry#retrieve}.
+ * to {@link SpecRegistry#retrieve}.
  */
 public final class LexicalSimilarity {
 

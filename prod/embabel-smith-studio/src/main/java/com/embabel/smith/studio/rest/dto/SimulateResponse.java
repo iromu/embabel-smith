@@ -1,6 +1,6 @@
 package com.embabel.smith.studio.rest.dto;
 
-import com.embabel.smith.runtime.SkillRunService;
+import com.embabel.smith.runtime.AgentSpecRunService;
 import com.embabel.smith.runtime.trace.TraceRecord;
 
 import java.util.List;
@@ -21,7 +21,7 @@ public record SimulateResponse(
     public record Step(String name, String status, long durationMs, String outputExcerpt) {
     }
 
-    public static SimulateResponse of(SkillRunService.RunResult result) {
+    public static SimulateResponse of(AgentSpecRunService.RunResult result) {
         TraceRecord trace = result.trace();
         List<Step> steps = trace == null || trace.steps() == null
                 ? List.of()

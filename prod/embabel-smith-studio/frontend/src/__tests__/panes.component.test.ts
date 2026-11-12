@@ -66,7 +66,7 @@ function mountPane(component: Component) {
 }
 
 /**
- * Pick an option in a q-select (the panes use selects for source/skill). The select is located by
+ * Pick an option in a q-select (the panes use selects for source/spec). The select is located by
  * its unique label prop; its v-model is set by emitting update:modelValue, then flushed so the
  * pane's ref updates.
  */
@@ -77,7 +77,7 @@ async function selectOption(wrapper: ReturnType<typeof mountPane>, label: string
   await flushPromises()
 }
 
-/** Seed the shared source/skill picker state used by the studio panes. */
+/** Seed the shared source/spec picker state used by the studio panes. */
 function seedSources() {
   listSources.mockResolvedValue([{ uri: 'folder:/s', kind: 'folder' }])
   listPacks.mockResolvedValue([
@@ -128,8 +128,8 @@ describe('AutoImprovePane', () => {
     triggerLoop.mockResolvedValue({
       ran: false,
       candidates: 0,
-      publishedSkills: [],
-      queuedSkills: [],
+      publishedSpecs: [],
+      queuedSpecs: [],
       autoPublish: false,
       errorCode: 'MODEL_NOT_CONFIGURED',
       error: 'No model endpoint configured',
@@ -154,7 +154,7 @@ describe('SecurityPane', () => {
     scan.mockResolvedValue({
       error: null,
       scan: {
-        skillName: 'alpha',
+        specName: 'alpha',
         verdict: 'SAFE',
         recommendedTier: null,
         summary: 'clean',
@@ -164,11 +164,11 @@ describe('SecurityPane', () => {
     const wrapper = mountPane(SecurityPane)
     await flushPromises()
 
-    await selectOption(wrapper, 'Skill', 'alpha')
+    await selectOption(wrapper, 'Spec', 'alpha')
     await wrapper.find('[data-test="security-btn"]').trigger('click')
     await flushPromises()
 
-    expect(scan).toHaveBeenCalledWith({ source: 'folder:/s', skill: 'alpha' })
+    expect(scan).toHaveBeenCalledWith({ source: 'folder:/s', spec: 'alpha' })
     expect(wrapper.find('[data-test="security-result"]').text()).toContain('SAFE')
   })
 })

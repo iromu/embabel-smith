@@ -8,8 +8,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * The Run pane (POC 22): pick a skill from the palette and run the fixed no-code runtime (POC 1's
- * {@link com.embabel.smith.runtime.SkillRunner}) over its exported goal — the action bodies invoke the
+ * The Run pane (POC 22): pick a spec from the palette and run the fixed no-code runtime (POC 1's
+ * {@link com.embabel.smith.runtime.SpecRunner}) over its exported goal — the action bodies invoke the
  * model, so this is endpoint-gated. Without a configured endpoint it returns a clear, named
  * configuration error before any model call. The model call is behind the {@link RunFn} seam so the
  * endpoint-present path is testable with a stub.
@@ -17,38 +17,38 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class RunController {
 
-    /** The model-dependent run: skill name + input to the goal output. */
+    /** The model-dependent run: spec name + input to the goal output. */
     @FunctionalInterface
     public interface RunFn {
-        String run(String skillName, String input) throws Exception;
+        String run(String specName, String input) throws Exception;
     }
 
-    private final SkillCatalog catalog;
+    private final SpecCatalog catalog;
     private final RunFn runner;
     private final ModelEndpointConfig endpoint;
 
-    public RunController(SkillCatalog catalog, RunFn runner, ModelEndpointConfig endpoint) {
+    public RunController(SpecCatalog catalog, RunFn runner, ModelEndpointConfig endpoint) {
         this.catalog = catalog;
         this.runner = runner;
         this.endpoint = endpoint;
     }
 
-    /** Run a skill over an input; a clear error when no endpoint is configured. */
+    /** Run a spec over an input; a clear error when no endpoint is configured. */
     @PostMapping("/api/run")
     public RunResponse run(@RequestBody RunRequest request) {
-        String skillName = request.skillName() == null ? "" : request.skillName();
-        if (skillName.isBlank()) {
-            return RunResponse.error("No skill selected; pick a skill to run first.");
+        String specName = request.specName() == null ? "" : request.specName();
+        if (specName.isBlank()) {
+            return RunResponse.error("No spec selected; pick a spec to run first.");
         }
-        if (catalog.get(skillName) == null) {
-            return RunResponse.error("Unknown skill: " + skillName + ". Choose one from the palette.");
+        if (catalog.get(specName) == null) {
+            return RunResponse.error("Unknown spec: " + specName + ". Choose one from the palette.");
         }
         String configError = endpoint.configError();
         if (configError != null) {
             return RunResponse.noEndpoint(configError);
         }
         try {
-            String output = runner.run(skillName, request.inputOrDefault());
+            String output = runner.run(specName, request.inputOrDefault());
             return RunResponse.ok(output);
         } catch (Exception e) {
             return RunResponse.error("Run failed: " + (e.getMessage() == null ? e.toString() : e.getMessage()));

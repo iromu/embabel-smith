@@ -24,11 +24,11 @@ class EvalControllerTest {
 
     private final ModelEndpointConfig noEndpoint = new ModelEndpointConfig("", "", "", "");
     private final ModelEndpointConfig endpoint = new ModelEndpointConfig("http://x", "key", "gpt", "gpt");
-    private SkillCatalog catalog;
+    private SpecCatalog catalog;
 
     @BeforeEach
     void setUp() {
-        catalog = new SkillCatalog("");
+        catalog = new SpecCatalog("");
     }
 
     private MockMvc with(EvalController.EvalFn fn, ModelEndpointConfig ep) {
@@ -41,7 +41,7 @@ class EvalControllerTest {
             throw new IllegalStateException("the evaluator must not be reached without an endpoint");
         }, noEndpoint);
         mvc.perform(post("/api/eval").contentType(MediaType.APPLICATION_JSON)
-                .content("{\"skillName\":\"compose-extract\"}"))
+                .content("{\"specName\":\"compose-extract\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.error").value(containsString("No resolvable model endpoint")));
     }
@@ -52,10 +52,10 @@ class EvalControllerTest {
                 new RefinementRunner.RefinementOutcome(0.5, 0.9, "revised prompt", List.of("bad input"));
         MockMvc mvc = with((s, t) -> outcome, endpoint);
         mvc.perform(post("/api/eval").contentType(MediaType.APPLICATION_JSON)
-                .content("{\"skillName\":\"compose-extract\"}"))
+                .content("{\"specName\":\"compose-extract\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.error").isEmpty())
-                .andExpect(jsonPath("$.skillName").value("compose-extract"))
+                .andExpect(jsonPath("$.specName").value("compose-extract"))
                 .andExpect(jsonPath("$.beforeScore").value(0.5))
                 .andExpect(jsonPath("$.afterScore").value(0.9))
                 .andExpect(jsonPath("$.refined").value(true))
@@ -65,12 +65,12 @@ class EvalControllerTest {
     }
 
     @Test
-    void noSkillSelectedIsRejected() throws Exception {
+    void noSpecSelectedIsRejected() throws Exception {
         MockMvc mvc = with((s, t) -> {
             throw new IllegalStateException("X");
         }, endpoint);
-        mvc.perform(post("/api/eval").contentType(MediaType.APPLICATION_JSON).content("{\"skillName\":\"\"}"))
+        mvc.perform(post("/api/eval").contentType(MediaType.APPLICATION_JSON).content("{\"specName\":\"\"}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.error").value(containsString("No skill selected")));
+                .andExpect(jsonPath("$.error").value(containsString("No spec selected")));
     }
 }

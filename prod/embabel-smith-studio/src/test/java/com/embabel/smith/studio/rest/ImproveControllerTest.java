@@ -2,7 +2,7 @@ package com.embabel.smith.studio.rest;
 
 import com.embabel.smith.builder.lifecycle.LifecycleMetadata;
 import com.embabel.smith.builder.lifecycle.LifecycleState;
-import com.embabel.smith.common.model.SkillPack;
+import com.embabel.smith.common.model.AgentSpec;
 import com.embabel.smith.studio.improve.PendingCandidate;
 import com.embabel.smith.studio.loop.LoopService;
 import com.embabel.smith.studio.rest.dto.ApproveResponse;
@@ -43,7 +43,7 @@ class ImproveControllerTest {
         List<CandidateInfo> candidates = controller.candidates();
         assertThat(candidates).hasSize(1);
         assertThat(candidates.get(0).id()).isEqualTo("summarizer-1");
-        assertThat(candidates.get(0).skill()).isEqualTo("summarizer");
+        assertThat(candidates.get(0).spec()).isEqualTo("summarizer");
         assertThat(candidates.get(0).proposedState()).isEqualTo("ACTIVE");
     }
 
@@ -71,7 +71,7 @@ class ImproveControllerTest {
         IterationInfo info = controller.trigger();
         assertThat(info.ran()).isTrue();
         assertThat(info.candidates()).isEqualTo(1);
-        assertThat(info.publishedSkills()).contains("summarizer");
+        assertThat(info.publishedSpecs()).contains("summarizer");
     }
 
     @Test
@@ -94,7 +94,7 @@ class ImproveControllerTest {
     }
 
     private static PendingCandidate candidate() {
-        SkillPack pack = RestTestFixtures.pack("summarizer", "summarize");
+        AgentSpec pack = RestTestFixtures.pack("summarizer", "summarize");
         LifecycleMetadata proposed =
                 new LifecycleMetadata("hash", 1.0, LifecycleState.ACTIVE, "now");
         return new PendingCandidate("summarizer-1", "summarizer", pack, proposed, 1.0, 0.5, null,

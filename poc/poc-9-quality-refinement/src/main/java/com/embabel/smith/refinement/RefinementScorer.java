@@ -8,13 +8,13 @@ import com.embabel.agent.eval.support.SubjectiveScores;
 import java.util.List;
 
 /**
- * Deterministic scoring of a goal-type skill's outputs, in the eval module's own {@link Score} /
+ * Deterministic scoring of a goal-type spec's outputs, in the eval module's own {@link Score} /
  * {@link FullScores} types (same shape as POC 5). {@code 1.0} when the output is present and passes
  * the acceptance check, {@code 0.0} otherwise; the composite is the mean of the per-task scores.
  */
 public class RefinementScorer {
 
-    public Score scoreOne(String goalOutput, SkillEvalTask task) {
+    public Score scoreOne(String goalOutput, SpecEvalTask task) {
         boolean pass = goalOutput != null && !goalOutput.isBlank() && task.acceptance().test(goalOutput);
         return new Score(task.input(), pass ? 1.0 : 0.0);
     }

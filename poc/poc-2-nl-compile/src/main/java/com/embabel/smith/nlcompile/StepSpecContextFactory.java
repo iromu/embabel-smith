@@ -8,7 +8,7 @@ import java.util.List;
 /**
  * Builds the {@link StepSpecContext} the natural-language compiler needs: the platform's data
  * dictionary (the types it may reference) plus the available tool groups, tools and LLM
- * references. The POC skill-packs are pure-LLM, so the tool/tool/reference lists are empty.
+ * references. The POC agent specs are pure-LLM, so the tool/tool/reference lists are empty.
  */
 public class StepSpecContextFactory {
 

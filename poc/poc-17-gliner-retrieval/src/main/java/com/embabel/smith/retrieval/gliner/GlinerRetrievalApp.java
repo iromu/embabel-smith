@@ -1,7 +1,7 @@
 package com.embabel.smith.retrieval.gliner;
 
-import com.embabel.smith.retrieval.SkillEntry;
-import com.embabel.smith.retrieval.scale.ScaleSkillLibrary;
+import com.embabel.smith.retrieval.SpecEntry;
+import com.embabel.smith.retrieval.scale.ScaleSpecLibrary;
 import io.gravitee.lab.gliner4j.schema.ClassificationLabel;
 
 import java.util.LinkedHashMap;
@@ -23,7 +23,7 @@ public final class GlinerRetrievalApp {
     }
 
     public static void main(String[] args) {
-        System.out.println("=== POC 17: GLiNER2 transformer skill classification ===");
+        System.out.println("=== POC 17: GLiNER2 transformer spec classification ===");
 
         GlinerModel model;
         try {
@@ -36,16 +36,16 @@ public final class GlinerRetrievalApp {
         }
 
         System.out.println("Model bundle: " + model.modelDir());
-        System.out.println("Shadowing scenario: " + ScaleSkillLibrary.benchmark().size()
+        System.out.println("Shadowing scenario: " + ScaleSpecLibrary.benchmark().size()
                 + " targets x 2 candidate-set variants (matching + strict)");
         System.out.println();
 
         ShadowingRunner runner = new ShadowingRunner();
         // Load the classifier once with the full label set; each select() call overrides with the
         // target's candidate-set labels.
-        List<ClassificationLabel> loadTimeLabels = GlinerSelector.labelsFor(ScaleSkillLibrary.full());
+        List<ClassificationLabel> loadTimeLabels = GlinerSelector.labelsFor(ScaleSpecLibrary.full());
 
-        Map<String, SkillSelector> methods = new LinkedHashMap<>();
+        Map<String, SpecSelector> methods = new LinkedHashMap<>();
         try (GlinerSelector gliner = GlinerSelector.fromModel(model, loadTimeLabels)) {
             methods.put("transformer (GLiNER2)", gliner);
             methods.put("lexical (word TF)", new LexicalSelector());

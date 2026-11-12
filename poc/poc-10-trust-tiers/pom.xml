@@ -14,7 +14,7 @@
     <name>poc-10-trust-tiers</name>
     <description>
         POC 10: trust tiers / guardrails. A TrustTierPolicy enforces a per-tier tool-group allowlist
-        (T1-T4, doc 03 §2.1) so a high-privilege skill is refused under a low-trust context, and a
+        (T1-T4, doc 03 §2.1) so a high-privilege spec is refused under a low-trust context, and a
         global user-input guardrail blocks forbidden content. Policy + guardrail are offline; the
         end-to-end block is endpoint-gated.
     </description>

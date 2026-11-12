@@ -1,6 +1,6 @@
-# POC 17 — GLiNER2 transformer skill classification
+# POC 17 — GLiNER2 transformer spec classification
 
-A **real transformer** takes the same within-topic skill-shadowing scenario POC 12 measured and
+A **real transformer** takes the same within-topic spec-shadowing scenario POC 12 measured and
 asks whether a zero-shot classifier that *understands* meaning breaks the tie that text-similarity
 cannot. POC 8 (lexical) and POC 12 (dense feature-hashing) both select by text similarity and both
 collapsed under shadowing (POC 12: lexical **17%**, dense **0%** Precision@1). POC 17 runs a GLiNER2
@@ -8,7 +8,7 @@ BERT classifier (via [GLiNER4j](https://github.com/gravitee-io/GLiNER4j) over ON
 identical candidate sets, alongside the same two baselines, so the three methods are directly
 comparable.
 
-The three methods share one `SkillSelector` seam (`select(query, candidates) → top-1 id`):
+The three methods share one `SpecSelector` seam (`select(query, candidates) → top-1 id`):
 `LexicalSelector` (POC 8 word-TF argmax), `DenseSelector` (POC 12 feature-hashing argmax), and
 `GlinerSelector` (GLiNER2 zero-shot classification over the candidate set).
 
@@ -16,7 +16,7 @@ The three methods share one `SkillSelector` seam (`select(query, candidates) →
 
 ```mermaid
 flowchart LR
-    LIB["ScaleSkillLibrary<br/>same shadowing scenario as POC 12"]
+    LIB["ScaleSpecLibrary<br/>same shadowing scenario as POC 12"]
     LEX["LexicalSelector<br/>POC 8 word-TF argmax"]
     DENSE["DenseSelector<br/>POC 12 feature-hashing argmax"]
     GL["GlinerSelector<br/>GLiNER2 zero-shot classification<br/>(ONNX Runtime, local)"]
@@ -66,20 +66,20 @@ mvn -pl poc/poc-17-gliner-retrieval exec:java
 ```
 
 It prints a Precision@1 comparison table for the three methods (transformer / lexical / dense) on
-the six `ScaleSkillLibrary` targets, in two candidate-set variants: **matching** (canonical + all 15
+the six `ScaleSpecLibrary` targets, in two candidate-set variants: **matching** (canonical + all 15
 near-duplicates, directly comparable to POC 12) and **strict** (excluding the near-exact duplicate —
 the meaningful shadowing signal).
 
-## Measured results (shared — skill selection, C10)
+## Measured results (shared — spec selection, C10)
 
-POCs 8, 12, 17, 19, 20, and 23 test the same hypothesis — **skill selection at scale** (claim C10) —
+POCs 8, 12, 17, 19, 20, and 23 test the same hypothesis — **spec selection at scale** (claim C10) —
 on the same scenario, with different techniques. This results section is **shared across their
 READMEs** (identical in each); the consolidated read is in `docs/04-poc-run-results.md` §7.1.
 
-**Small scale (POC 8 — 14 same-typed skills, lexical):** Precision@1 **100%**; the target stays
+**Small scale (POC 8 — 14 same-typed specs, lexical):** Precision@1 **100%**; the target stays
 top-1 as same-verb distractors are added (growth curve).
 
-**Distinct scale (POC 12/20/23 — 191 same-typed skills, full-library P@1):**
+**Distinct scale (POC 12/20/23 — 191 same-typed specs, full-library P@1):**
 
 | method | P@1 (191 distinct) |
 | --- | --- |
@@ -88,7 +88,7 @@ top-1 as same-verb distractors are added (growth curve).
 | embedding (MiniLM, local ONNX) | 100% |
 | embedding (nomic, remote) | 100% |
 
-**Under shadowing (POC 12/20/23 — 281 skills incl. 90 same-topic near-duplicates, full-library P@1):**
+**Under shadowing (POC 12/20/23 — 281 specs incl. 90 same-topic near-duplicates, full-library P@1):**
 
 | method | P@1 (281, shadowing) |
 | --- | --- |
@@ -107,10 +107,10 @@ top-1 as same-verb distractors are added (growth curve).
 | llm-id (Qwen3-0.6B) | 0% | 50% |
 | llm-ood (Qwen3-0.6B) | 50% | 67% |
 
-**Scaling dimension (POC 23 — remote nomic embedding, generated library to 1000 skills):**
-Precision@1 holds at **100%** from 100 to 1000 same-typed skills; steady-state per-query retrieval
+**Scaling dimension (POC 23 — remote nomic embedding, generated library to 1000 specs):**
+Precision@1 holds at **100%** from 100 to 1000 same-typed specs; steady-state per-query retrieval
 (cosine over cached vectors, no model call) grows linearly and stays sub-millisecond-to-~1.3 ms,
-while the one-time embedding index (one embedding per skill) is paid once and amortised. A
+while the one-time embedding index (one embedding per spec) is paid once and amortised. A
 per-candidate LLM/transformer selector would instead need *n* model calls per query.
 
 | size | P@1 | per-query retrieval |
@@ -121,14 +121,14 @@ per-candidate LLM/transformer selector would instead need *n* model calls per qu
 | 800 | 100% | 1.04 ms |
 | 1000 | 100% | 1.27 ms |
 
-**Shared reading:** retrieval is clean while skills are distinct (100% at every scale, up to 1000
-skills); near-duplicate shadowing collapses text-similarity (lexical 17%, dense 0%), and no
+**Shared reading:** retrieval is clean while specs are distinct (100% at every scale, up to 1000
+specs); near-duplicate shadowing collapses text-similarity (lexical 17%, dense 0%), and no
 text-similarity index cures it. Methods that score by *meaning* — a zero-shot transformer (GLiNER2,
 the best: strict 100%), a fine-tuned 0.6B LLM, and a real embedding index — beat text-similarity,
 but the near-duplicates are near-identical in *meaning* too, so none fully cures the collapse on its
 own (the remote nomic embedding ties lexical at 17% under shadowing — the specific embedding model
 matters). And the scaling result is unambiguous: a remote `EmbeddingService` retrieves cleanly to
-1000 skills with sub-millisecond-to-~1 ms per-query cost and **zero per-query model calls** — the
+1000 specs with sub-millisecond-to-~1 ms per-query cost and **zero per-query model calls** — the
 reason it is the selection mechanism of choice as the library outgrows per-candidate selectors. The
 real fix for shadowing is library **curation** (dedup / lifecycle — POC 18, applied in the POC 15
 retrieval pane).
@@ -137,7 +137,7 @@ retrieval pane).
 
 Against the hypothesis (claim C10, at scale — the remedy): **proven.** The GLiNER2 transformer
 **breaks the shadowing tie** that text-similarity cannot: with the degenerate near-exact duplicate
-removed (**strict**) it selects the canonical skill for all six targets (**100%**), while lexical
+removed (**strict**) it selects the canonical spec for all six targets (**100%**), while lexical
 and dense collapse (33% / 0%); in the POC-12-comparable **matching** set — which includes the
 near-exact `v0` duplicate, a genuinely ambiguous choice — it still leads (**83%** = 5/6). This is
 the mechanism the POC set out to test: a model that *understands* meaning, not one that matches
@@ -147,7 +147,7 @@ offline tests mock the classifier so the build stays green.
 
 ## Tests
 
-`SkillSelectorTest`, `LexicalSelectorTest`, `DenseSelectorTest`, `GlinerModelTest`,
+`SpecSelectorTest`, `LexicalSelectorTest`, `DenseSelectorTest`, `GlinerModelTest`,
 `GlinerSelectorTest`, and `ShadowingRunnerTest` pin the selector seam, the two baselines, the
 model gate, the label-building/top-1 logic (stubbed classifier), and the Precision@1 math — all
 offline, no model.

@@ -1,7 +1,7 @@
 package com.embabel.smith.runtime;
 
-import com.embabel.smith.skillsource.ResolvedSkillSource;
-import com.embabel.smith.skillsource.SkillSource;
+import com.embabel.smith.specsource.ResolvedSpecSource;
+import com.embabel.smith.specsource.SpecSource;
 
 import java.io.IOException;
 import java.net.URISyntaxException;
@@ -11,7 +11,7 @@ import java.util.Objects;
 import java.util.stream.Stream;
 
 /**
- * Access to the test skill-packs under {@code src/test/resources/test-packs}: builds temporary
+ * Access to the test agent specs under {@code src/test/resources/test-packs}: builds temporary
  * folder-source libraries from named packs and resolves them.
  */
 public final class TestPacks {
@@ -36,12 +36,12 @@ public final class TestPacks {
         return target;
     }
 
-    public static ResolvedSkillSource resolve(Path libraryDir) {
-        return SkillSource.parse("folder:" + libraryDir).resolve();
+    public static ResolvedSpecSource resolve(Path libraryDir) {
+        return SpecSource.parse("folder:" + libraryDir).resolve();
     }
 
-    public static com.embabel.smith.common.model.SkillPack read(String packName) throws IOException {
-        return new com.embabel.smith.common.io.SkillPackReader().read(root().resolve(packName));
+    public static com.embabel.smith.common.model.AgentSpec read(String packName) throws IOException {
+        return new com.embabel.smith.common.io.AgentSpecReader().read(root().resolve(packName));
     }
 
     private static void copyRecursively(Path from, Path to) throws IOException {

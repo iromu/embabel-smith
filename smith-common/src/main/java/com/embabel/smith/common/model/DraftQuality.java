@@ -6,7 +6,7 @@ import java.util.Set;
 
 /**
  * A read-only diagnostic for a compiled draft's goal shape — the measurable signal behind
- * doc 02 caveat #2 ("LLM-authored skill quality is weak at the source"). It classifies whether the
+ * doc 02 caveat #2 ("LLM-authored spec quality is weak at the source"). It classifies whether the
  * draft's exported goal is runnable or degenerate, and says exactly why. It does <em>not</em> modify
  * the draft: the builder's {@code normalizeGoalOutput} repairs the deterministic degenerate shapes
  * (void / no-op / scalar goals); this classifier is the measurement layer that makes the weakness

@@ -2,9 +2,9 @@ package com.embabel.smith.selector.llm;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.embabel.smith.retrieval.SkillEntry;
+import com.embabel.smith.retrieval.SpecEntry;
 import com.embabel.smith.retrieval.gliner.ShadowingRunner;
-import com.embabel.smith.retrieval.gliner.SkillSelector;
+import com.embabel.smith.retrieval.gliner.SpecSelector;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -26,7 +26,7 @@ class SmallLlmSelectorAppTest {
 
     @BeforeEach
     void startStub() throws IOException {
-        // The stubbed model always picks the first option — the canonical skill is listed first.
+        // The stubbed model always picks the first option — the canonical spec is listed first.
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/v1/chat/completions", exchange -> {
             byte[] body = "{\"choices\":[{\"message\":{\"role\":\"assistant\",\"content\":\"A\"}}]}"
@@ -47,8 +47,8 @@ class SmallLlmSelectorAppTest {
 
     @Test
     void theFiveMethodsAreRegisteredInTableOrder() {
-        SkillSelector stubGliner2 = (query, candidates) -> candidates.get(0).id();
-        Map<String, SkillSelector> methods =
+        SpecSelector stubGliner2 = (query, candidates) -> candidates.get(0).id();
+        Map<String, SpecSelector> methods =
                 SmallLlmSelectorApp.benchmarkMethods(baseUrl, "test-model", stubGliner2);
         assertThat(methods.keySet()).containsExactly(
                 "transformer (GLiNER2)",
@@ -60,8 +60,8 @@ class SmallLlmSelectorAppTest {
 
     @Test
     void theComparisonTableHasOneRowPerMethod() throws IOException {
-        SkillSelector stubGliner2 = (query, candidates) -> candidates.get(0).id();
-        Map<String, SkillSelector> methods =
+        SpecSelector stubGliner2 = (query, candidates) -> candidates.get(0).id();
+        Map<String, SpecSelector> methods =
                 SmallLlmSelectorApp.benchmarkMethods(baseUrl, "test-model", stubGliner2);
         ShadowingRunner runner = new ShadowingRunner();
 
@@ -82,19 +82,19 @@ class SmallLlmSelectorAppTest {
                 .contains("dense (feature hash)")
                 .contains("llm-id (Qwen3-0.6B)")
                 .contains("llm-ood (Qwen3-0.6B)")
-                .contains("100%"); // the stub always selects the canonical skill
+                .contains("100%"); // the stub always selects the canonical spec
     }
 
     @Test
     void theRunnerScoresAllFiveOnIdenticalCandidates() {
-        SkillSelector stubGliner2 = (query, candidates) -> candidates.get(0).id();
-        Map<String, SkillSelector> methods =
+        SpecSelector stubGliner2 = (query, candidates) -> candidates.get(0).id();
+        Map<String, SpecSelector> methods =
                 SmallLlmSelectorApp.benchmarkMethods(baseUrl, "test-model", stubGliner2);
         ShadowingRunner runner = new ShadowingRunner();
-        // The stubbed model answers "A" (ID) and the canonical skill is option A, so both LLM
+        // The stubbed model answers "A" (ID) and the canonical spec is option A, so both LLM
         // formats score 1.0; a selector that never answers scores 0.0.
         assertThat(methods.get("llm-id (Qwen3-0.6B)")
-                .select("any query", List.of(new SkillEntry("a", "a", "d", List.of(), "t"))))
+                .select("any query", List.of(new SpecEntry("a", "a", "d", List.of(), "t"))))
                 .isEqualTo("a");
         assertThat(runner.precisionAt1((query, candidates) -> null, ShadowingRunner.Variant.MATCHING))
                 .isZero();

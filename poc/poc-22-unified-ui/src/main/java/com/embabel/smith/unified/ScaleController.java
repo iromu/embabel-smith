@@ -1,10 +1,10 @@
 package com.embabel.smith.unified;
 
-import com.embabel.smith.retrieval.SkillEntry;
+import com.embabel.smith.retrieval.SpecEntry;
 import com.embabel.smith.retrieval.scale.ScaleRetrievalRunner;
-import com.embabel.smith.retrieval.scale.ScaleSkillLibrary;
-import com.embabel.smith.retrieval.scale.ScaleSkillRegistry;
-import com.embabel.smith.retrieval.scale.SkillScorer;
+import com.embabel.smith.retrieval.scale.ScaleSpecLibrary;
+import com.embabel.smith.retrieval.scale.ScaleSpecRegistry;
+import com.embabel.smith.retrieval.scale.SpecScorer;
 import com.embabel.smith.unified.dto.ScalePoint;
 import com.embabel.smith.unified.dto.ScaleResponse;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -15,8 +15,8 @@ import java.util.List;
 
 /**
  * The Scale pane (POC 22): quantifies selection accuracy (precision@1) of the active
- * {@link SkillScorer} as a same-typed library grows and as near-duplicate (shadowing) skills
- * accumulate, via POC 12's {@link ScaleRetrievalRunner} over {@link ScaleSkillLibrary}. Pure and
+ * {@link SpecScorer} as a same-typed library grows and as near-duplicate (shadowing) specs
+ * accumulate, via POC 12's {@link ScaleRetrievalRunner} over {@link ScaleSpecLibrary}. Pure and
  * offline (the lexical scorer is the default; a denser scorer drops in via the shared seam).
  */
 @RestController
@@ -24,7 +24,7 @@ public class ScaleController {
 
     private static final int CURVE_POINTS = 12;
 
-    private final SkillScorer scorer;
+    private final SpecScorer scorer;
     private final String scorerName;
 
     public ScaleController(ScorerBinding binding) {
@@ -35,14 +35,14 @@ public class ScaleController {
     /** Precision@1 for the core and full libraries, plus a sampled growth curve. */
     @GetMapping("/api/scale")
     public ScaleResponse scale() {
-        List<SkillEntry> core = ScaleSkillLibrary.core();
-        List<SkillEntry> full = ScaleSkillLibrary.full();
-        List<ScaleSkillLibrary.QueryTarget> benchmark = ScaleSkillLibrary.benchmark();
+        List<SpecEntry> core = ScaleSpecLibrary.core();
+        List<SpecEntry> full = ScaleSpecLibrary.full();
+        List<ScaleSpecLibrary.QueryTarget> benchmark = ScaleSpecLibrary.benchmark();
         ScaleRetrievalRunner runner = new ScaleRetrievalRunner();
-        double coreP1 = runner.precisionAt1(new ScaleSkillRegistry(core, scorer), benchmark);
-        double fullP1 = runner.precisionAt1(new ScaleSkillRegistry(full, scorer), benchmark);
+        double coreP1 = runner.precisionAt1(new ScaleSpecRegistry(core, scorer), benchmark);
+        double fullP1 = runner.precisionAt1(new ScaleSpecRegistry(full, scorer), benchmark);
         List<ScaleRetrievalRunner.CurvePoint> curve =
-                runner.growthCurve(core, ScaleSkillLibrary.growthSequence(), scorer, benchmark);
+                runner.growthCurve(core, ScaleSpecLibrary.growthSequence(), scorer, benchmark);
         return new ScaleResponse(scorerName, core.size(), round4(coreP1), full.size(), round4(fullP1),
                 sample(curve, CURVE_POINTS));
     }

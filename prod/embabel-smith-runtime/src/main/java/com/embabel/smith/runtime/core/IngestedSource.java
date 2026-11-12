@@ -1,16 +1,16 @@
 package com.embabel.smith.runtime.core;
 
 import com.embabel.agent.core.Agent;
-import com.embabel.smith.common.model.SkillPack;
-import com.embabel.smith.skillsource.ResolvedSkillSource;
+import com.embabel.smith.common.model.AgentSpec;
+import com.embabel.smith.specsource.ResolvedSpecSource;
 
 import java.util.List;
 
 /**
- * The outcome of ingesting a resolved skill source into the platform: the loaded packs, the
+ * The outcome of ingesting a resolved spec source into the platform: the loaded packs, the
  * deployed agent holding all of their goals, and the source they came from.
  */
-public record IngestedSource(ResolvedSkillSource source, List<SkillPack> packs, Agent agent) {
+public record IngestedSource(ResolvedSpecSource source, List<AgentSpec> packs, Agent agent) {
 
     public IngestedSource {
         packs = List.copyOf(packs);
@@ -22,7 +22,7 @@ public record IngestedSource(ResolvedSkillSource source, List<SkillPack> packs, 
     }
 
     /** The pack that exports the named goal. */
-    public SkillPack packForGoal(String goalName) {
+    public AgentSpec packForGoal(String goalName) {
         return packs.stream()
                 .filter(pack -> goalName.equals(pack.goal().name()))
                 .findFirst()

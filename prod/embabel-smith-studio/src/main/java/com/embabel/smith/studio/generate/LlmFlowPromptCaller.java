@@ -15,7 +15,7 @@ import java.time.Duration;
 /**
  * The production {@link FlowPromptCaller}: a raw OpenAI-compatible chat-completions call (the same
  * wire the builder's {@code LlmPromptRewriter} uses). Endpoint-gated. The generation prompt is
- * large and the answer a full skill-pack, so the timeout and token budget are generous.
+ * large and the answer a full agent spec, so the timeout and token budget are generous.
  */
 public class LlmFlowPromptCaller implements FlowPromptCaller {
 

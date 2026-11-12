@@ -3,7 +3,7 @@
     <q-card flat bordered class="q-pa-md">
       <q-card-section>
         <div class="text-h5">Trust</div>
-        <p class="text-grey-7">POC 10 — check a skill's tool groups against a trust-tier allowlist.</p>
+        <p class="text-grey-7">POC 10 — check a spec's tool groups against a trust-tier allowlist.</p>
       </q-card-section>
 
       <q-separator />
@@ -11,12 +11,12 @@
       <q-card-section>
         <div class="row q-gutter-sm items-center">
           <q-input
-            v-model="skillName"
-            label="Skill to check"
+            v-model="specName"
+            label="Spec to check"
             dense
             style="min-width: 300px"
-            data-test="trust-skill"
-            :hint="skillNames.join(', ') || 'loading…'"
+            data-test="trust-spec"
+            :hint="specNames.join(', ') || 'loading…'"
           />
           <q-select
             v-model="tier"
@@ -47,7 +47,7 @@
             declares: {{ result.declaredToolGroups.join(', ') }}
           </div>
         </div>
-        <div v-else class="text-grey-6">Pick a skill and a tier, then check the allowlist.</div>
+        <div v-else class="text-grey-6">Pick a spec and a tier, then check the allowlist.</div>
       </q-card-section>
     </q-card>
   </q-page>
@@ -56,28 +56,28 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 
-import { checkTrust, listSkills } from '../api/client'
+import { checkTrust, listSpecs } from '../api/client'
 import type { TrustResponse } from '../api/types'
 
 const TIERS = ['T1_COMMUNITY', 'T2_INTERNAL', 'T3_PARTNER', 'T4_PLATFORM']
 
-const skillName = ref('')
+const specName = ref('')
 const tier = ref('T3_PARTNER')
-const skills = ref<string[]>([])
+const specs = ref<string[]>([])
 const result = ref<TrustResponse | null>(null)
 const error = ref<string | null>(null)
 
-const skillNames = computed(() => skills.value)
+const specNames = computed(() => specs.value)
 const tiers = TIERS
 
 async function doCheck() {
-  if (!skillName.value.trim()) {
+  if (!specName.value.trim()) {
     return
   }
   error.value = null
   result.value = null
   try {
-    const res = await checkTrust({ skillName: skillName.value.trim(), tier: tier.value })
+    const res = await checkTrust({ specName: specName.value.trim(), tier: tier.value })
     if (res.error) {
       error.value = res.error
     } else {
@@ -89,6 +89,6 @@ async function doCheck() {
 }
 
 onMounted(async () => {
-  skills.value = (await listSkills()).map((s) => s.name)
+  specs.value = (await listSpecs()).map((s) => s.name)
 })
 </script>

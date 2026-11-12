@@ -13,10 +13,10 @@
     <artifactId>poc-14-composer</artifactId>
     <name>poc-14-composer</name>
     <description>
-        POC 14: the skill Composer (doc 03 §2.2). A headless model of the "visual skill-chain
-        editor": skills (exported goals) are nodes on a canvas, an edge is valid only when the
-        source skill's output type is what the target skill consumes (the drag-and-drop "snap"),
-        and a valid canvas is exported as a single new composite skill-pack whose action chain IS
+        POC 14: the spec Composer (doc 03 §2.2). A headless model of the "visual spec-chain
+        editor": specs (exported goals) are nodes on a canvas, an edge is valid only when the
+        source spec's output type is what the target spec consumes (the drag-and-drop "snap"),
+        and a valid canvas is exported as a single new composite agent spec whose action chain IS
         the composed plan. Fully offline and deterministic — no model endpoint.
     </description>
 

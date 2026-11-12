@@ -19,7 +19,7 @@ import java.time.Duration;
  * The Remote pane (POC 22): invoke a remote action over the network. It drives POC 16's
  * {@code RestAction} sidecar over its three-endpoint contract ({@code GET /api/v1/actions} for
  * reachability, {@code POST /api/v1/actions/execute} to run the deterministic action) — the "normal
- * agent harness" where a skill invokes an external process. The MCP server (POC 13) is the alternative
+ * agent harness" where a spec invokes an external process. The MCP server (POC 13) is the alternative
  * transport, reported alongside via {@code mcpUrl}.
  *
  * <p>Gated on the backing process: when the sidecar is unreachable the pane returns a "backing

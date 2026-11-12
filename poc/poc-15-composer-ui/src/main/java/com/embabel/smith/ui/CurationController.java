@@ -2,12 +2,12 @@ package com.embabel.smith.ui;
 
 import com.embabel.agent.core.AgentPlatform;
 import com.embabel.smith.common.config.ModelEndpointConfig;
-import com.embabel.smith.common.model.SkillPack;
-import com.embabel.smith.composer.SkillNode;
+import com.embabel.smith.common.model.AgentSpec;
+import com.embabel.smith.composer.SpecNode;
 import com.embabel.smith.lifecycle.DriftReport;
 import com.embabel.smith.lifecycle.LifecycleState;
 import com.embabel.smith.lifecycle.LiveEvalRunner;
-import com.embabel.smith.lifecycle.SkillEvalTask;
+import com.embabel.smith.lifecycle.SpecEvalTask;
 import com.embabel.smith.ui.dto.CurateRequest;
 import com.embabel.smith.ui.dto.CurateResponse;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,24 +19,24 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 /**
- * The curation re-eval behind the retrieval pane (POC 15): re-score a skill with POC 18's
+ * The curation re-eval behind the retrieval pane (POC 15): re-score a spec with POC 18's
  * {@link LiveEvalRunner} and move it through the lifecycle, so the library is curated, not just
  * scored. This is the endpoint-gated half — the pure content-hash / drift / state-machine half
- * (POC 18's {@link com.embabel.smith.lifecycle.LifecycleManager} via {@link SkillCuration}) is what
+ * (POC 18's {@link com.embabel.smith.lifecycle.LifecycleManager} via {@link SpecCuration}) is what
  * the retrieval pane applies offline. Without a configured endpoint it returns a clear configuration
  * error before any model call.
  */
 @RestController
 public class CurationController {
 
-    private final SkillCatalog catalog;
-    private final SkillCuration curation;
+    private final SpecCatalog catalog;
+    private final SpecCuration curation;
     private final AgentPlatform platform;
     private final ModelEndpointConfig endpoint;
 
     @Autowired
-    public CurationController(SkillCatalog catalog,
-                              SkillCuration curation,
+    public CurationController(SpecCatalog catalog,
+                              SpecCuration curation,
                               AgentPlatform platform,
                               @Value("${OPENAI_CUSTOM_BASE_URL:}") String baseUrl,
                               @Value("${OPENAI_CUSTOM_API_KEY:}") String apiKey,
@@ -48,34 +48,34 @@ public class CurationController {
         this.endpoint = new ModelEndpointConfig(baseUrl, apiKey, models, defaultLlm);
     }
 
-    /** Re-evaluate a skill's pass-rate and record its (possibly new) lifecycle state. */
+    /** Re-evaluate a spec's pass-rate and record its (possibly new) lifecycle state. */
     @PostMapping("/api/curate")
     public CurateResponse curate(@RequestBody CurateRequest request) {
-        String skillName = request.skillName() == null ? "" : request.skillName();
-        if (skillName.isBlank()) {
-            return CurateResponse.error("No skill selected; pick a skill to re-evaluate first.");
+        String specName = request.specName() == null ? "" : request.specName();
+        if (specName.isBlank()) {
+            return CurateResponse.error("No spec selected; pick a spec to re-evaluate first.");
         }
-        SkillNode node = catalog.get(skillName);
+        SpecNode node = catalog.get(specName);
         if (node == null) {
-            return CurateResponse.error("Unknown skill: " + skillName + ". Choose one from the palette.");
+            return CurateResponse.error("Unknown spec: " + specName + ". Choose one from the palette.");
         }
         String configError = endpoint.configError();
         if (configError != null) {
             return CurateResponse.error(configError);
         }
-        SkillPack pack = node.pack();
-        List<SkillEvalTask> tasks = request.tasksOrDefault().stream()
-                .map(t -> new SkillEvalTask(t.input(), t.acceptanceCriteria(),
+        AgentSpec pack = node.pack();
+        List<SpecEvalTask> tasks = request.tasksOrDefault().stream()
+                .map(t -> new SpecEvalTask(t.input(), t.acceptanceCriteria(),
                         out -> out != null && !out.isBlank()
                                 && out.toLowerCase().contains(t.mustContain().toLowerCase())))
                 .toList();
-        LifecycleState before = curation.stateBefore(skillName);
+        LifecycleState before = curation.stateBefore(specName);
         double measured = new LiveEvalRunner(platform).evaluate(pack, tasks);
-        LifecycleState after = curation.curate(skillName, measured);
-        SkillCuration.Baseline b = curation.baseline(skillName);
-        DriftReport report = new DriftReport(skillName, before, after,
-                curation.contentDrift(skillName), b.score(), measured,
-                b.contentHash(), curation.currentHash(skillName));
-        return CurateResponse.from(skillName, report, curation.surfaced(after));
+        LifecycleState after = curation.curate(specName, measured);
+        SpecCuration.Baseline b = curation.baseline(specName);
+        DriftReport report = new DriftReport(specName, before, after,
+                curation.contentDrift(specName), b.score(), measured,
+                b.contentHash(), curation.currentHash(specName));
+        return CurateResponse.from(specName, report, curation.surfaced(after));
     }
 }

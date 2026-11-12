@@ -1,8 +1,8 @@
 package com.embabel.smith.builder.eval;
 
 import com.embabel.smith.common.model.ActionStepSpec;
-import com.embabel.smith.common.model.SkillPack;
-import com.embabel.smith.common.validation.SkillPackValidator;
+import com.embabel.smith.common.model.AgentSpec;
+import com.embabel.smith.common.validation.AgentSpecValidator;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -22,7 +22,7 @@ public class RefinementLoop {
     private final double scoreGate;
     private final int maxRefine;
 
-    private final SkillPackValidator validator = new SkillPackValidator();
+    private final AgentSpecValidator validator = new AgentSpecValidator();
 
     public RefinementLoop(InvokerFactory invokerFactory, PromptRewriter rewriter,
                           List<EvalTask> tasks, double scoreGate, int maxRefine) {
@@ -33,13 +33,13 @@ public class RefinementLoop {
         this.maxRefine = Math.max(0, maxRefine);
     }
 
-    public RefinementOutcome refine(SkillPack initial) {
-        SkillPack current = initial;
+    public RefinementOutcome refine(AgentSpec initial) {
+        AgentSpec current = initial;
         double score = 0.0;
         List<String> failures = List.of();
         int refinements = 0;
         for (int round = 0; round <= maxRefine; round++) {
-            SkillInvoker invoker = invokerFactory.invokerFor(current);
+            AgentSpecInvoker invoker = invokerFactory.invokerFor(current);
             List<String> outputs = new ArrayList<>();
             for (EvalTask task : tasks) {
                 outputs.add(invoker.invoke(task.input()));
@@ -63,7 +63,7 @@ public class RefinementLoop {
      * re-validates the resulting pack, and returns it — or the original pack when the rewrite does
      * not validate, so the loop never corrupts a good draft.
      */
-    private SkillPack rewriteTerminalPrompt(SkillPack pack, List<String> failures) {
+    private AgentSpec rewriteTerminalPrompt(AgentSpec pack, List<String> failures) {
         ActionStepSpec terminal = terminalAction(pack);
         if (terminal == null) {
             return pack;
@@ -76,7 +76,7 @@ public class RefinementLoop {
         List<ActionStepSpec> steps = pack.steps().stream()
                 .map(s -> s.name().equals(terminal.name()) ? revised : s)
                 .toList();
-        SkillPack candidate = new SkillPack(pack.manifest(), pack.goal(), steps, pack.types());
+        AgentSpec candidate = new AgentSpec(pack.manifest(), pack.goal(), steps, pack.types());
         return validator.validate(candidate).isValid() ? candidate : pack;
     }
 
@@ -99,7 +99,7 @@ public class RefinementLoop {
     }
 
     /** The action whose output is the goal output (the last such step); the last step as a fallback. */
-    private ActionStepSpec terminalAction(SkillPack pack) {
+    private ActionStepSpec terminalAction(AgentSpec pack) {
         if (pack.steps().isEmpty()) {
             return null;
         }

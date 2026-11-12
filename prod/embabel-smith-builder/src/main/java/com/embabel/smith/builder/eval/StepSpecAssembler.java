@@ -12,7 +12,7 @@ import java.util.stream.Stream;
 /**
  * Assembles the flat step-spec directory that Embabel's {@code YmlStepSpecRepository} reads.
  *
- * <p>A skill-pack keeps {@code goal.yml} at its root and the action steps under {@code steps/},
+ * <p>A agent spec keeps {@code goal.yml} at its root and the action steps under {@code steps/},
  * but the repository loads from a single directory. This copies every pack's {@code goal.yml}
  * (renamed to {@code goal-<i>.yml}) and its {@code steps/*.yml} (prefixed {@code <i>-}) into one
  * target directory so all goals and actions are ingested together (and thus planned together).
@@ -34,7 +34,7 @@ public class StepSpecAssembler {
         for (Path packDir : packDirs) {
             Path goal = packDir.resolve("goal.yml");
             if (!Files.isRegularFile(goal)) {
-                throw new IOException("skill-pack has no goal.yml: " + packDir);
+                throw new IOException("agent spec has no goal.yml: " + packDir);
             }
             Files.copy(goal, targetDir.resolve("goal-" + i + ".yml"), COPY);
             for (Path step : yamlFiles(packDir.resolve("steps"))) {

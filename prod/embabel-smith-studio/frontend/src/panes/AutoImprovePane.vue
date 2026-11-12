@@ -54,11 +54,11 @@
         </div>
         <div v-else-if="iteration" class="text-grey-7 q-mt-sm" data-test="loop-iteration">
           last iteration: ran={{ iteration.ran }} · candidates={{ iteration.candidates }}
-          <template v-if="iteration.queuedSkills.length > 0">
-            · queued: {{ iteration.queuedSkills.join(', ') }}
+          <template v-if="iteration.queuedSpecs.length > 0">
+            · queued: {{ iteration.queuedSpecs.join(', ') }}
           </template>
-          <template v-if="iteration.publishedSkills.length > 0">
-            · published: {{ iteration.publishedSkills.join(', ') }}
+          <template v-if="iteration.publishedSpecs.length > 0">
+            · published: {{ iteration.publishedSpecs.join(', ') }}
           </template>
         </div>
       </q-card-section>
@@ -86,7 +86,7 @@
               <q-badge :color="lifecycleColor(c.proposedState)" :label="c.proposedState" />
             </q-item-section>
             <q-item-section>
-              <div class="text-weight-medium">{{ c.skill }}</div>
+              <div class="text-weight-medium">{{ c.spec }}</div>
               <div class="text-grey-7 text-caption">
                 score {{ c.score.toFixed(3) }} (Δ
                 {{ scoreDelta(c) >= 0 ? '+' : '' }}{{ scoreDelta(c).toFixed(3) }} over baseline
@@ -101,7 +101,7 @@
                   dense
                   color="positive"
                   icon="check"
-                  :aria-label="`approve ${c.skill}`"
+                  :aria-label="`approve ${c.spec}`"
                   @click="doApprove(c.id)"
                 />
                 <q-btn
@@ -109,7 +109,7 @@
                   dense
                   color="negative"
                   icon="close"
-                  :aria-label="`reject ${c.skill}`"
+                  :aria-label="`reject ${c.spec}`"
                   @click="doReject(c.id)"
                 />
               </div>

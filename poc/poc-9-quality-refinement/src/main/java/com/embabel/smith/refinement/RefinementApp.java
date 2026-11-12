@@ -8,9 +8,9 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 /**
- * The eval-guided refinement launcher (POC 9). Evaluates the weak LLM-authored tagline skill,
+ * The eval-guided refinement launcher (POC 9). Evaluates the weak LLM-authored tagline spec,
  * rewrites its prompt from the failing eval tasks, re-evaluates, and reports the before/after
- * composite score (the SkillAxe pattern, doc 03 §5). Endpoint-gated; the model endpoint is
+ * composite score (the SpecAxe pattern, doc 03 §5). Endpoint-gated; the model endpoint is
  * fully env-driven.
  *
  * <p>Run (with a live OpenAI-compatible endpoint):
@@ -48,13 +48,13 @@ public class RefinementApp implements CommandLineRunner {
             throw new IllegalStateException(configError);
         }
 
-        System.out.println("=== POC 9: LLM-authored skill quality + eval-guided refinement ===");
+        System.out.println("=== POC 9: LLM-authored spec quality + eval-guided refinement ===");
         RefinementRunner runner = new RefinementRunner(platform);
         RefinementRunner.Endpoint endpoint =
                 new RefinementRunner.Endpoint(baseUrl(), apiKey(), model());
 
         RefinementRunner.RefinementOutcome outcome = runner.improve(
-                TaglineSkill.weak(), TaglineSkill.STEP_NAME, TaglineSkill.tasks(), endpoint);
+                TaglineSpec.weak(), TaglineSpec.STEP_NAME, TaglineSpec.tasks(), endpoint);
 
         System.out.printf("before score: %.1f%%%n", outcome.beforeScore() * 100);
         if (!outcome.failingInputs().isEmpty()) {
@@ -64,7 +64,7 @@ public class RefinementApp implements CommandLineRunner {
         System.out.println(indent(outcome.revisedPrompt()));
         System.out.printf("after score:  %.1f%%%n", outcome.afterScore() * 100);
         System.out.println(outcome.improved()
-                ? "RESULT: the eval-guided rewrite improved the skill."
+                ? "RESULT: the eval-guided rewrite improved the spec."
                 : "RESULT: no improvement this run (LLM variance); the loop ran end-to-end.");
     }
 

@@ -8,8 +8,8 @@ import com.embabel.smith.retrieval.gliner.GlinerModel;
 import com.embabel.smith.retrieval.gliner.GlinerSelector;
 import com.embabel.smith.retrieval.gliner.LexicalSelector;
 import com.embabel.smith.retrieval.gliner.ShadowingRunner;
-import com.embabel.smith.retrieval.gliner.SkillSelector;
-import com.embabel.smith.retrieval.scale.ScaleSkillLibrary;
+import com.embabel.smith.retrieval.gliner.SpecSelector;
+import com.embabel.smith.retrieval.scale.ScaleSpecLibrary;
 import io.gravitee.lab.gliner4j.schema.ClassificationLabel;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
@@ -55,7 +55,7 @@ public class SmallLlmSelectorApp implements CommandLineRunner {
         Path gguf = resolveGguf();
         ServingGate.Result gate = ServingGate.check(gguf, ServingGate.dockerCli());
         if (!gate.ready()) {
-            System.err.println("=== POC 19: small-LLM skill selection — cannot start ===");
+            System.err.println("=== POC 19: small-LLM spec selection — cannot start ===");
             System.err.println(gate.failure());
             System.exit(1);
             return;
@@ -93,9 +93,9 @@ public class SmallLlmSelectorApp implements CommandLineRunner {
      * The five benchmark methods in table order: the GLiNER2 transformer, the lexical and dense
      * baselines, and the small LLM under each prompt format.
      */
-    static Map<String, SkillSelector> benchmarkMethods(String baseUrl, String model,
-                                                       SkillSelector gliner2) {
-        Map<String, SkillSelector> methods = new LinkedHashMap<>();
+    static Map<String, SpecSelector> benchmarkMethods(String baseUrl, String model,
+                                                       SpecSelector gliner2) {
+        Map<String, SpecSelector> methods = new LinkedHashMap<>();
         methods.put("transformer (GLiNER2)", gliner2);
         methods.put("lexical (word TF)", new LexicalSelector());
         methods.put("dense (feature hash)", new DenseSelector());
@@ -106,9 +106,9 @@ public class SmallLlmSelectorApp implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
-        System.out.println("=== POC 19: small-LLM skill selection ===");
+        System.out.println("=== POC 19: small-LLM spec selection ===");
         System.out.println("A 0.6B model fine-tuned for single-label decisions (iromu/Qwen3-0.6B-openjev),");
-        System.out.println("served in Docker (llama.cpp, compose.yml, dev-services managed), as a skill selector");
+        System.out.println("served in Docker (llama.cpp, compose.yml, dev-services managed), as a spec selector");
         System.out.println("on POC 17's shadowing scenario — under its in-distribution decision prompt");
         System.out.println("(llm-id) and an out-of-distribution free-form prompt (llm-ood).");
         System.out.println();
@@ -116,14 +116,14 @@ public class SmallLlmSelectorApp implements CommandLineRunner {
         String baseUrl = configuredBaseUrl.isBlank() ? LlmSelector.DEFAULT_BASE_URL : configuredBaseUrl;
         String model = configuredModel.isBlank() ? LlmSelector.DEFAULT_MODEL : configuredModel;
         System.out.println("Model endpoint: " + baseUrl + " (model: " + model + ")");
-        System.out.println("Shadowing scenario: " + ScaleSkillLibrary.benchmark().size()
+        System.out.println("Shadowing scenario: " + ScaleSpecLibrary.benchmark().size()
                 + " targets x 2 candidate-set variants (matching + strict)");
         System.out.println();
 
-        List<ClassificationLabel> loadTimeLabels = GlinerSelector.labelsFor(ScaleSkillLibrary.full());
+        List<ClassificationLabel> loadTimeLabels = GlinerSelector.labelsFor(ScaleSpecLibrary.full());
         ShadowingRunner runner = new ShadowingRunner();
         try (GlinerSelector gliner = GlinerSelector.fromModel(glinerModel(), loadTimeLabels)) {
-            Map<String, SkillSelector> methods = benchmarkMethods(baseUrl, model, gliner);
+            Map<String, SpecSelector> methods = benchmarkMethods(baseUrl, model, gliner);
             System.out.println("-- Precision@1 per method, per candidate-set variant --");
             runner.printComparisonTable(methods);
         }

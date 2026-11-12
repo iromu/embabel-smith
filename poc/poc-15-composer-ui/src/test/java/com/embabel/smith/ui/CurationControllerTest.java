@@ -12,7 +12,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * Offline tests for the curation re-eval (POC 15). The live re-eval is endpoint-gated, so these pin
- * the offline scaffolding: no skill selected, an unknown skill, and a missing endpoint (naming the
+ * the offline scaffolding: no spec selected, an unknown spec, and a missing endpoint (naming the
  * missing vars) — each returns before any model call, so the controller is built with no
  * {@code AgentPlatform}.
  */
@@ -22,33 +22,33 @@ class CurationControllerTest {
 
     @BeforeEach
     void setUp() {
-        SkillCatalog catalog = new SkillCatalog("");
-        CurationController controller = new CurationController(catalog, new SkillCuration(catalog), null, "", "", "", "");
+        SpecCatalog catalog = new SpecCatalog("");
+        CurationController controller = new CurationController(catalog, new SpecCuration(catalog), null, "", "", "", "");
         mockMvc = MockMvcBuilders.standaloneSetup(controller).build();
     }
 
     @Test
-    void noSkillSelectedIsRejected() throws Exception {
+    void noSpecSelectedIsRejected() throws Exception {
         mockMvc.perform(post("/api/curate").contentType(MediaType.APPLICATION_JSON)
-                .content("{\"skillName\":\"\"}"))
+                .content("{\"specName\":\"\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.error")
-                        .value(org.hamcrest.Matchers.containsString("No skill selected")));
+                        .value(org.hamcrest.Matchers.containsString("No spec selected")));
     }
 
     @Test
-    void anUnknownSkillIsRejected() throws Exception {
+    void anUnknownSpecIsRejected() throws Exception {
         mockMvc.perform(post("/api/curate").contentType(MediaType.APPLICATION_JSON)
-                .content("{\"skillName\":\"nope\"}"))
+                .content("{\"specName\":\"nope\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.error")
-                        .value(org.hamcrest.Matchers.containsString("Unknown skill")));
+                        .value(org.hamcrest.Matchers.containsString("Unknown spec")));
     }
 
     @Test
-    void aKnownSkillWithoutAnEndpointReturnsAClearConfigError() throws Exception {
+    void aKnownSpecWithoutAnEndpointReturnsAClearConfigError() throws Exception {
         mockMvc.perform(post("/api/curate").contentType(MediaType.APPLICATION_JSON)
-                .content("{\"skillName\":\"compose-extract\"}"))
+                .content("{\"specName\":\"compose-extract\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.error")
                         .value(org.hamcrest.Matchers.containsString("OPENAI_CUSTOM_BASE_URL")));

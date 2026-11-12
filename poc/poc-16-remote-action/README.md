@@ -1,10 +1,10 @@
 # POC 16 — The remote-action bridge
 
-The **third runtime bridge** doc 03 §2.3 calls for (doc 03 §4.2 "Option B"): a skill that invokes an
+The **third runtime bridge** doc 03 §2.3 calls for (doc 03 §4.2 "Option B"): a spec that invokes an
 action running in a **separate process**, planned and executed by the same GOAP planner that drives
-local actions. POC 7 proved the *shell* bridge (a skill runs a real CLI); POC 13 proved the *MCP*
+local actions. POC 7 proved the *shell* bridge (a spec runs a real CLI); POC 13 proved the *MCP*
 bridge (an exported goal published as a remote MCP tool). POC 16 proves the *remote-action* bridge —
-the "normal agent harness" where a skill invokes an external worker over HTTP.
+the "normal agent harness" where a spec invokes an external worker over HTTP.
 
 The plan is **fully deterministic and LLM-free**: the GOAP plan is non-LLM, and the remote action
 runs deterministic sidecar code. The model endpoint is only present to boot the platform; it is

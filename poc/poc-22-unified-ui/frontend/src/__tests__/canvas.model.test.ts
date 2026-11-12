@@ -1,19 +1,19 @@
 import { describe, expect, it } from 'vitest'
-import { checkEdge, validateCanvas, type SkillInfo } from '@/canvas/model'
+import { checkEdge, validateCanvas, type SpecInfo } from '@/canvas/model'
 
-// A minimal two-skill chain, mirroring the repo's compose-extract -> compose-explain:
+// A minimal two-spec chain, mirroring the repo's compose-extract -> compose-explain:
 // extract reads UserInput and emits an intermediate topic; explain consumes it and emits the goal.
-const extract: SkillInfo = {
+const extract: SpecInfo = {
   name: 'compose-extract',
   externalInputTypes: ['com.embabel.agent.domain.io.UserInput'],
   outputType: 'com.example.ExtractedTopic',
 }
-const explain: SkillInfo = {
+const explain: SpecInfo = {
   name: 'compose-explain',
   externalInputTypes: ['com.example.ExtractedTopic'],
   outputType: 'com.embabel.agent.spec.model.BackgroundMessage',
 }
-const skills = [extract, explain]
+const specs = [extract, explain]
 
 describe('checkEdge (the snap rule)', () => {
   it('accepts a type-compatible connection', () => {
@@ -34,7 +34,7 @@ describe('validateCanvas (chain composition)', () => {
     const result = validateCanvas({
       nodes: ['compose-extract', 'compose-explain'],
       edges: [{ from: 'compose-extract', to: 'compose-explain' }],
-      skills,
+      specs,
     })
     expect(result.valid).toBe(true)
     expect(result.issues).toEqual([])
@@ -45,7 +45,7 @@ describe('validateCanvas (chain composition)', () => {
     const result = validateCanvas({
       nodes: ['compose-extract', 'compose-explain'],
       edges: [],
-      skills,
+      specs,
     })
     expect(result.valid).toBe(false)
     expect(result.issues.length).toBeGreaterThan(0)
@@ -56,7 +56,7 @@ describe('validateCanvas (chain composition)', () => {
     const result = validateCanvas({
       nodes: ['compose-extract', 'compose-explain'],
       edges: [{ from: 'compose-explain', to: 'compose-extract' }],
-      skills,
+      specs,
     })
     expect(result.valid).toBe(false)
     expect(result.issues.some((i) => i.includes('type-incompatible'))).toBe(true)
@@ -69,20 +69,20 @@ describe('validateCanvas (chain composition)', () => {
         { from: 'compose-extract', to: 'compose-explain' },
         { from: 'compose-explain', to: 'compose-extract' },
       ],
-      skills,
+      specs,
     })
     expect(result.valid).toBe(false)
     expect(result.issues.length).toBeGreaterThan(0)
   })
 
-  it('ignores edges that reference skills not on the canvas', () => {
+  it('ignores edges that reference specs not on the canvas', () => {
     const result = validateCanvas({
       nodes: ['compose-extract'],
       edges: [{ from: 'compose-extract', to: 'ghost' }],
-      skills,
+      specs,
     })
     // A single entry with no exit is already invalid, but the dangling edge must be reported too.
     expect(result.valid).toBe(false)
-    expect(result.issues.some((i) => i.includes('references a missing skill'))).toBe(true)
+    expect(result.issues.some((i) => i.includes('references a missing spec'))).toBe(true)
   })
 })

@@ -7,7 +7,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Offline tests of {@link PackName#slug}: deterministic (same description → same slug),
  * non-alphanumerics collapse to '-', slugs are truncated to 40 chars, and empty/null fall back to
- * {@code built-skill}.
+ * {@code built-spec}.
  */
 class PackNameTest {
 
@@ -30,9 +30,9 @@ class PackNameTest {
     }
 
     @Test
-    void emptyOrNullFallsBackToBuiltSkill() {
-        assertThat(PackName.slug("")).isEqualTo("built-skill");
-        assertThat(PackName.slug("   ")).isEqualTo("built-skill");
-        assertThat(PackName.slug(null)).isEqualTo("built-skill");
+    void emptyOrNullFallsBackToBuiltSpec() {
+        assertThat(PackName.slug("")).isEqualTo("built-spec");
+        assertThat(PackName.slug("   ")).isEqualTo("built-spec");
+        assertThat(PackName.slug(null)).isEqualTo("built-spec");
     }
 }

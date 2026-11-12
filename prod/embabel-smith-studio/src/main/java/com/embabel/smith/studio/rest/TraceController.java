@@ -13,7 +13,7 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * The Traces surface (change 06): the rolling window of a skill's trace records, most recent first,
+ * The Traces surface (change 06): the rolling window of a spec's trace records, most recent first,
  * each carrying its per-step records (for step-level drill-down) and the failure reason where
  * present. Offline — reads the JSONL trace store, no model calls.
  */
@@ -26,12 +26,12 @@ public class TraceController {
         this.reader = new TraceWindowReader(traceStore);
     }
 
-    /** The recent traces for a skill, most recent first, bounded by {@code limit}. */
+    /** The recent traces for a spec, most recent first, bounded by {@code limit}. */
     @GetMapping("/api/traces")
-    public List<TraceInfo> traces(@RequestParam("skill") String skill,
+    public List<TraceInfo> traces(@RequestParam("spec") String spec,
                                   @RequestParam(value = "limit", required = false,
                                           defaultValue = "100") int limit) {
-        List<TraceRecord> window = reader.window(skill);
+        List<TraceRecord> window = reader.window(spec);
         int from = Math.max(0, window.size() - Math.max(1, limit));
         List<TraceRecord> recent = new ArrayList<>(window.subList(from, window.size()));
         Collections.reverse(recent); // the window is completion order; the pane wants most recent first

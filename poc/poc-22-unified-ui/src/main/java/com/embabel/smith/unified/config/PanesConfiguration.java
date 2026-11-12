@@ -8,8 +8,8 @@ import com.embabel.common.ai.model.LlmOptions;
 import com.embabel.smith.common.config.ModelEndpointConfig;
 import com.embabel.smith.common.model.ActionStepSpec;
 import com.embabel.smith.common.model.DraftQuality;
-import com.embabel.smith.common.model.SkillPack;
-import com.embabel.smith.composer.SkillNode;
+import com.embabel.smith.common.model.AgentSpec;
+import com.embabel.smith.composer.SpecNode;
 import com.embabel.smith.lifecycle.LiveEvalRunner;
 import com.embabel.smith.nlcompile.NlCompileRunner;
 import com.embabel.smith.refinement.RefinementRunner;
@@ -17,13 +17,13 @@ import com.embabel.smith.retrieval.embedding.Embedder;
 import com.embabel.smith.retrieval.embedding.MiniLmEmbedder;
 import com.embabel.smith.retrieval.embedding.RealEmbeddingScorer;
 import com.embabel.smith.retrieval.scale.LexicalScorer;
-import com.embabel.smith.runtime.SkillRunner;
+import com.embabel.smith.runtime.SpecRunner;
 import com.embabel.smith.unified.AuthorController;
 import com.embabel.smith.unified.EvalController;
 import com.embabel.smith.unified.LifecycleController;
 import com.embabel.smith.unified.RunController;
 import com.embabel.smith.unified.ScorerBinding;
-import com.embabel.smith.unified.SkillCatalog;
+import com.embabel.smith.unified.SpecCatalog;
 import com.embabel.smith.unified.dto.ActionInfo;
 import com.embabel.smith.unified.dto.AuthorDraft;
 import org.springframework.beans.factory.annotation.Value;
@@ -54,7 +54,7 @@ public class PanesConfiguration {
     }
 
     /**
-     * The active retrieval scorer (the shared {@code SkillScorer} seam). Default: the offline lexical
+     * The active retrieval scorer (the shared {@code SpecScorer} seam). Default: the offline lexical
      * scorer. Opt-in: {@code builder.scorer=embedding} wires POC 20's real ONNX embedding scorer
      * without touching the panes — the Retrieve and Scale responses carry the active scorer name.
      */
@@ -79,8 +79,8 @@ public class PanesConfiguration {
     }
 
     @Bean
-    public RunController.RunFn runFn(AgentPlatform platform, SkillCatalog catalog) {
-        return (skillName, input) -> new SkillRunner(platform).run(catalog.dir(skillName), input, null);
+    public RunController.RunFn runFn(AgentPlatform platform, SpecCatalog catalog) {
+        return (specName, input) -> new SpecRunner(platform).run(catalog.dir(specName), input, null);
     }
 
     @Bean
@@ -94,11 +94,11 @@ public class PanesConfiguration {
     }
 
     @Bean
-    public EvalController.EvalFn evalFn(AgentPlatform platform, SkillCatalog catalog,
+    public EvalController.EvalFn evalFn(AgentPlatform platform, SpecCatalog catalog,
                                         ModelEndpointConfig endpoint) {
-        return (skillName, tasks) -> {
-            SkillNode node = catalog.get(skillName);
-            SkillPack pack = node.pack();
+        return (specName, tasks) -> {
+            SpecNode node = catalog.get(specName);
+            AgentSpec pack = node.pack();
             RefinementRunner runner = new RefinementRunner(platform);
             RefinementRunner.Endpoint ep = new RefinementRunner.Endpoint(
                     endpoint.baseUrl(), endpoint.apiKey(), endpoint.defaultLlm());
@@ -107,9 +107,9 @@ public class PanesConfiguration {
     }
 
     @Bean
-    public LifecycleController.LiveEvalFn liveEvalFn(AgentPlatform platform, SkillCatalog catalog) {
-        return (skillName, tasks) ->
-                new LiveEvalRunner(platform).evaluate(catalog.get(skillName).pack(), tasks);
+    public LifecycleController.LiveEvalFn liveEvalFn(AgentPlatform platform, SpecCatalog catalog) {
+        return (specName, tasks) ->
+                new LiveEvalRunner(platform).evaluate(catalog.get(specName).pack(), tasks);
     }
 
     private static AuthorDraft toDraft(AgentCompilationResult result) {
@@ -136,7 +136,7 @@ public class PanesConfiguration {
                 issues);
     }
 
-    private static String pickStep(SkillPack pack) {
+    private static String pickStep(AgentSpec pack) {
         return pack.steps().stream()
                 .filter(s -> s.prompt() != null && !s.prompt().isBlank())
                 .map(ActionStepSpec::name)

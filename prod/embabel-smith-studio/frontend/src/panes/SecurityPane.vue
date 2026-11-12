@@ -4,7 +4,7 @@
       <PageHeader
         icon="security"
         title="Security"
-        description="Scan a skill-pack at install time; pure static analysis, offline."
+        description="Scan a spec-pack at install time; pure static analysis, offline."
       />
 
       <q-separator />
@@ -20,12 +20,12 @@
             data-test="security-source"
           />
           <q-select
-            v-model="skill"
-            label="Skill"
+            v-model="spec"
+            label="Spec"
             dense
-            :options="skillOptions"
+            :options="specOptions"
             style="width: 260px"
-            data-test="security-skill"
+            data-test="security-spec"
           />
           <q-btn label="Scan" color="primary" icon="security" @click="doScan" data-test="security-btn" />
         </div>
@@ -54,7 +54,7 @@
           </q-list>
           <div v-else class="text-positive q-mt-sm">No findings.</div>
         </div>
-        <div v-else class="text-grey-6">Pick a source and a skill, then scan its pack.</div>
+        <div v-else class="text-grey-6">Pick a source and a spec, then scan its pack.</div>
       </q-card-section>
     </q-card>
   </q-page>
@@ -66,9 +66,9 @@ import { ref } from 'vue'
 import PageHeader from '../components/PageHeader.vue'
 import { scan } from '../api/client'
 import type { ScanInfo } from '../api/types'
-import { useSourceSkill } from '../composables/useSourceSkill'
+import { useSourceSpec } from '../composables/useSourceSpec'
 
-const { source, skill, sourceOptions, skillOptions } = useSourceSkill()
+const { source, spec, sourceOptions, specOptions } = useSourceSpec()
 const result = ref<ScanInfo | null>(null)
 const error = ref<string | null>(null)
 
@@ -81,13 +81,13 @@ function severityColor(s: string): string {
 }
 
 async function doScan() {
-  if (source.value === '' || skill.value === '') {
+  if (source.value === '' || spec.value === '') {
     return
   }
   error.value = null
   result.value = null
   try {
-    const res = await scan({ source: source.value, skill: skill.value })
+    const res = await scan({ source: source.value, spec: spec.value })
     if (res.error) {
       error.value = res.error
     } else {

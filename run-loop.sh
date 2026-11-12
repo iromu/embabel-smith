@@ -2,15 +2,15 @@
 #
 # run-loop.sh — the full build→run loop (task 7.1).
 #
-#   [1/2] poc-3-builder-agent : a natural-language description → a validated skill-pack on disk
-#   [2/2] poc-1-no-code-runtime: run that produced skill-pack over an input and print the goal output
+#   [1/2] poc-3-builder-agent : a natural-language description → a validated agent spec on disk
+#   [2/2] poc-1-no-code-runtime: run that produced agent spec over an input and print the goal output
 #
 # Requires a LIVE model endpoint (any OpenAI-compatible backend) via env vars — see README "Model endpoint":
 #   OPENAI_CUSTOM_BASE_URL, OPENAI_CUSTOM_API_KEY, OPENAI_CUSTOM_MODELS, EMBABEL_MODELS_DEFAULT_LLM
 #
 # Usage:
 #   ./run-loop.sh [description] [input]
-#   PLANNER=UTILITY BUILDER_OUTPUT_DIR=./built-skills ./run-loop.sh
+#   PLANNER=UTILITY BUILDER_OUTPUT_DIR=./built-specs ./run-loop.sh
 #
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -28,11 +28,11 @@ if [ ${#missing[@]} -gt 0 ]; then
 fi
 
 # --- inputs (overridable) ----------------------------------------------------
-DESCRIPTION="${1:-A skill that explains a topic in plain language and posts it as a background message}"
+DESCRIPTION="${1:-An agent that explains a topic in plain language and posts it as a background message}"
 INPUT="${2:-Explain how a coffee machine works}"
 PLANNER="${PLANNER:-GOAP}"
 # Absolute by default so the built pack is found regardless of the forked app's working directory.
-OUTPUT_DIR="${BUILDER_OUTPUT_DIR:-$(pwd)/built-skills}"
+OUTPUT_DIR="${BUILDER_OUTPUT_DIR:-$(pwd)/built-specs}"
 
 echo "==> [0/2] Building modules to the local repo (mvn install -DskipTests)"
 mvn -q install -DskipTests
@@ -50,12 +50,12 @@ if ! BUILDER_DESCRIPTION="$DESCRIPTION" BUILDER_OUTPUT_DIR="$OUTPUT_DIR" \
   exit 1
 fi
 
-PACK_PATH="$(grep -E 'Built skill-pack:' "$BUILD_LOG" | tail -1 | sed -E 's/.* at //')"
+PACK_PATH="$(grep -E 'Built agent spec': "$BUILD_LOG" | tail -1 | sed -E 's/.* at //')"
 if [ -z "${PACK_PATH:-}" ] || [ ! -d "$PACK_PATH" ]; then
-  echo "Could not locate the built skill-pack (expected under $OUTPUT_DIR)." >&2
+  echo "Could not locate the built agent spec (expected under $OUTPUT_DIR)." >&2
   exit 1
 fi
-echo "    built skill-pack: $PACK_PATH"
+echo "    built agent spec: $PACK_PATH"
 
 echo "==> [2/2] No-code runtime — input: $INPUT (planner=$PLANNER)"
 BUILDER_PACK_DIR="$PACK_PATH" BUILDER_INPUT="$INPUT" BUILDER_PLANNER="$PLANNER" \

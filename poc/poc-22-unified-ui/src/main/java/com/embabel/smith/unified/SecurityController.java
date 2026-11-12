@@ -1,9 +1,9 @@
 package com.embabel.smith.unified;
 
-import com.embabel.smith.composer.SkillNode;
+import com.embabel.smith.composer.SpecNode;
 import com.embabel.smith.security.Finding;
 import com.embabel.smith.security.ScanReport;
-import com.embabel.smith.security.SkillSecurityScanner;
+import com.embabel.smith.security.SpecSecurityScanner;
 import com.embabel.smith.unified.dto.SecurityFinding;
 import com.embabel.smith.unified.dto.SecurityRequest;
 import com.embabel.smith.unified.dto.SecurityResponse;
@@ -14,38 +14,38 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 /**
- * The Security pane (POC 22): scan a skill-pack at install time via POC 21's
- * {@link SkillSecurityScanner} — pure static analysis over the skill's own prompts, fully offline.
+ * The Security pane (POC 22): scan a agent spec at install time via POC 21's
+ * {@link SpecSecurityScanner} — pure static analysis over the spec's own prompts, fully offline.
  * It flags prompt-injection text, over-privileged tool groups, network references, and
  * secret-exfiltration patterns, and reports a {@code SAFE}/{@code REVIEW}/{@code BLOCK} verdict plus
- * the minimum POC 10 trust tier at which the skill is safe to load.
+ * the minimum POC 10 trust tier at which the spec is safe to load.
  */
 @RestController
 public class SecurityController {
 
-    private final SkillCatalog catalog;
-    private final SkillSecurityScanner scanner = new SkillSecurityScanner();
+    private final SpecCatalog catalog;
+    private final SpecSecurityScanner scanner = new SpecSecurityScanner();
 
-    public SecurityController(SkillCatalog catalog) {
+    public SecurityController(SpecCatalog catalog) {
         this.catalog = catalog;
     }
 
-    /** Scan a skill-pack from the palette and report its findings, verdict, and recommended tier. */
+    /** Scan a agent spec from the palette and report its findings, verdict, and recommended tier. */
     @PostMapping("/api/security")
     public SecurityResponse security(@RequestBody SecurityRequest request) {
-        String skillName = request.skillName() == null ? "" : request.skillName();
-        if (skillName.isBlank()) {
-            return SecurityResponse.error("No skill selected; pick a skill to scan first.");
+        String specName = request.specName() == null ? "" : request.specName();
+        if (specName.isBlank()) {
+            return SecurityResponse.error("No spec selected; pick a spec to scan first.");
         }
-        SkillNode node = catalog.get(skillName);
+        SpecNode node = catalog.get(specName);
         if (node == null) {
-            return SecurityResponse.error("Unknown skill: " + skillName + ". Choose one from the palette.");
+            return SecurityResponse.error("Unknown spec: " + specName + ". Choose one from the palette.");
         }
         ScanReport report = scanner.scan(node.pack());
         List<SecurityFinding> findings = report.findings().stream()
                 .map(SecurityController::toFinding)
                 .toList();
-        return SecurityResponse.ok(skillName, report.verdict().name(), report.recommendedTier().name(),
+        return SecurityResponse.ok(specName, report.verdict().name(), report.recommendedTier().name(),
                 report.summary(), findings);
     }
 

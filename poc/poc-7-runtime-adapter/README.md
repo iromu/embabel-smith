@@ -1,14 +1,14 @@
 # POC 7 — Runtime adapter (CLI / script invocation)
 
-A skill-pack action declares `toolGroups: [shell]`; the platform injects a self-published `shell`
-tool group under that role so the skill runs a **real CLI** with no orchestration code — the
+A agent spec action declares `toolGroups: [shell]`; the platform injects a self-published `shell`
+tool group under that role so the spec runs a **real CLI** with no orchestration code — the
 "normal agent harness" promise.
 
 ## What it proves
 
-- **Skills invoke CLIs/scripts (C11).** The `shell-runner` skill's action called
+- **Specs invoke CLIs/scripts (C11).** The `shell-runner` spec's action called
   `runCommand({"command":"uname -s"})` and the goal returned the real output (`"stdout":"Linux"`).
-  A skill is therefore not locked to LLM-only actions — it can drive the host.
+  A spec is therefore not locked to LLM-only actions — it can drive the host.
 - The tool group is auto-discovered by the platform's `RegistryToolGroupResolver`.
 
 > Integration note: Embabel's `ToolGroupMetadata`/`getVersion()` are Kotlin-mangled and
@@ -19,7 +19,7 @@ tool group under that role so the skill runs a **real CLI** with no orchestratio
 
 ```mermaid
 flowchart LR
-    SKILL["CLI skill action<br/>toolGroups: shell"] --> TG["shell ToolGroup<br/>injected under the shell role"]
+    SPEC["CLI spec action<br/>toolGroups: shell"] --> TG["shell ToolGroup<br/>injected under the shell role"]
     TG --> TOOL["ShellCommandTool.runCommand"]
     TOOL --> PB["ProcessBuilder"]
     PB --> CLI["real CLI (uname -s)"]
@@ -27,7 +27,7 @@ flowchart LR
 ```
 
 `ShellCommandTool` exposes a `runCommand` tool (via `ProcessBuilder`); `ShellToolGroup` publishes it
-as a `ToolGroup` bean under the `shell` role; `AdapterRunner` deploys the CLI skill with that tool
+as a `ToolGroup` bean under the `shell` role; `AdapterRunner` deploys the CLI spec with that tool
 group in scope and runs the plan.
 
 ## Run it
@@ -35,7 +35,7 @@ group in scope and runs the plan.
 Endpoint-gated:
 
 ```bash
-BUILDER_PACK_DIR="$PWD/skill-packs/shell-runner" \
+BUILDER_PACK_DIR="$PWD/agent specs/shell-runner" \
 BUILDER_INPUT="Run the command: uname -s, and report the result" \
     mvn -pl poc/poc-7-runtime-adapter spring-boot:run
 ```
@@ -57,9 +57,9 @@ in a local CLI, a remote MCP server, or a separate sidecar process.
 
 ## Conclusion
 
-Against the hypothesis (claim C11, local-CLI half): **proven.** The `shell-runner` skill invoked a
+Against the hypothesis (claim C11, local-CLI half): **proven.** The `shell-runner` spec invoked a
 real CLI through an injected `shell` tool group (`runCommand({"command":"uname -s"})` →
-`"stdout":"Linux"`, goal achieved), so a skill is not locked to LLM-only actions — it can drive the
+`"stdout":"Linux"`, goal achieved), so a spec is not locked to LLM-only actions — it can drive the
 host. The tool group is auto-discovered by the platform's `RegistryToolGroupResolver`. The one
 friction point: Embabel's `ToolGroupMetadata`/`getVersion()` are Kotlin-mangled, so the group is
 registered via reflection on the mangled companion — integration friction a first-party

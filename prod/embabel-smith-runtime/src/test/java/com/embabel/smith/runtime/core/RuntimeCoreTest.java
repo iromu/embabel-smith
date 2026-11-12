@@ -2,9 +2,9 @@ package com.embabel.smith.runtime.core;
 
 import com.embabel.agent.core.AgentPlatform;
 import com.embabel.agent.core.DomainType;
-import com.embabel.smith.common.model.SkillPack;
+import com.embabel.smith.common.model.AgentSpec;
 import com.embabel.smith.runtime.TestPacks;
-import com.embabel.smith.skillsource.ResolvedSkillSource;
+import com.embabel.smith.specsource.ResolvedSpecSource;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
@@ -88,7 +88,7 @@ class RuntimeCoreTest {
 
     @Test
     void multiPackIngestDeploysAllGoalsAndResolvesTheGoalPack(@TempDir Path tmp) throws Exception {
-        ResolvedSkillSource resolved = TestPacks.resolve(TestPacks.library(tmp, "extract", "explain"));
+        ResolvedSpecSource resolved = TestPacks.resolve(TestPacks.library(tmp, "extract", "explain"));
 
         IngestedSource ingested = core().ingest(resolved);
 
@@ -111,7 +111,7 @@ class RuntimeCoreTest {
 
     @Test
     void aDuplicateGoalNameFailsAtIngestNamingBothPacks(@TempDir Path tmp) throws Exception {
-        ResolvedSkillSource resolved = TestPacks.resolve(TestPacks.library(tmp, "dup-a", "dup-b"));
+        ResolvedSpecSource resolved = TestPacks.resolve(TestPacks.library(tmp, "dup-a", "dup-b"));
 
         assertThatThrownBy(() -> core().ingest(resolved))
                 .isInstanceOf(IllegalStateException.class)

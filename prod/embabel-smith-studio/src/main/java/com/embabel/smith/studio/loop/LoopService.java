@@ -61,14 +61,14 @@ public class LoopService {
             for (PendingCandidate candidate : produced) {
                 try {
                     loop.queue().approve(candidate.id(), this::publish);
-                    published.add(candidate.skill());
+                    published.add(candidate.spec());
                 } catch (RuntimeException e) {
-                    queued.add(candidate.skill()); // publish failed; leave it pending for a manual decision
+                    queued.add(candidate.spec()); // publish failed; leave it pending for a manual decision
                 }
             }
         } else {
             for (PendingCandidate candidate : produced) {
-                queued.add(candidate.skill());
+                queued.add(candidate.spec());
             }
         }
         return new IterationInfo(true, produced.size(), published, queued, state.autoPublish(), null, null);
@@ -124,7 +124,7 @@ public class LoopService {
 
     /**
      * Publishes a candidate through the shared publisher (the loop's write path). push=true: an
-     * approved/auto-published candidate must persist into the skill source, so a git source is
+     * approved/auto-published candidate must persist into the spec source, so a git source is
      * pushed (the folder publisher ignores the flag).
      */
     private PublishResult publish(PendingCandidate candidate) {
@@ -132,7 +132,7 @@ public class LoopService {
             return publisher.publish(candidate.candidate(), candidate.proposedLifecycle(), true, true);
         } catch (IOException e) {
             throw new UncheckedIOException(
-                    "cannot publish candidate for " + candidate.skill(), e);
+                    "cannot publish candidate for " + candidate.spec(), e);
         }
     }
 }

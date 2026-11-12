@@ -1,6 +1,6 @@
 package com.embabel.smith.studio.rest.dto;
 
-/** The result of scanning a skill-pack (the Security pane): the scan report, or the error. */
+/** The result of scanning a agent spec (the Security pane): the scan report, or the error. */
 public record SecurityResponse(String error, ScanInfo scan) {
 
     public static SecurityResponse ok(ScanInfo scan) {

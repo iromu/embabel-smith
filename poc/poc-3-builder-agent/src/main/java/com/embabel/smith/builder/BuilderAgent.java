@@ -14,12 +14,12 @@ import com.embabel.agent.spec.compile.DefaultNaturalLanguageCompiler;
 import com.embabel.agent.spec.model.PromptedActionSpec;
 import com.embabel.agent.spec.model.StepSpecContext;
 import com.embabel.common.ai.model.LlmOptions;
-import com.embabel.smith.common.io.SkillPackReader;
-import com.embabel.smith.common.io.SkillPackWriter;
+import com.embabel.smith.common.io.AgentSpecReader;
+import com.embabel.smith.common.io.AgentSpecWriter;
 import com.embabel.smith.common.model.ActionStepSpec;
 import com.embabel.smith.common.model.DraftQuality;
-import com.embabel.smith.common.model.SkillPack;
-import com.embabel.smith.common.validation.SkillPackValidator;
+import com.embabel.smith.common.model.AgentSpec;
+import com.embabel.smith.common.validation.AgentSpecValidator;
 import com.embabel.smith.common.validation.ValidationIssue;
 import org.springframework.beans.factory.annotation.Value;
 
@@ -29,43 +29,43 @@ import java.util.List;
 
 /**
  * POC 3 — the builder agent (design D2). It is a code-backed {@code @Agent} run by the default GOAP
- * planner. Its single goal is "a validated skill-pack exists on disk" ({@link SkillPackRef}),
+ * planner. Its single goal is "a validated agent spec exists on disk" ({@link AgentSpecRef}),
  * reached by a deterministic pipeline of three code-backed actions:
  *
  * <pre>
  *   UserInput --compileFromDescription--> CompiledDraft
  *           --validateDraft-------------> ValidatedDraft
- *           --writeSkillPack------------> SkillPackRef   (goal)
+ *           --writeAgentSpec------------> AgentSpecRef   (goal)
  * </pre>
  *
  * The LLM is called only inside {@link #compileFromDescription(UserInput)} (endpoint-gated); the
  * validate and write steps are pure Java, so the pipeline order is deterministic and the offline
  * behaviour is testable. Design D5 is enforced here: an invalid draft is never written.
  */
-@Agent(planner = PlannerType.GOAP, description = "Builds a validated skill-pack from a natural-language description")
+@Agent(planner = PlannerType.GOAP, description = "Builds a validated agent spec from a natural-language description")
 public class BuilderAgent {
 
     private final Ai ai;
     private final DataDictionary dataDictionary;
     private final Path outputDir;
 
-    private final DraftToSkillPack mapper = new DraftToSkillPack();
-    private final SkillPackValidator validator = new SkillPackValidator();
-    private final SkillPackWriter writer = new SkillPackWriter();
-    private final SkillPackReader reader = new SkillPackReader();
+    private final DraftToAgentSpec mapper = new DraftToAgentSpec();
+    private final AgentSpecValidator validator = new AgentSpecValidator();
+    private final AgentSpecWriter writer = new AgentSpecWriter();
+    private final AgentSpecReader reader = new AgentSpecReader();
 
     public BuilderAgent(Ai ai, AgentPlatform platform,
-                        @Value("${builder.output-dir:./built-skills}") String outputDir) {
+                        @Value("${builder.output-dir:./built-specs}") String outputDir) {
         this.ai = ai;
         this.dataDictionary = platform;
         this.outputDir = Path.of(outputDir);
     }
 
     /**
-     * Endpoint-gated: compiles a natural-language description into a draft skill via the NL
+     * Endpoint-gated: compiles a natural-language description into a draft spec via the NL
      * compiler. This is the only step that calls the LLM.
      */
-    @Action(description = "Compile a natural-language description into a draft skill-pack")
+    @Action(description = "Compile a natural-language description into a draft agent spec")
     public CompiledDraft compileFromDescription(UserInput description) {
         if (ai == null) {
             throw new IllegalStateException(
@@ -79,7 +79,7 @@ public class BuilderAgent {
                 name, dataDictionary, List.of(), List.of(), List.of());
         AgentCompilationResult result = compiler.compileAgent(name, description.getContent(), context);
         List<String> issues = result.getErrors().stream().map(CompilationError::getMessage).toList();
-        SkillPack pack = mapper.toSkillPack(result, name);
+        AgentSpec pack = mapper.toAgentSpec(result, name);
 
         // Measure the draft's goal shape (doc 02 caveat #2) before and after the builder's
         // normalization, so the log shows whether the safety net repaired a degenerate draft.
@@ -111,25 +111,25 @@ public class BuilderAgent {
      * Pure: writes a valid draft to disk and re-validates the written pack (group-1 validation).
      * Refuses to write an invalid draft (design D5).
      */
-    @Action(description = "Write the validated skill-pack to disk")
-    @AchievesGoal(description = "A validated skill-pack exists on disk")
-    public SkillPackRef writeSkillPack(ValidatedDraft draft) {
+    @Action(description = "Write the validated agent spec to disk")
+    @AchievesGoal(description = "A validated agent spec exists on disk")
+    public AgentSpecRef writeAgentSpec(ValidatedDraft draft) {
         if (!draft.valid()) {
             throw new IllegalStateException("Refusing to write an invalid draft: " + draft.issues());
         }
         Path dir = outputDir.resolve(draft.pack().name());
-        SkillPack readBack;
+        AgentSpec readBack;
         try {
             writer.write(draft.pack(), dir);
             readBack = reader.read(dir);
         } catch (IOException e) {
-            throw new IllegalStateException("Failed to write/re-read the skill-pack at " + dir, e);
+            throw new IllegalStateException("Failed to write/re-read the agent spec at " + dir, e);
         }
         List<String> issues = toMessages(validator.validate(readBack).issues());
         if (!issues.isEmpty()) {
             throw new IllegalStateException("Written pack failed re-validation: " + issues);
         }
-        return new SkillPackRef(dir, readBack.name(), readBack.version());
+        return new AgentSpecRef(dir, readBack.name(), readBack.version());
     }
 
     private List<String> toMessages(List<ValidationIssue> issues) {
@@ -145,6 +145,6 @@ public class BuilderAgent {
         if (slug.length() > 40) {
             slug = slug.substring(0, 40).replaceAll("-$", "");
         }
-        return slug.isEmpty() ? "built-skill" : slug;
+        return slug.isEmpty() ? "built-spec" : slug;
     }
 }

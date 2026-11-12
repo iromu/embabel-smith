@@ -29,12 +29,12 @@ afterEach(() => {
 
 describe('api/client — the single fetch site', () => {
   it('listSources GETs /api/sources and parses the source list', async () => {
-    const { calls } = stubFetch([{ uri: 'folder:/skills', kind: 'folder' }])
+    const { calls } = stubFetch([{ uri: 'folder:/specs', kind: 'folder' }])
     const sources = await api.listSources()
     expect(calls).toHaveLength(1)
     expect(calls[0].url).toBe('/api/sources')
     expect(calls[0].init?.method).toBeUndefined()
-    expect(sources[0].uri).toBe('folder:/skills')
+    expect(sources[0].uri).toBe('folder:/specs')
     expect(sources[0].kind).toBe('folder')
   })
 
@@ -80,7 +80,7 @@ describe('api/client — the single fetch site', () => {
     const { calls } = stubFetch({
       status: 'BUILT',
       stage: 'publish',
-      packName: 'new-skill',
+      packName: 'new-spec',
       score: 0.8,
       issues: [],
       scan: null,
@@ -89,66 +89,66 @@ describe('api/client — the single fetch site', () => {
       errorCode: null,
       error: null,
     })
-    const res = await api.build({ description: 'a skill', outputSource: 'folder:/out' })
+    const res = await api.build({ description: 'a spec', outputSource: 'folder:/out' })
     expect(calls[0].url).toBe('/api/build')
-    expect(bodyOf(calls[0])).toEqual({ description: 'a skill', outputSource: 'folder:/out' })
+    expect(bodyOf(calls[0])).toEqual({ description: 'a spec', outputSource: 'folder:/out' })
     expect(res.status).toBe('BUILT')
-    expect(res.packName).toBe('new-skill')
+    expect(res.packName).toBe('new-spec')
   })
 
-  it('evaluate POSTs source + skill and parses the eval response', async () => {
+  it('evaluate POSTs source + spec and parses the eval response', async () => {
     const { calls } = stubFetch({
       error: null,
       errorCode: null,
-      skill: 'alpha',
+      spec: 'alpha',
       score: 0.75,
       refinementCount: 1,
       failingTasks: ['t1'],
       passed: false,
       revisedPrompt: 'improved',
     })
-    const res = await api.evaluate({ source: 'folder:/s', skill: 'alpha' })
+    const res = await api.evaluate({ source: 'folder:/s', spec: 'alpha' })
     expect(calls[0].url).toBe('/api/eval')
-    expect(bodyOf(calls[0])).toEqual({ source: 'folder:/s', skill: 'alpha' })
+    expect(bodyOf(calls[0])).toEqual({ source: 'folder:/s', spec: 'alpha' })
     expect(res.score).toBe(0.75)
     expect(res.failingTasks).toEqual(['t1'])
   })
 
-  it('scan POSTs source + skill and parses the verdict + findings', async () => {
+  it('scan POSTs source + spec and parses the verdict + findings', async () => {
     const { calls } = stubFetch({
       error: null,
       scan: {
-        skillName: 'shell-runner',
+        specName: 'shell-runner',
         verdict: 'REVIEW',
         recommendedTier: 'HIGH',
         summary: 'one finding',
         findings: [{ severity: 'HIGH', category: 'HIGH_PRIVILEGE_TOOL', message: 'm', evidence: 'e' }],
       },
     })
-    const res = await api.scan({ source: 'folder:/s', skill: 'shell-runner' })
+    const res = await api.scan({ source: 'folder:/s', spec: 'shell-runner' })
     expect(calls[0].url).toBe('/api/security')
-    expect(bodyOf(calls[0])).toEqual({ source: 'folder:/s', skill: 'shell-runner' })
+    expect(bodyOf(calls[0])).toEqual({ source: 'folder:/s', spec: 'shell-runner' })
     expect(res.scan?.verdict).toBe('REVIEW')
     expect(res.scan?.findings[0].category).toBe('HIGH_PRIVILEGE_TOOL')
   })
 
-  it('checkTrust POSTs source + skill + tier and parses the allowlist result', async () => {
+  it('checkTrust POSTs source + spec + tier and parses the allowlist result', async () => {
     const { calls } = stubFetch({
       error: null,
-      skillName: 'shell-runner',
+      specName: 'shell-runner',
       tier: 'STANDARD',
       allowed: false,
       disallowedGroups: ['shell'],
       declaredToolGroups: ['shell', 'files'],
     })
-    const res = await api.checkTrust({ source: 'folder:/s', skill: 'shell-runner', tier: 'STANDARD' })
+    const res = await api.checkTrust({ source: 'folder:/s', spec: 'shell-runner', tier: 'STANDARD' })
     expect(calls[0].url).toBe('/api/trust')
-    expect(bodyOf(calls[0])).toEqual({ source: 'folder:/s', skill: 'shell-runner', tier: 'STANDARD' })
+    expect(bodyOf(calls[0])).toEqual({ source: 'folder:/s', spec: 'shell-runner', tier: 'STANDARD' })
     expect(res.allowed).toBe(false)
     expect(res.disallowedGroups).toEqual(['shell'])
   })
 
-  it('traces GETs /api/traces with skill + limit and parses the window', async () => {
+  it('traces GETs /api/traces with spec + limit and parses the window', async () => {
     const { calls } = stubFetch([
       {
         runId: 'r1',
@@ -168,7 +168,7 @@ describe('api/client — the single fetch site', () => {
       },
     ])
     const res = await api.traces('alpha', 50)
-    expect(calls[0].url).toBe(`/api/traces?skill=${encodeURIComponent('alpha')}&limit=50`)
+    expect(calls[0].url).toBe(`/api/traces?spec=${encodeURIComponent('alpha')}&limit=50`)
     expect(res[0].runId).toBe('r1')
   })
 
@@ -176,7 +176,7 @@ describe('api/client — the single fetch site', () => {
     const { calls } = stubFetch([
       {
         id: 'c1',
-        skill: 'alpha',
+        spec: 'alpha',
         score: 0.9,
         baseline: 0.7,
         diffSummary: 'tightened prompt',
@@ -200,7 +200,7 @@ describe('api/client — the single fetch site', () => {
   })
 
   it('loop control endpoints hit the /api/loop surface', async () => {
-    const { calls } = stubFetch({ ran: true, candidates: 1, publishedSkills: [], queuedSkills: ['a'], autoPublish: false, errorCode: null, error: null })
+    const { calls } = stubFetch({ ran: true, candidates: 1, publishedSpecs: [], queuedSpecs: ['a'], autoPublish: false, errorCode: null, error: null })
     await api.triggerLoop()
     await api.startLoop()
     await api.stopLoop()

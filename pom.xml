@@ -11,9 +11,10 @@
 
     <name>Embabel Smith</name>
     <description>
-        A skills-first Embabel agent builder: a general-purpose builder agent that emits
-        deployable, no-code skill-packs, plus the fixed no-code runtime that ingests them.
-        Greenfield POC multi-module project on Embabel 1.5.4 / Java 21.
+        A GOAP-based Embabel agent builder: a general-purpose builder agent that emits
+        deployable, no-code agent specs — declarative YAML step definitions — plus the fixed
+        no-code runtime that ingests them. Greenfield POC multi-module project on
+        Embabel 1.5.4 / Java 21.
     </description>
 
     <properties>
@@ -144,7 +145,7 @@
             <!-- Production modules. -->
             <dependency>
                 <groupId>com.embabel.smith</groupId>
-                <artifactId>embabel-smith-skillsource</artifactId>
+                <artifactId>embabel-smith-specsource</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
@@ -199,7 +200,7 @@
             </dependency>
             <dependency>
                 <groupId>com.embabel.smith</groupId>
-                <artifactId>poc-18-skill-lifecycle</artifactId>
+                <artifactId>poc-18-agent-spec-lifecycle</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
@@ -215,7 +216,7 @@
             </dependency>
             <dependency>
                 <groupId>com.embabel.smith</groupId>
-                <artifactId>poc-21-skill-security</artifactId>
+                <artifactId>poc-21-agent-spec-security</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <!-- Remote transports (POC 22 Remote pane): the RestAction sidecar and the MCP server. -->
@@ -230,7 +231,7 @@
                 <version>${project.version}</version>
             </dependency>
 
-            <!-- Jackson (used by smith-common for skill-pack YAML I/O and by the runtime for trace JSONL). -->
+            <!-- Jackson (used by smith-common for agent-spec YAML I/O and by the runtime for trace JSONL). -->
             <dependency>
                 <groupId>com.fasterxml.jackson.core</groupId>
                 <artifactId>jackson-databind</artifactId>

@@ -4,19 +4,19 @@ import static com.embabel.smith.selector.llm.DecisionPrompt.Format.ID;
 import static com.embabel.smith.selector.llm.DecisionPrompt.Format.OOD;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.embabel.smith.retrieval.SkillEntry;
+import com.embabel.smith.retrieval.SpecEntry;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
 class DecisionPromptTest {
 
-    private static final List<SkillEntry> THREE = List.of(
-            new SkillEntry("http-client", "http-client", "A reusable HTTP client wrapper for REST calls.",
+    private static final List<SpecEntry> THREE = List.of(
+            new SpecEntry("http-client", "http-client", "A reusable HTTP client wrapper for REST calls.",
                     List.of("UserInput"), "HttpResponse"),
-            new SkillEntry("retry-policy", "retry-policy", "Adds retry-with-backoff behaviour to failing operations.",
+            new SpecEntry("retry-policy", "retry-policy", "Adds retry-with-backoff behaviour to failing operations.",
                     List.of("Operation"), "Operation"),
-            new SkillEntry("http-mock", "http-mock", "Stubs outgoing HTTP calls in tests.",
+            new SpecEntry("http-mock", "http-mock", "Stubs outgoing HTTP calls in tests.",
                     List.of("TestContext"), "MockServer"));
 
     @Test
@@ -40,7 +40,7 @@ class DecisionPromptTest {
                 .contains("1. http-client — A reusable HTTP client wrapper for REST calls.")
                 .contains("2. retry-policy — Adds retry-with-backoff behaviour to failing operations.")
                 .contains("3. http-mock — Stubs outgoing HTTP calls in tests.")
-                .contains("Reply with only the number of the best skill.")
+                .contains("Reply with only the number of the best spec.")
                 .doesNotContain("single letter");
     }
 
@@ -75,7 +75,7 @@ class DecisionPromptTest {
     void oodReplyOutsideTheOptionRangeIsNoSelection() {
         assertThat(DecisionPrompt.parse(OOD, "9", THREE)).isNull();
         assertThat(DecisionPrompt.parse(OOD, "0", THREE)).isNull();
-        assertThat(DecisionPrompt.parse(OOD, "no skill fits", THREE)).isNull();
+        assertThat(DecisionPrompt.parse(OOD, "no spec fits", THREE)).isNull();
     }
 
     @Test

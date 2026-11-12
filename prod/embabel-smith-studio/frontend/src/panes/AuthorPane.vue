@@ -4,7 +4,7 @@
       <PageHeader
         icon="edit"
         title="Build"
-        description="Describe a skill and publish it to a source through the builder (compile → eval → security → lifecycle)."
+        description="Describe a spec and publish it to a source through the builder (compile → eval → security → lifecycle)."
       />
 
       <q-separator />
@@ -13,7 +13,7 @@
         <div class="row q-gutter-sm items-start">
           <q-input
             v-model="description"
-            label="Describe the skill"
+            label="Describe the spec"
             dense
             style="flex: 1; min-width: 320px"
             data-test="build-description"
@@ -60,7 +60,7 @@
             published: {{ report.published.location }}{{ report.published.pushed ? ' (pushed)' : '' }}
           </div>
         </div>
-        <div v-else class="text-grey-6">Describe a skill and pick where to publish it, then build.</div>
+        <div v-else class="text-grey-6">Describe a spec and pick where to publish it, then build.</div>
       </q-card-section>
     </q-card>
   </q-page>

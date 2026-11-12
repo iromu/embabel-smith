@@ -2,8 +2,8 @@ package com.embabel.smith.builder.publish;
 
 import com.embabel.smith.builder.lifecycle.LifecycleMetadata;
 import com.embabel.smith.builder.lifecycle.LifecycleStamper;
-import com.embabel.smith.common.io.SkillPackWriter;
-import com.embabel.smith.common.model.SkillPack;
+import com.embabel.smith.common.io.AgentSpecWriter;
+import com.embabel.smith.common.model.AgentSpec;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -16,19 +16,19 @@ import java.util.List;
 import java.util.stream.Stream;
 
 /**
- * Publishes a skill-pack into a git repository's working tree (design D3): clones the source,
+ * Publishes a agent spec into a git repository's working tree (design D3): clones the source,
  * writes the pack (plus its {@code lifecycle.yml} sidecar) as a subdirectory named after the pack,
  * commits it, and — only when {@code --push} is set — pushes to the remote. A same-named pack
  * already in the repository is a collision unless {@code --overwrite} replaces it.
  *
  * <p>All git commands run non-interactively against the system {@code git} CLI (the same approach
- * as {@code GitSkillSource}). The default is a local commit only; no push.
+ * as {@code GitSpecSource}). The default is a local commit only; no push.
  */
 public class GitPublisher implements Publisher {
 
     private final PublishTarget target;
     private final Path workDir;
-    private final SkillPackWriter writer = new SkillPackWriter();
+    private final AgentSpecWriter writer = new AgentSpecWriter();
     private final LifecycleStamper stamper = new LifecycleStamper();
 
     public GitPublisher(PublishTarget target) {
@@ -42,11 +42,11 @@ public class GitPublisher implements Publisher {
     }
 
     @Override
-    public PublishResult publish(SkillPack pack, LifecycleMetadata lifecycle, boolean overwrite, boolean push)
+    public PublishResult publish(AgentSpec pack, LifecycleMetadata lifecycle, boolean overwrite, boolean push)
             throws IOException {
         Path packDir = workDir.resolve(pack.name());
         if (Files.isDirectory(packDir) && !overwrite) {
-            throw new CollisionException("A skill-pack named '" + pack.name()
+            throw new CollisionException("A agent spec named '" + pack.name()
                     + "' already exists in git source '" + target.location() + "'; pass --overwrite to replace it");
         }
         if (Files.isDirectory(packDir)) {

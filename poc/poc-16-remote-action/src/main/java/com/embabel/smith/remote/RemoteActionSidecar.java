@@ -27,7 +27,7 @@ import java.util.Map;
  *
  * <p>The action is deliberately <em>deterministic and LLM-free</em> (it just digests the input text
  * into word/char stats) so the POC shows the bridge executing <em>sidecar code</em> that the agent
- * itself has no way to run — the "normal agent harness" where a skill invokes an external process.
+ * itself has no way to run — the "normal agent harness" where a spec invokes an external process.
  */
 public class RemoteActionSidecar {
 

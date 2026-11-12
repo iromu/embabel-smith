@@ -3,13 +3,13 @@
  *
  * Each interface mirrors a `com.embabel.smith.unified.dto` record field-for-field, so a backend
  * field rename is caught by `vue-tsc --noEmit` (and the client tests) rather than at runtime. The
- * canvas-specific types (`SkillInfo`, `Edge`) live in `canvas/model.ts` and are re-exported here so
+ * canvas-specific types (`SpecInfo`, `Edge`) live in `canvas/model.ts` and are re-exported here so
  * the whole contract is importable from one place.
  */
 
-import type { SkillInfo, Edge } from '../canvas/model'
+import type { SpecInfo, Edge } from '../canvas/model'
 
-export type { SkillInfo, Edge }
+export type { SpecInfo, Edge }
 
 // ---- Compose (POC 14) ------------------------------------------------------
 export interface CanvasRequest {
@@ -58,7 +58,7 @@ export interface RetrieveResponse {
 
 // ---- Security (POC 21) -----------------------------------------------------
 export interface SecurityRequest {
-  skillName: string
+  specName: string
 }
 export interface SecurityFinding {
   severity: string
@@ -68,7 +68,7 @@ export interface SecurityFinding {
 }
 export interface SecurityResponse {
   error: string | null
-  skillName: string | null
+  specName: string | null
   verdict: string | null
   recommendedTier: string | null
   summary: string | null
@@ -77,12 +77,12 @@ export interface SecurityResponse {
 
 // ---- Trust (POC 10) --------------------------------------------------------
 export interface TrustRequest {
-  skillName: string
+  specName: string
   tier: string
 }
 export interface TrustResponse {
   error: string | null
-  skillName: string | null
+  specName: string | null
   tier: string | null
   allowed: boolean
   disallowedGroups: string[]
@@ -105,7 +105,7 @@ export interface ScaleResponse {
 
 // ---- Run (POC 1, endpoint-gated) --------------------------------------------
 export interface RunRequest {
-  skillName: string
+  specName: string
   input: string
 }
 export interface RunResponse {
@@ -145,12 +145,12 @@ export interface EvalTask {
   mustContain: string
 }
 export interface EvalRequest {
-  skillName: string
+  specName: string
   tasks?: EvalTask[]
 }
 export interface EvalResponse {
   error: string | null
-  skillName: string | null
+  specName: string | null
   stepName: string | null
   beforeScore: number
   afterScore: number
@@ -162,12 +162,12 @@ export interface EvalResponse {
 
 // ---- Lifecycle (POC 18, endpoint-gated) ------------------------------------
 export interface CurateRequest {
-  skillName: string
+  specName: string
   tasks?: EvalTask[]
 }
 export interface CurateResponse {
   error: string | null
-  skillName: string | null
+  specName: string | null
   before: string | null
   after: string | null
   contentDrift: boolean

@@ -12,7 +12,7 @@ import java.nio.file.Path;
 /**
  * The fixed no-code runtime launcher (POC 1).
  *
- * <p>Boots an Embabel {@link AgentPlatform}, ingests a skill-pack from YAML with zero
+ * <p>Boots an Embabel {@link AgentPlatform}, ingests a agent spec from YAML with zero
  * compilation, and runs a plan over the exported goal. The model endpoint is fully env-driven
  * (see {@link ModelEndpointConfig}); the planner defaults to GOAP and is selectable per run.
  *
@@ -40,7 +40,7 @@ public class NoCodeRuntime implements CommandLineRunner {
                          @Value("${OPENAI_CUSTOM_API_KEY:}") String apiKey,
                          @Value("${OPENAI_CUSTOM_MODELS:}") String models,
                          @Value("${EMBABEL_MODELS_DEFAULT_LLM:}") String defaultLlm,
-                         @Value("${builder.pack-dir:skill-packs/explainer}") Path packDir,
+                         @Value("${builder.pack-dir:agent-specs/explainer}") Path packDir,
                          @Value("${builder.input:}") String input,
                          @Value("${builder.planner:}") String plannerOverride) {
         this.platform = platform;
@@ -61,8 +61,8 @@ public class NoCodeRuntime implements CommandLineRunner {
             throw new IllegalStateException(configError);
         }
 
-        String result = new SkillRunner(platform).run(packDir, input, plannerOverride);
-        System.out.println("=== Skill output ===");
+        String result = new SpecRunner(platform).run(packDir, input, plannerOverride);
+        System.out.println("=== Spec output ===");
         System.out.println(result);
     }
 }

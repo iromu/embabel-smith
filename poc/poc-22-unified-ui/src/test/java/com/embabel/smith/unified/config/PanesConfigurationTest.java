@@ -1,6 +1,6 @@
 package com.embabel.smith.unified.config;
 
-import com.embabel.smith.retrieval.SkillEntry;
+import com.embabel.smith.retrieval.SpecEntry;
 import com.embabel.smith.retrieval.embedding.Embedder;
 import com.embabel.smith.unified.ScorerBinding;
 import org.junit.jupiter.api.Test;
@@ -37,8 +37,8 @@ class PanesConfigurationTest {
         ScorerBinding binding = config.embeddingScorerBinding(stub);
         assertThat(binding.name()).isEqualTo("embedding (MiniLM)");
 
-        SkillEntry extract = entry("compose-extract", "extract the topic from the request");
-        SkillEntry explain = entry("compose-explain", "write the explainer message");
+        SpecEntry extract = entry("compose-extract", "extract the topic from the request");
+        SpecEntry explain = entry("compose-explain", "write the explainer message");
         assertThat(binding.scorer().score("extract the topic", extract))
                 .isGreaterThan(binding.scorer().score("extract the topic", explain));
     }
@@ -50,7 +50,7 @@ class PanesConfigurationTest {
                 .hasMessageContaining("failed to load the MiniLM ONNX embedder");
     }
 
-    private static SkillEntry entry(String name, String description) {
-        return new SkillEntry(name, name, description, List.of("UserInput"), "BackgroundMessage");
+    private static SpecEntry entry(String name, String description) {
+        return new SpecEntry(name, name, description, List.of("UserInput"), "BackgroundMessage");
     }
 }

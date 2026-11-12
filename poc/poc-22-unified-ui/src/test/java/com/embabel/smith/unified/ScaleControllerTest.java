@@ -14,7 +14,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * Offline tests for the Scale pane (POC 22). The measurement delegates to POC 12's
- * {@code ScaleRetrievalRunner} over {@code ScaleSkillLibrary} with the offline lexical scorer, so
+ * {@code ScaleRetrievalRunner} over {@code ScaleSpecLibrary} with the offline lexical scorer, so
  * these pin the precision@1 shape: the full library (core + near-duplicates) is larger than the core,
  * both P@1 values are in [0,1], and the growth curve is non-empty. The body is parsed with Jackson
  * (like {@link RetrieveControllerTest}) so the cross-field {@code fullSize > coreSize} check is a

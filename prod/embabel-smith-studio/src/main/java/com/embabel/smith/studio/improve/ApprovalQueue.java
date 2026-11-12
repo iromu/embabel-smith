@@ -74,7 +74,7 @@ public final class ApprovalQueue {
     }
 
     /**
-     * Publishes a gated candidate to the skill source and returns the result. Implemented by the
+     * Publishes a gated candidate to the spec source and returns the result. Implemented by the
      * loop, so the queue stays a pure data structure.
      */
     @FunctionalInterface

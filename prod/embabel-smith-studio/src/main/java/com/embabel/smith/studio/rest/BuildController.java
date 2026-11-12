@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * The Author pane (change 06): submit a description and an output source, and build the skill-pack
+ * The Author pane (change 06): submit a description and an output source, and build the agent spec
  * through the change-04 builder core (compile → eval → security → lifecycle → publish). Endpoint-
  * gated — without a configured model endpoint it returns the structured
  * {@code MODEL_NOT_CONFIGURED} error before any build. The build is behind the {@link BuildFn} seam
@@ -38,8 +38,8 @@ public class BuildController {
     public BuildResponse build(@RequestBody BuildRequest request) {
         if (request.description() == null || request.description().isBlank()) {
             return BuildResponse.blocked("input", null,
-                    java.util.List.of("No description provided; describe the skill to build."),
-                    "No description provided; describe the skill to build.");
+                    java.util.List.of("No description provided; describe the spec to build."),
+                    "No description provided; describe the spec to build.");
         }
         if (request.outputSource() == null || request.outputSource().isBlank()) {
             return BuildResponse.blocked("input", null,

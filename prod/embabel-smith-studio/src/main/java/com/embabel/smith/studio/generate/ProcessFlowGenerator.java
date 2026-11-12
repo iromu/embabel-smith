@@ -2,8 +2,8 @@ package com.embabel.smith.studio.generate;
 
 import com.embabel.smith.common.model.ActionStepSpec;
 import com.embabel.smith.common.model.GoalStepSpec;
-import com.embabel.smith.common.model.SkillPack;
-import com.embabel.smith.common.model.SkillPackManifest;
+import com.embabel.smith.common.model.AgentSpec;
+import com.embabel.smith.common.model.AgentSpecManifest;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -14,7 +14,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * The generation core: a business-process blueprint in, a {@link SkillPack} (goal + action steps +
+ * The generation core: a business-process blueprint in, a {@link AgentSpec} (goal + action steps +
  * intermediate types) out. It runs the {@code process_to_flow} prompt against the model and parses
  * the answer into the shared pack format, so the result is exactly what the runtime ingests and the
  * Compose editor renders. The model call is behind the {@link FlowPromptCaller} seam; parsing and
@@ -36,21 +36,21 @@ public class ProcessFlowGenerator {
         this.template = template;
     }
 
-    /** Generates the skill-pack for the given blueprint. Throws if the model answer is not parseable. */
-    public SkillPack generate(String blueprint) {
-        String user = "Below is a business-process description. Produce the skill-pack JSON for the "
+    /** Generates the agent spec for the given blueprint. Throws if the model answer is not parseable. */
+    public AgentSpec generate(String blueprint) {
+        String user = "Below is a business-process description. Produce the agent spec JSON for the "
                 + "core end-to-end process.\n\n" + blueprint;
         String raw = caller.call(template, user);
         return parse(raw);
     }
 
-    private SkillPack parse(String raw) {
+    private AgentSpec parse(String raw) {
         String packed = extractJson(raw);
-        SkillPack pack;
+        AgentSpec pack;
         try {
-            pack = json.readValue(packed, SkillPack.class);
+            pack = json.readValue(packed, AgentSpec.class);
         } catch (Exception e) {
-            throw new IllegalStateException("The model did not return a valid skill-pack JSON: "
+            throw new IllegalStateException("The model did not return a valid agent spec JSON: "
                     + e.getMessage(), e);
         }
         return normalize(pack);
@@ -84,19 +84,19 @@ public class ProcessFlowGenerator {
     }
 
     /** Fills in the format invariants the model may omit: a manifest, an exported goal, and canonical prompt vars. */
-    private SkillPack normalize(SkillPack pack) {
-        SkillPackManifest manifest = pack.manifest();
+    private AgentSpec normalize(AgentSpec pack) {
+        AgentSpecManifest manifest = pack.manifest();
         if (manifest == null || manifest.name() == null || manifest.name().isBlank()) {
             String name = pack.goal() != null && pack.goal().name() != null
                     ? slug(pack.goal().name()) : "generated-process";
-            manifest = new SkillPackManifest(name, "1.0.0");
+            manifest = new AgentSpecManifest(name, "1.0.0");
         }
         GoalStepSpec goal = pack.goal();
         if (goal != null && !goal.isExported()) {
             goal = GoalStepSpec.exportedGoal(goal.name(), goal.description(), goal.outputTypeName());
         }
         List<ActionStepSpec> steps = pack.steps().stream().map(this::canonicalizePromptVars).toList();
-        return new SkillPack(manifest, goal, steps, pack.types());
+        return new AgentSpec(manifest, goal, steps, pack.types());
     }
 
     /**

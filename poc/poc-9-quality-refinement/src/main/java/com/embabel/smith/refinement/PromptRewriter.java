@@ -1,8 +1,8 @@
 package com.embabel.smith.refinement;
 
 import com.embabel.smith.common.model.ActionStepSpec;
-import com.embabel.smith.common.model.SkillPack;
-import com.embabel.smith.common.validation.SkillPackValidator;
+import com.embabel.smith.common.model.AgentSpec;
+import com.embabel.smith.common.validation.AgentSpecValidator;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -17,19 +17,19 @@ import java.time.Duration;
 import java.util.List;
 
 /**
- * The eval → rewrite step (POC 9, the SkillAxe pattern from doc 03 §5). Two halves:
+ * The eval → rewrite step (POC 9, the SpecAxe pattern from doc 03 §5). Two halves:
  * {@link #rewrite} is endpoint-gated (asks the model to revise the prompt so it satisfies the
  * failing criteria); {@link #applyRevisedPrompt} is pure Java (splices the revised prompt into the
  * named step and re-runs validation), so the re-validation half is verifiable offline.
  */
 public class PromptRewriter {
 
-    private final SkillPackValidator validator = new SkillPackValidator();
+    private final AgentSpecValidator validator = new AgentSpecValidator();
     private final ObjectMapper json = new ObjectMapper();
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(15)).build();
 
     /** The result of applying a rewrite: the revised prompt, the revised pack, and whether it re-validates. */
-    public record RewriteResult(String revisedPrompt, SkillPack revisedPack, boolean valid, List<String> issues) {
+    public record RewriteResult(String revisedPrompt, AgentSpec revisedPack, boolean valid, List<String> issues) {
         public RewriteResult {
             issues = issues == null ? List.of() : List.copyOf(issues);
         }
@@ -41,14 +41,14 @@ public class PromptRewriter {
      * already env-driven for the rest of the POC).
      */
     public String rewrite(String baseUrl, String apiKey, String model,
-                          String currentPrompt, List<SkillEvalTask> failingTasks) {
+                          String currentPrompt, List<SpecEvalTask> failingTasks) {
         StringBuilder criteria = new StringBuilder();
-        for (SkillEvalTask task : failingTasks) {
+        for (SpecEvalTask task : failingTasks) {
             criteria.append("- input: ").append(task.input())
                     .append("; must satisfy: ").append(task.acceptanceCriteria()).append('\n');
         }
         String instruction = """
-                You revise the prompt of a single skill action so it reliably produces output that
+                You revise the prompt of a single spec action so it reliably produces output that
                 satisfies the acceptance criteria below. Keep it a single action prompt; preserve the
                 {{...}} template variables; return ONLY the revised prompt text, no commentary.
 
@@ -94,11 +94,11 @@ public class PromptRewriter {
     }
 
     /** Pure: splice a revised prompt into the named step and re-validate the revised draft. */
-    public RewriteResult applyRevisedPrompt(SkillPack pack, String stepName, String revisedPrompt) {
+    public RewriteResult applyRevisedPrompt(AgentSpec pack, String stepName, String revisedPrompt) {
         List<ActionStepSpec> newSteps = pack.steps().stream()
                 .map(s -> s.name().equals(stepName) ? withPrompt(s, revisedPrompt) : s)
                 .toList();
-        SkillPack revised = new SkillPack(pack.manifest(), pack.goal(), newSteps, pack.types());
+        AgentSpec revised = new AgentSpec(pack.manifest(), pack.goal(), newSteps, pack.types());
         List<String> issues = validator.validate(revised).issues().stream()
                 .map(issue -> issue.code() + " — " + issue.message())
                 .toList();

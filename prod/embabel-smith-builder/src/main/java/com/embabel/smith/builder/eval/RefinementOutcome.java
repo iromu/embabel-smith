@@ -1,6 +1,6 @@
 package com.embabel.smith.builder.eval;
 
-import com.embabel.smith.common.model.SkillPack;
+import com.embabel.smith.common.model.AgentSpec;
 
 import java.util.List;
 
@@ -9,6 +9,6 @@ import java.util.List;
  * eval score, how many prompt-rewrite iterations were applied, the tasks still failing, and
  * whether the final score met the gate.
  */
-public record RefinementOutcome(SkillPack pack, double score, int refinementCount,
+public record RefinementOutcome(AgentSpec pack, double score, int refinementCount,
                                 List<String> failingTasks, boolean passed) {
 }

@@ -2,7 +2,7 @@
   <PocOnlyPane
     title="Retrieve"
     poc="POC 12 / 18"
-    detail="Rank the skill library by a pluggable scorer, curation-aware."
+    detail="Rank the spec library by a pluggable scorer, curation-aware."
   />
 </template>
 

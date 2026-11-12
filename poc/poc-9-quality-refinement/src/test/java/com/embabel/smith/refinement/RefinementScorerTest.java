@@ -15,8 +15,8 @@ class RefinementScorerTest {
 
     private final RefinementScorer scorer = new RefinementScorer();
 
-    private SkillEvalTask task(String input) {
-        return new SkillEvalTask(input, "must contain Nimbus",
+    private SpecEvalTask task(String input) {
+        return new SpecEvalTask(input, "must contain Nimbus",
                 out -> out != null && out.contains("Nimbus"));
     }
 

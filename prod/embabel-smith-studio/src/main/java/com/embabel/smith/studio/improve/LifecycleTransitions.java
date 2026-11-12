@@ -2,13 +2,13 @@ package com.embabel.smith.studio.improve;
 
 import com.embabel.smith.builder.lifecycle.LifecycleMetadata;
 import com.embabel.smith.builder.lifecycle.LifecycleState;
-import com.embabel.smith.builder.lifecycle.SkillContentHash;
-import com.embabel.smith.common.model.SkillPack;
+import com.embabel.smith.builder.lifecycle.SpecContentHash;
+import com.embabel.smith.common.model.AgentSpec;
 
 import java.time.Instant;
 
 /**
- * The lifecycle state machine (POC 18, carried into the product): how a skill's state moves as it
+ * The lifecycle state machine (POC 18, carried into the product): how a spec's state moves as it
  * is improved and regresses.
  *
  * <pre>
@@ -53,8 +53,8 @@ public final class LifecycleTransitions {
      * The sidecar for a published candidate: the new content hash, the new baseline (the
      * candidate's re-eval score), and the state it transitions to.
      */
-    public static LifecycleMetadata sidecarFor(SkillPack candidate, double newBaseline, LifecycleState state) {
-        return new LifecycleMetadata(SkillContentHash.of(candidate), newBaseline, state,
+    public static LifecycleMetadata sidecarFor(AgentSpec candidate, double newBaseline, LifecycleState state) {
+        return new LifecycleMetadata(SpecContentHash.of(candidate), newBaseline, state,
                 Instant.now().toString());
     }
 

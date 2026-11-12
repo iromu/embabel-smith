@@ -14,9 +14,9 @@
     <name>poc-3-builder-agent</name>
     <description>
         POC 3: the builder as an Embabel meta-agent. A single GOAP-planned @Agent whose goal is
-        "a validated skill-pack exists on disk", with code-backed actions that compile a
+        "a validated agent spec exists on disk", with code-backed actions that compile a
         description into a draft (NaturalLanguageCompiler), validate it against a throwaway
-        platform, write the skill-pack to disk, and score/rewrite prompts via embabel-agent-eval.
+        platform, write the agent spec to disk, and score/rewrite prompts via embabel-agent-eval.
     </description>
 
     <dependencies>

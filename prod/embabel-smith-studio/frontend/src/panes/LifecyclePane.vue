@@ -19,7 +19,7 @@
             style="width: 320px"
             data-test="lifecycle-source"
           />
-          <q-btn label="Refresh" color="primary" icon="refresh" @click="loadSkills" data-test="lifecycle-refresh" />
+          <q-btn label="Refresh" color="primary" icon="refresh" @click="loadSpecs" data-test="lifecycle-refresh" />
         </div>
       </q-card-section>
 
@@ -28,11 +28,11 @@
       <q-card-section>
         <div v-if="error" class="text-negative" data-test="lifecycle-error">{{ error }}</div>
         <div v-else-if="loading" class="text-grey-6">loading…</div>
-        <div v-else-if="skills.length === 0" class="text-grey-6" data-test="lifecycle-empty">
+        <div v-else-if="specs.length === 0" class="text-grey-6" data-test="lifecycle-empty">
           No packs in this source.
         </div>
         <q-list dense v-else data-test="lifecycle-list">
-          <q-item v-for="pack in skills" :key="pack.name" class="q-py-sm">
+          <q-item v-for="pack in specs" :key="pack.name" class="q-py-sm">
             <q-item-section>
               <div class="text-weight-medium">{{ pack.name }}</div>
               <div class="text-grey-7 text-caption">hash {{ shortHash(pack.contentHash) }}</div>
@@ -62,10 +62,10 @@
 import { ref } from 'vue'
 
 import PageHeader from '../components/PageHeader.vue'
-import { useSourceSkill } from '../composables/useSourceSkill'
+import { useSourceSpec } from '../composables/useSourceSpec'
 import { lifecycleColor } from '../improve/model'
 
-const { source, skills, sourceOptions, loading, loadSkills } = useSourceSkill()
+const { source, specs, sourceOptions, loading, loadSpecs } = useSourceSpec()
 const error = ref<string | null>(null)
 
 function shortHash(hash: string): string {

@@ -6,12 +6,12 @@ import com.embabel.smith.builder.lifecycle.LifecycleMetadata;
 import com.embabel.smith.builder.lifecycle.LifecycleStamper;
 import com.embabel.smith.builder.lifecycle.LifecycleState;
 import com.embabel.smith.builder.publish.PublishResult;
-import com.embabel.smith.common.io.SkillPackWriter;
+import com.embabel.smith.common.io.AgentSpecWriter;
 import com.embabel.smith.common.io.Yaml;
-import com.embabel.smith.common.model.SkillPack;
+import com.embabel.smith.common.model.AgentSpec;
 import com.embabel.smith.runtime.trace.JsonlTraceStore;
-import com.embabel.smith.skillsource.FolderSkillSource;
-import com.embabel.smith.skillsource.SkillSource;
+import com.embabel.smith.specsource.FolderSpecSource;
+import com.embabel.smith.specsource.SpecSource;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -28,22 +28,22 @@ class ImprovementLoopTest {
     @TempDir
     Path tmp;
 
-    private final SkillPackWriter writer = new SkillPackWriter();
+    private final AgentSpecWriter writer = new AgentSpecWriter();
     private final InvokerFactory passingInvoker = pack -> input -> "pass";
     private final List<EvalTask> tasks = List.of(new EvalTask("t", "in", "pass"));
 
-    private SkillSource source(SkillPack pack) throws IOException {
+    private SpecSource source(AgentSpec pack) throws IOException {
         Path root = tmp.resolve("source");
         writer.write(pack, root.resolve(pack.name()));
-        return new FolderSkillSource("folder:" + root, root);
+        return new FolderSpecSource("folder:" + root, root);
     }
 
     private JsonlTraceStore store() {
         return new JsonlTraceStore(tmp.resolve("traces.jsonl"));
     }
 
-    private ImprovementLoop loop(SkillSource source, JsonlTraceStore store,
-                                 List<SkillPack> published, boolean autoPublish) {
+    private ImprovementLoop loop(SpecSource source, JsonlTraceStore store,
+                                 List<AgentSpec> published, boolean autoPublish) {
         return new ImprovementLoop(source, store,
                 (current, feedback) -> current + " [revised]",
                 passingInvoker, tasks,
@@ -56,13 +56,13 @@ class ImprovementLoopTest {
 
     @Test
     void failingWindowProducesGatedCandidate() throws IOException {
-        SkillPack pack = TestFixtures.pack("extract", "s1", "s2");
+        AgentSpec pack = TestFixtures.pack("extract", "s1", "s2");
         JsonlTraceStore store = store();
         store.append(TestFixtures.failedTrace("r1", "extract", "input",
                 TestFixtures.step("s1", "completed", "ok"),
                 TestFixtures.step("s2", "failed", "bad")));
 
-        List<SkillPack> published = new ArrayList<>();
+        List<AgentSpec> published = new ArrayList<>();
         ImprovementLoop loop = loop(source(pack), store, published, false); // hold mode
 
         List<PendingCandidate> produced = loop.runOnce();
@@ -71,7 +71,7 @@ class ImprovementLoopTest {
         assertThat(loop.queue().size()).isEqualTo(1);
         assertThat(published).isEmpty(); // held, not published
         PendingCandidate candidate = produced.get(0);
-        assertThat(candidate.skill()).isEqualTo("extract");
+        assertThat(candidate.spec()).isEqualTo("extract");
         assertThat(candidate.candidate().step("s2").prompt()).contains("[revised]");
         assertThat(candidate.candidate().step("s1").prompt()).isEqualTo(pack.step("s1").prompt());
         assertThat(candidate.proposedLifecycle().state()).isEqualTo(LifecycleState.ACTIVE);
@@ -79,13 +79,13 @@ class ImprovementLoopTest {
 
     @Test
     void cleanWindowPublishesNothing() throws IOException {
-        SkillPack pack = TestFixtures.pack("extract", "s1", "s2");
+        AgentSpec pack = TestFixtures.pack("extract", "s1", "s2");
         JsonlTraceStore store = store();
         store.append(TestFixtures.okTrace("r1", "extract", "input",
                 TestFixtures.step("s1", "completed", "ok"),
                 TestFixtures.step("s2", "completed", "ok")));
 
-        List<SkillPack> published = new ArrayList<>();
+        List<AgentSpec> published = new ArrayList<>();
         ImprovementLoop loop = loop(source(pack), store, published, false);
 
         List<PendingCandidate> produced = loop.runOnce();
@@ -97,12 +97,12 @@ class ImprovementLoopTest {
 
     @Test
     void secondRunOverUnchangedTracesPublishesNothing() throws IOException {
-        SkillPack pack = TestFixtures.pack("extract", "s1", "s2");
+        AgentSpec pack = TestFixtures.pack("extract", "s1", "s2");
         JsonlTraceStore store = store();
         store.append(TestFixtures.failedTrace("r1", "extract", "input",
                 TestFixtures.step("s2", "failed", "bad")));
 
-        List<SkillPack> published = new ArrayList<>();
+        List<AgentSpec> published = new ArrayList<>();
         ImprovementLoop loop = loop(source(pack), store, published, true); // auto-publish
 
         loop.runOnce();
@@ -114,12 +114,12 @@ class ImprovementLoopTest {
 
     @Test
     void autoPublishPublishesImmediately() throws IOException {
-        SkillPack pack = TestFixtures.pack("extract", "s1", "s2");
+        AgentSpec pack = TestFixtures.pack("extract", "s1", "s2");
         JsonlTraceStore store = store();
         store.append(TestFixtures.failedTrace("r1", "extract", "input",
                 TestFixtures.step("s2", "failed", "bad")));
 
-        List<SkillPack> published = new ArrayList<>();
+        List<AgentSpec> published = new ArrayList<>();
         ImprovementLoop loop = loop(source(pack), store, published, true); // auto-publish
 
         List<PendingCandidate> produced = loop.runOnce();
@@ -131,7 +131,7 @@ class ImprovementLoopTest {
 
     @Test
     void publishPersistsToTheSourceWithPush() throws IOException {
-        SkillPack pack = TestFixtures.pack("extract", "s1", "s2");
+        AgentSpec pack = TestFixtures.pack("extract", "s1", "s2");
         JsonlTraceStore store = store();
         store.append(TestFixtures.failedTrace("r1", "extract", "input",
                 TestFixtures.step("s2", "failed", "bad")));
@@ -152,20 +152,20 @@ class ImprovementLoopTest {
     }
 
     @Test
-    void inFlightSkillIsSkipped() throws IOException {
-        SkillPack pack = TestFixtures.pack("extract", "s1", "s2");
+    void inFlightSpecIsSkipped() throws IOException {
+        AgentSpec pack = TestFixtures.pack("extract", "s1", "s2");
         Path root = tmp.resolve("source");
         writer.write(pack, root.resolve("extract"));
         new LifecycleStamper().write(root.resolve("extract"),
                 TestFixtures.sidecar(pack, 0.5, LifecycleState.ACTIVE));
-        SkillSource source = new FolderSkillSource("folder:" + root, root);
+        SpecSource source = new FolderSpecSource("folder:" + root, root);
 
         JsonlTraceStore store = store();
         store.append(TestFixtures.failedTrace("r1", "extract", "input",
                 TestFixtures.step("s2", "failed", "bad")));
 
-        List<SkillPack> published = new ArrayList<>();
-        List<SkillPack> invoked = new ArrayList<>();
+        List<AgentSpec> published = new ArrayList<>();
+        List<AgentSpec> invoked = new ArrayList<>();
         ImprovementLoop loop = new ImprovementLoop(source, store,
                 (current, feedback) -> current + " [revised]",
                 p -> {
@@ -182,19 +182,19 @@ class ImprovementLoopTest {
 
         loop.runOnce();
 
-        assertThat(published).isEmpty(); // skipped: the skill was already in flight
+        assertThat(published).isEmpty(); // skipped: the spec was already in flight
         assertThat(invoked).isEmpty(); // skipped before detect: no eval budget was spent
     }
 
     @Test
     void rejectedCandidateIsRecordedWithItsScore() throws IOException {
-        SkillPack pack = TestFixtures.pack("extract", "s1", "s2");
+        AgentSpec pack = TestFixtures.pack("extract", "s1", "s2");
         JsonlTraceStore store = store();
         store.append(TestFixtures.failedTrace("r1", "extract", "input",
                 TestFixtures.step("s1", "completed", "ok"),
                 TestFixtures.step("s2", "failed", "bad")));
 
-        List<SkillPack> published = new ArrayList<>();
+        List<AgentSpec> published = new ArrayList<>();
         // The failing invoker scores 0.0 and the fresh incubating sidecar's baseline is 0.0, so
         // 0.0 does not strictly beat 0.0 and the candidate is rejected at the baseline stage.
         ImprovementLoop loop = new ImprovementLoop(source(pack), store,
@@ -218,20 +218,20 @@ class ImprovementLoopTest {
 
     @Test
     void contentDriftTriggersLiveReeval() throws IOException {
-        SkillPack pack = TestFixtures.pack("extract", "s1", "s2");
+        AgentSpec pack = TestFixtures.pack("extract", "s1", "s2");
         Path root = tmp.resolve("source");
         writer.write(pack, root.resolve("extract"));
         // A drifted sidecar: its recorded hash does not match the current pack's content.
         new LifecycleStamper().write(root.resolve("extract"),
                 new LifecycleMetadata("some-other-hash", 0.0, LifecycleState.INCUBATING, "t"));
-        SkillSource source = new FolderSkillSource("folder:" + root, root);
+        SpecSource source = new FolderSpecSource("folder:" + root, root);
 
         JsonlTraceStore store = store();
         store.append(TestFixtures.okTrace("r1", "extract", "input",
                 TestFixtures.step("s2", "completed", "ok")));
 
-        List<SkillPack> published = new ArrayList<>();
-        List<SkillPack> invoked = new ArrayList<>();
+        List<AgentSpec> published = new ArrayList<>();
+        List<AgentSpec> invoked = new ArrayList<>();
         ImprovementLoop loop = new ImprovementLoop(source, store,
                 (current, feedback) -> current + " [revised]",
                 p -> {
@@ -252,18 +252,18 @@ class ImprovementLoopTest {
 
     @Test
     void activePackBelowBaselineDegradesInPass() throws IOException {
-        SkillPack pack = TestFixtures.pack("extract", "s1", "s2");
+        AgentSpec pack = TestFixtures.pack("extract", "s1", "s2");
         Path root = tmp.resolve("source");
         writer.write(pack, root.resolve("extract"));
         new LifecycleStamper().write(root.resolve("extract"),
                 TestFixtures.sidecar(pack, 0.9, LifecycleState.ACTIVE));
-        SkillSource source = new FolderSkillSource("folder:" + root, root);
+        SpecSource source = new FolderSpecSource("folder:" + root, root);
 
         JsonlTraceStore store = store();
         store.append(TestFixtures.okTrace("r1", "extract", "input",
                 TestFixtures.step("s2", "completed", "ok")));
 
-        List<SkillPack> published = new ArrayList<>();
+        List<AgentSpec> published = new ArrayList<>();
         ImprovementLoop loop = new ImprovementLoop(source, store,
                 (current, feedback) -> current + " [revised]",
                 p -> input -> "fail", // scores 0.0, below the 0.9 baseline
@@ -285,20 +285,20 @@ class ImprovementLoopTest {
 
     @Test
     void retiredPackIsNotRefined() throws IOException {
-        SkillPack pack = TestFixtures.pack("extract", "s1", "s2");
+        AgentSpec pack = TestFixtures.pack("extract", "s1", "s2");
         Path root = tmp.resolve("source");
         writer.write(pack, root.resolve("extract"));
         // The pack is retired: its sidecar records the RETIRED state at a sub-baseline pass-rate,
         // so the (passing) re-eval would beat the baseline if the loop were to refine it.
         new LifecycleStamper().write(root.resolve("extract"),
                 TestFixtures.sidecar(pack, 0.5, LifecycleState.RETIRED));
-        SkillSource source = new FolderSkillSource("folder:" + root, root);
+        SpecSource source = new FolderSpecSource("folder:" + root, root);
 
         JsonlTraceStore store = store();
         store.append(TestFixtures.failedTrace("r1", "extract", "input",
                 TestFixtures.step("s2", "failed", "bad")));
 
-        List<SkillPack> published = new ArrayList<>();
+        List<AgentSpec> published = new ArrayList<>();
         ImprovementLoop loop = loop(source, store, published, true); // auto-publish
 
         List<PendingCandidate> produced = loop.runOnce();
@@ -310,13 +310,13 @@ class ImprovementLoopTest {
 
     @Test
     void degradedPackThatRetiresInPassIsNotRefined() throws IOException {
-        SkillPack pack = TestFixtures.pack("extract", "s1", "s2");
+        AgentSpec pack = TestFixtures.pack("extract", "s1", "s2");
         Path root = tmp.resolve("source");
         writer.write(pack, root.resolve("extract"));
         // A degraded pack with a high baseline; the failing invoker scores below it.
         new LifecycleStamper().write(root.resolve("extract"),
                 TestFixtures.sidecar(pack, 0.9, LifecycleState.DEGRADED));
-        SkillSource source = new FolderSkillSource("folder:" + root, root);
+        SpecSource source = new FolderSpecSource("folder:" + root, root);
 
         JsonlTraceStore store = store();
         store.append(TestFixtures.failedTrace("r1", "extract", "input",
@@ -324,7 +324,7 @@ class ImprovementLoopTest {
                 TestFixtures.step("s2", "failed", "bad")));
 
         boolean[] refined = {false};
-        List<SkillPack> published = new ArrayList<>();
+        List<AgentSpec> published = new ArrayList<>();
         // The failing invoker scores 0.0 on the "pass" task (below the 0.9 baseline), so the
         // degraded pack retires; the recording rewriter proves the refiner is never reached.
         ImprovementLoop loop = new ImprovementLoop(source, store,

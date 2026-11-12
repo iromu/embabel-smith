@@ -32,9 +32,9 @@ class LiveRunIntegrationTest {
     @Test
     void aLiveRunEmitsATraceRecordWithPerStepCapture(@TempDir Path tmp) throws Exception {
         Path library = TestPacks.library(tmp, "extract");
-        SkillRunService service = new SkillRunService(platform, tmp.resolve("traces/runs.jsonl"));
+        AgentSpecRunService service = new AgentSpecRunService(platform, tmp.resolve("traces/runs.jsonl"));
 
-        SkillRunService.RunResult result = service.run("folder:" + library, "briefDone",
+        AgentSpecRunService.RunResult result = service.run("folder:" + library, "briefDone",
                 "Explain how a coffee machine works", null, TrustTier.STANDARD);
 
         assertThat(result.success()).isTrue();
@@ -64,9 +64,9 @@ class LiveRunIntegrationTest {
     @Test
     void aCrossPackPlanSpansBothPacksInOrder(@TempDir Path tmp) throws Exception {
         Path library = TestPacks.library(tmp, "extract", "explain");
-        SkillRunService service = new SkillRunService(platform, tmp.resolve("traces/runs.jsonl"));
+        AgentSpecRunService service = new AgentSpecRunService(platform, tmp.resolve("traces/runs.jsonl"));
 
-        SkillRunService.RunResult result = service.run("folder:" + library, "explainDone",
+        AgentSpecRunService.RunResult result = service.run("folder:" + library, "explainDone",
                 "Explain how a coffee machine works", null, TrustTier.STANDARD);
 
         assertThat(result.success()).isTrue();

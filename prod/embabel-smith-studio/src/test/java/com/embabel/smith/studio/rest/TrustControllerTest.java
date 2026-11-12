@@ -55,9 +55,9 @@ class TrustControllerTest {
     }
 
     @Test
-    void returnsErrorWhenNoSourceOrSkill() {
+    void returnsErrorWhenNoSourceOrSpec() {
         TrustController controller = new TrustController(new SourceService("", ""));
         TrustResponse response = controller.check(new TrustRequest("", "", "STANDARD"));
-        assertThat(response.error()).contains("No source or skill");
+        assertThat(response.error()).contains("No source or spec");
     }
 }

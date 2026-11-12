@@ -1,6 +1,6 @@
 package com.embabel.smith.unified.dto;
 
-/** A retrieval query: the natural-language task and how many skills to return. */
+/** A retrieval query: the natural-language task and how many specs to return. */
 public record RetrieveRequest(String query, Integer k) {
 
     public int kOrDefault() {

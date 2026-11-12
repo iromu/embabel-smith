@@ -15,7 +15,7 @@
     <description>
         POC 20: real semantic EmbeddingService. Runs a real dense sentence-encoder (all-MiniLM-L6-v2
         BERT via ONNX Runtime + the HuggingFace tokenizer, mean-pooled and L2-normalised) behind
-        POC 12's SkillScorer seam, on POC 12's 200+ same-typed shadowing scenario, to measure whether
+        POC 12's SpecScorer seam, on POC 12's 200+ same-typed shadowing scenario, to measure whether
         a real embedding index -- not POC 12's feature-hashing stand-in -- cures the near-duplicate
         shadowing collapse that lexical and dense text-similarity both suffer. A local-model-gated
         benchmark (one-time ONNX download); offline tests use a deterministic stub embedder so the
@@ -23,8 +23,8 @@
     </description>
 
     <dependencies>
-        <!-- Reuse POC 12's ScaleSkillLibrary (191/281 same-typed scenario), the SkillScorer
-             seam, the ScaleSkillRegistry ranking, the ScaleRetrievalRunner P@1 math, and the
+        <!-- Reuse POC 12's ScaleSpecLibrary (191/281 same-typed scenario), the SpecScorer
+             seam, the ScaleSpecRegistry ranking, the ScaleRetrievalRunner P@1 math, and the
              lexical / feature-hash-dense baselines. -->
         <dependency>
             <groupId>com.embabel.smith</groupId>

@@ -1,6 +1,6 @@
 package com.embabel.smith.runtime.core;
 
-import com.embabel.smith.common.model.SkillPack;
+import com.embabel.smith.common.model.AgentSpec;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -22,16 +22,16 @@ public class TrustTierPolicy {
     }
 
     /** The distinct tool-group roles a pack's actions declare. */
-    public Set<String> declaredToolGroups(SkillPack pack) {
+    public Set<String> declaredToolGroups(AgentSpec pack) {
         Set<String> groups = new TreeSet<>();
         pack.steps().forEach(step -> groups.addAll(step.toolGroups()));
         return groups;
     }
 
     /** The packs that cannot run under the given tier; empty when every pack is allowed. */
-    public List<Violation> violations(List<SkillPack> packs, TrustTier tier) {
+    public List<Violation> violations(List<AgentSpec> packs, TrustTier tier) {
         List<Violation> violations = new ArrayList<>();
-        for (SkillPack pack : packs) {
+        for (AgentSpec pack : packs) {
             List<String> disallowed = declaredToolGroups(pack).stream()
                     .filter(group -> !tier.allows(group))
                     .sorted()

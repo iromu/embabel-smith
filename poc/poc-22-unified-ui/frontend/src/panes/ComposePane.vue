@@ -4,7 +4,7 @@
       <q-card-section>
         <div class="text-h5">Compose</div>
         <p class="text-grey-7">
-          POC 14 — place skills, connect them with type-checked edges, and export a composite skill-pack.
+          POC 14 — place specs, connect them with type-checked edges, and export a composite agent spec.
         </p>
       </q-card-section>
 
@@ -14,10 +14,10 @@
         <div class="row q-gutter-sm items-center">
           <q-input
             v-model="pick"
-            label="Add a skill (from the palette)"
+            label="Add a spec (from the palette)"
             dense
-            data-test="compose-skill-input"
-            :hint="skillNames.join(', ') || 'loading…'"
+            data-test="compose-spec-input"
+            :hint="specNames.join(', ') || 'loading…'"
             style="min-width: 300px"
           />
           <q-btn label="Add" icon="add" @click="addNode" data-test="compose-add-btn" />
@@ -44,7 +44,7 @@
         <div class="text-subtitle2">Canvas</div>
         <div class="q-mt-sm">
           <q-badge v-for="n in nodes" :key="'n' + n" class="q-mr-sm" color="primary" :label="n" />
-          <span v-if="nodes.length === 0" class="text-grey-6">no skills placed</span>
+          <span v-if="nodes.length === 0" class="text-grey-6">no specs placed</span>
         </div>
         <div class="q-mt-sm">
           <q-badge
@@ -87,12 +87,12 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 
-import { compose, listSkills } from '../api/client'
-import type { ComposeResponse, SkillInfo } from '../api/types'
+import { compose, listSpecs } from '../api/client'
+import type { ComposeResponse, SpecInfo } from '../api/types'
 import { checkEdge, validateCanvas } from '../canvas/model'
 import type { CanvasResult, Edge, EdgeCheck } from '../canvas/model'
 
-const skills = ref<SkillInfo[]>([])
+const specs = ref<SpecInfo[]>([])
 const nodes = ref<string[]>([])
 const edges = ref<Edge[]>([])
 const pick = ref('')
@@ -103,23 +103,23 @@ const validation = ref<CanvasResult | null>(null)
 const composed = ref<ComposeResponse | null>(null)
 const composeError = ref<string | null>(null)
 
-const skillNames = computed(() => skills.value.map((s) => s.name))
+const specNames = computed(() => specs.value.map((s) => s.name))
 
-function skill(name: string): SkillInfo | undefined {
-  return skills.value.find((s) => s.name === name)
+function spec(name: string): SpecInfo | undefined {
+  return specs.value.find((s) => s.name === name)
 }
 
 function addNode() {
   const name = pick.value.trim()
-  if (name && skill(name) && !nodes.value.includes(name)) {
+  if (name && spec(name) && !nodes.value.includes(name)) {
     nodes.value.push(name)
   }
   pick.value = ''
 }
 
 function addEdge() {
-  const source = skill(edgeFrom.value.trim())
-  const target = skill(edgeTo.value.trim())
+  const source = spec(edgeFrom.value.trim())
+  const target = spec(edgeTo.value.trim())
   if (!source || !target) {
     return
   }
@@ -130,7 +130,7 @@ function addEdge() {
 }
 
 function validate() {
-  validation.value = validateCanvas({ nodes: nodes.value, edges: edges.value, skills: skills.value })
+  validation.value = validateCanvas({ nodes: nodes.value, edges: edges.value, specs: specs.value })
 }
 
 async function exportComposite() {
@@ -144,6 +144,6 @@ async function exportComposite() {
 }
 
 onMounted(async () => {
-  skills.value = await listSkills()
+  specs.value = await listSpecs()
 })
 </script>

@@ -1,9 +1,9 @@
 package com.embabel.smith.runtime;
 
 import com.embabel.agent.api.common.PlannerType;
-import com.embabel.smith.common.model.SkillPack;
-import com.embabel.smith.common.samples.SampleSkillPacks;
-import com.embabel.smith.common.model.SkillPackManifest;
+import com.embabel.smith.common.model.AgentSpec;
+import com.embabel.smith.common.samples.SampleAgentSpecs;
+import com.embabel.smith.common.model.AgentSpecManifest;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -19,9 +19,9 @@ class PlannerResolverTest {
 
     @Test
     void defaultsToGoapWhenNothingIsSpecified() {
-        SkillPack pack = SampleSkillPacks.explainer();
+        AgentSpec pack = SampleAgentSpecs.explainer();
         // replace the manifest so it declares no default planner
-        SkillPack noDefault = new SkillPack(new SkillPackManifest("explainer", "1.0.0"),
+        AgentSpec noDefault = new AgentSpec(new AgentSpecManifest("explainer", "1.0.0"),
                 pack.goal(), pack.steps(), pack.types());
 
         assertThat(resolver.resolve(null, noDefault)).isEqualTo(PlannerType.GOAP);
@@ -30,24 +30,24 @@ class PlannerResolverTest {
 
     @Test
     void anExplicitPerRunChoiceWins() {
-        assertThat(resolver.resolve("UTILITY", SampleSkillPacks.explainer())).isEqualTo(PlannerType.UTILITY);
-        assertThat(resolver.resolve("hybrid", SampleSkillPacks.explainer())).isEqualTo(PlannerType.HYBRID);
-        assertThat(resolver.resolve("SUPERVISOR", SampleSkillPacks.explainer())).isEqualTo(PlannerType.SUPERVISOR);
+        assertThat(resolver.resolve("UTILITY", SampleAgentSpecs.explainer())).isEqualTo(PlannerType.UTILITY);
+        assertThat(resolver.resolve("hybrid", SampleAgentSpecs.explainer())).isEqualTo(PlannerType.HYBRID);
+        assertThat(resolver.resolve("SUPERVISOR", SampleAgentSpecs.explainer())).isEqualTo(PlannerType.SUPERVISOR);
     }
 
     @Test
     void fallsBackToTheManifestDefault() {
-        SkillPack pack = SampleSkillPacks.explainer(); // manifest declares defaultPlanner: GOAP
+        AgentSpec pack = SampleAgentSpecs.explainer(); // manifest declares defaultPlanner: GOAP
         assertThat(resolver.resolve(null, pack)).isEqualTo(PlannerType.GOAP);
 
-        SkillPack utilityDefault = new SkillPack(new SkillPackManifest("p", "1", "UTILITY", null),
+        AgentSpec utilityDefault = new AgentSpec(new AgentSpecManifest("p", "1", "UTILITY", null),
                 pack.goal(), pack.steps(), pack.types());
         assertThat(resolver.resolve(null, utilityDefault)).isEqualTo(PlannerType.UTILITY);
     }
 
     @Test
     void rejectsAnUnknownPlanner() {
-        assertThatThrownBy(() -> resolver.resolve("NOT_A_PLANNER", SampleSkillPacks.explainer()))
+        assertThatThrownBy(() -> resolver.resolve("NOT_A_PLANNER", SampleAgentSpecs.explainer()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("NOT_A_PLANNER");
     }

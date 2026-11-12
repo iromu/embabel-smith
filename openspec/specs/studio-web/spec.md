@@ -1,12 +1,12 @@
 # studio-web Specification
 
 ## Purpose
-The unified web product: one application that runs skills from a source, builds new skills, and operates the trace-driven self-improvement loop — with a UI where each of those is a pane. It is the production counterpart of POC 22, re-pointed at the production cores and extended with trace and loop control.
+The unified web product: one application that runs agent specs from a source, builds new agent specs, and operates the trace-driven self-improvement loop — with a UI where each of those is a pane. It is the production counterpart of POC 22, re-pointed at the production cores and extended with trace and loop control.
 
 ## Requirements
 
 ### Requirement: Run goals from the UI
-The studio SHALL let the user pick a skill source, pick an exported goal from that source, submit an input, and see the goal output — executing through the change-03 runtime core.
+The studio SHALL let the user pick a spec source, pick an exported goal from that source, submit an input, and see the goal output — executing through the change-03 runtime core.
 
 #### Scenario: Run from the UI
 - **WHEN** the user selects a source, a goal, and an input and submits
@@ -36,7 +36,7 @@ The studio SHALL expose loop control: start/stop the interval schedule, trigger 
 
 #### Scenario: On-demand iteration
 - **WHEN** the user triggers a single iteration
-- **THEN** the loop runs once and the pane reports which skills were detected, refined, gated, and published or queued
+- **THEN** the loop runs once and the pane reports which specs were detected, refined, gated, and published or queued
 
 #### Scenario: Approve a candidate
 - **WHEN** the user approves a pending candidate
@@ -47,11 +47,11 @@ The studio SHALL expose loop control: start/stop the interval schedule, trigger 
 - **THEN** gated candidates are published without pending approval until the user disables it
 
 ### Requirement: Show traces
-The studio SHALL show, per skill, the rolling window of its trace records: run time, source ref, success/failure, per-step status and durations, and the failure reason where present, with step-level drill-down.
+The studio SHALL show, per spec, the rolling window of its trace records: run time, source ref, success/failure, per-step status and durations, and the failure reason where present, with step-level drill-down.
 
 #### Scenario: Trace history
-- **WHEN** the user opens the Traces pane for a skill
-- **THEN** it lists that skill's recent runs, most recent first, within the retention window
+- **WHEN** the user opens the Traces pane for a spec
+- **THEN** it lists that spec's recent runs, most recent first, within the retention window
 
 #### Scenario: Failure drill-down
 - **WHEN** the user opens a failed run
@@ -65,7 +65,7 @@ The studio SHALL show each pack's lifecycle state (`incubating` / `active` / `de
 - **THEN** its lifecycle state, baseline, and drift status are shown
 
 ### Requirement: REST surface
-The studio SHALL expose a JSON REST API covering: run (source, goal, input, planner, trust tier), build (description, output source), sources and packs listing, traces listing (per skill), pending candidates listing, candidate approve/reject, loop start/stop/trigger, and auto-publish get/set.
+The studio SHALL expose a JSON REST API covering: run (source, goal, input, planner, trust tier), build (description, output source), sources and packs listing, traces listing (per spec), pending candidates listing, candidate approve/reject, loop start/stop/trigger, and auto-publish get/set.
 
 #### Scenario: API contract is stable for the frontend
 - **WHEN** the frontend calls any endpoint

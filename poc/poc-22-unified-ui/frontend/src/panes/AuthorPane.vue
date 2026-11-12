@@ -3,7 +3,7 @@
     <q-card flat bordered class="q-pa-md">
       <q-card-section>
         <div class="text-h5">Author</div>
-        <p class="text-grey-7">POC 2 — describe a skill in plain language; compile a draft + quality verdict.</p>
+        <p class="text-grey-7">POC 2 — describe a spec in plain language; compile a draft + quality verdict.</p>
       </q-card-section>
 
       <q-separator />
@@ -13,7 +13,7 @@
           <q-input v-model="agentName" label="Agent name (optional)" dense style="width: 240px" data-test="author-agent" />
           <q-input
             v-model="description"
-            label="Describe the skill"
+            label="Describe the spec"
             dense
             style="min-width: 360px"
             data-test="author-description"
@@ -54,7 +54,7 @@
             <div v-for="(issue, i) in draft.issues" :key="i">{{ issue }}</div>
           </div>
         </div>
-        <div v-else class="text-grey-6">Describe a skill and compile a draft.</div>
+        <div v-else class="text-grey-6">Describe a spec and compile a draft.</div>
       </q-card-section>
     </q-card>
   </q-page>

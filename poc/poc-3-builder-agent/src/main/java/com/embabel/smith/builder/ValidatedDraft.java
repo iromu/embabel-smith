@@ -1,6 +1,6 @@
 package com.embabel.smith.builder;
 
-import com.embabel.smith.common.model.SkillPack;
+import com.embabel.smith.common.model.AgentSpec;
 
 import java.util.List;
 
@@ -9,7 +9,7 @@ import java.util.List;
  * are consistent. When {@code valid} is false, the draft MUST NOT be written (design D5) — the
  * builder reports the issues instead.
  */
-public record ValidatedDraft(SkillPack pack, boolean valid, List<String> issues) {
+public record ValidatedDraft(AgentSpec pack, boolean valid, List<String> issues) {
 
     public ValidatedDraft {
         issues = issues == null ? List.of() : List.copyOf(issues);

@@ -49,7 +49,7 @@ class ModelNotConfiguredTest {
     @Test
     void buildReportsModelNotConfiguredWhenNoEndpoint() {
         BuildResponse response = buildController.build(
-                new BuildRequest("a skill", "folder:/tmp/out", null, null, null));
+                new BuildRequest("a spec", "folder:/tmp/out", null, null, null));
         assertThat(response.errorCode()).isEqualTo("MODEL_NOT_CONFIGURED");
         assertThat(response.status()).isEqualTo("BLOCKED");
     }

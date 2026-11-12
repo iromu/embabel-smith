@@ -2,8 +2,8 @@ package com.embabel.smith.trust;
 
 import com.embabel.agent.core.AgentPlatform;
 import com.embabel.smith.common.config.ModelEndpointConfig;
-import com.embabel.smith.common.io.SkillPackReader;
-import com.embabel.smith.common.model.SkillPack;
+import com.embabel.smith.common.io.AgentSpecReader;
+import com.embabel.smith.common.model.AgentSpec;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
@@ -14,7 +14,7 @@ import java.nio.file.Path;
 
 /**
  * The trust-tier / guardrail launcher (POC 10). Offline it shows the per-tier tool-group allowlist
- * (a {@code shell} skill refused under {@code T1}, allowed under {@code T3}); with a live endpoint it
+ * (a {@code shell} spec refused under {@code T1}, allowed under {@code T3}); with a live endpoint it
  * shows a global user-input guardrail letting a clean run through and blocking a prompt-injection
  * attempt. The model endpoint is fully env-driven.
  *
@@ -33,7 +33,7 @@ public class TrustApp implements CommandLineRunner {
     private final AgentPlatform platform;
     private final ModelEndpointConfig endpoint;
     private final TrustTierPolicy policy = new TrustTierPolicy();
-    private final SkillPackReader reader = new SkillPackReader();
+    private final AgentSpecReader reader = new AgentSpecReader();
 
     public TrustApp(AgentPlatform platform,
                     @Value("${OPENAI_CUSTOM_BASE_URL:}") String baseUrl,
@@ -76,18 +76,18 @@ public class TrustApp implements CommandLineRunner {
     }
 
     private void printTierChecks() throws Exception {
-        SkillPack shellSkill = reader.read(findPack("shell-runner"));
-        SkillPack plainSkill = reader.read(findPack("explainer"));
+        AgentSpec shellSpec = reader.read(findPack("shell-runner"));
+        AgentSpec plainSpec = reader.read(findPack("explainer"));
 
-        TrustTierPolicy.CheckResult shellT1 = policy.check(shellSkill, TrustTier.T1_COMMUNITY);
-        TrustTierPolicy.CheckResult shellT3 = policy.check(shellSkill, TrustTier.T3_PARTNER);
-        TrustTierPolicy.CheckResult plainT1 = policy.check(plainSkill, TrustTier.T1_COMMUNITY);
+        TrustTierPolicy.CheckResult shellT1 = policy.check(shellSpec, TrustTier.T1_COMMUNITY);
+        TrustTierPolicy.CheckResult shellT3 = policy.check(shellSpec, TrustTier.T3_PARTNER);
+        TrustTierPolicy.CheckResult plainT1 = policy.check(plainSpec, TrustTier.T1_COMMUNITY);
 
         System.out.println("-- Per-tier tool-group allowlist (offline) --");
-        System.out.println("shell-runner declares toolGroups " + policy.declaredToolGroups(shellSkill));
+        System.out.println("shell-runner declares toolGroups " + policy.declaredToolGroups(shellSpec));
         System.out.println("  under T1_COMMUNITY: " + verdict(shellT1));
         System.out.println("  under T3_PARTNER:   " + verdict(shellT3));
-        System.out.println("explainer declares toolGroups " + policy.declaredToolGroups(plainSkill));
+        System.out.println("explainer declares toolGroups " + policy.declaredToolGroups(plainSpec));
         System.out.println("  under T1_COMMUNITY: " + verdict(plainT1));
     }
 
@@ -98,12 +98,12 @@ public class TrustApp implements CommandLineRunner {
     private Path findPack(String name) {
         Path dir = Path.of("").toAbsolutePath();
         while (dir != null) {
-            Path candidate = dir.resolve("skill-packs").resolve(name);
+            Path candidate = dir.resolve("agent-specs").resolve(name);
             if (Files.isDirectory(candidate)) {
                 return candidate;
             }
             dir = dir.getParent();
         }
-        throw new IllegalStateException("Could not locate skill-packs/" + name);
+        throw new IllegalStateException("Could not locate agent-specs/" + name);
     }
 }

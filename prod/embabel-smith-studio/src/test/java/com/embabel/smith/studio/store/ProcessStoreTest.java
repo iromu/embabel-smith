@@ -3,8 +3,8 @@ package com.embabel.smith.studio.store;
 import com.embabel.smith.common.model.ActionStepSpec;
 import com.embabel.smith.common.model.DynamicTypeDef;
 import com.embabel.smith.common.model.GoalStepSpec;
-import com.embabel.smith.common.model.SkillPack;
-import com.embabel.smith.common.model.SkillPackManifest;
+import com.embabel.smith.common.model.AgentSpec;
+import com.embabel.smith.common.model.AgentSpecManifest;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -22,25 +22,25 @@ class ProcessStoreTest {
     @TempDir
     Path root;
 
-    private SkillPack pack(String name, String goal) {
+    private AgentSpec pack(String name, String goal) {
         ActionStepSpec step = ActionStepSpec.action(name + "_step", "a step",
                 List.of("UserInput"), name + "_Out", "Produce {{userInput}} into the result.");
         GoalStepSpec goalSpec = GoalStepSpec.exportedGoal(goal, "the goal", name + "_Out");
         DynamicTypeDef type = new DynamicTypeDef(name + "_Out", "an output", null, null, null);
-        return new SkillPack(new SkillPackManifest(name, "1.0.0"), goalSpec, List.of(step), List.of(type));
+        return new AgentSpec(new AgentSpecManifest(name, "1.0.0"), goalSpec, List.of(step), List.of(type));
     }
 
     @Test
     void saveListLoadRoundTripsAPack() {
         ProcessStore store = new ProcessStore(root);
-        SkillPack original = pack("alpha", "alpha_goal");
+        AgentSpec original = pack("alpha", "alpha_goal");
 
         ProcessStore.PackRecord record = store.savePack(original);
         assertThat(record.name()).isEqualTo("alpha");
         assertThat(record.goal()).isEqualTo("alpha_goal");
         assertThat(record.steps()).isEqualTo(1);
 
-        SkillPack loaded = store.loadPack("alpha");
+        AgentSpec loaded = store.loadPack("alpha");
         assertThat(loaded).isNotNull();
         assertThat(loaded.name()).isEqualTo("alpha");
         assertThat(loaded.version()).isEqualTo("1.0.0");

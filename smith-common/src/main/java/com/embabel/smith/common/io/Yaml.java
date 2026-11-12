@@ -6,7 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 
 /**
- * The single {@link ObjectMapper} used to (de)serialize skill-pack YAML.
+ * The single {@link ObjectMapper} used to (de)serialize agent spec YAML.
  *
  * <p>Configured to omit null fields on write and to tolerate unknown fields on read, so the
  * reader can also ingest richer Embabel-emitted step files (which carry fields such as {@code llm}

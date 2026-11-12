@@ -3,12 +3,12 @@ package com.embabel.smith.builder;
 import com.embabel.smith.builder.lifecycle.LifecycleMetadata;
 import com.embabel.smith.builder.publish.PublishResult;
 import com.embabel.smith.builder.security.ScanReport;
-import com.embabel.smith.common.model.SkillPack;
+import com.embabel.smith.common.model.AgentSpec;
 
 import java.util.List;
 
 /**
- * The outcome of a build: whether the skill-pack was published or the build was blocked, at which
+ * The outcome of a build: whether the agent spec was published or the build was blocked, at which
  * stage it stopped, and the evidence (eval score, security scan, lifecycle metadata, publish
  * location). A blocked build names the stage and the reasons it stopped; when the build could not
  * be resolved cleanly (an ambiguous/invalid description) it carries the draft for review.
@@ -22,7 +22,7 @@ public record BuildResult(
         ScanReport scan,
         LifecycleMetadata lifecycle,
         PublishResult published,
-        SkillPack draft) {
+        AgentSpec draft) {
 
     public enum Status {
         BUILT,
@@ -39,7 +39,7 @@ public record BuildResult(
     }
 
     public static BuildResult blocked(String stage, String packName, List<String> issues,
-                                      Double score, ScanReport scan, SkillPack draft) {
+                                      Double score, ScanReport scan, AgentSpec draft) {
         return new BuildResult(Status.BLOCKED, stage, packName, score,
                 issues == null ? List.of() : List.copyOf(issues), scan, null, null, draft);
     }

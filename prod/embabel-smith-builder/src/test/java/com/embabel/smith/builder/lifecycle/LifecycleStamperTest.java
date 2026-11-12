@@ -1,8 +1,8 @@
 package com.embabel.smith.builder.lifecycle;
 
 import com.embabel.smith.common.io.Yaml;
-import com.embabel.smith.common.model.SkillPack;
-import com.embabel.smith.common.samples.SampleSkillPacks;
+import com.embabel.smith.common.model.AgentSpec;
+import com.embabel.smith.common.samples.SampleAgentSpecs;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -23,11 +23,11 @@ class LifecycleStamperTest {
 
     @Test
     void stampsTheBaselineMetadata() {
-        SkillPack pack = SampleSkillPacks.explainer();
+        AgentSpec pack = SampleAgentSpecs.explainer();
 
         LifecycleMetadata metadata = stamper.stamp(pack, 1.0);
 
-        assertThat(metadata.contentHash()).isEqualTo(SkillContentHash.of(pack));
+        assertThat(metadata.contentHash()).isEqualTo(SpecContentHash.of(pack));
         assertThat(metadata.baselinePassRate()).isEqualTo(1.0);
         assertThat(metadata.state()).isEqualTo(LifecycleState.INCUBATING); // builder always records the initial state
         assertThat(metadata.updatedAt()).isNotBlank();
@@ -35,13 +35,13 @@ class LifecycleStamperTest {
 
     @Test
     void aWeakBaselineStaysIncubating() {
-        LifecycleMetadata metadata = stamper.stamp(SampleSkillPacks.explainer(), 0.5);
+        LifecycleMetadata metadata = stamper.stamp(SampleAgentSpecs.explainer(), 0.5);
         assertThat(metadata.state()).isEqualTo(LifecycleState.INCUBATING);
     }
 
     @Test
     void writesTheSidecarWithTheRecordedContent(@TempDir Path dir) throws Exception {
-        SkillPack pack = SampleSkillPacks.explainer();
+        AgentSpec pack = SampleAgentSpecs.explainer();
         LifecycleMetadata metadata = stamper.stamp(pack, 1.0);
 
         stamper.write(dir, metadata);

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Select skills at scale using a *remote* OpenAI-compatible `EmbeddingService`, and measure both its
+Select specs at scale using a *remote* OpenAI-compatible `EmbeddingService`, and measure both its
 C10-comparable selection accuracy and the scaling dimension (amortised one-time embedding cost and
 per-query retrieval latency as the same-typed library grows).
 
@@ -29,19 +29,19 @@ verifiable without the real endpoint.
 - **THEN** the request is routed through that transport, enabling offline verification (including a
   real round-trip against a local HTTP server)
 
-### Requirement: Score skills by remote-embedding cosine
+### Requirement: Score specs by remote-embedding cosine
 
-The system SHALL rank same-typed skills for a task query by cosine similarity between the query's
-embedding and each skill's embedding, memoising each distinct query and each distinct skill so that
+The system SHALL rank same-typed specs for a task query by cosine similarity between the query's
+embedding and each spec's embedding, memoising each distinct query and each distinct spec so that
 each is embedded at most once.
 
 #### Scenario: Closer embedding ranks higher
-- **WHEN** two candidate skills are scored against a query
-- **THEN** the skill whose embedding is closer to the query's embedding scores higher
+- **WHEN** two candidate specs are scored against a query
+- **THEN** the spec whose embedding is closer to the query's embedding scores higher
 
 #### Scenario: Memoisation
-- **WHEN** the same query is scored against the same skill repeatedly
-- **THEN** the skill and query are not re-embedded (no additional embedding request)
+- **WHEN** the same query is scored against the same spec repeatedly
+- **THEN** the spec and query are not re-embedded (no additional embedding request)
 
 ### Requirement: Gate the live run on endpoint availability
 
@@ -71,7 +71,7 @@ verifiable offline.
 
 The benchmark SHALL evaluate the remote embedding, the lexical baseline, and the dense baseline on
 POC 12's identical same-typed shadowing library and report Precision@1 for each at the distinct and
-shadowing scales, so the results are directly comparable to the existing skill-selection group.
+shadowing scales, so the results are directly comparable to the existing spec-selection group.
 
 #### Scenario: One Precision@1 per method per scale
 - **WHEN** the C10-comparable scenario runs

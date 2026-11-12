@@ -8,13 +8,13 @@ set of proven capabilities over a thin REST surface, at a frontend footprint sma
 LLM can hold and edit it.
 
 The SPA exposes **ten panes**, each backed by a thin `@RestController` that delegates to a proven
-POC class (the POC 15 pattern — no new agent/skill logic):
+POC class (the POC 15 pattern — no new agent/spec logic):
 
 | Pane        | Proven POC(s) | Behaviour                                   |
 |-------------|---------------|---------------------------------------------|
-| **Run**     | POC 1         | pick a skill, run the GOAP plan, see output (endpoint-gated) |
+| **Run**     | POC 1         | pick a spec, run the GOAP plan, see output (endpoint-gated) |
 | **Author**  | POC 2         | NL → draft + `DraftQuality` verdict (endpoint-gated) |
-| **Compose** | POC 14        | place skills, type-checked edges, export composite (offline) |
+| **Compose** | POC 14        | place specs, type-checked edges, export composite (offline) |
 | **Retrieve**| POC 12/18     | rank the library by a pluggable scorer, curation-aware (offline) |
 | **Eval**    | POC 9         | score + prompt rewrite + re-score (endpoint-gated) |
 | **Lifecycle**| POC 18       | drift detection, re-eval, state transitions (re-eval endpoint-gated) |
@@ -51,10 +51,10 @@ flowchart LR
     subgraph POC["Proven POC modules"]
         direction LR
         P14["POC 14<br/>CompositionCanvas"]
-        P12["POC 12<br/>ScaleSkillRegistry + SkillScorer"]
-        P21["POC 21<br/>SkillSecurityScanner"]
+        P12["POC 12<br/>ScaleSpecRegistry + SpecScorer"]
+        P21["POC 21<br/>SpecSecurityScanner"]
         P10["POC 10<br/>TrustTierPolicy"]
-        P1["POC 1<br/>SkillRunner (GOAP)"]
+        P1["POC 1<br/>SpecRunner (GOAP)"]
         P2["POC 2<br/>NlCompileRunner"]
         P9["POC 9<br/>RefinementRunner"]
         P18["POC 18<br/>LifecycleManager + LiveEvalRunner"]
@@ -75,7 +75,7 @@ flowchart LR
 
 - **`frontend/`** — the SPA. Pure logic is separated from the views so it is unit-testable:
   - `src/canvas/model.ts` — the type-checked "snap" rule and chain validation as pure functions
-    (`{nodes, edges, skills} → {valid, issues, chain}`), mirroring POC 14's edge type-check.
+    (`{nodes, edges, specs} → {valid, issues, chain}`), mirroring POC 14's edge type-check.
   - `src/api/client.ts` — the **only** place that calls `fetch()`; every pane goes through it, so
     tests mock `fetch` once and exercise all panes' data flow.
   - `src/api/types.ts` — TypeScript interfaces mirroring the backend DTOs (the type-safety payoff:
@@ -87,8 +87,8 @@ flowchart LR
   `ModelEndpointConfig.configError()` first and return a clear, named configuration error before any
   model call; the Remote controller checks sidecar reachability and returns a "not running" body when
   down.
-- **`SkillCatalog` / `SkillCuration`** — the palette (every valid, exported skill-pack under the
-  skill-packs directory) and POC 18's library curation, reused by the Compose, Retrieve, and
+- **`SpecCatalog` / `SpecCuration`** — the palette (every valid, exported agent spec under the
+  agent specs directory) and POC 18's library curation, reused by the Compose, Retrieve, and
   Lifecycle panes.
 
 ## What it proves
@@ -99,12 +99,12 @@ flowchart LR
   check, and the scale table all run fully offline.
 - **Endpoint-gated panes degrade gracefully** — without the model env vars they show
   "endpoint not configured" instead of failing.
-- **The canvas snap is type-checked** — an edge is valid only when the source skill's output type is
+- **The canvas snap is type-checked** — an edge is valid only when the source spec's output type is
   one of the target's input types; an incompatible edge is flagged with the type-mismatch reason
   (POC 14's rule, surfaced in the browser).
-- **Retrieval is curation-aware and pluggable** — retired skills are dropped, degraded skills
+- **Retrieval is curation-aware and pluggable** — retired specs are dropped, degraded specs
   de-ranked, every hit stamped with its lifecycle state; a denser scorer (POC 17/19/20) drops in via
-  the shared `SkillScorer` seam and the pane reports the active scorer.
+  the shared `SpecScorer` seam and the pane reports the active scorer.
 - **Remote panes are gated on the backing process** — "not running" when the sidecar is down, the
   remote action's result when it is up.
 
@@ -130,7 +130,7 @@ export OPENAI_CUSTOM_MODELS=... EMBABEL_MODELS_DEFAULT_LLM=...
 ```
 
 `SERVER_PORT` defaults to 18080 to avoid a local service on 8080. The default build depends only on
-the light + remote POC modules; the heavy scorers are opt-in via the shared `SkillScorer` seam —
+the light + remote POC modules; the heavy scorers are opt-in via the shared `SpecScorer` seam —
 e.g. POC 20's real ONNX embedding scorer (the model bundle from POC 20's one-time download):
 
 ```bash
@@ -156,7 +156,7 @@ rank by it; the default remains the offline `lexical` scorer.
 
 Against the hypothesis (claim C15, extended — the builder UI as a typed, testable SPA):
 **in progress.** The design risk the POC de-risks is not the capabilities — each pane delegates to
-a proven POC class (POC 1/2/9/10/12/14/16/18/21), so the agent/skill logic is already proven — but
+a proven POC class (POC 1/2/9/10/12/14/16/18/21), so the agent/spec logic is already proven — but
 the *surface*: a typed, component-based, unit-tested SPA (Vue 3 + Quasar + TypeScript) that drives
 the full set of proven capabilities over a thin REST surface. When complete, the verdict will be
 that the "missing piece" doc 01 names can be a small, LLM-editable, type-checked frontend whose

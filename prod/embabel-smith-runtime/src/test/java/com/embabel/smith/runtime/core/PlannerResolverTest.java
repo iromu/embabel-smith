@@ -1,8 +1,8 @@
 package com.embabel.smith.runtime.core;
 
 import com.embabel.agent.api.common.PlannerType;
-import com.embabel.smith.common.model.SkillPack;
-import com.embabel.smith.common.model.SkillPackManifest;
+import com.embabel.smith.common.model.AgentSpec;
+import com.embabel.smith.common.model.AgentSpecManifest;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -14,8 +14,8 @@ class PlannerResolverTest {
 
     private final PlannerResolver resolver = new PlannerResolver();
 
-    private static SkillPack pack(String defaultPlanner) {
-        return new SkillPack(new SkillPackManifest("pack", "1.0.0", defaultPlanner, null), null, List.of(), List.of());
+    private static AgentSpec pack(String defaultPlanner) {
+        return new AgentSpec(new AgentSpecManifest("pack", "1.0.0", defaultPlanner, null), null, List.of(), List.of());
     }
 
     @Test

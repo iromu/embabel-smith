@@ -2,9 +2,9 @@ package com.embabel.smith.studio.rest;
 
 import com.embabel.smith.builder.lifecycle.LifecycleMetadata;
 import com.embabel.smith.builder.lifecycle.LifecycleState;
-import com.embabel.smith.builder.lifecycle.SkillContentHash;
+import com.embabel.smith.builder.lifecycle.SpecContentHash;
 import com.embabel.smith.common.io.Yaml;
-import com.embabel.smith.common.model.SkillPack;
+import com.embabel.smith.common.model.AgentSpec;
 import com.embabel.smith.studio.rest.dto.PackInfo;
 import com.embabel.smith.studio.rest.dto.SourceInfo;
 import org.junit.jupiter.api.Test;
@@ -37,11 +37,11 @@ class SourceControllerTest {
 
     @Test
     void listsPacksWithLifecycleAndNoDrift(@TempDir Path tmp) throws Exception {
-        SkillPack active = RestTestFixtures.pack("active", "s1");
+        AgentSpec active = RestTestFixtures.pack("active", "s1");
         RestTestFixtures.writePack(tmp, active);
         // The sidecar records the pack's semantic content hash (what the builder stamps); a matching
         // hash means no drift, so the pack must not be reported as drifted.
-        writeSidecar(tmp.resolve("active"), SkillContentHash.of(active),
+        writeSidecar(tmp.resolve("active"), SpecContentHash.of(active),
                 LifecycleState.ACTIVE, 1.0);
         RestTestFixtures.writePack(tmp, RestTestFixtures.pack("plain", "s1"));
 

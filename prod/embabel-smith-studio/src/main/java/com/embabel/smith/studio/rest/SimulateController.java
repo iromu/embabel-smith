@@ -1,7 +1,7 @@
 package com.embabel.smith.studio.rest;
 
 import com.embabel.smith.common.config.ModelEndpointConfig;
-import com.embabel.smith.common.model.SkillPack;
+import com.embabel.smith.common.model.AgentSpec;
 import com.embabel.smith.studio.rest.dto.SimulateRequest;
 import com.embabel.smith.studio.rest.dto.SimulateResponse;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -20,7 +20,7 @@ public class SimulateController {
     /** The model-dependent dry-run: a pack plus a sample input to a run outcome with its steps. */
     @FunctionalInterface
     public interface SimulateFn {
-        SimulateResponse simulate(SkillPack pack, String input);
+        SimulateResponse simulate(AgentSpec pack, String input);
     }
 
     private final SimulateFn simulator;
@@ -33,7 +33,7 @@ public class SimulateController {
 
     @PostMapping("/api/simulate")
     public SimulateResponse simulate(@RequestBody SimulateRequest request) {
-        SkillPack pack = request.pack();
+        AgentSpec pack = request.pack();
         if (pack == null || pack.goal() == null || pack.goal().name() == null) {
             return SimulateResponse.failed("No pack or goal to simulate; generate a flow first.");
         }

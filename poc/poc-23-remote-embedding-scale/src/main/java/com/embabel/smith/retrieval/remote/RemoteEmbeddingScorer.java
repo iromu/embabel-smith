@@ -1,23 +1,23 @@
 package com.embabel.smith.retrieval.remote;
 
-import com.embabel.smith.retrieval.SkillEntry;
+import com.embabel.smith.retrieval.SpecEntry;
 import com.embabel.smith.retrieval.scale.SemanticSimilarity;
-import com.embabel.smith.retrieval.scale.SkillScorer;
+import com.embabel.smith.retrieval.scale.SpecScorer;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * A {@link SkillScorer} backed by the remote {@link RemoteEmbedder}: cosine between the (memoised)
- * query embedding and each skill's (memoised) embedding. The same seam as POC 12's
+ * A {@link SpecScorer} backed by the remote {@link RemoteEmbedder}: cosine between the (memoised)
+ * query embedding and each spec's (memoised) embedding. The same seam as POC 12's
  * {@code SemanticScorer} and POC 20's {@code RealEmbeddingScorer}, but the vectors come from a
  * network {@code EmbeddingService} rather than hashed n-grams or a local ONNX model — so the
  * comparison is apples-to-apples.
  *
  * <p>Both query and entry vectors are memoised by key, so a benchmark that scores the same query
- * against a growing library embeds each distinct query and each distinct skill exactly once.
+ * against a growing library embeds each distinct query and each distinct spec exactly once.
  */
-public final class RemoteEmbeddingScorer implements SkillScorer {
+public final class RemoteEmbeddingScorer implements SpecScorer {
 
     private final RemoteEmbedder embedder;
     private final Map<String, double[]> queryVectors = new ConcurrentHashMap<>();
@@ -28,14 +28,14 @@ public final class RemoteEmbeddingScorer implements SkillScorer {
     }
 
     @Override
-    public double score(String query, SkillEntry entry) {
+    public double score(String query, SpecEntry entry) {
         double[] q = queryVectors.computeIfAbsent(query, embedder::embed);
         double[] e = entryVectors.computeIfAbsent(entry.id(), k -> embedder.embed(text(entry)));
         return SemanticSimilarity.cosine(q, e);
     }
 
     /** The same text the lexical / dense baselines score, so the comparison is apples-to-apples. */
-    private static String text(SkillEntry entry) {
+    private static String text(SpecEntry entry) {
         return entry.name() + " " + entry.description();
     }
 }

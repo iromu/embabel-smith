@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Embabel Smith — Skill Composer</title>
+<title>Embabel Smith — Spec Composer</title>
 <style>
   :root { --bg:#0f1117; --panel:#1a1d27; --node:#232838; --ink:#e6e8ef; --dim:#9aa1b3;
           --ok:#4ade80; --bad:#f87171; --accent:#6ea8fe; }
@@ -76,12 +76,12 @@
 </head>
 <body>
 <header>
-  <h1>Embabel Smith — Skill Composer</h1>
-  <span class="sub">Drag skills onto the canvas, then drag an output port to an input port to connect.
+  <h1>Embabel Smith — Spec Composer</h1>
+  <span class="sub">Drag specs onto the canvas, then drag an output port to an input port to connect.
   A connection only "snaps" when the types match (POC 14's edge type-check).</span>
 </header>
 <main>
-  <div id="palette"><h2>Skills</h2><div id="chips"></div></div>
+  <div id="palette"><h2>Specs</h2><div id="chips"></div></div>
   <div id="stage">
     <div id="status">
       <span id="badge" class="badge ok">empty canvas</span>
@@ -91,30 +91,30 @@
   </div>
   <div id="side">
     <section id="author">
-      <h2>Author <span class="hint">— describe a skill in plain language</span></h2>
-      <textarea id="description" rows="3" placeholder="e.g. A skill that explains a topic in plain language and posts it as a background message"></textarea>
+      <h2>Author <span class="hint">— describe a spec in plain language</span></h2>
+      <textarea id="description" rows="3" placeholder="e.g. A spec that explains a topic in plain language and posts it as a background message"></textarea>
       <button id="compile">Compile draft</button>
       <div id="author-results" style="margin-top:10px"><div class="hint">
         Endpoint-gated: needs the OPENAI_CUSTOM_* env vars. Compiles the description into a draft and
         shows its goal shape + DraftQuality verdict.</div></div>
     </section>
     <section id="eval">
-      <h2>Eval / refine <span class="hint">— check a skill, refine it on failure</span></h2>
-      <select id="eval-skill"><option value="">— pick a skill —</option></select>
+      <h2>Eval / refine <span class="hint">— check a spec, refine it on failure</span></h2>
+      <select id="eval-spec"><option value="">— pick a spec —</option></select>
       <button id="run-eval">Evaluate + refine</button>
       <div id="eval-results" style="margin-top:10px"><div class="hint">
         Endpoint-gated: needs the OPENAI_CUSTOM_* env vars. Runs a POC 5 eval over the tasks and, if any
         fail, offers a POC 9 prompt rewrite + re-score.</div></div>
     </section>
     <section id="retrieval">
-      <h2>Retrieval <span class="hint">— which skills would this route to?</span></h2>
+      <h2>Retrieval <span class="hint">— which specs would this route to?</span></h2>
       <input id="query" type="text" placeholder="e.g. explain a topic in plain language">
       <button id="retrieve">Retrieve top-5</button>
       <div id="retrieval-results" style="margin-top:10px"><div class="hint">
         The same scorer seam as POC 8/12/17/20 (lexical by default — offline; the POC 20 embedding
         drops in here). Type a task and rank the palette by relevance. Each hit shows its POC 18
-        lifecycle state — retired skills are dropped and degraded ones de-ranked; "re-eval + curate"
-        re-scores a skill (endpoint-gated) and moves it through the lifecycle.</div></div>
+        lifecycle state — retired specs are dropped and degraded ones de-ranked; "re-eval + curate"
+        re-scores a spec (endpoint-gated) and moves it through the lifecycle.</div></div>
     </section>
   </div>
 </main>
@@ -126,7 +126,7 @@
 
 <script>
 const NODE_W = 170, NODE_H = 64;
-let skills = [];
+let specs = [];
 let nodes = {};      // id -> {name, x, y}
 let edges = [];      // [{from, to}]
 let nodeId = 0;
@@ -139,32 +139,32 @@ const chainEl = document.getElementById('chain');
 const resultEl = document.getElementById('result');
 
 async function init() {
-  const res = await fetch('/api/skills');
-  skills = await res.json();
-  for (const s of skills) {
+  const res = await fetch('/api/specs');
+  specs = await res.json();
+  for (const s of specs) {
     const chip = document.createElement('div');
     chip.className = 'chip';
     chip.draggable = true;
     chip.innerHTML = `<div class="n">${s.name}</div>
       <div class="io">${s.externalInputTypes.join(', ') || '—'} → ${short(s.outputType)}</div>`;
-    chip.addEventListener('dragstart', e => e.dataTransfer.setData('skill', s.name));
+    chip.addEventListener('dragstart', e => e.dataTransfer.setData('spec', s.name));
     chip.addEventListener('click', () => addNode(s.name, 40 + (nodeId % 5) * 20, 40 + (nodeId % 5) * 20));
     chips.appendChild(chip);
     const opt = document.createElement('option');
     opt.value = s.name; opt.textContent = s.name;
-    document.getElementById('eval-skill').appendChild(opt);
+    document.getElementById('eval-spec').appendChild(opt);
   }
 }
 
 stage.addEventListener('dragover', e => e.preventDefault());
 stage.addEventListener('drop', e => {
   e.preventDefault();
-  const skill = e.dataTransfer.getData('skill');
+  const spec = e.dataTransfer.getData('spec');
   const move = e.dataTransfer.getData('move');
   const rect = stage.getBoundingClientRect();
   const x = e.clientX - rect.left - NODE_W / 2;
   const y = e.clientY - rect.top - NODE_H / 2;
-  if (skill) addNode(skill, x, y);
+  if (spec) addNode(spec, x, y);
   else if (move && nodes[move]) { nodes[move].x = x; nodes[move].y = y; render(); }
 });
 
@@ -192,7 +192,7 @@ function render() {
     el.style.top = n.y + 'px';
     el.draggable = true;
     el.innerHTML = `<div class="n">${n.name}</div>
-      <div class="io">in: ${skillIn(n.name)} · out: ${short(skillOut(n.name))}</div>`;
+      <div class="io">in: ${specIn(n.name)} · out: ${short(specOut(n.name))}</div>`;
     el.addEventListener('dragstart', e => { e.dataTransfer.setData('move', id); });
     const out = document.createElement('div');
     out.className = 'port out';
@@ -224,8 +224,8 @@ function render() {
   }
 }
 
-function skillIn(name) { const s = skills.find(s => s.name === name); return s ? s.externalInputTypes.map(short).join(', ') : ''; }
-function skillOut(name) { const s = skills.find(s => s.name === name); return s ? s.outputType : ''; }
+function specIn(name) { const s = specs.find(s => s.name === name); return s ? s.externalInputTypes.map(short).join(', ') : ''; }
+function specOut(name) { const s = specs.find(s => s.name === name); return s ? s.outputType : ''; }
 function short(t) { return t ? t.split('.').pop() : ''; }
 
 async function revalidate() {
@@ -267,7 +267,7 @@ document.getElementById('reset').addEventListener('click', () => { nodes = {}; e
 document.getElementById('compile').addEventListener('click', async () => {
   const desc = document.getElementById('description').value.trim();
   const box = document.getElementById('author-results');
-  if (!desc) { box.innerHTML = '<div class="issue">Describe the skill first.</div>'; return; }
+  if (!desc) { box.innerHTML = '<div class="issue">Describe the spec first.</div>'; return; }
   box.innerHTML = '<div class="hint">Compiling… (calls the model)</div>';
   const res = await fetch('/api/compile', { method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ description: desc }) });
@@ -298,15 +298,15 @@ document.getElementById('compile').addEventListener('click', async () => {
 });
 
 document.getElementById('run-eval').addEventListener('click', async () => {
-  const skill = document.getElementById('eval-skill').value;
+  const spec = document.getElementById('eval-spec').value;
   const box = document.getElementById('eval-results');
-  if (!skill) { box.innerHTML = '<div class="issue">Pick a skill to evaluate first.</div>'; return; }
-  box.innerHTML = '<div class="hint">Evaluating… (runs the skill + model; may refine the prompt)</div>';
+  if (!spec) { box.innerHTML = '<div class="issue">Pick a spec to evaluate first.</div>'; return; }
+  box.innerHTML = '<div class="hint">Evaluating… (runs the spec + model; may refine the prompt)</div>';
   const res = await fetch('/api/eval', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ skillName: skill }) });
+    body: JSON.stringify({ specName: spec }) });
   const data = await res.json();
   if (data.error) { box.innerHTML = '<div class="issue">' + data.error + '</div>'; return; }
-  let html = '<div class="hit"><div class="n"><span>' + data.skillName + '</span>'
+  let html = '<div class="hit"><div class="n"><span>' + data.specName + '</span>'
     + '<span class="score">step: ' + (data.stepName || '—') + '</span></div></div>';
   if (data.refined) {
     const cls = data.improved ? 'up' : 'down';
@@ -344,7 +344,7 @@ document.getElementById('retrieve').addEventListener('click', async () => {
 function renderRetrievalInto(box, data, q) {
   if (!data.results || !data.results.length) {
     box.insertAdjacentHTML('beforeend',
-      '<div class="hint">No skills matched (retired skills are dropped by curation).</div>');
+      '<div class="hint">No specs matched (retired specs are dropped by curation).</div>');
     return;
   }
   const max = data.results[0].score || 1;
@@ -361,12 +361,12 @@ function renderRetrievalInto(box, data, q) {
   }
 }
 
-// Re-evaluate a skill's pass-rate (endpoint-gated), show its lifecycle transition + verdict, then
+// Re-evaluate a spec's pass-rate (endpoint-gated), show its lifecycle transition + verdict, then
 // re-run the retrieval so the curation's effect on the ranking is visible.
 async function curate(name, box, q) {
-  box.innerHTML = '<div class="hint">Re-evaluating <b>' + name + '</b>… (runs the skill + model)</div>';
+  box.innerHTML = '<div class="hint">Re-evaluating <b>' + name + '</b>… (runs the spec + model)</div>';
   const res = await fetch('/api/curate', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ skillName: name }) });
+    body: JSON.stringify({ specName: name }) });
   const data = await res.json();
   if (data.error) { box.innerHTML = '<div class="issue">' + data.error + '</div>'; return; }
   const cls = data.surfaced ? 'ok' : 'bad';

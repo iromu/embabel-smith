@@ -3,7 +3,7 @@
     <q-card flat bordered class="q-pa-md">
       <q-card-section>
         <div class="text-h5">Security</div>
-        <p class="text-grey-7">POC 21 — scan a skill-pack at install time; pure static analysis, offline.</p>
+        <p class="text-grey-7">POC 21 — scan an agent spec at install time; pure static analysis, offline.</p>
       </q-card-section>
 
       <q-separator />
@@ -11,12 +11,12 @@
       <q-card-section>
         <div class="row q-gutter-sm items-center">
           <q-input
-            v-model="skillName"
-            label="Skill to scan"
+            v-model="specName"
+            label="Spec to scan"
             dense
             style="min-width: 320px"
-            data-test="security-skill"
-            :hint="skillNames.join(', ') || 'loading…'"
+            data-test="security-spec"
+            :hint="specNames.join(', ') || 'loading…'"
           />
           <q-btn label="Scan" color="primary" icon="security" @click="doScan" data-test="security-btn" />
         </div>
@@ -45,7 +45,7 @@
           </q-list>
           <div v-else class="text-positive q-mt-sm">No findings.</div>
         </div>
-        <div v-else class="text-grey-6">Pick a skill and scan its pack.</div>
+        <div v-else class="text-grey-6">Pick a spec and scan it.</div>
       </q-card-section>
     </q-card>
   </q-page>
@@ -54,15 +54,15 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 
-import { listSkills, scan } from '../api/client'
+import { listSpecs, scan } from '../api/client'
 import type { SecurityResponse } from '../api/types'
 
-const skillName = ref('')
-const skills = ref<string[]>([])
+const specName = ref('')
+const specs = ref<string[]>([])
 const result = ref<SecurityResponse | null>(null)
 const error = ref<string | null>(null)
 
-const skillNames = computed(() => skills.value)
+const specNames = computed(() => specs.value)
 
 function verdictColor(v: string | null): string {
   switch (v) {
@@ -82,13 +82,13 @@ function severityColor(s: string): string {
 }
 
 async function doScan() {
-  if (!skillName.value.trim()) {
+  if (!specName.value.trim()) {
     return
   }
   error.value = null
   result.value = null
   try {
-    const res = await scan({ skillName: skillName.value.trim() })
+    const res = await scan({ specName: specName.value.trim() })
     if (res.error) {
       error.value = res.error
     } else {
@@ -100,6 +100,6 @@ async function doScan() {
 }
 
 onMounted(async () => {
-  skills.value = (await listSkills()).map((s) => s.name)
+  specs.value = (await listSpecs()).map((s) => s.name)
 })
 </script>

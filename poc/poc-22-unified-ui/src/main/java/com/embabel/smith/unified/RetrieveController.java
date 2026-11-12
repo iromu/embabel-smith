@@ -1,9 +1,9 @@
 package com.embabel.smith.unified;
 
 import com.embabel.smith.lifecycle.LifecycleState;
-import com.embabel.smith.retrieval.SkillEntry;
-import com.embabel.smith.retrieval.scale.ScaleSkillRegistry;
-import com.embabel.smith.retrieval.scale.SkillScorer;
+import com.embabel.smith.retrieval.SpecEntry;
+import com.embabel.smith.retrieval.scale.ScaleSpecRegistry;
+import com.embabel.smith.retrieval.scale.SpecScorer;
 import com.embabel.smith.unified.dto.RetrieveRequest;
 import com.embabel.smith.unified.dto.RetrieveResponse;
 import com.embabel.smith.unified.dto.RetrieveResult;
@@ -16,30 +16,30 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * The Retrieve pane (POC 22): given a natural-language query, rank the catalog's skills by relevance
- * and return the top-k — the "which skills would this task route to" view. It reuses the same
- * {@link SkillScorer} seam the whole retrieval POC family shares (POC 8 lexical, POC 12 dense, POC 17
+ * The Retrieve pane (POC 22): given a natural-language query, rank the catalog's specs by relevance
+ * and return the top-k — the "which specs would this task route to" view. It reuses the same
+ * {@link SpecScorer} seam the whole retrieval POC family shares (POC 8 lexical, POC 12 dense, POC 17
  * GLiNER2, POC 20 real embedding); the active scorer is a {@link ScorerBinding} bean, so a denser
  * scorer drops in without changing the pane's interface, and the response carries the active scorer
  * name.
  *
  * <p>On top of the raw relevance ranking, the pane applies POC 18's library curation via
- * {@link SkillCuration}: a retired skill is dropped from the results entirely, and a degraded one is
+ * {@link SpecCuration}: a retired spec is dropped from the results entirely, and a degraded one is
  * de-ranked (its score halved, so it falls in the ranking) — the library is curated, not just scored.
  */
 @RestController
 public class RetrieveController {
 
-    private final ScaleSkillRegistry registry;
-    private final SkillScorer scorer;
+    private final ScaleSpecRegistry registry;
+    private final SpecScorer scorer;
     private final String scorerName;
-    private final SkillCuration curation;
+    private final SpecCuration curation;
 
-    public RetrieveController(SkillCatalog catalog, SkillCuration curation, ScorerBinding binding) {
+    public RetrieveController(SpecCatalog catalog, SpecCuration curation, ScorerBinding binding) {
         this.scorer = binding.scorer();
         this.scorerName = binding.name();
         this.curation = curation;
-        this.registry = new ScaleSkillRegistry(catalog.retrievalEntries(), scorer);
+        this.registry = new ScaleSpecRegistry(catalog.retrievalEntries(), scorer);
     }
 
     /** Rank the catalog by relevance to the query, curate it, and return the top-k with scores. */
@@ -57,10 +57,10 @@ public class RetrieveController {
     }
 
     /**
-     * Curate one ranked hit: drop it if its skill is retired, otherwise de-rank it if degraded and
-     * stamp its lifecycle state. Returns null for a retired (out-of-library) skill.
+     * Curate one ranked hit: drop it if its spec is retired, otherwise de-rank it if degraded and
+     * stamp its lifecycle state. Returns null for a retired (out-of-library) spec.
      */
-    private RetrieveResult curated(String query, SkillEntry e) {
+    private RetrieveResult curated(String query, SpecEntry e) {
         LifecycleState state = curation.currentState(e.name());
         if (!curation.surfaced(state)) {
             return null;

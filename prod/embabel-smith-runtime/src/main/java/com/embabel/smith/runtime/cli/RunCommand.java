@@ -1,7 +1,7 @@
 package com.embabel.smith.runtime.cli;
 
 import com.embabel.agent.core.AgentPlatform;
-import com.embabel.smith.runtime.SkillRunService;
+import com.embabel.smith.runtime.AgentSpecRunService;
 import com.embabel.smith.runtime.core.TrustTier;
 import com.embabel.smith.runtime.trace.JsonlTraceStore;
 import picocli.CommandLine.Option;
@@ -11,15 +11,15 @@ import java.nio.file.Path;
 import java.util.concurrent.Callable;
 
 /**
- * The {@code smith run} command: runs an exported goal over the skill-packs in a source,
+ * The {@code smith run} command: runs an exported goal over the agent specs in a source,
  * printing the goal output to stdout on success (exit 0) and a clear error to stderr on
  * failure (exit 1). Usage errors exit 2 (picocli default).
  */
-@Command(name = "run", description = "Run an exported goal over the skill-packs in a source")
+@Command(name = "run", description = "Run an exported goal over the agent specs in a source")
 public class RunCommand implements Callable<Integer> {
 
     @Option(names = "--source", required = true,
-            description = "Skill source URI: folder:<path> or git:<url>[@ref]")
+            description = "Spec source URI: folder:<path> or git:<url>[@ref]")
     String source;
 
     @Option(names = "--goal", description = "Goal to run (defaults to the single exported goal)")
@@ -45,15 +45,15 @@ public class RunCommand implements Callable<Integer> {
     }
 
     /** Test seam: allows substituting the run service. */
-    protected SkillRunService newService(Path traceFile) {
-        return new SkillRunService(platform, traceFile);
+    protected AgentSpecRunService newService(Path traceFile) {
+        return new AgentSpecRunService(platform, traceFile);
     }
 
     @Override
     public Integer call() {
         try {
             Path traceFile = traceDir != null ? traceDir.resolve("runs.jsonl") : JsonlTraceStore.defaultPath();
-            SkillRunService.RunResult result = newService(traceFile)
+            AgentSpecRunService.RunResult result = newService(traceFile)
                     .run(source, goal, input, planner, trustTier);
             if (result.success()) {
                 System.out.println(result.output());

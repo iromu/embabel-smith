@@ -1,7 +1,7 @@
 package com.embabel.smith.runtime.core;
 
 import com.embabel.agent.api.common.PlannerType;
-import com.embabel.smith.common.model.SkillPack;
+import com.embabel.smith.common.model.AgentSpec;
 
 import java.util.Arrays;
 
@@ -14,7 +14,7 @@ import java.util.Arrays;
  */
 public class PlannerResolver {
 
-    public PlannerType resolve(String runOverride, SkillPack goalPack) {
+    public PlannerType resolve(String runOverride, AgentSpec goalPack) {
         String chosen = firstNonBlank(runOverride,
                 goalPack == null || goalPack.manifest() == null ? null : goalPack.manifest().defaultPlanner());
         if (chosen == null) {

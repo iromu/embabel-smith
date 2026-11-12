@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * The Author-a-Process workspace's generation step: a blueprint (a description, or a path to
- * business-process docs) in, a generated skill-pack (GOAP goal + action steps + types) out —
+ * business-process docs) in, a generated agent spec (GOAP goal + action steps + types) out —
  * not published, so the UI can render and edit it before publishing via {@code /api/compose}.
  * Endpoint-gated: without a model endpoint it returns the structured {@code MODEL_NOT_CONFIGURED}
  * error. The model-dependent generation is behind the {@link GenerateFn} seam so the endpoint-present

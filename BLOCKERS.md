@@ -2,7 +2,7 @@
 
 Autonomous build (2026-11-11). Goal: a working home-screen workspace in
 `prod/embabel-smith-studio` that generates an agentic (GOAP) process from business
-documents, renders it as an editable flow, can simulate a run, and publishes a pack.
+documents, renders it as an editable flow, can simulate a run, and publishes a spec.
 Test input: `/home/wantez/source/github/TauricResearch/TradingAgents/docs/business`.
 
 ## Status: WORKING — generate + simulate verified end-to-end (2026-11-11)
@@ -14,8 +14,8 @@ Remaining: OpenSpec "capture" of the design, and optional model-based discovery
 (extraction via `business_process_discovery.jinja`) — see Plan items 9–10.
 
 ## Design (decided with the user)
-- **One pack** — the whole process is a single skill-pack (goal + steps + types).
-  "Skills" = the steps; "tools" deferred (no-code format has no LLM-tool concept;
+- **One spec** — the whole process is a single agent spec (goal + steps + types).
+  "Specs" = the steps; "tools" deferred (no-code format has no LLM-tool concept;
   "tool" already means trust-tier group).
 - **Home screen** — the author-a-process workspace replaces the 13-pane POC sidebar
   as the landing page; the old panes are demoted to a secondary "Operations" nav.
@@ -25,20 +25,20 @@ Remaining: OpenSpec "capture" of the design, and optional model-based discovery
   an auto/manual toggle controls whether generation runs straight after.
 
 ## Plan
-1. [x] Backend: `/api/generate` (blueprint/path -> SkillPack JSON), generation prompt
+1. [x] Backend: `/api/generate` (blueprint/path -> AgentSpec JSON), generation prompt
 2. [x] Spike generation against the TradingAgents docs; iterate on the prompt for a nice flow
-3. [x] Backend: `/api/simulate` (pack + input -> per-step trace) via SkillRunService
+3. [x] Backend: `/api/simulate` (spec + input -> per-step trace) via AgentSpecRunService
 4. [x] Backend: `/api/discover` (path/url -> docs + process inventory)
-5. [x] Frontend: ProcessWorkspace home page (blueprint input, progress, flow graph, skills, simulate, publish)
+5. [x] Frontend: ProcessWorkspace home page (blueprint input, progress, flow graph, specs, simulate, publish)
 6. [x] Frontend: types.ts + client.ts for the new endpoints; router + App nav
 7. [x] Build SPA, run app, Playwright the pipeline, verify the flow (programmatically — see Blockers), iterate
-8. [x] DB (docker) — NOT needed for v1; packs/docs are ephemeral per run (see note below)
+8. [x] DB (docker) — NOT needed for v1; specs/docs are ephemeral per run (see note below)
 9. [x] OpenSpec: capture the design — change `07-smith-studio-process-workspace`
 10. [ ] Optional: model-based discovery — run `business_process_discovery.jinja` against a raw
     codebase/docs dir to extract the process (currently `/api/discover` only loads existing docs)
 
 ## Blockers (things I could not resolve on my own)
-- **DB not needed for v1** — generated packs and loaded docs are per-run and ephemeral
+- **DB not needed for v1** — generated specs and loaded docs are per-run and ephemeral
   (simulate writes to a throwaway temp dir, cleaned after). No durable store is required
   until we add "save my generated processes" / history. Flag if you want that.
 
@@ -48,7 +48,7 @@ the UI was then visually verified and polished — see the Log.)_
 ## Log
 - 2026-11-11 recon: model endpoint live (Qwen-instruct @ spark.local:4000, 262K ctx).
   Tooling: node 24, maven 3.9, java 25, docker running. ComposePane is a reusable
-  Vue Flow graph editor. SkillPack is Jackson-serializable to the frontend ComposePack shape.
+  Vue Flow graph editor. AgentSpec is Jackson-serializable to the frontend ComposePack shape.
   RuntimeCore.ingest is isolated per call (platform.plus + unique-suffix agent) -> safe for simulate.
 - Generation SPIKE (via /tmp/gen_spike.py, mirrors ProcessFlowGenerator): the model produced a
   clean 9-step GOAP flow from the TradingAgents docs — 4 parallel analyst steps (UserInput ->
@@ -59,17 +59,17 @@ the UI was then visually verified and polished — see the Log.)_
   beans) and the frontend home workspace (ProcessWorkspace, router `/`, App nav "Studio" group,
   types.ts/client.ts). Typechecks and builds; Playwright E2E confirmed home loads, docs load (8),
   and generate renders 9 nodes.
-- **Simulate bug found + fixed.** First simulate returned "skill source 'folder:...' contains no
-  skill-packs". Root cause: the model emits *snake_case* prompt vars (`{{ user_input }}`,
-  `{{ technical_report }}`), but the runtime contract (SkillPackValidator) binds the *decapitalized
+- **Simulate bug found + fixed.** First simulate returned "spec source 'folder:...' contains no
+  agent specs". Root cause: the model emits *snake_case* prompt vars (`{{ user_input }}`,
+  `{{ technical_report }}`), but the runtime contract (AgentSpecValidator) binds the *decapitalized
   camelCase* input-type name (`{{ userInput }}`, `{{ technicalReport }}`). So every step failed
-  `PROMPT_UNDECLARED_INPUT`, the pack failed `SkillPackValidator`, and `FolderSkillSource` excluded
-  it -> empty pack set. **Fix:** added `ProcessFlowGenerator.canonicalizePromptVars` — a post-parse
+  `PROMPT_UNDECLARED_INPUT`, the spec failed `AgentSpecValidator`, and `FolderSpecSource` excluded
+  it -> empty spec set. **Fix:** added `ProcessFlowGenerator.canonicalizePromptVars` — a post-parse
   normalizer that rewrites each `{{var}}` to the canonical decapitalized form of its matching input
   type (robust to any casing/underscore form), plus strengthened rule 7 of `process_to_flow.jinja`.
   Verified by a new offline test (`ProcessFlowGeneratorTest`: the real model answer normalises to a
-  pack that passes on-disk validation and is discoverable by `FolderSkillSource`).
-- **Simulate now works end-to-end.** curl `/api/simulate` on a fresh generated pack: success=true,
+  spec that passes on-disk validation and is discoverable by `FolderSpecSource`).
+- **Simulate now works end-to-end.** curl `/api/simulate` on a fresh generated spec: success=true,
   all 9 steps completed (per-step durations), real `FinalDecision` output (rating/summary/thesis).
   App log shows the full GOAP data dictionary + per-step LLM outputs. Playwright E2E re-run: generate
   -> 10 nodes / 16 edges in a clean layered layout -> simulate "succeeded" with 10 step rows.

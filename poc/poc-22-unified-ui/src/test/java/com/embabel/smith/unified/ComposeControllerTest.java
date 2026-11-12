@@ -17,7 +17,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * Offline tests for the Compose pane (POC 22). The endpoints delegate to POC 14's proven model, so
  * these pin the canvas type-check, chain, and composite export the drag-and-drop UI drives. A
- * hand-built {@link SkillCatalog} (empty override → walk up to the repo's skill-packs) plus a temp
+ * hand-built {@link SpecCatalog} (empty override → walk up to the repo's agent-specs dir) plus a temp
  * export dir keeps the test hermetic and fully offline.
  */
 class ComposeControllerTest {
@@ -29,13 +29,13 @@ class ComposeControllerTest {
 
     @BeforeEach
     void setUp() {
-        SkillCatalog catalog = new SkillCatalog("");
+        SpecCatalog catalog = new SpecCatalog("");
         mockMvc = MockMvcBuilders.standaloneSetup(new ComposeController(catalog, outDir)).build();
     }
 
     @Test
-    void listsTheComposeSkills() throws Exception {
-        mockMvc.perform(get("/api/skills"))
+    void listsTheComposeSpecs() throws Exception {
+        mockMvc.perform(get("/api/specs"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[?(@.name=='compose-extract')]").exists())
                 .andExpect(jsonPath("$[?(@.name=='compose-explain')]").exists());

@@ -13,7 +13,7 @@
     <artifactId>smith-common</artifactId>
     <name>smith-common</name>
     <description>
-        The shared skill-pack contract: a pure Java data model for the on-disk YAML
+        The shared agent-spec contract: a pure Java data model for the on-disk YAML
         format (manifest, action steps, exported goal, intermediate types) plus its
         YAML (de)serialization and structural validation. No Embabel dependency: both
         the builder (producer) and the no-code runtime (consumer) depend on this module

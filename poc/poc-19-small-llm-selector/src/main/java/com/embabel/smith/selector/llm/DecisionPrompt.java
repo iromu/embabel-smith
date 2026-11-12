@@ -1,6 +1,6 @@
 package com.embabel.smith.selector.llm;
 
-import com.embabel.smith.retrieval.SkillEntry;
+import com.embabel.smith.retrieval.SpecEntry;
 
 import java.util.List;
 import java.util.regex.Matcher;
@@ -14,7 +14,7 @@ import java.util.regex.Pattern;
  * lettered options, and the instruction to answer with the single letter of the correct
  * option — the shape the model was fine-tuned on, where the answer is the first generated
  * token followed by EOS. The out-of-distribution (OOD) format drops the lettered-option
- * contract in favor of a free-form "reply with the skill id" prompt; the ID/OOD gap on
+ * contract in favor of a free-form "reply with the spec id" prompt; the ID/OOD gap on
  * identical candidate sets is itself a finding.
  */
 public final class DecisionPrompt {
@@ -33,25 +33,25 @@ public final class DecisionPrompt {
     }
 
     /** Build the prompt for {@code format}: the query plus one option line per candidate. */
-    public static String build(Format format, String query, List<SkillEntry> candidates) {
+    public static String build(Format format, String query, List<SpecEntry> candidates) {
         StringBuilder options = new StringBuilder();
         for (int i = 0; i < candidates.size(); i++) {
-            SkillEntry candidate = candidates.get(i);
+            SpecEntry candidate = candidates.get(i);
             String label = format == Format.ID ? String.valueOf((char) ('A' + i)) : String.valueOf(i + 1);
             options.append(label).append(". ")
                     .append(candidate.name()).append(" — ").append(candidate.description())
                     .append('\n');
         }
         if (format == Format.ID) {
-            return "Which skill should the agent invoke for this request?\n\n"
+            return "Which spec should the agent invoke for this request?\n\n"
                     + "Request: \"" + query + "\"\n\n"
                     + "Options:\n" + options
                     + "\nAnswer with the single letter of the correct option.";
         }
-        return "You are choosing which skill to invoke for an agent.\n\n"
+        return "You are choosing which spec to invoke for an agent.\n\n"
                 + "User request: \"" + query + "\"\n\n"
-                + "Skills:\n" + options
-                + "\nReply with only the number of the best skill.";
+                + "Specs:\n" + options
+                + "\nReply with only the number of the best spec.";
     }
 
     /**
@@ -62,7 +62,7 @@ public final class DecisionPrompt {
      * when the reply carries no number, the first candidate whose name appears in the reply
      * is used. Anything else is no selection ({@code null}).
      */
-    public static String parse(Format format, String reply, List<SkillEntry> candidates) {
+    public static String parse(Format format, String reply, List<SpecEntry> candidates) {
         if (reply == null || reply.isBlank() || candidates.isEmpty()) {
             return null;
         }
@@ -81,7 +81,7 @@ public final class DecisionPrompt {
             return index >= 0 && index < candidates.size() ? candidates.get(index).id() : null;
         }
         String lower = text.toLowerCase();
-        for (SkillEntry candidate : candidates) {
+        for (SpecEntry candidate : candidates) {
             if (lower.contains(candidate.name().toLowerCase())) {
                 return candidate.id();
             }

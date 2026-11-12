@@ -10,11 +10,11 @@ import com.embabel.agent.spec.StepSpecAgentScopeBuilder;
 import com.embabel.agent.spec.model.BackgroundMessage;
 import com.embabel.agent.spec.yml.YmlStepSpecRepository;
 import com.embabel.smith.common.config.ModelEndpointConfig;
-import com.embabel.smith.common.io.SkillPackReader;
-import com.embabel.smith.common.model.SkillPack;
-import com.embabel.smith.common.validation.SkillPackValidator;
+import com.embabel.smith.common.io.AgentSpecReader;
+import com.embabel.smith.common.model.AgentSpec;
+import com.embabel.smith.common.validation.AgentSpecValidator;
 import com.embabel.smith.common.validation.ValidationResult;
-import com.embabel.smith.runtime.SkillPackTypeMapper;
+import com.embabel.smith.runtime.AgentSpecTypeMapper;
 import com.embabel.smith.runtime.StepSpecAssembler;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
@@ -27,9 +27,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * POC 5 launcher — evaluates a goal-type skill against a set of tasks and prints a composite score.
+ * POC 5 launcher — evaluates a goal-type spec against a set of tasks and prints a composite score.
  *
- * <p>Boots an Embabel {@link AgentPlatform}, deploys the target skill-pack (reusing the no-code
+ * <p>Boots an Embabel {@link AgentPlatform}, deploys the target agent spec (reusing the no-code
  * runtime's type-mapping / step-spec assembly), invokes it via {@link AgentInvocation} (the
  * non-chat path), and scores the goal outputs. The model endpoint is fully env-driven
  * ({@link ModelEndpointConfig}, design D4).
@@ -40,7 +40,7 @@ import java.util.List;
  *   export OPENAI_CUSTOM_API_KEY=sk-...
  *   export OPENAI_CUSTOM_MODELS=my-model
  *   export EMBABEL_MODELS_DEFAULT_LLM=my-model
- *   mvn -pl poc/poc-5-eval spring-boot:run -Dbuilder.pack-dir=skill-packs/explainer
+ *   mvn -pl poc/poc-5-eval spring-boot:run -Dbuilder.pack-dir=agent-specs/explainer
  * </pre>
  */
 @SpringBootApplication
@@ -56,7 +56,7 @@ public class EvalApp implements CommandLineRunner {
                    @Value("${OPENAI_CUSTOM_API_KEY:}") String apiKey,
                    @Value("${OPENAI_CUSTOM_MODELS:}") String models,
                    @Value("${EMBABEL_MODELS_DEFAULT_LLM:}") String defaultLlm,
-                   @Value("${builder.pack-dir:skill-packs/explainer}") Path packDir,
+                   @Value("${builder.pack-dir:agent-specs/explainer}") Path packDir,
                    @Value("${BUILDER_EVAL_RUNS:5}") int runs) {
         this.platform = platform;
         this.endpoint = new ModelEndpointConfig(baseUrl, apiKey, models, defaultLlm);
@@ -75,23 +75,23 @@ public class EvalApp implements CommandLineRunner {
             throw new IllegalStateException(configError);
         }
 
-        SkillPack pack = loadAndValidate(packDir);
+        AgentSpec pack = loadAndValidate(packDir);
         AgentScope scope = buildScope(pack);
-        Agent agent = scope.createAgent("eval-target", "eval-skill", "Eval target: " + pack.name());
+        Agent agent = scope.createAgent("eval-target", "eval-spec", "Eval target: " + pack.name());
         platform.deploy(agent);
 
         AgentInvocation<BackgroundMessage> invocation = AgentInvocation.create(platform, BackgroundMessage.class);
-        SkillInvoker invoker = new AgentInvocationSkillInvoker(invocation);
+        SpecInvoker invoker = new AgentInvocationSpecInvoker(invocation);
 
-        List<SkillEvalTask> tasks = List.of(
-                new SkillEvalTask("Explain how a coffee machine works",
+        List<SpecEvalTask> tasks = List.of(
+                new SpecEvalTask("Explain how a coffee machine works",
                         "a plain-language explainer about coffee machines",
                         out -> out.toLowerCase().contains("coffee")),
-                new SkillEvalTask("Explain what a black hole is",
+                new SpecEvalTask("Explain what a black hole is",
                         "an explanation of black holes",
                         out -> out.toLowerCase().contains("black hole")));
 
-        GoalSkillEvaluator evaluator = new GoalSkillEvaluator();
+        GoalSpecEvaluator evaluator = new GoalSpecEvaluator();
         List<Double> totals = new ArrayList<>();
         FullScores scores = null;
         for (int i = 0; i < runs; i++) {
@@ -108,28 +108,28 @@ public class EvalApp implements CommandLineRunner {
         if (runs > 1) {
             ScoreStability stability = ScoreStability.of(totals);
             System.out.println();
-            System.out.println("=== Eval-score stability (" + runs + " runs, same skill + tasks) ===");
+            System.out.println("=== Eval-score stability (" + runs + " runs, same spec + tasks) ===");
             System.out.println("per-run totals: " + totals);
             System.out.printf("mean=%.3f  min=%.3f  max=%.3f  range=%.3f  stdev=%.3f%n",
                     stability.mean(), stability.min(), stability.max(), stability.range(), stability.stdev());
             System.out.println("verdict: " + (stability.stable()
-                    ? "STABLE — the eval is a repeatable signal for this skill"
+                    ? "STABLE — the eval is a repeatable signal for this spec"
                     : "NOISY — the score varies run-to-run; read it as a distribution, not a point"));
         }
     }
 
-    private SkillPack loadAndValidate(Path dir) throws Exception {
-        SkillPack pack = new SkillPackReader().read(dir);
-        ValidationResult result = new SkillPackValidator().validate(dir);
+    private AgentSpec loadAndValidate(Path dir) throws Exception {
+        AgentSpec pack = new AgentSpecReader().read(dir);
+        ValidationResult result = new AgentSpecValidator().validate(dir);
         if (!result.isValid()) {
-            throw new IllegalStateException("Skill-pack failed validation: " + result.issues());
+            throw new IllegalStateException("Spec-pack failed validation: " + result.issues());
         }
         return pack;
     }
 
-    private AgentScope buildScope(SkillPack pack) throws Exception {
+    private AgentScope buildScope(AgentSpec pack) throws Exception {
         DataDictionary types = platform.plus(
-                DataDictionary.fromDomainTypes("skill-types", new SkillPackTypeMapper().allRuntimeTypes(pack)));
+                DataDictionary.fromDomainTypes("spec-types", new AgentSpecTypeMapper().allRuntimeTypes(pack)));
         Path stepsDir = Files.createTempDirectory("eval-steps-");
         new StepSpecAssembler().assemble(packDir, stepsDir);
         StepSpecAgentScopeBuilder builder = new StepSpecAgentScopeBuilder(

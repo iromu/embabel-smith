@@ -6,25 +6,25 @@ pre-filter, as doc 03 §2.1 calls for ("build a semantic index over `GoalSpec.de
 retriever was an **offline feature-hashing stand-in** (hashed character/word n-grams), and POC 17's
 GLiNER2 was a zero-shot *classifier*, not an embedding index. POC 20 puts a genuine transformer
 embedding model — `all-MiniLM-L6-v2` (384-dim BERT, via ONNX Runtime + the HuggingFace tokenizer) —
-into POC 12's `SkillScorer` seam and runs the **identical** 200+ same-typed shadowing scenario to
+into POC 12's `SpecScorer` seam and runs the **identical** 200+ same-typed shadowing scenario to
 answer the question POC 12 left open: does a real embedding index cure the near-duplicate collapse
 that lexical and dense text-similarity both suffer?
 
-The three methods share one `SkillScorer` seam (`score(query, entry) → double`) and the same
-`ScaleSkillRegistry` / `ScaleRetrievalRunner` P@1 math, so the comparison is apples-to-apples:
+The three methods share one `SpecScorer` seam (`score(query, entry) → double`) and the same
+`ScaleSpecRegistry` / `ScaleRetrievalRunner` P@1 math, so the comparison is apples-to-apples:
 `LexicalScorer` (POC 8 word-TF), `SemanticScorer` (POC 12 feature-hashing stand-in), and
-`RealEmbeddingScorer` (this POC — cosine of the MiniLM embeddings, memoised per query and per skill).
+`RealEmbeddingScorer` (this POC — cosine of the MiniLM embeddings, memoised per query and per spec).
 
 ## How it works
 
 ```mermaid
 flowchart LR
-    LIB["ScaleSkillLibrary<br/>same 191/281 scenario as POC 12"]
+    LIB["ScaleSpecLibrary<br/>same 191/281 scenario as POC 12"]
     LEX["LexicalScorer<br/>POC 8 word-TF"]
     DENSE["SemanticScorer<br/>POC 12 feature-hashing stand-in"]
     EMB["MiniLmEmbedder<br/>ONNX all-MiniLM-L6-v2 (local, 384-dim)<br/>mean-pool + L2-normalise"]
     REAL["RealEmbeddingScorer<br/>cosine of memoised embeddings"]
-    REG["ScaleSkillRegistry<br/>ranks by pluggable SkillScorer"]
+    REG["ScaleSpecRegistry<br/>ranks by pluggable SpecScorer"]
     RUN["ScaleRetrievalRunner<br/>precision@1 / top-k"]
     LIB --> LEX --> REG
     LIB --> DENSE --> REG
@@ -74,16 +74,16 @@ It prints a Precision@1 comparison table for the three methods (lexical / dense 
 POC 12's scenario: the **core** 191 distinct-topic library, the **full** 281 library (with 90
 same-topic near-duplicates), the growth curve, and per-target top-1.
 
-## Measured results (shared — skill selection, C10)
+## Measured results (shared — spec selection, C10)
 
-POCs 8, 12, 17, 19, 20, and 23 test the same hypothesis — **skill selection at scale** (claim C10) —
+POCs 8, 12, 17, 19, 20, and 23 test the same hypothesis — **spec selection at scale** (claim C10) —
 on the same scenario, with different techniques. This results section is **shared across their
 READMEs** (identical in each); the consolidated read is in `docs/04-poc-run-results.md` §7.1.
 
-**Small scale (POC 8 — 14 same-typed skills, lexical):** Precision@1 **100%**; the target stays
+**Small scale (POC 8 — 14 same-typed specs, lexical):** Precision@1 **100%**; the target stays
 top-1 as same-verb distractors are added (growth curve).
 
-**Distinct scale (POC 12/20/23 — 191 same-typed skills, full-library P@1):**
+**Distinct scale (POC 12/20/23 — 191 same-typed specs, full-library P@1):**
 
 | method | P@1 (191 distinct) |
 | --- | --- |
@@ -92,7 +92,7 @@ top-1 as same-verb distractors are added (growth curve).
 | embedding (MiniLM, local ONNX) | 100% |
 | embedding (nomic, remote) | 100% |
 
-**Under shadowing (POC 12/20/23 — 281 skills incl. 90 same-topic near-duplicates, full-library P@1):**
+**Under shadowing (POC 12/20/23 — 281 specs incl. 90 same-topic near-duplicates, full-library P@1):**
 
 | method | P@1 (281, shadowing) |
 | --- | --- |
@@ -111,10 +111,10 @@ top-1 as same-verb distractors are added (growth curve).
 | llm-id (Qwen3-0.6B) | 0% | 50% |
 | llm-ood (Qwen3-0.6B) | 50% | 67% |
 
-**Scaling dimension (POC 23 — remote nomic embedding, generated library to 1000 skills):**
-Precision@1 holds at **100%** from 100 to 1000 same-typed skills; steady-state per-query retrieval
+**Scaling dimension (POC 23 — remote nomic embedding, generated library to 1000 specs):**
+Precision@1 holds at **100%** from 100 to 1000 same-typed specs; steady-state per-query retrieval
 (cosine over cached vectors, no model call) grows linearly and stays sub-millisecond-to-~1.3 ms,
-while the one-time embedding index (one embedding per skill) is paid once and amortised. A
+while the one-time embedding index (one embedding per spec) is paid once and amortised. A
 per-candidate LLM/transformer selector would instead need *n* model calls per query.
 
 | size | P@1 | per-query retrieval |
@@ -125,14 +125,14 @@ per-candidate LLM/transformer selector would instead need *n* model calls per qu
 | 800 | 100% | 1.04 ms |
 | 1000 | 100% | 1.27 ms |
 
-**Shared reading:** retrieval is clean while skills are distinct (100% at every scale, up to 1000
-skills); near-duplicate shadowing collapses text-similarity (lexical 17%, dense 0%), and no
+**Shared reading:** retrieval is clean while specs are distinct (100% at every scale, up to 1000
+specs); near-duplicate shadowing collapses text-similarity (lexical 17%, dense 0%), and no
 text-similarity index cures it. Methods that score by *meaning* — a zero-shot transformer (GLiNER2,
 the best: strict 100%), a fine-tuned 0.6B LLM, and a real embedding index — beat text-similarity,
 but the near-duplicates are near-identical in *meaning* too, so none fully cures the collapse on its
 own (the remote nomic embedding ties lexical at 17% under shadowing — the specific embedding model
 matters). And the scaling result is unambiguous: a remote `EmbeddingService` retrieves cleanly to
-1000 skills with sub-millisecond-to-~1 ms per-query cost and **zero per-query model calls** — the
+1000 specs with sub-millisecond-to-~1 ms per-query cost and **zero per-query model calls** — the
 reason it is the selection mechanism of choice as the library outgrows per-candidate selectors. The
 real fix for shadowing is library **curation** (dedup / lifecycle — POC 18, applied in the POC 15
 retrieval pane).
@@ -141,10 +141,10 @@ retrieval pane).
 
 Against the hypothesis (claim C10 — the last retrieval gap): **proven, with the shared limit.**
 A genuine `EmbeddingService` now exists and **retrieves cleanly at the distinct scale** (100% at
-191 distinct-topic skills — the doc 03 §2.1 gap closed with a real transformer index, not a
+191 distinct-topic specs — the doc 03 §2.1 gap closed with a real transformer index, not a
 stand-in). Under shadowing it **beats text-similarity** (33% vs lexical 17% / dense 0%) because it
 scores by *meaning*, but it still gets shadowed on 4 of the 6 targets — the near-duplicates are
-near-identical in *meaning* too, so the canonical skill is not the unique best match. This confirms
+near-identical in *meaning* too, so the canonical spec is not the unique best match. This confirms
 POC 12's conclusion: the fundamental fix for shadowing is library **curation** (dedup / lifecycle —
 POC 18), not just a better embedding (see the shared results above). The run is
 **local-model-gated** (one-time ONNX download; offline tests use a deterministic stub embedder).

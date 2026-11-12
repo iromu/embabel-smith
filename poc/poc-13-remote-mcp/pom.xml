@@ -14,9 +14,9 @@
     <name>poc-13-remote-mcp</name>
     <description>
         POC 13: remote / MCP invocation — the other half of C11 (doc 03 §2.3 "normal agent
-        harness" across processes). Publishes a skill's exported goal as an MCP tool via
+        harness" across processes). Publishes a spec's exported goal as an MCP tool via
         @Export(remote=true) over Streamable HTTP (embabel-agent-starter-mcpserver), then consumes
-        that tool over the network with the MCP client SDK to run the skill remotely.
+        that tool over the network with the MCP client SDK to run the spec remotely.
     </description>
 
     <dependencies>

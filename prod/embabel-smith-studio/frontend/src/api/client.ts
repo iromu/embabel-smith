@@ -125,8 +125,8 @@ export const checkTrust = (req: TrustRequest): Promise<TrustResponse> =>
   post<TrustResponse>('/api/trust', req)
 
 // ---- Traces (offline) -------------------------------------------------------
-export const traces = (skill: string, limit = 100): Promise<TraceInfo[]> =>
-  get<TraceInfo[]>(`/api/traces?skill=${encodeURIComponent(skill)}&limit=${limit}`)
+export const traces = (spec: string, limit = 100): Promise<TraceInfo[]> =>
+  get<TraceInfo[]>(`/api/traces?spec=${encodeURIComponent(spec)}&limit=${limit}`)
 
 // ---- Improvement loop -------------------------------------------------------
 export const listCandidates = (): Promise<CandidateInfo[]> =>

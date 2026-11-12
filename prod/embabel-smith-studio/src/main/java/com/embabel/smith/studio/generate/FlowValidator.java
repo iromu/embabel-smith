@@ -1,7 +1,7 @@
 package com.embabel.smith.studio.generate;
 
 import com.embabel.smith.common.model.ActionStepSpec;
-import com.embabel.smith.common.model.SkillPack;
+import com.embabel.smith.common.model.AgentSpec;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -21,7 +21,7 @@ public final class FlowValidator {
     private FlowValidator() {
     }
 
-    public static List<String> issues(SkillPack pack) {
+    public static List<String> issues(AgentSpec pack) {
         List<String> issues = new ArrayList<>();
         if (pack.goal() == null || !pack.goal().isExported()) {
             issues.add("The flow needs an exported goal (the type the run returns).");

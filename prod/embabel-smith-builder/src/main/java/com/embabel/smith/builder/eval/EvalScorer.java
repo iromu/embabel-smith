@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Scores a set of {@link EvalTask}s against the outputs the built skill produced (extracted from
+ * Scores a set of {@link EvalTask}s against the outputs the built spec produced (extracted from
  * POC 5's eval harness). A task passes when its output contains the expected substring; the
  * composite score is the fraction of tasks that passed.
  */

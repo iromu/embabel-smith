@@ -13,8 +13,8 @@
     <artifactId>poc-9-quality-refinement</artifactId>
     <name>poc-9-quality-refinement</name>
     <description>
-        POC 9: LLM-authored skill quality + eval-guided refinement (SkillAxe pattern). Evaluates a
-        weak LLM-authored skill, rewrites its prompt from the failing eval tasks, re-evaluates, and
+        POC 9: LLM-authored spec quality + eval-guided refinement (SkillAxe pattern). Evaluates a
+        weak LLM-authored spec, rewrites its prompt from the failing eval tasks, re-evaluates, and
         reports the before/after composite score. Endpoint-gated (the rewrite calls the model); the
         scoring / re-validation half is verifiable offline.
     </description>

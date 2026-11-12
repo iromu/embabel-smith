@@ -21,7 +21,7 @@
     </description>
 
     <modules>
-        <module>embabel-smith-skillsource</module>
+        <module>embabel-smith-specsource</module>
         <module>embabel-smith-runtime</module>
         <module>embabel-smith-builder</module>
         <module>embabel-smith-studio</module>

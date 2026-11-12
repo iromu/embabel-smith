@@ -9,7 +9,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  *
  * <p>A Spring Boot web app that serves the Vue 3 + Quasar + TypeScript SPA (built into
  * {@code static/}) and exposes a thin REST surface ({@code /api/*}) — one endpoint per pane — each
- * delegating to a proven POC class (the POC 15 pattern). No new agent/skill logic: the pixels drive
+ * delegating to a proven POC class (the POC 15 pattern). No new agent/spec logic: the pixels drive
  * the same logic the offline POCs prove.
  *
  * <p>Run (pick a free port; 8080 may be taken by another local service):

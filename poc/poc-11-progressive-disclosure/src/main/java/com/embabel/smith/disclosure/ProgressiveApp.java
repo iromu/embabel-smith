@@ -1,14 +1,14 @@
 package com.embabel.smith.disclosure;
 
-import com.embabel.smith.common.io.SkillPackReader;
-import com.embabel.smith.common.model.SkillPack;
+import com.embabel.smith.common.io.AgentSpecReader;
+import com.embabel.smith.common.model.AgentSpec;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
 /**
- * The progressive-disclosure context-cost report (POC 11). Offline: loads a skill-pack that ships a
+ * The progressive-disclosure context-cost report (POC 11). Offline: loads a agent spec that ships a
  * bundled reference, and shows the plan context stays bounded as the reference grows, while an eager
  * (inlined) prompt grows linearly.
  *
@@ -21,13 +21,13 @@ public final class ProgressiveApp {
 
     public static void main(String[] args) throws IOException {
         Path packDir = findPack("reference-heavy");
-        SkillPack pack = new SkillPackReader().read(packDir);
+        AgentSpec pack = new AgentSpecReader().read(packDir);
         String baseReference = Files.readString(packDir.resolve("references/domain.md"));
 
         ProgressiveDisclosureRunner runner = new ProgressiveDisclosureRunner();
 
         System.out.println("=== POC 11: progressive-disclosure stress test ===");
-        System.out.println("Skill: " + pack.name() + " — ships a bundled reference (references/domain.md)");
+        System.out.println("Spec: " + pack.name() + " — ships a bundled reference (references/domain.md)");
         System.out.printf("%n%-12s %-16s %-18s %-18s %-10s%n",
                 "reference", "plan context", "progressive prompt", "eager prompt", "eager/progressive");
         System.out.println("-".repeat(76));
@@ -65,12 +65,12 @@ public final class ProgressiveApp {
     private static Path findPack(String name) {
         Path dir = Path.of("").toAbsolutePath();
         while (dir != null) {
-            Path candidate = dir.resolve("skill-packs").resolve(name);
+            Path candidate = dir.resolve("agent-specs").resolve(name);
             if (Files.isDirectory(candidate)) {
                 return candidate;
             }
             dir = dir.getParent();
         }
-        throw new IllegalStateException("Could not locate skill-packs/" + name);
+        throw new IllegalStateException("Could not locate agent-specs/" + name);
     }
 }

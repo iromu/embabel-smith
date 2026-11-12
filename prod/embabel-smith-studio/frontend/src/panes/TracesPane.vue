@@ -4,7 +4,7 @@
       <PageHeader
         icon="history"
         title="Traces"
-        description="A skill's recent runs, most recent first, with per-step drill-down."
+        description="A spec's recent runs, most recent first, with per-step drill-down."
       />
 
       <q-separator />
@@ -20,12 +20,12 @@
             data-test="traces-source"
           />
           <q-select
-            v-model="skill"
-            label="Skill"
+            v-model="spec"
+            label="Spec"
             dense
-            :options="skillOptions"
+            :options="specOptions"
             style="width: 260px"
-            data-test="traces-skill"
+            data-test="traces-spec"
           />
           <q-btn label="Load" color="primary" icon="history" @click="loadTraces" data-test="traces-btn" />
         </div>
@@ -36,7 +36,7 @@
       <q-card-section>
         <div v-if="error" class="text-negative" data-test="traces-error">{{ error }}</div>
         <div v-else-if="traceRows.length === 0" class="text-grey-6" data-test="traces-empty">
-          No traces for this skill yet.
+          No traces for this spec yet.
         </div>
         <q-table
           v-else
@@ -134,7 +134,7 @@ import type { QTableColumn } from 'quasar'
 import PageHeader from '../components/PageHeader.vue'
 import { traces } from '../api/client'
 import type { TraceInfo } from '../api/types'
-import { useSourceSkill } from '../composables/useSourceSkill'
+import { useSourceSpec } from '../composables/useSourceSpec'
 import {
   failureReason,
   formatDuration,
@@ -143,7 +143,7 @@ import {
   stepStatusColor,
 } from '../traces/model'
 
-const { source, skill, sourceOptions, skillOptions } = useSourceSkill()
+const { source, spec, sourceOptions, specOptions } = useSourceSpec()
 const traceRows = ref<TraceInfo[]>([])
 const error = ref<string | null>(null)
 const stepsOpen = ref(false)
@@ -168,13 +168,13 @@ function openSteps(trace: TraceInfo) {
 }
 
 async function loadTraces() {
-  if (source.value === '' || skill.value === '') {
+  if (source.value === '' || spec.value === '') {
     return
   }
   error.value = null
   traceRows.value = []
   try {
-    traceRows.value = await traces(skill.value)
+    traceRows.value = await traces(spec.value)
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e)
   }

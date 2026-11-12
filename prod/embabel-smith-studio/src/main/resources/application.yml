@@ -28,7 +28,7 @@ embabel:
 # The studio's configuration (change 06).
 smith:
   studio:
-    # The skill sources the studio offers (comma-separated source URIs: folder:<path> or
+    # The spec sources the studio offers (comma-separated source URIs: folder:<path> or
     # git:<url>[@ref]). The panes let the user pick one of these to operate on.
     sources: ${SMITH_STUDIO_SOURCES:}
     # The source the self-improvement loop watches and refines (a source URI; defaults to the first
@@ -36,7 +36,7 @@ smith:
     improve-source: ${SMITH_STUDIO_IMPROVE_SOURCE:}
     # The trace store directory (defaults to ~/.smith/traces; the store file is <dir>/runs.jsonl).
     trace-dir: ${SMITH_STUDIO_TRACE_DIR:}
-    # The git source cache root (defaults to ~/.smith/skill-sources).
+    # The git source cache root (defaults to ~/.smith/spec-sources).
     source-cache-dir: ${SMITH_STUDIO_SOURCE_CACHE_DIR:}
     loop:
       # The interval between scheduled loop iterations, in milliseconds (the schedule is off by

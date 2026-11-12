@@ -13,10 +13,10 @@
     <artifactId>poc-8-retrieval</artifactId>
     <name>poc-8-retrieval</name>
     <description>
-        POC 8: skill retrieval at scale / skill shadowing. A SkillRegistry indexes a library of
-        same-typed skill-packs and a semantic (lexical-similarity) pre-filter narrows candidates
+        POC 8: spec retrieval at scale / spec shadowing. A SpecRegistry indexes a library of
+        same-typed agent specs and a semantic (lexical-similarity) pre-filter narrows candidates
         before the type-based GOAP planner runs — measuring selection accuracy as the library grows.
-        Fully offline and deterministic (no model endpoint); running a selected skill is covered by
+        Fully offline and deterministic (no model endpoint); running a selected spec is covered by
         POC 1 / POC 7.
     </description>
 

@@ -5,12 +5,12 @@ import com.embabel.agent.core.AgentProcess;
 import com.embabel.agent.core.AgentProcessStatusCode;
 import com.embabel.agent.spec.model.BackgroundMessage;
 import com.embabel.smith.common.model.ActionStepSpec;
-import com.embabel.smith.common.model.SkillPack;
+import com.embabel.smith.common.model.AgentSpec;
 import com.embabel.smith.runtime.core.IngestedSource;
 import com.embabel.smith.runtime.core.RunOutcome;
 import com.embabel.smith.runtime.core.TrustTier;
-import com.embabel.smith.skillsource.ResolvedPack;
-import com.embabel.smith.skillsource.ResolvedSkillSource;
+import com.embabel.smith.specsource.ResolvedSpec;
+import com.embabel.smith.specsource.ResolvedSpecSource;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -56,14 +56,14 @@ public class TraceRecorder {
      * ingestion ({@code resolved}/{@code ingested} may be {@code null}), appends it to the
      * store, and returns it.
      */
-    public TraceRecord record(String sourceUri, ResolvedSkillSource resolved, IngestedSource ingested,
+    public TraceRecord record(String sourceUri, ResolvedSpecSource resolved, IngestedSource ingested,
                               String goal, String input, TrustTier tier, RunOutcome outcome) {
         TraceRecord record = build(sourceUri, resolved, ingested, goal, input, tier, outcome);
         store.append(record);
         return record;
     }
 
-    TraceRecord build(String sourceUri, ResolvedSkillSource resolved, IngestedSource ingested,
+    TraceRecord build(String sourceUri, ResolvedSpecSource resolved, IngestedSource ingested,
                       String goal, String input, TrustTier tier, RunOutcome outcome) {
         String uri = resolved != null ? resolved.origin().uri() : sourceUri;
         String ref = null;
@@ -76,8 +76,8 @@ public class TraceRecorder {
         TraceRecord.PackRef pack = null;
         if (ingested != null) {
             try {
-                SkillPack goalPack = ingested.packForGoal(goal);
-                ResolvedPack resolvedPack = ingested.source().packs().stream()
+                AgentSpec goalPack = ingested.packForGoal(goal);
+                ResolvedSpec resolvedPack = ingested.source().packs().stream()
                         .filter(candidate -> candidate.name().equals(goalPack.name()))
                         .findFirst()
                         .orElse(null);
@@ -111,7 +111,7 @@ public class TraceRecorder {
         }
         Map<String, String> stepOutputTypes = new LinkedHashMap<>();
         if (ingested != null) {
-            for (SkillPack pack : ingested.packs()) {
+            for (AgentSpec pack : ingested.packs()) {
                 for (ActionStepSpec step : pack.steps()) {
                     stepOutputTypes.putIfAbsent(step.name(), step.outputTypeName());
                 }
@@ -169,7 +169,7 @@ public class TraceRecorder {
     }
 
     /** The commit SHA the git source materialized at, or {@code null} when it cannot be read. */
-    private static String resolvedCommit(ResolvedSkillSource.Origin origin) {
+    private static String resolvedCommit(ResolvedSpecSource.Origin origin) {
         try {
             Process process = new ProcessBuilder("git", "-C", origin.root().toString(), "rev-parse", "HEAD")
                     .redirectErrorStream(true)

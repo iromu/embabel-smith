@@ -1,13 +1,13 @@
 package com.embabel.smith.retrieval.embedding;
 
-import com.embabel.smith.retrieval.SkillEntry;
+import com.embabel.smith.retrieval.SpecEntry;
 import com.embabel.smith.retrieval.scale.LexicalScorer;
 import com.embabel.smith.retrieval.scale.ScaleRetrievalRunner;
 import com.embabel.smith.retrieval.scale.ScaleRetrievalRunner.CurvePoint;
-import com.embabel.smith.retrieval.scale.ScaleSkillLibrary;
-import com.embabel.smith.retrieval.scale.ScaleSkillRegistry;
+import com.embabel.smith.retrieval.scale.ScaleSpecLibrary;
+import com.embabel.smith.retrieval.scale.ScaleSpecRegistry;
 import com.embabel.smith.retrieval.scale.SemanticScorer;
-import com.embabel.smith.retrieval.scale.SkillScorer;
+import com.embabel.smith.retrieval.scale.SpecScorer;
 
 import java.io.PrintStream;
 import java.nio.file.Files;
@@ -16,7 +16,7 @@ import java.util.List;
 
 /**
  * The real-embedding retrieval report (POC 20). It plugs a genuine transformer {@link Embedder}
- * (a local ONNX sentence-encoder, {@link MiniLmEmbedder}) into POC 12's {@link SkillScorer} seam and
+ * (a local ONNX sentence-encoder, {@link MiniLmEmbedder}) into POC 12's {@link SpecScorer} seam and
  * runs the *identical* 200+ same-typed shadowing scenario POC 12 and POC 17 used, to answer the one
  * question POC 12 left open: does a **real** embedding index — not the feature-hashing stand-in —
  * cure the near-duplicate shadowing collapse that lexical and dense text-similarity both suffer?
@@ -67,19 +67,19 @@ public final class EmbeddingRetrievalApp {
      */
     public static void run(Embedder embedder, Path modelDir, PrintStream out) {
         ScaleRetrievalRunner runner = new ScaleRetrievalRunner();
-        List<ScaleSkillLibrary.QueryTarget> queries = ScaleSkillLibrary.benchmark();
-        List<SkillEntry> core = ScaleSkillLibrary.core();
-        List<SkillEntry> full = ScaleSkillLibrary.full();
+        List<ScaleSpecLibrary.QueryTarget> queries = ScaleSpecLibrary.benchmark();
+        List<SpecEntry> core = ScaleSpecLibrary.core();
+        List<SpecEntry> full = ScaleSpecLibrary.full();
 
-        SkillScorer lexical = new LexicalScorer();
-        SkillScorer dense = new SemanticScorer();
-        SkillScorer real = new RealEmbeddingScorer(embedder);
+        SpecScorer lexical = new LexicalScorer();
+        SpecScorer dense = new SemanticScorer();
+        SpecScorer real = new RealEmbeddingScorer(embedder);
 
         out.println("=== POC 20: real semantic EmbeddingService ===");
         out.println("Model bundle: " + modelDir.toAbsolutePath());
-        out.println("Core library (distinct topics): " + core.size() + " skills, all "
-                + ScaleSkillLibrary.USER_INPUT + " -> " + ScaleSkillLibrary.BACKGROUND_MESSAGE);
-        out.println("Full library (+ near-duplicate shadowing): " + full.size() + " skills");
+        out.println("Core library (distinct topics): " + core.size() + " specs, all "
+                + ScaleSpecLibrary.USER_INPUT + " -> " + ScaleSpecLibrary.BACKGROUND_MESSAGE);
+        out.println("Full library (+ near-duplicate shadowing): " + full.size() + " specs");
         out.println();
 
         out.println("-- Precision as the library grows (distinct topics, no shadowing) --");
@@ -97,9 +97,9 @@ public final class EmbeddingRetrievalApp {
         out.println();
 
         out.println("-- Growth curve: precision@1 as same-topic near-duplicates are added --");
-        List<CurvePoint> lexCurve = runner.growthCurve(core, ScaleSkillLibrary.growthSequence(), lexical, queries);
-        List<CurvePoint> denseCurve = runner.growthCurve(core, ScaleSkillLibrary.growthSequence(), dense, queries);
-        List<CurvePoint> realCurve = runner.growthCurve(core, ScaleSkillLibrary.growthSequence(), real, queries);
+        List<CurvePoint> lexCurve = runner.growthCurve(core, ScaleSpecLibrary.growthSequence(), lexical, queries);
+        List<CurvePoint> denseCurve = runner.growthCurve(core, ScaleSpecLibrary.growthSequence(), dense, queries);
+        List<CurvePoint> realCurve = runner.growthCurve(core, ScaleSpecLibrary.growthSequence(), real, queries);
         out.printf("  %-6s  %-9s  %-9s  %s%n", "size", "lexical", "dense", "embedding");
         for (int i = 0; i < lexCurve.size(); i++) {
             CurvePoint p = lexCurve.get(i);
@@ -113,8 +113,8 @@ public final class EmbeddingRetrievalApp {
         out.println();
 
         out.println("-- Per-target top-1 at full scale (embedding) --");
-        ScaleSkillRegistry fullReal = new ScaleSkillRegistry(full, real);
-        for (ScaleSkillLibrary.QueryTarget q : queries) {
+        ScaleSpecRegistry fullReal = new ScaleSpecRegistry(full, real);
+        for (ScaleSpecLibrary.QueryTarget q : queries) {
             String top = runner.topHitId(fullReal, q.query());
             boolean canonical = top != null && top.equals(q.targetId());
             out.printf("  %-24s -> top-1=%-24s [%s]%n", q.query(), top,
@@ -122,33 +122,33 @@ public final class EmbeddingRetrievalApp {
         }
         out.println();
 
-        double lexFull = runner.precisionAt1(new ScaleSkillRegistry(full, lexical), queries);
-        double denseFull = runner.precisionAt1(new ScaleSkillRegistry(full, dense), queries);
-        double realFull = runner.precisionAt1(new ScaleSkillRegistry(full, real), queries);
-        double realCore = runner.precisionAt1(new ScaleSkillRegistry(core, real), queries);
+        double lexFull = runner.precisionAt1(new ScaleSpecRegistry(full, lexical), queries);
+        double denseFull = runner.precisionAt1(new ScaleSpecRegistry(full, dense), queries);
+        double realFull = runner.precisionAt1(new ScaleSpecRegistry(full, real), queries);
+        double realCore = runner.precisionAt1(new ScaleSpecRegistry(core, real), queries);
         out.println("-- Verdict --");
-        out.printf("  1. Distinct topics: the real embedding index hits %.0f%% at %d skills — a genuine%n",
+        out.printf("  1. Distinct topics: the real embedding index hits %.0f%% at %d specs — a genuine%n",
                 realCore * 100, core.size());
         out.println("     EmbeddingService (not a stand-in) retrieves cleanly when the library is distinct.");
         out.printf("  2. Near-duplicate shadowing at full scale: lexical %.0f%%, dense %.0f%%, real embedding %.0f%%.%n",
                 lexFull * 100, denseFull * 100, realFull * 100);
         out.println("     A real transformer embedding is a different (meaning-based) signal than hashed");
         out.println("     n-grams — see whether it holds up where text-similarity collapses, or shares");
-        out.println("     the same near-duplicate ambiguity (the canonical skill is still not unique).");
+        out.println("     the same near-duplicate ambiguity (the canonical spec is still not unique).");
     }
 
-    private static void printCoreRow(PrintStream out, ScaleRetrievalRunner runner, List<SkillEntry> core,
-                                     List<ScaleSkillLibrary.QueryTarget> queries, String label, SkillScorer scorer) {
+    private static void printCoreRow(PrintStream out, ScaleRetrievalRunner runner, List<SpecEntry> core,
+                                     List<ScaleSpecLibrary.QueryTarget> queries, String label, SpecScorer scorer) {
         out.printf("  %-22s  %5s  %5s%n", label,
-                pct(runner.precisionAt1(new ScaleSkillRegistry(core, scorer), queries)),
-                pct(runner.precisionInTopK(new ScaleSkillRegistry(core, scorer), queries, 5)));
+                pct(runner.precisionAt1(new ScaleSpecRegistry(core, scorer), queries)),
+                pct(runner.precisionInTopK(new ScaleSpecRegistry(core, scorer), queries, 5)));
     }
 
-    private static void printFullRow(PrintStream out, ScaleRetrievalRunner runner, List<SkillEntry> full,
-                                     List<ScaleSkillLibrary.QueryTarget> queries, String label, SkillScorer scorer) {
+    private static void printFullRow(PrintStream out, ScaleRetrievalRunner runner, List<SpecEntry> full,
+                                     List<ScaleSpecLibrary.QueryTarget> queries, String label, SpecScorer scorer) {
         out.printf("  %-22s  %5s  %5s%n", label,
-                pct(runner.precisionAt1(new ScaleSkillRegistry(full, scorer), queries)),
-                pct(runner.precisionInTopK(new ScaleSkillRegistry(full, scorer), queries, 5)));
+                pct(runner.precisionAt1(new ScaleSpecRegistry(full, scorer), queries)),
+                pct(runner.precisionInTopK(new ScaleSpecRegistry(full, scorer), queries, 5)));
     }
 
     private static String pct(double value) {

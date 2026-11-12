@@ -3,13 +3,13 @@ package com.embabel.smith.unified.dto;
 import java.util.List;
 
 /**
- * The result of a trust-tier check (POC 10): whether the skill is allowed under the tier, which of
+ * The result of a trust-tier check (POC 10): whether the spec is allowed under the tier, which of
  * its tool groups are not permitted, and the full set it declares. {@link #error} is non-null when
- * the request could not be checked (no skill selected, an unknown skill, or an unknown tier).
+ * the request could not be checked (no spec selected, an unknown spec, or an unknown tier).
  */
 public record TrustResponse(
         String error,
-        String skillName,
+        String specName,
         String tier,
         boolean allowed,
         List<String> disallowedGroups,
@@ -19,8 +19,8 @@ public record TrustResponse(
         return new TrustResponse(error, null, null, false, List.of(), List.of());
     }
 
-    public static TrustResponse ok(String skillName, String tier, boolean allowed,
+    public static TrustResponse ok(String specName, String tier, boolean allowed,
                                    List<String> disallowed, List<String> declared) {
-        return new TrustResponse(null, skillName, tier, allowed, disallowed, declared);
+        return new TrustResponse(null, specName, tier, allowed, disallowed, declared);
     }
 }

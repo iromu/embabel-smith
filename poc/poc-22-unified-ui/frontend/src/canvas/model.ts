@@ -2,13 +2,13 @@
  * The type-checked "snap" rule and chain validation for the Compose pane, as pure functions.
  *
  * This mirrors POC 14's `CompositionCanvas` (validate + chain + the edge type-check) so the browser
- * can check a connection the instant it is made — the drag-and-drop "snap" is exactly "skill A's
- * output type is one of skill B's external inputs". Keeping it pure (no DOM, no Vue) makes it
+ * can check a connection the instant it is made — the drag-and-drop "snap" is exactly "spec A's
+ * output type is one of spec B's external inputs". Keeping it pure (no DOM, no Vue) makes it
  * trivially unit-testable and small enough to hold and edit.
  */
 
-/** A skill offered by the palette (mirrors the backend `SkillInfo` DTO). */
-export interface SkillInfo {
+/** A spec offered by the palette (mirrors the backend `SpecInfo` DTO). */
+export interface SpecInfo {
   name: string
   externalInputTypes: string[]
   outputType: string
@@ -20,11 +20,11 @@ export interface Edge {
   to: string
 }
 
-/** The canvas to validate: the placed skills, the connections, and the palette. */
+/** The canvas to validate: the placed specs, the connections, and the palette. */
 export interface CanvasInput {
   nodes: string[]
   edges: Edge[]
-  skills: SkillInfo[]
+  specs: SpecInfo[]
 }
 
 /** The validation result: whether it is a valid chain, the issues, and the composed chain. */
@@ -52,11 +52,11 @@ export function shortName(typeName: string): string {
 }
 
 /**
- * The snap rule: a connection is valid only when the source skill's output type is one of the
- * target skill's external input types. An incompatible connection is flagged with the
+ * The snap rule: a connection is valid only when the source spec's output type is one of the
+ * target spec's external input types. An incompatible connection is flagged with the
  * type-mismatch reason.
  */
-export function checkEdge(source: SkillInfo, target: SkillInfo): EdgeCheck {
+export function checkEdge(source: SpecInfo, target: SpecInfo): EdgeCheck {
   const targetInputs = new Set(target.externalInputTypes.map(shortName))
   if (targetInputs.has(shortName(source.outputType))) {
     return { valid: true }
@@ -70,15 +70,15 @@ export function checkEdge(source: SkillInfo, target: SkillInfo): EdgeCheck {
 }
 
 /**
- * Validates a canvas as a single, executable skill chain. Returns the issues (empty when valid) and
+ * Validates a canvas as a single, executable spec chain. Returns the issues (empty when valid) and
  * the composed chain. Mirrors POC 14's `validate()` / `chain()`.
  */
 export function validateCanvas(input: CanvasInput): CanvasResult {
-  const { nodes, edges, skills } = input
-  const byName = new Map(skills.map((s) => [s.name, s]))
+  const { nodes, edges, specs } = input
+  const byName = new Map(specs.map((s) => [s.name, s]))
   const issues: string[] = []
 
-  // Only placed, known skills participate; duplicates are collapsed.
+  // Only placed, known specs participate; duplicates are collapsed.
   const placed: string[] = []
   const seenNode = new Set<string>()
   for (const name of nodes) {
@@ -89,10 +89,10 @@ export function validateCanvas(input: CanvasInput): CanvasResult {
   }
   const placedSet = new Set(placed)
 
-  // Every edge must reference placed skills and be type-compatible.
+  // Every edge must reference placed specs and be type-compatible.
   for (const edge of edges) {
     if (!placedSet.has(edge.from) || !placedSet.has(edge.to)) {
-      issues.push(`edge ${edge.from} -> ${edge.to} references a missing skill`)
+      issues.push(`edge ${edge.from} -> ${edge.to} references a missing spec`)
       continue
     }
     const source = byName.get(edge.from)!
@@ -109,13 +109,13 @@ export function validateCanvas(input: CanvasInput): CanvasResult {
   const exits = placed.filter((n) => shortName(byName.get(n)!.outputType) === BACKGROUND_MESSAGE)
 
   if (entries.length !== 1) {
-    issues.push(`expected exactly one entry skill (input ${USER_INPUT}), found ${entries.length}`)
+    issues.push(`expected exactly one entry spec (input ${USER_INPUT}), found ${entries.length}`)
   }
   if (exits.length !== 1) {
-    issues.push(`expected exactly one exit skill (output ${BACKGROUND_MESSAGE}), found ${exits.length}`)
+    issues.push(`expected exactly one exit spec (output ${BACKGROUND_MESSAGE}), found ${exits.length}`)
   }
 
-  // Structure: every non-entry skill has exactly one incoming edge; every non-exit skill has exactly
+  // Structure: every non-entry spec has exactly one incoming edge; every non-exit spec has exactly
   // one outgoing edge.
   const inDeg = new Map<string, number>()
   const outDeg = new Map<string, number>()
@@ -151,13 +151,13 @@ export function validateCanvas(input: CanvasInput): CanvasResult {
     }
   }
   if (issues.length === 0 && chain.length !== placed.length) {
-    issues.push('the chain does not cover every skill on the canvas')
+    issues.push('the chain does not cover every spec on the canvas')
   }
 
   return { valid: issues.length === 0, issues, chain }
 }
 
-/** The ordered path from the entry skill to the exit skill (the plan the composite will run). */
+/** The ordered path from the entry spec to the exit spec (the plan the composite will run). */
 function computeChain(placed: string[], edges: Edge[], entry: string, exit: string): string[] {
   const path: string[] = []
   const seen = new Set<string>()
@@ -172,7 +172,7 @@ function computeChain(placed: string[], edges: Edge[], entry: string, exit: stri
     current = next ? next.to : null
   }
   if (path[path.length - 1] !== exit) {
-    throw new Error(`chain does not reach the exit skill ${exit}`)
+    throw new Error(`chain does not reach the exit spec ${exit}`)
   }
   return path
 }

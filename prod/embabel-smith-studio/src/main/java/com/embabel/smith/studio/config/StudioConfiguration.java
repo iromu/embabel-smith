@@ -5,8 +5,8 @@ import com.embabel.agent.core.AgentPlatform;
 import com.embabel.smith.builder.BuildOptions;
 import com.embabel.smith.builder.BuilderService;
 import com.embabel.smith.builder.core.BuilderAgent;
-import com.embabel.smith.builder.core.DefaultSkillCompiler;
-import com.embabel.smith.builder.eval.AgentSkillInvokerFactory;
+import com.embabel.smith.builder.core.DefaultAgentSpecCompiler;
+import com.embabel.smith.builder.eval.AgentSpecInvokerFactory;
 import com.embabel.smith.builder.eval.EvalTask;
 import com.embabel.smith.builder.eval.InvokerFactory;
 import com.embabel.smith.builder.eval.LlmPromptRewriter;
@@ -17,13 +17,13 @@ import com.embabel.smith.builder.publish.GitPublisher;
 import com.embabel.smith.builder.publish.PublishTarget;
 import com.embabel.smith.builder.publish.Publisher;
 import com.embabel.smith.common.config.ModelEndpointConfig;
-import com.embabel.smith.common.io.SkillPackWriter;
-import com.embabel.smith.common.model.SkillPack;
-import com.embabel.smith.runtime.SkillRunService;
+import com.embabel.smith.common.io.AgentSpecWriter;
+import com.embabel.smith.common.model.AgentSpec;
+import com.embabel.smith.runtime.AgentSpecRunService;
 import com.embabel.smith.runtime.core.TrustTier;
 import com.embabel.smith.runtime.trace.JsonlTraceStore;
-import com.embabel.smith.skillsource.GitSkillSource;
-import com.embabel.smith.skillsource.SkillSource;
+import com.embabel.smith.specsource.GitSpecSource;
+import com.embabel.smith.specsource.SpecSource;
 import com.embabel.smith.studio.generate.BlueprintLoader;
 import com.embabel.smith.studio.generate.FlowPromptCaller;
 import com.embabel.smith.studio.generate.FlowValidator;
@@ -81,16 +81,16 @@ public class StudioConfiguration {
     }
 
     @Bean
-    public SkillRunService skillRunService(AgentPlatform platform, JsonlTraceStore traceStore) {
-        return new SkillRunService(platform, traceStore.file());
+    public AgentSpecRunService agentSpecRunService(AgentPlatform platform, JsonlTraceStore traceStore) {
+        return new AgentSpecRunService(platform, traceStore.file());
     }
 
     @Bean
     public BuilderService builderService(AgentPlatform platform, Ai ai, ModelEndpointConfig endpoint)
             throws IOException {
         Path scratch = Files.createTempDirectory("smith-studio-builder-scratch-");
-        BuilderAgent agent = new BuilderAgent(new DefaultSkillCompiler(ai), platform, scratch.toString());
-        InvokerFactory invokerFactory = new AgentSkillInvokerFactory(platform);
+        BuilderAgent agent = new BuilderAgent(new DefaultAgentSpecCompiler(ai), platform, scratch.toString());
+        InvokerFactory invokerFactory = new AgentSpecInvokerFactory(platform);
         PromptRewriter rewriter = new LlmPromptRewriter(endpoint.baseUrl(), endpoint.apiKey(),
                 model(endpoint));
         return new BuilderService(agent, invokerFactory, rewriter, defaultEvalTasks());
@@ -98,7 +98,7 @@ public class StudioConfiguration {
 
     /** The Run pane's model-dependent run, backed by the change-03 run service. */
     @Bean
-    public RunController.RunFn runFn(SkillRunService runService) {
+    public RunController.RunFn runFn(AgentSpecRunService runService) {
         return runService::run;
     }
 
@@ -127,7 +127,7 @@ public class StudioConfiguration {
     public GenerateController.GenerateFn generateFn(ProcessFlowGenerator generator) {
         return blueprint -> {
             try {
-                SkillPack pack = generator.generate(blueprint);
+                AgentSpec pack = generator.generate(blueprint);
                 return GenerateResponse.of(pack, FlowValidator.issues(pack));
             } catch (Exception e) {
                 String message = e.getMessage() == null ? e.toString() : e.getMessage();
@@ -173,8 +173,8 @@ public class StudioConfiguration {
 
     /** The workspace's dry-run: write the pack to a temp folder and run it through the run service. */
     @Bean
-    public SimulateController.SimulateFn simulateFn(SkillRunService runService) {
-        SkillPackWriter writer = new SkillPackWriter();
+    public SimulateController.SimulateFn simulateFn(AgentSpecRunService runService) {
+        AgentSpecWriter writer = new AgentSpecWriter();
         return (pack, input) -> {
             try {
                 // A folder source scans immediate subdirectories for packs, so the pack must live in
@@ -182,7 +182,7 @@ public class StudioConfiguration {
                 Path tmp = Files.createTempDirectory("smith-simulate-");
                 String name = pack.name() == null || pack.name().isBlank() ? "pack" : pack.name();
                 writer.write(pack, tmp.resolve(name));
-                SkillRunService.RunResult result =
+                AgentSpecRunService.RunResult result =
                         runService.run("folder:" + tmp, pack.goal().name(), input, "GOAP", TrustTier.STANDARD);
                 return SimulateResponse.of(result);
             } catch (IOException e) {
@@ -200,7 +200,7 @@ public class StudioConfiguration {
     /** The Eval pane's model-dependent evaluation: a bounded eval → refine loop over the tasks. */
     @Bean
     public EvalController.EvalFn evalFn(AgentPlatform platform, ModelEndpointConfig endpoint) {
-        InvokerFactory invokerFactory = new AgentSkillInvokerFactory(platform);
+        InvokerFactory invokerFactory = new AgentSpecInvokerFactory(platform);
         PromptRewriter rewriter = new LlmPromptRewriter(endpoint.baseUrl(), endpoint.apiKey(),
                 model(endpoint));
         return (pack, tasks) -> new RefinementLoop(invokerFactory, rewriter, tasks,
@@ -209,7 +209,7 @@ public class StudioConfiguration {
 
     /** The source the improvement loop watches and refines (defaults to the first configured source). */
     @Bean
-    public SkillSource improveSource(
+    public SpecSource improveSource(
             @Value("${smith.studio.improve-source:}") String improveSource,
             @Value("${smith.studio.sources:}") String sources,
             @Value("${smith.studio.source-cache-dir:}") String cacheDir) throws IOException {
@@ -220,13 +220,13 @@ public class StudioConfiguration {
         if (uri == null || uri.isBlank()) {
             // No source configured: the loop is inert (an empty folder source yields no packs).
             Path empty = Files.createTempDirectory("smith-studio-empty-source-");
-            return new com.embabel.smith.skillsource.FolderSkillSource("folder:" + empty, empty);
+            return new com.embabel.smith.specsource.FolderSpecSource("folder:" + empty, empty);
         }
         return Sources.parse(uri, cacheRoot(cacheDir));
     }
 
     @Bean
-    public Publisher loopPublisher(SkillSource improveSource,
+    public Publisher loopPublisher(SpecSource improveSource,
                                    @Value("${smith.studio.improve-source:}") String improveSourceUri,
                                    @Value("${smith.studio.sources:}") String sources,
                                    @Value("${smith.studio.source-cache-dir:}") String cacheDir) {
@@ -241,13 +241,13 @@ public class StudioConfiguration {
     }
 
     @Bean
-    public ImprovementLoop improvementLoop(SkillSource improveSource, JsonlTraceStore traceStore,
+    public ImprovementLoop improvementLoop(SpecSource improveSource, JsonlTraceStore traceStore,
                                            ModelEndpointConfig endpoint, AgentPlatform platform,
                                            Publisher loopPublisher,
                                            @Value("${smith.studio.loop.auto-publish:false}") boolean autoPublish) {
         PromptRewriter rewriter = new LlmPromptRewriter(endpoint.baseUrl(), endpoint.apiKey(),
                 model(endpoint));
-        InvokerFactory invokerFactory = new AgentSkillInvokerFactory(platform);
+        InvokerFactory invokerFactory = new AgentSpecInvokerFactory(platform);
         // Always hold: auto-publish is applied at the LoopService layer so the toggle is live.
         return new ImprovementLoop(improveSource, traceStore, rewriter, invokerFactory,
                 defaultEvalTasks(), loopPublisher, false);
@@ -301,7 +301,7 @@ public class StudioConfiguration {
 
     private static Path cacheRoot(String configured) {
         if (configured == null || configured.isBlank()) {
-            return GitSkillSource.defaultCacheRoot();
+            return GitSpecSource.defaultCacheRoot();
         }
         return expandHome(configured.trim());
     }

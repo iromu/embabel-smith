@@ -1,18 +1,18 @@
 package com.embabel.smith.studio.rest.dto;
 
-import com.embabel.smith.common.model.SkillPack;
+import com.embabel.smith.common.model.AgentSpec;
 
 import java.util.List;
 
 /**
- * The generate response: the produced {@link SkillPack} (serialisable to the frontend's ComposePack
+ * The generate response: the produced {@link AgentSpec} (serialisable to the frontend's ComposePack
  * shape), the flow-soundness issues (empty when sound), and a structured error. {@code errorCode}
  * is {@code MODEL_NOT_CONFIGURED} when the endpoint is absent, so the UI renders its dedicated
  * banner.
  */
-public record GenerateResponse(SkillPack pack, List<String> issues, String error, String errorCode) {
+public record GenerateResponse(AgentSpec pack, List<String> issues, String error, String errorCode) {
 
-    public static GenerateResponse of(SkillPack pack, List<String> issues) {
+    public static GenerateResponse of(AgentSpec pack, List<String> issues) {
         return new GenerateResponse(pack, issues, null, null);
     }
 

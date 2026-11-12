@@ -1,7 +1,7 @@
 package com.embabel.smith.selector.llm;
 
-import com.embabel.smith.retrieval.SkillEntry;
-import com.embabel.smith.retrieval.gliner.SkillSelector;
+import com.embabel.smith.retrieval.SpecEntry;
+import com.embabel.smith.retrieval.gliner.SpecSelector;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -14,13 +14,13 @@ import java.time.Duration;
 import java.util.List;
 
 /**
- * A {@link SkillSelector} backed by the small decision LLM served by the module's Docker
+ * A {@link SpecSelector} backed by the small decision LLM served by the module's Docker
  * container (llama.cpp, OpenAI-compatible {@code /v1}). One instance per
  * {@link DecisionPrompt.Format}: the selector asks the model to choose among the candidates
  * and parses the reply into the top-1 selection. The contract answer is one token, so the
  * request is temperature 0 with a small {@code max_tokens}.
  */
-public final class LlmSelector implements SkillSelector {
+public final class LlmSelector implements SpecSelector {
 
     /** The model name the container serves (its mounted GGUF path). */
     public static final String DEFAULT_MODEL = "/models/Qwen3-0.6B-openjev-Q8_0.gguf";
@@ -47,7 +47,7 @@ public final class LlmSelector implements SkillSelector {
     }
 
     @Override
-    public String select(String query, List<SkillEntry> candidates) {
+    public String select(String query, List<SpecEntry> candidates) {
         if (candidates.isEmpty()) {
             return null;
         }

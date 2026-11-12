@@ -5,9 +5,9 @@ import com.embabel.smith.builder.eval.EvalTask;
 import com.embabel.smith.builder.eval.InvokerFactory;
 import com.embabel.smith.builder.security.ScanReport;
 import com.embabel.smith.builder.security.ScanVerdict;
-import com.embabel.smith.builder.security.SkillSecurityScanner;
-import com.embabel.smith.common.model.SkillPack;
-import com.embabel.smith.common.validation.SkillPackValidator;
+import com.embabel.smith.builder.security.AgentSpecSecurityScanner;
+import com.embabel.smith.common.model.AgentSpec;
+import com.embabel.smith.common.validation.AgentSpecValidator;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -39,16 +39,16 @@ import java.util.List;
  */
 public class GateChain {
 
-    private final SkillPackValidator validator;
-    private final SkillSecurityScanner scanner;
+    private final AgentSpecValidator validator;
+    private final AgentSpecSecurityScanner scanner;
     private final InvokerFactory invokerFactory;
     private final List<EvalTask> evalTasks;
 
     public GateChain(InvokerFactory invokerFactory, List<EvalTask> evalTasks) {
-        this(new SkillPackValidator(), new SkillSecurityScanner(), invokerFactory, evalTasks);
+        this(new AgentSpecValidator(), new AgentSpecSecurityScanner(), invokerFactory, evalTasks);
     }
 
-    public GateChain(SkillPackValidator validator, SkillSecurityScanner scanner,
+    public GateChain(AgentSpecValidator validator, AgentSpecSecurityScanner scanner,
                      InvokerFactory invokerFactory, List<EvalTask> evalTasks) {
         if (evalTasks == null || evalTasks.isEmpty()) {
             throw new IllegalArgumentException("eval tasks must not be empty");
@@ -60,7 +60,7 @@ public class GateChain {
     }
 
     /** Runs the gate without triggering failures (a drift-only pass: no failure-fix fallback). */
-    public GateResult gate(SkillPack candidate, double baseline) {
+    public GateResult gate(AgentSpec candidate, double baseline) {
         return gate(candidate, baseline, List.of());
     }
 
@@ -71,7 +71,7 @@ public class GateChain {
      * non-blank and <em>different</em> from the recorded failure (a candidate that reproduces the
      * same truncated output has not fixed anything).
      */
-    public GateResult gate(SkillPack candidate, double baseline, List<FailedInput> failedInputs) {
+    public GateResult gate(AgentSpec candidate, double baseline, List<FailedInput> failedInputs) {
         // a. D5 validation (cheap, deterministic)
         var validation = validator.validate(candidate);
         if (!validation.isValid()) {
@@ -127,7 +127,7 @@ public class GateChain {
      * output, or output that merely reproduces the recorded failure (the same truncated output
      * excerpt, so the candidate is repeating the defect rather than correcting it).
      */
-    private List<String> failingInputs(SkillPack candidate, List<FailedInput> failedInputs) {
+    private List<String> failingInputs(AgentSpec candidate, List<FailedInput> failedInputs) {
         var invoker = invokerFactory.invokerFor(candidate);
         List<String> unfixed = new ArrayList<>();
         for (FailedInput failure : failedInputs) {
@@ -156,7 +156,7 @@ public class GateChain {
      * Deploys the pack and runs it against the eval tasks, returning its pass-rate. Exposed so the
      * loop can do the "live re-eval &lt; baseline" regression check on a pack's current content.
      */
-    public double reeval(SkillPack pack) {
+    public double reeval(AgentSpec pack) {
         var invoker = invokerFactory.invokerFor(pack);
         List<String> outputs = new ArrayList<>();
         for (EvalTask task : evalTasks) {

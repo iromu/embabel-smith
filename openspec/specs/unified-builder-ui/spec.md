@@ -38,25 +38,25 @@ clear "endpoint not configured" state instead of failing.
 - **THEN** the pane shows an endpoint-not-configured message and does not error
 
 ### Requirement: The canvas snap is type-checked
-A connection between two skills SHALL be valid only when the source skill's output type is one of
-the target skill's input types; an incompatible connection SHALL be flagged with the type-mismatch
+A connection between two specs SHALL be valid only when the source spec's output type is one of
+the target spec's input types; an incompatible connection SHALL be flagged with the type-mismatch
 reason.
 
 #### Scenario: Compatible connection snaps
-- **WHEN** the user connects a skill whose output type is an input of the target skill
+- **WHEN** the user connects a spec whose output type is an input of the target spec
 - **THEN** the connection is valid and the composed chain updates
 
 #### Scenario: Incompatible connection is flagged
-- **WHEN** the user connects a skill whose output type is not an input of the target skill
+- **WHEN** the user connects a spec whose output type is not an input of the target spec
 - **THEN** the connection is flagged invalid with the type-mismatch reason
 
 ### Requirement: Retrieval is curation-aware
-Retrieval results SHALL drop retired skills entirely and de-rank degraded skills, and SHALL stamp
+Retrieval results SHALL drop retired specs entirely and de-rank degraded specs, and SHALL stamp
 each returned hit with its lifecycle state.
 
-#### Scenario: A retired skill is excluded
-- **WHEN** the library contains a retired skill matching the query
-- **THEN** the retired skill is absent from the retrieval results
+#### Scenario: A retired spec is excluded
+- **WHEN** the library contains a retired spec matching the query
+- **THEN** the retired spec is absent from the retrieval results
 
 #### Scenario: Each hit carries its lifecycle state
 - **WHEN** the user runs a retrieval query

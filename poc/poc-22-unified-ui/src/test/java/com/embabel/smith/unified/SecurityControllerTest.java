@@ -14,9 +14,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * Offline tests for the Security pane (POC 22). The scan delegates to POC 21's
- * {@code SkillSecurityScanner} (pure static analysis — no model), so these pin the findings, the
+ * {@code SpecSecurityScanner} (pure static analysis — no model), so these pin the findings, the
  * {@code SAFE}/{@code REVIEW}/{@code BLOCK} verdict, and the recommended minimum trust tier, plus the
- * offline scaffolding (no skill / unknown skill).
+ * offline scaffolding (no spec / unknown spec).
  */
 class SecurityControllerTest {
 
@@ -24,14 +24,14 @@ class SecurityControllerTest {
 
     @BeforeEach
     void setUp() {
-        SkillCatalog catalog = new SkillCatalog("");
+        SpecCatalog catalog = new SpecCatalog("");
         mockMvc = MockMvcBuilders.standaloneSetup(new SecurityController(catalog)).build();
     }
 
     @Test
-    void aShellSkillIsFlaggedHighPrivilege() throws Exception {
+    void aShellSpecIsFlaggedHighPrivilege() throws Exception {
         mockMvc.perform(post("/api/security").contentType(MediaType.APPLICATION_JSON)
-                .content("{\"skillName\":\"shell-runner\"}"))
+                .content("{\"specName\":\"shell-runner\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.error").isEmpty())
                 .andExpect(jsonPath("$.verdict").value(org.hamcrest.Matchers.isIn(List.of("REVIEW", "BLOCK"))))
@@ -41,9 +41,9 @@ class SecurityControllerTest {
     }
 
     @Test
-    void aBenignSkillScansClean() throws Exception {
+    void aBenignSpecScansClean() throws Exception {
         mockMvc.perform(post("/api/security").contentType(MediaType.APPLICATION_JSON)
-                .content("{\"skillName\":\"compose-extract\"}"))
+                .content("{\"specName\":\"compose-extract\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.error").isEmpty())
                 .andExpect(jsonPath("$.verdict")
@@ -52,20 +52,20 @@ class SecurityControllerTest {
     }
 
     @Test
-    void noSkillSelectedIsRejected() throws Exception {
+    void noSpecSelectedIsRejected() throws Exception {
         mockMvc.perform(post("/api/security").contentType(MediaType.APPLICATION_JSON)
-                .content("{\"skillName\":\"\"}"))
+                .content("{\"specName\":\"\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.error")
-                        .value(org.hamcrest.Matchers.containsString("No skill selected")));
+                        .value(org.hamcrest.Matchers.containsString("No spec selected")));
     }
 
     @Test
-    void anUnknownSkillIsRejected() throws Exception {
+    void anUnknownSpecIsRejected() throws Exception {
         mockMvc.perform(post("/api/security").contentType(MediaType.APPLICATION_JSON)
-                .content("{\"skillName\":\"nope\"}"))
+                .content("{\"specName\":\"nope\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.error")
-                        .value(org.hamcrest.Matchers.containsString("Unknown skill")));
+                        .value(org.hamcrest.Matchers.containsString("Unknown spec")));
     }
 }

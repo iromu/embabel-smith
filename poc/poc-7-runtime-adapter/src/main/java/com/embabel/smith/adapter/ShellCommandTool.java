@@ -7,7 +7,7 @@ import java.util.List;
 /**
  * The real shell executor behind the {@code shell} tool group. Runs a command via
  * {@link ProcessBuilder} and returns its exit code, stdout and stderr. This is the "bridge" the
- * skill-pack's {@code toolGroups: [shell]} action gets injected (doc 03 §2.3, Option A — the shell
+ * agent spec's {@code toolGroups: [shell]} action gets injected (doc 03 §2.3, Option A — the shell
  * tool group, the simplest of Embabel's three CLI bridges).
  */
 public final class ShellCommandTool {

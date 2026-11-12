@@ -1,7 +1,7 @@
 package com.embabel.smith.retrieval.gliner;
 
-import com.embabel.smith.retrieval.SkillEntry;
-import com.embabel.smith.retrieval.scale.ScaleSkillLibrary;
+import com.embabel.smith.retrieval.SpecEntry;
+import com.embabel.smith.retrieval.scale.ScaleSpecLibrary;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -17,13 +17,13 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class ShadowingRunnerTest {
 
-    private static final SkillSelector ALWAYS_CANONICAL =
+    private static final SpecSelector ALWAYS_CANONICAL =
             (query, candidates) -> candidates.stream()
-                    .filter(e -> !isNearDup(e.id())).findFirst().map(SkillEntry::id).orElse(null);
+                    .filter(e -> !isNearDup(e.id())).findFirst().map(SpecEntry::id).orElse(null);
 
-    private static final SkillSelector ALWAYS_NEAR_DUP =
+    private static final SpecSelector ALWAYS_NEAR_DUP =
             (query, candidates) -> candidates.stream()
-                    .filter(e -> isNearDup(e.id())).findFirst().map(SkillEntry::id).orElse(null);
+                    .filter(e -> isNearDup(e.id())).findFirst().map(SpecEntry::id).orElse(null);
 
     private static boolean isNearDup(String id) {
         return id.matches(".*-v\\d+$");
@@ -45,12 +45,12 @@ class ShadowingRunnerTest {
 
     @Test
     void partialSelectorScoresTheFractionOfCanonicalHits() {
-        List<ScaleSkillLibrary.QueryTarget> targets = ScaleSkillLibrary.benchmark();
+        List<ScaleSpecLibrary.QueryTarget> targets = ScaleSpecLibrary.benchmark();
         Set<String> canonicalFor = targets.subList(0, 3).stream()
-                .map(ScaleSkillLibrary.QueryTarget::targetId)
+                .map(ScaleSpecLibrary.QueryTarget::targetId)
                 .collect(Collectors.toSet());
-        SkillSelector halfRight = (query, candidates) -> {
-            SkillEntry canonical = candidates.stream().filter(e -> !isNearDup(e.id())).findFirst().orElseThrow();
+        SpecSelector halfRight = (query, candidates) -> {
+            SpecEntry canonical = candidates.stream().filter(e -> !isNearDup(e.id())).findFirst().orElseThrow();
             if (canonicalFor.contains(canonical.id())) {
                 return canonical.id();
             }
@@ -79,9 +79,9 @@ class ShadowingRunnerTest {
     @Test
     void matchingIncludesAllNearDuplicatesAndStrictExcludesTheNearExactOne() {
         ShadowingRunner runner = new ShadowingRunner();
-        String target = ScaleSkillLibrary.benchmark().get(0).targetId();
-        List<SkillEntry> matching = runner.candidatesFor(target, ShadowingRunner.Variant.MATCHING);
-        List<SkillEntry> strict = runner.candidatesFor(target, ShadowingRunner.Variant.STRICT);
+        String target = ScaleSpecLibrary.benchmark().get(0).targetId();
+        List<SpecEntry> matching = runner.candidatesFor(target, ShadowingRunner.Variant.MATCHING);
+        List<SpecEntry> strict = runner.candidatesFor(target, ShadowingRunner.Variant.STRICT);
 
         // canonical + 15 near-dups = 16; strict drops the near-exact v0 = 15.
         assertThat(matching).hasSize(16);

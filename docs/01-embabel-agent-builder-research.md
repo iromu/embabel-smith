@@ -43,7 +43,7 @@ Execution:
   Modes: Focused (call a specific agent) / Closed (LLM picks an agent) /
          Open (LLM picks a goal, platform assembles an agent).
   Subagents: an @Action can spawn nested processes (asSubProcess); in YAML
-  terms, exported goals (export: true) become callable tools/skills.
+  terms, exported goals (export: true) become callable goals.
 
 Planners (PlannerType enum — verified in the 1.5.4 jar):
   GOAP       default; deterministic goal-oriented A* over pre/postconditions.
@@ -99,7 +99,7 @@ alongside the 1.5.4 platform — no longer "experimental only"). Contents:
       prompt: "Summarize: {{userInput.content}}"   # Jinja2 template
       toolGroups: [search, web]
       tools: [toolNames]
-      export: false    # true => auto goal, callable as a tool/skill
+      export: false    # true => auto goal, callable as a tool
   GoalSpec:
       stepType: goal
       name, description
@@ -232,7 +232,7 @@ path is confirmed.)
   |  | prompts/types  |  | advisor (LLM)  |  | eval jobs (YAML)     |  |
   |  | tools/MCP      |  | "suggest"      |  | LLM-as-judge scores  |  |
   |  | guardrails     |  | shape heur.   |  | prompt rewrite loop  |  |
-  |  | skills (export)|  |                |  | diff view, re-run    |  |
+  |  | goals (export) |  |                |  | diff view, re-run    |  |
   |  +-------+--------+  +-------+--------+  +----------+-----------+  |
   |          |                    |                       |            |
   |          v                    v                       v            |
@@ -320,7 +320,7 @@ path is confirmed.)
                           #   mode, autonomy cut-offs, default model
     agents/<name>/
       steps/*.yml         # PromptedActionSpec files (one per action)
-      goal.yml            # GoalSpec (export=true when it is a "skill")
+      goal.yml            # GoalSpec (export=true — the callable goal)
     types/*.yml           # DynamicType definitions (intermediate types)
     tools/
       mcp.yml             # MCP client connections → application.yml
@@ -337,7 +337,7 @@ path is confirmed.)
 ### 3.4 UI panes (design, not implementation)
   1. Agents & subagents: list/create. Per agent: name, description,
      planner (GOAP/UTILITY/HYBRID/SUPERVISOR + "Suggest" button),
-     execution mode (focused/closed/open), exported goals (= skills).
+     execution mode (focused/closed/open), exported goals (the callable goals).
   2. Action editor (core screen): name, description, prompt (Jinja2
      editor with {{var}} autocomplete from input types), input types
      (pick from platform DataDictionary + project DynamicTypes), output
@@ -376,16 +376,17 @@ path is confirmed.)
     endpoint works — verified)
   Everything else is data (YAML), not code.
 
-### 3.6 "Skills" mapping (Embabel has no primitive named "skill")
-  skill == exported goal (export: true; callable as a tool by the chat
-  LLM with UserInput) OR a tool group OR an MCP tool. The vaadin
-  SkillsSection already displays a SkillInfo list. The builder treats
-  "mark as skill" as a toggle on a goal/action that sets export=true.
+### 3.6 Callable units (Embabel has no single primitive for this)
+  A callable unit is an exported goal (export: true; callable as a tool
+  by the chat LLM with UserInput), a tool group, or an MCP tool. The
+  vaadin SkillsSection already displays a SkillInfo list. The builder
+  treats "mark as callable" as a toggle on a goal/action that sets
+  export=true.
 
 ## SECTION 4 — LIMITATIONS & RISKS (honest)
 Works well (buildable now):
   - LLM-prompt-only agents with typed chains, GOAP planning, tool groups,
-    MCP, export-as-skill, eval, prompt-improvement loop, planner
+    MCP, exported goals, eval, prompt-improvement loop, planner
     suggestion. Covers the large majority of agent use cases: research,
     summarization, triage, drafting, classification, routing, RAG flows.
 
@@ -423,7 +424,7 @@ Risks:
     chains the action into existing platform actions automatically.
   - Extract "when X / if Y" filters into SpEL preconditions, never into
     Jinja if/else (saves LLM spend; the compiler does this).
-  - Keep one goal per agent; use exported goals as the skill surface.
+  - Keep one goal per agent; use exported goals as the callable surface.
   - Use cost/value on actions to steer the GOAP planner (cheapest path
     wins; value steers utility planning).
   - nullable: true on actions to enable replanning instead of hard

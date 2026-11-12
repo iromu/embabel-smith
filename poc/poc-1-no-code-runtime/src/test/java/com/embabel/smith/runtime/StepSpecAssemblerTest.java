@@ -1,7 +1,7 @@
 package com.embabel.smith.runtime;
 
-import com.embabel.smith.common.io.SkillPackWriter;
-import com.embabel.smith.common.samples.SampleSkillPacks;
+import com.embabel.smith.common.io.AgentSpecWriter;
+import com.embabel.smith.common.samples.SampleAgentSpecs;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -21,7 +21,7 @@ class StepSpecAssemblerTest {
 
     @Test
     void assemblesGoalAndStepsIntoOneFlatDirectory(@TempDir Path dir) throws Exception {
-        Path packDir = new SkillPackWriter().write(SampleSkillPacks.explainer(), dir.resolve("pack"));
+        Path packDir = new AgentSpecWriter().write(SampleAgentSpecs.explainer(), dir.resolve("pack"));
         Path target = dir.resolve("flat");
 
         assembler.assemble(packDir, target);
@@ -38,7 +38,7 @@ class StepSpecAssemblerTest {
 
     @Test
     void failsClearlyWhenThereIsNoGoal(@TempDir Path dir) throws Exception {
-        Path packDir = new SkillPackWriter().write(SampleSkillPacks.explainer(), dir.resolve("pack"));
+        Path packDir = new AgentSpecWriter().write(SampleAgentSpecs.explainer(), dir.resolve("pack"));
         Files.delete(packDir.resolve("goal.yml"));
 
         assertThatThrownBy(() -> assembler.assemble(packDir, dir.resolve("flat")))

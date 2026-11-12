@@ -22,11 +22,11 @@ class RunControllerTest {
 
     private final ModelEndpointConfig noEndpoint = new ModelEndpointConfig("", "", "", "");
     private final ModelEndpointConfig endpoint = new ModelEndpointConfig("http://x", "key", "gpt", "gpt");
-    private SkillCatalog catalog;
+    private SpecCatalog catalog;
 
     @BeforeEach
     void setUp() {
-        catalog = new SkillCatalog("");
+        catalog = new SpecCatalog("");
     }
 
     private MockMvc with(RunController.RunFn fn, ModelEndpointConfig ep) {
@@ -39,35 +39,35 @@ class RunControllerTest {
             throw new IllegalStateException("the runner must not be reached without an endpoint");
         }, noEndpoint);
         mvc.perform(post("/api/run").contentType(MediaType.APPLICATION_JSON)
-                .content("{\"skillName\":\"compose-extract\",\"input\":\"hi\"}"))
+                .content("{\"specName\":\"compose-extract\",\"input\":\"hi\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.output").isEmpty())
                 .andExpect(jsonPath("$.error").value(containsString("No resolvable model endpoint")));
     }
 
     @Test
-    void aConfiguredEndpointRunsTheSkill() throws Exception {
+    void aConfiguredEndpointRunsTheSpec() throws Exception {
         MockMvc mvc = with((s, i) -> "RUN_OUTPUT", endpoint);
         mvc.perform(post("/api/run").contentType(MediaType.APPLICATION_JSON)
-                .content("{\"skillName\":\"compose-extract\",\"input\":\"hi\"}"))
+                .content("{\"specName\":\"compose-extract\",\"input\":\"hi\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.error").isEmpty())
                 .andExpect(jsonPath("$.output").value("RUN_OUTPUT"));
     }
 
     @Test
-    void noSkillSelectedIsRejected() throws Exception {
+    void noSpecSelectedIsRejected() throws Exception {
         MockMvc mvc = with((s, i) -> "X", endpoint);
-        mvc.perform(post("/api/run").contentType(MediaType.APPLICATION_JSON).content("{\"skillName\":\"\"}"))
+        mvc.perform(post("/api/run").contentType(MediaType.APPLICATION_JSON).content("{\"specName\":\"\"}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.error").value(containsString("No skill selected")));
+                .andExpect(jsonPath("$.error").value(containsString("No spec selected")));
     }
 
     @Test
-    void anUnknownSkillIsRejected() throws Exception {
+    void anUnknownSpecIsRejected() throws Exception {
         MockMvc mvc = with((s, i) -> "X", endpoint);
-        mvc.perform(post("/api/run").contentType(MediaType.APPLICATION_JSON).content("{\"skillName\":\"nope\"}"))
+        mvc.perform(post("/api/run").contentType(MediaType.APPLICATION_JSON).content("{\"specName\":\"nope\"}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.error").value(containsString("Unknown skill")));
+                .andExpect(jsonPath("$.error").value(containsString("Unknown spec")));
     }
 }

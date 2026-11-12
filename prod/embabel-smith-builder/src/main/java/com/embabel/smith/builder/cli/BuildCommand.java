@@ -6,8 +6,8 @@ import com.embabel.smith.builder.BuildOptions;
 import com.embabel.smith.builder.BuildResult;
 import com.embabel.smith.builder.BuilderService;
 import com.embabel.smith.builder.core.BuilderAgent;
-import com.embabel.smith.builder.core.DefaultSkillCompiler;
-import com.embabel.smith.builder.eval.AgentSkillInvokerFactory;
+import com.embabel.smith.builder.core.DefaultAgentSpecCompiler;
+import com.embabel.smith.builder.eval.AgentSpecInvokerFactory;
 import com.embabel.smith.builder.eval.EvalTask;
 import com.embabel.smith.builder.eval.InvokerFactory;
 import com.embabel.smith.builder.eval.LlmPromptRewriter;
@@ -25,15 +25,15 @@ import java.util.List;
 import java.util.concurrent.Callable;
 
 /**
- * The {@code smith build} command: builds a skill-pack from a natural-language description, runs it
+ * The {@code smith build} command: builds a agent spec from a natural-language description, runs it
  * through eval → refine → security → lifecycle, and publishes it to a source. The build report goes
  * to stdout; a blocked build prints the stage and reason and exits 1. Usage errors exit 2 (picocli
  * default).
  */
-@Command(name = "build", description = "Build a skill-pack from a description and publish it to a source")
+@Command(name = "build", description = "Build a agent spec from a description and publish it to a source")
 public class BuildCommand implements Callable<Integer> {
 
-    @Parameters(index = "0", description = "The natural-language description of the skill to build")
+    @Parameters(index = "0", description = "The natural-language description of the spec to build")
     String description;
 
     @Option(names = "--out", required = true,
@@ -65,14 +65,14 @@ public class BuildCommand implements Callable<Integer> {
 
     /** Test seam: allows substituting the build service. */
     protected BuilderService newService(Path scratch) {
-        BuilderAgent agent = new BuilderAgent(new DefaultSkillCompiler(ai), platform, scratch.toString());
-        InvokerFactory factory = new AgentSkillInvokerFactory(platform);
+        BuilderAgent agent = new BuilderAgent(new DefaultAgentSpecCompiler(ai), platform, scratch.toString());
+        InvokerFactory factory = new AgentSpecInvokerFactory(platform);
         PromptRewriter rewriter = new LlmPromptRewriter(baseUrl, apiKey, model);
         return new BuilderService(agent, factory, rewriter, defaultEvalTasks());
     }
 
     /**
-     * The default eval task set: a single "the skill runs and produces output" case, shared via
+     * The default eval task set: a single "the spec runs and produces output" case, shared via
      * {@link EvalTask#smokeDefault()}. The task set is a parameter of the build (design D1); richer
      * acceptance criteria can be supplied by callers of {@link BuilderService}.
      */

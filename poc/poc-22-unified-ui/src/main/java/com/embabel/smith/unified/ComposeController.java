@@ -2,17 +2,17 @@ package com.embabel.smith.unified;
 
 import com.embabel.smith.common.model.ActionStepSpec;
 import com.embabel.smith.common.model.DynamicTypeDef;
-import com.embabel.smith.common.model.SkillPack;
+import com.embabel.smith.common.model.AgentSpec;
 import com.embabel.smith.composer.CompositeExporter;
 import com.embabel.smith.composer.CompositionCanvas;
-import com.embabel.smith.composer.SkillNode;
+import com.embabel.smith.composer.SpecNode;
 import com.embabel.smith.unified.dto.CanvasRequest;
 import com.embabel.smith.unified.dto.CanvasResponse;
 import com.embabel.smith.unified.dto.ComposeRequest;
 import com.embabel.smith.unified.dto.ComposeResponse;
 import com.embabel.smith.unified.dto.Edge;
 import com.embabel.smith.unified.dto.GoalInfo;
-import com.embabel.smith.unified.dto.SkillInfo;
+import com.embabel.smith.unified.dto.SpecInfo;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -27,7 +27,7 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * The Compose pane (POC 22): the skill palette, the type-checked canvas, and the composite export.
+ * The Compose pane (POC 22): the spec palette, the type-checked canvas, and the composite export.
  * Every endpoint delegates to POC 14's proven composer model ({@link CompositionCanvas} /
  * {@link CompositeExporter}), so the browser's "snap" (edge type-check), chain, and composite export
  * are the same logic the offline POC proves. Fully offline — no model endpoint.
@@ -35,21 +35,21 @@ import java.util.Set;
 @RestController
 public class ComposeController {
 
-    private final SkillCatalog catalog;
+    private final SpecCatalog catalog;
     private final CompositeExporter exporter = new CompositeExporter();
     private final Path outDir;
 
-    public ComposeController(SkillCatalog catalog,
+    public ComposeController(SpecCatalog catalog,
                              @Value("${builder.compose-output-dir:target/composed-ui}") Path outDir) {
         this.catalog = catalog;
         this.outDir = outDir;
     }
 
-    /** The palette: every available skill with its external inputs and output type. */
-    @GetMapping("/api/skills")
-    public List<SkillInfo> skills() {
+    /** The palette: every available spec with its external inputs and output type. */
+    @GetMapping("/api/specs")
+    public List<SpecInfo> specs() {
         return catalog.all().values().stream()
-                .map(node -> new SkillInfo(node.id(), new ArrayList<>(node.externalInputTypes()),
+                .map(node -> new SpecInfo(node.id(), new ArrayList<>(node.externalInputTypes()),
                         node.outputType()))
                 .toList();
     }
@@ -60,12 +60,12 @@ public class ComposeController {
         CompositionCanvas canvas = buildCanvas(request.nodes(), request.edges());
         List<String> issues = canvas.validate();
         List<String> chain = issues.isEmpty()
-                ? canvas.chain().stream().map(SkillNode::id).toList()
+                ? canvas.chain().stream().map(SpecNode::id).toList()
                 : List.of();
         return new CanvasResponse(issues.isEmpty(), issues, chain);
     }
 
-    /** Exports a valid canvas as a composite skill-pack and reports its shape. */
+    /** Exports a valid canvas as a composite agent spec and reports its shape. */
     @PostMapping("/api/compose")
     public ComposeResponse compose(@RequestBody ComposeRequest request) throws IOException {
         CompositionCanvas canvas = buildCanvas(request.nodes(), request.edges());
@@ -74,7 +74,7 @@ public class ComposeController {
             return new ComposeResponse(null, null, List.of(), List.of(), issues);
         }
         String name = request.name() == null || request.name().isBlank() ? "compose-composite" : request.name();
-        SkillPack composite = exporter.buildComposite(name, canvas);
+        AgentSpec composite = exporter.buildComposite(name, canvas);
         Path dir = exporter.export(name, canvas, outDir);
         return new ComposeResponse(
                 dir.toString(),
@@ -85,15 +85,15 @@ public class ComposeController {
                 List.of());
     }
 
-    /** Builds a canvas from skill names + edges; unknown skills / dangling edges are dropped. */
+    /** Builds a canvas from spec names + edges; unknown specs / dangling edges are dropped. */
     private CompositionCanvas buildCanvas(List<String> nodeNames, List<Edge> edges) {
         CompositionCanvas canvas = new CompositionCanvas();
         Set<String> added = new LinkedHashSet<>();
         if (nodeNames != null) {
             for (String name : nodeNames) {
-                SkillNode node = catalog.get(name);
+                SpecNode node = catalog.get(name);
                 if (node != null && added.add(name)) {
-                    canvas.addSkill(node);
+                    canvas.addSpec(node);
                 }
             }
         }

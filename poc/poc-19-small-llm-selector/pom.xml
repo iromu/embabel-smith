@@ -13,9 +13,9 @@
     <artifactId>poc-19-small-llm-selector</artifactId>
     <name>poc-19-small-llm-selector</name>
     <description>
-        POC 19: small-LLM skill selection. Runs a 0.6B model fine-tuned for single-label
-        decisions (iromu/Qwen3-0.6B-openjev, Q8_0 GGUF) as a skill selector on the same
-        within-topic skill-shadowing scenario POC 17 measured, to test whether a
+        POC 19: small-LLM spec selection. Runs a 0.6B model fine-tuned for single-label
+        decisions (iromu/Qwen3-0.6B-openjev, Q8_0 GGUF) as a spec selector on the same
+        within-topic spec-shadowing scenario POC 17 measured, to test whether a
         sub-billion-parameter LLM breaks the tie that lexical and dense text-similarity
         cannot — and how it compares to the GLiNER2 transformer classifier. The model is
         served in a Docker container (llama.cpp) whose lifecycle Spring Boot Dev Services
@@ -25,8 +25,8 @@
     </description>
 
     <dependencies>
-        <!-- Reuse POC 17's SkillSelector seam, ShadowingRunner, and the lexical/dense/
-             GLiNER2 baseline selectors (transitively POC 12's ScaleSkillLibrary). -->
+        <!-- Reuse POC 17's SpecSelector seam, ShadowingRunner, and the lexical/dense/
+             GLiNER2 baseline selectors (transitively POC 12's ScaleSpecLibrary). -->
         <dependency>
             <groupId>com.embabel.smith</groupId>
             <artifactId>poc-17-gliner-retrieval</artifactId>

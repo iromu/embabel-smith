@@ -8,7 +8,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Offline test of the {@link DraftQuality} goal-shape classifier (doc 02 caveat #2 — the measurable
- * half of "LLM-authored skill quality is weak at the source"). Each degenerate goal shape is
+ * half of "LLM-authored spec quality is weak at the source"). Each degenerate goal shape is
  * detected with the right verdict and reason, and a coherent draft is reported healthy. Pure
  * function — no LLM, no platform.
  */

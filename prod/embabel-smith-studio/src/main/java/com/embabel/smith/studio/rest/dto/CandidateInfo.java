@@ -9,7 +9,7 @@ import java.util.List;
  * score vs the baseline, the security scan, the triggering failure traces, a diff summary, and the
  * lifecycle state it would transition to.
  */
-public record CandidateInfo(String id, String skill, double score, double baseline,
+public record CandidateInfo(String id, String spec, double score, double baseline,
                             String diffSummary, ScanInfo scan, List<TraceInfo> evidence,
                             String proposedState) {
 
@@ -17,7 +17,7 @@ public record CandidateInfo(String id, String skill, double score, double baseli
         List<TraceInfo> evidence = candidate.evidence().stream().map(TraceInfo::of).toList();
         return new CandidateInfo(
                 candidate.id(),
-                candidate.skill(),
+                candidate.spec(),
                 candidate.score(),
                 candidate.baseline(),
                 candidate.diffSummary(),

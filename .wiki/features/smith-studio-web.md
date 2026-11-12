@@ -26,10 +26,10 @@ cores instead of POC launchers.
 ## Thin controllers, cores do the work
 
 Each REST controller is a thin `@RestController` that delegates to a production core
-(`SkillRunService`, `BuilderService`, `ImprovementLoop`). Model-backed collaborators are injected
+(`AgentSpecRunService`, `BuilderService`, `ImprovementLoop`). Model-backed collaborators are injected
 as narrow functional seams so the controllers are offline-testable without a live model. The
 endpoints: run (source, goal, input, planner, trust tier), build (description, output source), list
-sources and packs (with lifecycle state + drift), list per-skill traces, list/approve/reject pending
+sources and packs (with lifecycle state + drift), list per-spec traces, list/approve/reject pending
 candidates, and loop start/stop/trigger plus auto-publish get/set.
 
 ## The front end
@@ -38,7 +38,7 @@ Evolved from POC 22's SPA (Vue 3 + Quasar + Vite + TypeScript; `npm run build` e
 `src/main/resources/static`, which is gitignored). The panes:
 
 - **Six backed panes** re-pointed at the studio REST: Run, Author, Eval, Lifecycle, Security, Trust.
-- **Traces** — per-skill trace history (most-recent-first), step drill-down, failure reason.
+- **Traces** — per-spec trace history (most-recent-first), step drill-down, failure reason.
 - **Auto-improve** — loop status, pending candidates with their evidence, approve/reject,
   auto-publish toggle, lifecycle badges.
 - **Four POC-only panes** (Compose, Retrieve, Scale, Remote) carried as disabled reference stubs —

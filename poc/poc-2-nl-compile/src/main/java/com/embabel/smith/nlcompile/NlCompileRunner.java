@@ -12,7 +12,7 @@ import com.embabel.common.ai.model.LlmOptions;
  * {@link AgentCompilationResult} (actions + exported goal + intermediate types + issues to review)
  * via Embabel's {@link DefaultNaturalLanguageCompiler}.
  *
- * <p>The result is a <em>draft</em>, not a finished skill: when the description is ambiguous the
+ * <p>The result is a <em>draft</em>, not a finished spec: when the description is ambiguous the
  * compiler returns a draft together with explicit issues ({@code getErrors()}) to review, rather
  * than silently guessing.
  */

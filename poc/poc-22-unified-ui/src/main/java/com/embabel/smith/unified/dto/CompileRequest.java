@@ -1,6 +1,6 @@
 package com.embabel.smith.unified.dto;
 
-/** A natural-language skill description to compile into a draft, plus an optional agent name. */
+/** A natural-language spec description to compile into a draft, plus an optional agent name. */
 public record CompileRequest(String description, String agentName) {
 
     public String agentNameOrDefault() {

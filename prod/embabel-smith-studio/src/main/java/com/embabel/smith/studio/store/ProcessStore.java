@@ -1,8 +1,8 @@
 package com.embabel.smith.studio.store;
 
-import com.embabel.smith.common.io.SkillPackReader;
-import com.embabel.smith.common.io.SkillPackWriter;
-import com.embabel.smith.common.model.SkillPack;
+import com.embabel.smith.common.io.AgentSpecReader;
+import com.embabel.smith.common.io.AgentSpecWriter;
+import com.embabel.smith.common.model.AgentSpec;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
@@ -19,11 +19,11 @@ import java.util.Objects;
 import java.util.stream.Stream;
 
 /**
- * The durable store for generated skill-packs and discovery history (task 5.2). Rooted at a
+ * The durable store for generated agent specs and discovery history (task 5.2). Rooted at a
  * configurable directory, it outlives a run so previously generated packs can be listed and
  * reloaded and prior discoveries reviewed.
  *
- * <p>Saved packs are full pack directories written by the shared {@link SkillPackWriter} under
+ * <p>Saved packs are full pack directories written by the shared {@link AgentSpecWriter} under
  * {@code packs/<name>/}; listing derives each record by reading the pack (manifest name, goal,
  * step count, directory mtime), so there is no separate index to drift from. Discovery history is
  * an append-only {@code discovery-history.jsonl} — one record per successful discovery.
@@ -41,8 +41,8 @@ public class ProcessStore {
     private static final String HISTORY_FILE = "discovery-history.jsonl";
 
     private final Path root;
-    private final SkillPackWriter writer = new SkillPackWriter();
-    private final SkillPackReader reader = new SkillPackReader();
+    private final AgentSpecWriter writer = new AgentSpecWriter();
+    private final AgentSpecReader reader = new AgentSpecReader();
     private final ObjectMapper json = new ObjectMapper();
 
     public ProcessStore(Path root) {
@@ -56,7 +56,7 @@ public class ProcessStore {
     // ---- Packs --------------------------------------------------------------
 
     /** Writes the pack to the store and returns its listing record. */
-    public PackRecord savePack(SkillPack pack) {
+    public PackRecord savePack(AgentSpec pack) {
         String name = requireName(pack);
         Path dir = packsDir().resolve(name);
         try {
@@ -89,7 +89,7 @@ public class ProcessStore {
     }
 
     /** Loads a saved pack by name, or {@code null} when no such pack is stored. */
-    public SkillPack loadPack(String name) {
+    public AgentSpec loadPack(String name) {
         Path dir = packsDir().resolve(sanitize(name));
         if (!Files.isRegularFile(dir.resolve("manifest.yml"))) {
             return null;
@@ -101,7 +101,7 @@ public class ProcessStore {
         }
     }
 
-    private PackRecord recordOf(Path dir, SkillPack pack) {
+    private PackRecord recordOf(Path dir, AgentSpec pack) {
         return new PackRecord(
                 pack.name(),
                 pack.goal() == null ? null : pack.goal().name(),
@@ -173,7 +173,7 @@ public class ProcessStore {
         return root.resolve("packs");
     }
 
-    private static String requireName(SkillPack pack) {
+    private static String requireName(AgentSpec pack) {
         String name = pack.name();
         if (name == null || name.isBlank()) {
             throw new IllegalArgumentException("The pack has no name to save");

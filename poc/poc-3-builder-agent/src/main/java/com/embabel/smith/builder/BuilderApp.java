@@ -20,7 +20,7 @@ import java.util.Map;
  * POC 3 launcher — runs the builder agent end-to-end against a live model endpoint.
  *
  * <p>Boots an Embabel {@link AgentPlatform}, runs the {@link BuilderAgent} (GOAP) over a
- * natural-language description, and reports the skill-pack it wrote to disk. The model endpoint is
+ * natural-language description, and reports the agent spec it wrote to disk. The model endpoint is
  * fully env-driven (see {@link ModelEndpointConfig}, design D4).
  *
  * <p>Run (with a live OpenAI-compatible endpoint):
@@ -30,7 +30,7 @@ import java.util.Map;
  *   export OPENAI_CUSTOM_MODELS=my-model
  *   export EMBABEL_MODELS_DEFAULT_LLM=my-model
  *   mvn -pl poc/poc-3-builder-agent spring-boot:run \
- *       -Dbuilder.description="A skill that explains a topic in plain language and posts it as a background message"
+ *       -Dbuilder.description="A spec that explains a topic in plain language and posts it as a background message"
  * </pre>
  */
 @SpringBootApplication
@@ -65,14 +65,14 @@ public class BuilderApp implements CommandLineRunner {
             throw new IllegalStateException(configError);
         }
         String desc = description.isBlank()
-                ? "A skill that takes a user's question, extracts the topic, and posts a plain-language "
+                ? "A spec that takes a user's question, extracts the topic, and posts a plain-language "
                         + "explanation as a background message."
                 : description;
-        System.out.println("[builder] Building a skill from: " + desc);
+        System.out.println("[builder] Building a spec from: " + desc);
 
         AgentScope scope = AgentScopeBuilder.fromInstance(builderAgent).createAgentScope();
         Agent agent = scope.createAgent("builder", "builder-agent",
-                "Compiles a natural-language description into a validated skill-pack on disk");
+                "Compiles a natural-language description into a validated agent spec on disk");
         platform.deploy(agent);
 
         AgentProcess process = platform.runAgentFrom(
@@ -81,11 +81,11 @@ public class BuilderApp implements CommandLineRunner {
                 Map.of("userInput", new UserInput(desc)));
 
         Object last = process.lastResult();
-        if (last instanceof SkillPackRef ref) {
-            System.out.println("[builder] Built skill-pack: " + ref.name() + " v" + ref.version()
+        if (last instanceof AgentSpecRef ref) {
+            System.out.println("[builder] Built agent spec: " + ref.name() + " v" + ref.version()
                     + " at " + ref.path());
         } else {
-            System.out.println("[builder] No skill-pack produced; status=" + process.getStatus());
+            System.out.println("[builder] No agent spec produced; status=" + process.getStatus());
         }
     }
 }

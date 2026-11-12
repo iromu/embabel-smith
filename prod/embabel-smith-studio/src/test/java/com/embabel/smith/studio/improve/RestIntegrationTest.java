@@ -1,10 +1,10 @@
 package com.embabel.smith.studio.improve;
 
-import com.embabel.smith.common.io.SkillPackWriter;
+import com.embabel.smith.common.io.AgentSpecWriter;
 import com.embabel.smith.common.model.ActionStepSpec;
 import com.embabel.smith.common.model.GoalStepSpec;
-import com.embabel.smith.common.model.SkillPack;
-import com.embabel.smith.common.model.SkillPackManifest;
+import com.embabel.smith.common.model.AgentSpec;
+import com.embabel.smith.common.model.AgentSpecManifest;
 import com.embabel.smith.runtime.trace.JsonlTraceStore;
 import com.embabel.smith.studio.rest.BuildController;
 import com.embabel.smith.studio.rest.ImproveController;
@@ -75,7 +75,7 @@ class RestIntegrationTest {
     @Test
     void runBuildAndLoopOverTheRestSurface() throws Exception {
         // A live pack in the source, plus a seeded failing trace to drive the loop's detection.
-        new SkillPackWriter().write(livePack(), SOURCE.resolve("summarize"));
+        new AgentSpecWriter().write(livePack(), SOURCE.resolve("summarize"));
         new JsonlTraceStore(TRACE_DIR.resolve("runs.jsonl")).append(
                 TestFixtures.failedTrace("seed-1", "summarize", "Describe your use case.",
                         TestFixtures.step("summarize", "failed", "produced no summary")));
@@ -99,13 +99,13 @@ class RestIntegrationTest {
 
         // 4. The seeded failing trace produced a held candidate.
         List<CandidateInfo> candidates = improveController.candidates();
-        assertThat(candidates).extracting(CandidateInfo::skill).contains("summarize");
+        assertThat(candidates).extracting(CandidateInfo::spec).contains("summarize");
     }
 
     /** A realistic single-step summarizer, deployable by the runtime (canonical FQN types). */
-    private static SkillPack livePack() {
-        return new SkillPack(
-                new SkillPackManifest("summarize", "1.0.0"),
+    private static AgentSpec livePack() {
+        return new AgentSpec(
+                new AgentSpecManifest("summarize", "1.0.0"),
                 GoalStepSpec.exportedGoal("summarize", "Summarize an input", BACKGROUND_MESSAGE),
                 List.of(ActionStepSpec.action("summarize", "Summarize the input",
                         List.of(USER_INPUT), BACKGROUND_MESSAGE,

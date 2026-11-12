@@ -13,8 +13,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * Offline tests for the Trust pane (POC 22). The check delegates to POC 10's
  * {@code TrustTierPolicy} (the per-tier tool-group allowlist — pure, no model), so these pin the
- * allow/deny decision: a {@code shell} skill is denied at {@code T1} (no tool access) and allowed at
- * {@code T4} (everything), plus the offline scaffolding (unknown tier, no skill, unknown skill).
+ * allow/deny decision: a {@code shell} spec is denied at {@code T1} (no tool access) and allowed at
+ * {@code T4} (everything), plus the offline scaffolding (unknown tier, no spec, unknown spec).
  */
 class TrustControllerTest {
 
@@ -22,14 +22,14 @@ class TrustControllerTest {
 
     @BeforeEach
     void setUp() {
-        SkillCatalog catalog = new SkillCatalog("");
+        SpecCatalog catalog = new SpecCatalog("");
         mockMvc = MockMvcBuilders.standaloneSetup(new TrustController(catalog)).build();
     }
 
     @Test
-    void aShellSkillIsDeniedAtT1() throws Exception {
+    void aShellSpecIsDeniedAtT1() throws Exception {
         mockMvc.perform(post("/api/trust").contentType(MediaType.APPLICATION_JSON)
-                .content("{\"skillName\":\"shell-runner\",\"tier\":\"T1_COMMUNITY\"}"))
+                .content("{\"specName\":\"shell-runner\",\"tier\":\"T1_COMMUNITY\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.error").isEmpty())
                 .andExpect(jsonPath("$.allowed").value(false))
@@ -38,9 +38,9 @@ class TrustControllerTest {
     }
 
     @Test
-    void aShellSkillIsAllowedAtT4() throws Exception {
+    void aShellSpecIsAllowedAtT4() throws Exception {
         mockMvc.perform(post("/api/trust").contentType(MediaType.APPLICATION_JSON)
-                .content("{\"skillName\":\"shell-runner\",\"tier\":\"T4_PLATFORM\"}"))
+                .content("{\"specName\":\"shell-runner\",\"tier\":\"T4_PLATFORM\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.error").isEmpty())
                 .andExpect(jsonPath("$.allowed").value(true))
@@ -50,18 +50,18 @@ class TrustControllerTest {
     @Test
     void anUnknownTierIsRejected() throws Exception {
         mockMvc.perform(post("/api/trust").contentType(MediaType.APPLICATION_JSON)
-                .content("{\"skillName\":\"shell-runner\",\"tier\":\"T9\"}"))
+                .content("{\"specName\":\"shell-runner\",\"tier\":\"T9\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.error")
                         .value(org.hamcrest.Matchers.containsString("Unknown tier")));
     }
 
     @Test
-    void noSkillSelectedIsRejected() throws Exception {
+    void noSpecSelectedIsRejected() throws Exception {
         mockMvc.perform(post("/api/trust").contentType(MediaType.APPLICATION_JSON)
-                .content("{\"skillName\":\"\",\"tier\":\"T3_PARTNER\"}"))
+                .content("{\"specName\":\"\",\"tier\":\"T3_PARTNER\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.error")
-                        .value(org.hamcrest.Matchers.containsString("No skill selected")));
+                        .value(org.hamcrest.Matchers.containsString("No spec selected")));
     }
 }

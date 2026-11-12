@@ -1,7 +1,7 @@
 package com.embabel.smith.runtime;
 
 import com.embabel.agent.api.common.PlannerType;
-import com.embabel.smith.common.model.SkillPack;
+import com.embabel.smith.common.model.AgentSpec;
 
 /**
  * Resolves which planner a run should use.
@@ -12,7 +12,7 @@ import com.embabel.smith.common.model.SkillPack;
  */
 public class PlannerResolver {
 
-    public PlannerType resolve(String runOverride, SkillPack pack) {
+    public PlannerType resolve(String runOverride, AgentSpec pack) {
         String chosen = firstNonBlank(runOverride,
                 pack == null || pack.manifest() == null ? null : pack.manifest().defaultPlanner());
         if (chosen == null) {

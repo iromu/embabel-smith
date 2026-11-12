@@ -1,6 +1,6 @@
 package com.embabel.smith.unified;
 
-import com.embabel.smith.retrieval.SkillEntry;
+import com.embabel.smith.retrieval.SpecEntry;
 import com.embabel.smith.retrieval.scale.LexicalScorer;
 import com.embabel.smith.unified.dto.RetrieveResponse;
 import com.embabel.smith.unified.dto.RetrieveResult;
@@ -21,8 +21,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * Offline tests for the Retrieve pane (POC 22). The endpoint reuses POC 12's scorer-agnostic
- * {@code ScaleSkillRegistry} over the catalog with the offline lexical scorer, so these pin the
- * "which skills would this query route to" ranking — no model needed. The pane also applies POC 18's
+ * {@code ScaleSpecRegistry} over the catalog with the offline lexical scorer, so these pin the
+ * "which specs would this query route to" ranking — no model needed. The pane also applies POC 18's
  * library curation (retired dropped, degraded de-ranked, every hit stamped with its lifecycle state),
  * and reports the active scorer name so a denser scorer (the seam) is observable.
  */
@@ -32,14 +32,14 @@ class RetrieveControllerTest {
     private static final String EXTRACT_QUERY = "extract the topic audience and tone from the user request";
 
     private final ObjectMapper json = new ObjectMapper();
-    private SkillCatalog catalog;
-    private SkillCuration curation;
+    private SpecCatalog catalog;
+    private SpecCuration curation;
     MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
-        catalog = new SkillCatalog("");
-        curation = new SkillCuration(catalog);
+        catalog = new SpecCatalog("");
+        curation = new SpecCuration(catalog);
         mockMvc = MockMvcBuilders.standaloneSetup(
                 new RetrieveController(catalog, curation, new ScorerBinding(new LexicalScorer(), "lexical")))
                 .build();
@@ -59,7 +59,7 @@ class RetrieveControllerTest {
     }
 
     @Test
-    void anExtractQueryRanksTheExtractSkillFirst() throws Exception {
+    void anExtractQueryRanksTheExtractSpecFirst() throws Exception {
         String body = String.format("{\"query\":\"%s\",\"k\":3}", EXTRACT_QUERY);
         mockMvc.perform(post("/api/retrieve").contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isOk())
@@ -86,14 +86,14 @@ class RetrieveControllerTest {
     }
 
     @Test
-    void aRetiredSkillIsDroppedFromRetrieval() throws Exception {
+    void aRetiredSpecIsDroppedFromRetrieval() throws Exception {
         curation.curate(EXTRACT, 0.1); // score collapse -> RETIRED, out of the library
         List<RetrieveResult> results = retrieve(EXTRACT_QUERY, 10).results();
         assertThat(results).noneMatch(r -> EXTRACT.equals(r.name()));
     }
 
     @Test
-    void aDegradedSkillIsDeRanked() throws Exception {
+    void aDegradedSpecIsDeRanked() throws Exception {
         double activeScore = find(retrieve(EXTRACT_QUERY, 10), EXTRACT).orElseThrow().score();
         curation.curate(EXTRACT, 0.85); // score drop -> DEGRADED, de-ranked
         RetrieveResult degraded = find(retrieve(EXTRACT_QUERY, 10), EXTRACT).orElseThrow();

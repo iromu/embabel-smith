@@ -9,9 +9,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * The Author pane (POC 22): given a natural-language description, compile a draft skill via POC 2's
+ * The Author pane (POC 22): given a natural-language description, compile a draft spec via POC 2's
  * {@link com.embabel.smith.nlcompile.NlCompileRunner} and report its goal shape +
- * {@code DraftQuality} verdict — the "describe a skill in plain language" half of the builder. This is
+ * {@code DraftQuality} verdict — the "describe a spec in plain language" half of the builder. This is
  * endpoint-gated: it needs a live OpenAI-compatible endpoint, and returns a clear configuration error
  * (not an opaque model error) when none is set. The model call is behind the {@link CompileFn} seam so
  * the endpoint-present path is testable with a stub.
@@ -38,7 +38,7 @@ public class AuthorController {
     public CompileResponse compile(@RequestBody CompileRequest request) {
         String description = request.description() == null ? "" : request.description();
         if (description.isBlank()) {
-            return CompileResponse.badRequest("No description supplied; describe the skill first.");
+            return CompileResponse.badRequest("No description supplied; describe the spec first.");
         }
         String configError = endpoint.configError();
         if (configError != null) {

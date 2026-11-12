@@ -1,6 +1,6 @@
 package com.embabel.smith.studio.improve;
 
-import com.embabel.smith.common.model.SkillPack;
+import com.embabel.smith.common.model.AgentSpec;
 import com.embabel.smith.runtime.trace.TraceRecord;
 import org.junit.jupiter.api.Test;
 
@@ -12,7 +12,7 @@ class RefinerTest {
 
     @Test
     void onlyFailingStepPromptChanges() {
-        SkillPack pack = TestFixtures.pack("extract", "s1", "s2", "s3");
+        AgentSpec pack = TestFixtures.pack("extract", "s1", "s2", "s3");
         List<TraceRecord> failures = List.of(TestFixtures.failedTrace("r1", "extract", "input",
                 TestFixtures.step("s1", "completed", "ok"),
                 TestFixtures.step("s2", "failed", "bad output"),
@@ -32,7 +32,7 @@ class RefinerTest {
 
     @Test
     void evidenceIsInRewriteInput() {
-        SkillPack pack = TestFixtures.pack("extract", "s2");
+        AgentSpec pack = TestFixtures.pack("extract", "s2");
         List<TraceRecord> failures = List.of(TestFixtures.failedTrace("r1", "extract", "the input",
                 TestFixtures.step("s2", "failed", "the output excerpt")));
 
@@ -50,7 +50,7 @@ class RefinerTest {
 
     @Test
     void noFailureEvidenceLeavesPackUnchanged() {
-        SkillPack pack = TestFixtures.pack("extract", "s1", "s2");
+        AgentSpec pack = TestFixtures.pack("extract", "s1", "s2");
         // A failed run with no executed steps (e.g. a model abort) gives no step-level evidence.
         List<TraceRecord> failures = List.of(TestFixtures.failedTrace("r1", "extract", "input"));
 

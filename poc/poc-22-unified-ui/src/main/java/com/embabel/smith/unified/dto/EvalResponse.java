@@ -5,12 +5,12 @@ import java.util.List;
 /**
  * The result of the eval/refinement pane (POC 9): the composite score before (and, when a prompt
  * rewrite ran, after) refinement, the step refined, the revised prompt, and the inputs that failed.
- * {@link #error} is non-null when the request could not run (no skill selected, an unknown skill, or
+ * {@link #error} is non-null when the request could not run (no spec selected, an unknown spec, or
  * no endpoint configured) — in which case the score/refinement fields are empty.
  */
 public record EvalResponse(
         String error,
-        String skillName,
+        String specName,
         String stepName,
         double beforeScore,
         double afterScore,
@@ -23,10 +23,10 @@ public record EvalResponse(
         return new EvalResponse(error, null, null, 0.0, 0.0, false, false, null, List.of());
     }
 
-    public static EvalResponse ok(String skillName, String stepName, double before, double after,
+    public static EvalResponse ok(String specName, String stepName, double before, double after,
                                  boolean refined, boolean improved, String revisedPrompt,
                                  List<String> failingInputs) {
-        return new EvalResponse(null, skillName, stepName, round4(before), round4(after), refined,
+        return new EvalResponse(null, specName, stepName, round4(before), round4(after), refined,
                 improved, revisedPrompt, failingInputs);
     }
 

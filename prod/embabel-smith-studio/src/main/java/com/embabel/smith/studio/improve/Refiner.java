@@ -2,7 +2,7 @@ package com.embabel.smith.studio.improve;
 
 import com.embabel.smith.builder.eval.PromptRewriter;
 import com.embabel.smith.common.model.ActionStepSpec;
-import com.embabel.smith.common.model.SkillPack;
+import com.embabel.smith.common.model.AgentSpec;
 import com.embabel.smith.runtime.trace.TraceRecord;
 
 import java.util.ArrayList;
@@ -28,14 +28,14 @@ public class Refiner {
      * The outcome of a refinement: the candidate pack and the names of the steps whose prompts were
      * rewritten (empty when nothing needed refining).
      */
-    public record Refinement(SkillPack candidate, List<String> changedSteps) {
+    public record Refinement(AgentSpec candidate, List<String> changedSteps) {
 
         public boolean changed() {
             return !changedSteps.isEmpty();
         }
     }
 
-    public Refinement refine(SkillPack current, List<TraceRecord> failureTraces) {
+    public Refinement refine(AgentSpec current, List<TraceRecord> failureTraces) {
         Set<String> failing = failingSteps(failureTraces);
         if (failing.isEmpty()) {
             return new Refinement(current, List.of());
@@ -52,7 +52,7 @@ public class Refiner {
             steps.set(i, withPrompt(step, newPrompt));
             changed.add(step.name());
         }
-        SkillPack candidate = new SkillPack(current.manifest(), current.goal(), steps, current.types());
+        AgentSpec candidate = new AgentSpec(current.manifest(), current.goal(), steps, current.types());
         return new Refinement(candidate, List.copyOf(changed));
     }
 

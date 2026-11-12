@@ -25,7 +25,7 @@ function trace(runId: string): TraceInfo {
 function candidate(partial: Partial<CandidateInfo>): CandidateInfo {
   return {
     id: 'c1',
-    skill: 'alpha',
+    spec: 'alpha',
     score: 0.9,
     baseline: 0.7,
     diffSummary: 'tightened prompt',

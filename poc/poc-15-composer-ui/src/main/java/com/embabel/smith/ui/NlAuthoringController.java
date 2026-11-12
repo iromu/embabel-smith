@@ -15,8 +15,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * The NL-authoring pane behind the canvas (POC 15): given a natural-language description, compile a
- * draft skill via POC 2's {@link NlCompileRunner} and report its goal shape + {@code DraftQuality}
- * verdict — the "describe a skill in plain language" half of the builder UI. This is the
+ * draft spec via POC 2's {@link NlCompileRunner} and report its goal shape + {@code DraftQuality}
+ * verdict — the "describe a spec in plain language" half of the builder UI. This is the
  * endpoint-gated half of the canvas: it needs a live OpenAI-compatible endpoint, and returns a clear
  * configuration error (not an opaque model error) when none is set.
  */
@@ -44,7 +44,7 @@ public class NlAuthoringController {
     public CompileResponse compile(@RequestBody CompileRequest request) {
         String description = request.description() == null ? "" : request.description();
         if (description.isBlank()) {
-            return CompileResponse.badRequest("No description supplied; describe the skill first.");
+            return CompileResponse.badRequest("No description supplied; describe the spec first.");
         }
         String configError = endpoint.configError();
         if (configError != null) {

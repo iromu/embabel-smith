@@ -1,7 +1,7 @@
 package com.embabel.smith.studio.rest;
 
 import com.embabel.smith.common.config.ModelEndpointConfig;
-import com.embabel.smith.runtime.SkillRunService;
+import com.embabel.smith.runtime.AgentSpecRunService;
 import com.embabel.smith.runtime.core.TrustTier;
 import com.embabel.smith.studio.rest.dto.RunRequest;
 import com.embabel.smith.studio.rest.dto.RunResponse;
@@ -21,7 +21,7 @@ public class RunController {
     /** The model-dependent run: source + goal + input + planner + tier to a run result. */
     @FunctionalInterface
     public interface RunFn {
-        SkillRunService.RunResult run(String source, String goal, String input, String planner,
+        AgentSpecRunService.RunResult run(String source, String goal, String input, String planner,
                                       TrustTier tier);
     }
 
@@ -44,7 +44,7 @@ public class RunController {
         }
         TrustTier tier = parseTier(request.trustTier());
         try {
-            SkillRunService.RunResult result = runner.run(request.source(), request.goal(),
+            AgentSpecRunService.RunResult result = runner.run(request.source(), request.goal(),
                     request.input(), request.planner(), tier);
             String runId = result.trace() == null ? null : result.trace().runId();
             return result.success()

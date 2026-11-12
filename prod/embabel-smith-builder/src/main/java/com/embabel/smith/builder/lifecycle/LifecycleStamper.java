@@ -1,7 +1,7 @@
 package com.embabel.smith.builder.lifecycle;
 
 import com.embabel.smith.common.io.Yaml;
-import com.embabel.smith.common.model.SkillPack;
+import com.embabel.smith.common.model.AgentSpec;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -9,7 +9,7 @@ import java.nio.file.Path;
 import java.time.Instant;
 
 /**
- * Stamps the lifecycle sidecar for a published skill-pack (design D4, the POC 18 contract): the
+ * Stamps the lifecycle sidecar for a published agent spec (design D4, the POC 18 contract): the
  * content hash, the baseline eval pass-rate, and the initial lifecycle state. The builder always
  * records the initial state as {@link LifecycleState#INCUBATING}; the {@code incubating → active}
  * promotion is a later *transition* owned by the studio (change 05, POC 18's
@@ -22,8 +22,8 @@ public class LifecycleStamper {
      * always the initial {@link LifecycleState#INCUBATING}; the baseline pass-rate is recorded but
      * does not drive the initial state.
      */
-    public LifecycleMetadata stamp(SkillPack pack, double baselinePassRate) {
-        return new LifecycleMetadata(SkillContentHash.of(pack), baselinePassRate,
+    public LifecycleMetadata stamp(AgentSpec pack, double baselinePassRate) {
+        return new LifecycleMetadata(SpecContentHash.of(pack), baselinePassRate,
                 LifecycleState.INCUBATING, Instant.now().toString());
     }
 

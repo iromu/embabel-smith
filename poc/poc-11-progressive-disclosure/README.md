@@ -1,6 +1,6 @@
 # POC 11 — Progressive-disclosure stress test
 
-A skill-pack ships a large bundled reference. The POC measures two context costs: the **plan
+A agent spec ships a large bundled reference. The POC measures two context costs: the **plan
 context** (what the GOAP planner loads) stays bounded regardless of the reference size, whereas
 inlining the reference into the action prompt grows the execution context with it. Fully offline.
 
@@ -15,7 +15,7 @@ inlining the reference into the action prompt grows the execution context with i
 
 ```mermaid
 flowchart TD
-    PACK["skill-pack with bundled reference<br/>reference grows ×100"]
+    PACK["agent spec with bundled reference<br/>reference grows ×100"]
     PACK --> PLAN["GOAP planner loads plan context<br/>bounded: constant 280 chars"]
     PACK -->|"progressive: load on demand"| EXEC1["execution context stays small"]
     PACK -->|"eager: inline reference into prompt"| EXEC2["execution context grows<br/>3,469 → 320,863 chars"]
@@ -23,7 +23,7 @@ flowchart TD
 
 `PlanContextMeter` measures the plan-context size vs. the progressive/eager prompt size for a pack
 that carries a `references/domain.md`; `ProgressiveDisclosureRunner` scales the reference and reports
-the ratio. The sample pack is `skill-packs/reference-heavy`.
+the ratio. The sample pack is `agent specs/reference-heavy`.
 
 ## Run it
 

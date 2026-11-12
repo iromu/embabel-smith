@@ -23,21 +23,21 @@ class EvalControllerTest {
                 },
                 new SourceService("", ""),
                 new ModelEndpointConfig("", "", "", ""));
-        EvalResponse response = controller.eval(new EvalRequest("folder:/tmp", "skill", null));
+        EvalResponse response = controller.eval(new EvalRequest("folder:/tmp", "spec", null));
         assertThat(response.errorCode()).isEqualTo("MODEL_NOT_CONFIGURED");
         assertThat(response.error()).contains("No resolvable model endpoint");
     }
 
     @Test
-    void returnsErrorWhenNoSourceOrSkill() {
+    void returnsErrorWhenNoSourceOrSpec() {
         EvalController controller = new EvalController(
                 (pack, tasks) -> {
-                    throw new AssertionError("must not evaluate without a source/skill");
+                    throw new AssertionError("must not evaluate without a source/spec");
                 },
                 new SourceService("", ""),
                 configured());
         EvalResponse response = controller.eval(new EvalRequest("", "", null));
-        assertThat(response.error()).contains("No source or skill");
+        assertThat(response.error()).contains("No source or spec");
     }
 
     @Test
@@ -49,7 +49,7 @@ class EvalControllerTest {
                 sourceService,
                 configured());
         EvalResponse response = controller.eval(new EvalRequest("folder:" + tmp, "summarizer", null));
-        assertThat(response.skill()).isEqualTo("summarizer");
+        assertThat(response.spec()).isEqualTo("summarizer");
         assertThat(response.score()).isEqualTo(0.5);
         assertThat(response.refinementCount()).isEqualTo(1);
         assertThat(response.failingTasks()).contains("task1");
@@ -57,11 +57,11 @@ class EvalControllerTest {
     }
 
     @Test
-    void returnsErrorForUnknownSkill(@TempDir Path tmp) {
+    void returnsErrorForUnknownSpec(@TempDir Path tmp) {
         SourceService sourceService = new SourceService("folder:" + tmp, "");
         EvalController controller = new EvalController(
                 (pack, tasks) -> {
-                    throw new AssertionError("must not evaluate an unknown skill");
+                    throw new AssertionError("must not evaluate an unknown spec");
                 },
                 sourceService,
                 configured());

@@ -6,11 +6,11 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
 
 /**
- * A pure-data intermediate type — the skill-pack's view of an Embabel {@code DynamicType}.
+ * A pure-data intermediate type — the agent spec's view of an Embabel {@code DynamicType}.
  *
  * <p>Declared in {@code types/<name>.yml}. It names a type with a description and a set of
  * named, typed own-properties, and requires <em>no</em> compiled JVM class to exist. This is
- * what makes a skill-pack portable and ingestible without a build step.
+ * what makes a agent spec portable and ingestible without a build step.
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record DynamicTypeDef(

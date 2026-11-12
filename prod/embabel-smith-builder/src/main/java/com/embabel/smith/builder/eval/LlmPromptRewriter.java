@@ -34,7 +34,7 @@ public class LlmPromptRewriter implements PromptRewriter {
     @Override
     public String rewrite(String currentPrompt, String failureFeedback) {
         String instruction = """
-                You revise the prompt of a single skill action so it reliably produces output that
+                You revise the prompt of a single spec action so it reliably produces output that
                 satisfies the failing acceptance criteria below. Keep it a single action prompt;
                 preserve the {{...}} template variables; return ONLY the revised prompt text, no commentary.
 

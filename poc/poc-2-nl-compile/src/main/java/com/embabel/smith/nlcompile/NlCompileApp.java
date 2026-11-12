@@ -15,7 +15,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import java.util.List;
 
 /**
- * POC 2 launcher: compiles a natural-language description into a draft skill and reports it.
+ * POC 2 launcher: compiles a natural-language description into a draft spec and reports it.
  *
  * <p>Run (with a live OpenAI-compatible endpoint):
  * <pre>

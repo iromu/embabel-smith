@@ -4,7 +4,7 @@
       <PageHeader
         icon="account_tree"
         title="Compose"
-        description="Place steps, connect them with type-checked edges, and export a composite skill-pack."
+        description="Place steps, connect them with type-checked edges, and export a composite spec-pack."
       />
 
       <q-separator />

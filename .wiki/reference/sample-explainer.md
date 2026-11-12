@@ -4,20 +4,20 @@ type: "reference"
 status: "active"
 language: "default"
 source_paths:
-  - "skill-packs/explainer/manifest.yml"
-  - "skill-packs/explainer/goal.yml"
-  - "skill-packs/explainer/steps/extractTopic.yml"
-  - "skill-packs/explainer/steps/writeExplainer.yml"
-  - "skill-packs/explainer/types/TopicBrief.yml"
-  - "smith-common/src/main/java/com/embabel/smith/common/samples/SampleSkillPacks.java"
+  - "agent-specs/explainer/manifest.yml"
+  - "agent-specs/explainer/goal.yml"
+  - "agent-specs/explainer/steps/extractTopic.yml"
+  - "agent-specs/explainer/steps/writeExplainer.yml"
+  - "agent-specs/explainer/types/TopicBrief.yml"
+  - "smith-common/src/main/java/com/embabel/smith/common/samples/SampleAgentSpecs.java"
 updated_at: "2026-11-01"
 ---
 
 # The explainer sample pack
 
-`skill-packs/explainer/` is the canonical, well-formed skill-pack the whole project is checked
-against. It is the on-disk twin of `SampleSkillPacks.explainer()` in `smith-common`. See
-[[skill-pack-format]] for the general shape and [[skill-pack-model]] for the model records.
+`agent-specs/explainer/` is the canonical, well-formed agent spec that the whole project is checked
+against. It is the on-disk twin of `SampleAgentSpecs.explainer()` in `smith-common`. See
+[[agent-spec-format]] for the general shape and [[agent-spec-model]] for the model records.
 
 ## The chain
 
@@ -37,17 +37,17 @@ Two actions, one intermediate type, one exported goal. Read it top to bottom:
    references `{{topicBrief.topic}}`, `{{topicBrief.audience}}`, `{{topicBrief.tone}}` — each bound
    by the declared `TopicBrief` input and present on its `ownProperties`.
 5. **`goal.yml`** — `export: true`, `outputTypeName: com.embabel.agent.spec.model.BackgroundMessage`.
-   This exported goal is the skill; its output type is what a run returns. See
-   [[exported-goal-as-skill]].
+   This exported goal is the spec; its output type is what a run returns. See
+   [[exported-goal-as-spec]].
 
 ## Why it is useful to read
 
 - It is the **fixture** for offline tests across `smith-common`, the builder, and the runtime, so
   every module is checked against the same sample.
 - It is the default `builder.pack-dir` for POC 1, POC 4, and POC 5, so it is the pack those run
-  commands execute. See [[runtime-run]], [[skill-format-on-demand]], and [[eval-scoring]].
+  commands execute. See [[runtime-run]], [[spec-format-on-demand]], and [[eval-scoring]].
 - It is the **safe first change** in [[getting-started]]: editing `writeExplainer.yml`'s prompt
   changes data only and keeps validation green, because the referenced properties are unchanged.
 
-If you are learning the format, read this directory first, then `docs/skill-pack-format.md`, then
-`SkillRunner.java`.
+If you are learning the format, read this directory first, then `docs/agent-spec-format.md`, then
+`SpecRunner.java`.

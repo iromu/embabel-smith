@@ -1,13 +1,13 @@
 package com.embabel.smith.composer;
 
-import com.embabel.smith.common.io.SkillPackReader;
+import com.embabel.smith.common.io.AgentSpecReader;
 import com.embabel.smith.common.model.DynamicTypeDef;
 import com.embabel.smith.common.model.PropertyDef;
-import com.embabel.smith.common.model.SkillPack;
-import com.embabel.smith.common.model.SkillPackManifest;
+import com.embabel.smith.common.model.AgentSpec;
+import com.embabel.smith.common.model.AgentSpecManifest;
 import com.embabel.smith.common.model.GoalStepSpec;
 import com.embabel.smith.common.model.ActionStepSpec;
-import com.embabel.smith.common.validation.SkillPackValidator;
+import com.embabel.smith.common.validation.AgentSpecValidator;
 import com.embabel.smith.common.validation.ValidationResult;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -20,7 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Offline tests for composite export (POC 14): the exported composite is a single, well-formed
- * skill-pack whose action chain is the composed plan, and it re-validates cleanly.
+ * agent spec whose action chain is the composed plan, and it re-validates cleanly.
  */
 class CompositeExporterTest {
 
@@ -29,7 +29,7 @@ class CompositeExporterTest {
 
     @Test
     void buildCompositeUnionsStepsAndTypesUnderOneGoal() {
-        SkillPack composite = exporter.buildComposite("compose-composite", validCanvas());
+        AgentSpec composite = exporter.buildComposite("compose-composite", validCanvas());
 
         assertThat(composite.goal().isExported()).isTrue();
         assertThat(composite.goal().outputTypeName()).isEqualTo(BG);
@@ -43,39 +43,39 @@ class CompositeExporterTest {
     void theExportedCompositeRevalidatesCleanly(@TempDir Path tmp) throws IOException {
         Path compositeDir = exporter.export("compose-composite", validCanvas(), tmp);
 
-        SkillPack reRead = new SkillPackReader().read(compositeDir);
+        AgentSpec reRead = new AgentSpecReader().read(compositeDir);
         assertThat(reRead.steps()).extracting(ActionStepSpec::name)
                 .containsExactly("extractTopic", "writeExplainer");
-        assertThat(new SkillPackValidator().validate(compositeDir).isValid())
-                .as("the exported composite is a loadable skill-pack")
+        assertThat(new AgentSpecValidator().validate(compositeDir).isValid())
+                .as("the exported composite is a loadable agent spec")
                 .isTrue();
     }
 
     private CompositionCanvas validCanvas() {
         CompositionCanvas canvas = new CompositionCanvas();
-        canvas.addSkill(new SkillNode(extractPack()));
-        canvas.addSkill(new SkillNode(explainPack()));
+        canvas.addSpec(new SpecNode(extractPack()));
+        canvas.addSpec(new SpecNode(explainPack()));
         canvas.connect("compose-extract", "compose-explain");
         return canvas;
     }
 
     // --- fixtures (mirroring the compose-extract / compose-explain samples) ---
 
-    private static SkillPack extractPack() {
-        SkillPackManifest manifest = new SkillPackManifest("compose-extract", "1.0.0", "GOAP", null);
+    private static AgentSpec extractPack() {
+        AgentSpecManifest manifest = new AgentSpecManifest("compose-extract", "1.0.0", "GOAP", null);
         GoalStepSpec goal = GoalStepSpec.exportedGoal("topicExtracted", "desc", "TopicBrief");
         ActionStepSpec action = ActionStepSpec.action("extractTopic", "desc",
                 List.of("com.embabel.agent.domain.io.UserInput"), "TopicBrief",
                 "Extract the topic: {{userInput.content}}");
-        return new SkillPack(manifest, goal, List.of(action), List.of(topicBrief()));
+        return new AgentSpec(manifest, goal, List.of(action), List.of(topicBrief()));
     }
 
-    private static SkillPack explainPack() {
-        SkillPackManifest manifest = new SkillPackManifest("compose-explain", "1.0.0", "GOAP", null);
+    private static AgentSpec explainPack() {
+        AgentSpecManifest manifest = new AgentSpecManifest("compose-explain", "1.0.0", "GOAP", null);
         GoalStepSpec goal = GoalStepSpec.exportedGoal("explainerDone", "desc", BG);
         ActionStepSpec action = ActionStepSpec.action("writeExplainer", "desc",
                 List.of("TopicBrief"), BG, "Write the explainer: {{topicBrief.topic}}");
-        return new SkillPack(manifest, goal, List.of(action), List.of(topicBrief()));
+        return new AgentSpec(manifest, goal, List.of(action), List.of(topicBrief()));
     }
 
     private static DynamicTypeDef topicBrief() {
