@@ -1,47 +1,51 @@
 <template>
-  <q-page padding>
-    <q-card flat bordered class="q-pa-md">
+  <q-page>
+    <div class="pane-stack">
       <PageHeader
         icon="verified_user"
         title="Trust"
         description="Check whether a spec's declared tool-groups are allowed under a trust tier."
       />
 
-      <q-separator />
-
-      <q-card-section>
-        <div class="row q-gutter-sm items-center">
-          <q-select
-            v-model="source"
-            label="Source"
-            dense
-            :options="sourceOptions"
-            style="width: 320px"
-            data-test="trust-source"
-          />
-          <q-select
-            v-model="spec"
-            label="Spec"
-            dense
-            :options="specOptions"
-            style="width: 260px"
-            data-test="trust-spec"
-          />
-          <q-select
-            v-model="tier"
-            label="Tier"
-            dense
-            :options="tiers"
-            style="width: 160px"
-            data-test="trust-tier"
-          />
-          <q-btn label="Check" color="primary" icon="verified_user" @click="doCheck" data-test="trust-btn" />
+      <SectionCard title="Check a spec" icon="verified_user">
+        <div class="row q-col-gutter-md items-start">
+          <div class="col-auto">
+            <q-select
+              v-model="source"
+              label="Source"
+              outlined
+              :options="sourceOptions"
+              style="width: 220px"
+              data-test="trust-source"
+            />
+          </div>
+          <div class="col-auto">
+            <q-select
+              v-model="spec"
+              label="Spec"
+              outlined
+              :options="specOptions"
+              style="width: 220px"
+              data-test="trust-spec"
+            />
+          </div>
+          <div class="col-auto">
+            <q-select
+              v-model="tier"
+              label="Tier"
+              outlined
+              :options="tiers"
+              style="width: 150px"
+              data-test="trust-tier"
+            />
+          </div>
+          <div class="col-auto">
+            <q-btn label="Check" color="primary" icon="verified_user" @click="doCheck" data-test="trust-btn" />
+          </div>
         </div>
-      </q-card-section>
+      </SectionCard>
 
-      <q-separator />
-
-      <q-card-section>
+      <SectionCard title="Verdict" icon="gavel">
         <div v-if="error" class="text-negative" data-test="trust-error">{{ error }}</div>
         <div v-else-if="result" data-test="trust-result">
           <q-badge :color="result.allowed ? 'positive' : 'negative'" :label="result.allowed ? 'ALLOWED' : 'DENIED'" />
@@ -53,16 +57,24 @@
             declares: {{ result.declaredToolGroups.join(', ') }}
           </div>
         </div>
-        <div v-else class="text-grey-6">Pick a source, a spec and a trust tier, then check.</div>
-      </q-card-section>
-    </q-card>
+        <EmptyState
+          v-else
+          icon="policy"
+          title="No check yet"
+          hint="Pick a source, a spec and a trust tier, then check to see the verdict here."
+          data-test="trust-empty"
+        />
+      </SectionCard>
+    </div>
   </q-page>
 </template>
 
 <script setup lang="ts">
 import { ref } from 'vue'
 
+import EmptyState from '../components/EmptyState.vue'
 import PageHeader from '../components/PageHeader.vue'
+import SectionCard from '../components/SectionCard.vue'
 import { checkTrust } from '../api/client'
 import type { TrustResponse } from '../api/types'
 import { useSourceSpec } from '../composables/useSourceSpec'

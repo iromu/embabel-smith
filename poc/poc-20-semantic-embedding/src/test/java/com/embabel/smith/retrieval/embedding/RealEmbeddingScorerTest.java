@@ -12,56 +12,66 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
 
-/** Pins the scorer: cosine of the (memoised) embeddings, and that each distinct text is embedded once. */
+/**
+ * Pins the scorer: cosine of the (memoised) embeddings, and that each distinct text is
+ * embedded once.
+ */
 class RealEmbeddingScorerTest {
 
-    /** A deterministic {@link Embedder}: fixed unit vector per text, and a record of what it embedded. */
-    private static final class CountingEmbedder implements Embedder {
-        private final Map<String, float[]> byText = new HashMap<>();
-        private final Set<String> embedded = new HashSet<>();
+	/**
+	 * A deterministic {@link Embedder}: fixed unit vector per text, and a record of what
+	 * it embedded.
+	 */
+	private static final class CountingEmbedder implements Embedder {
 
-        CountingEmbedder() {
-            byText.put("q coffee", new float[]{1, 0});
-            byText.put("s1 coffee machine explainer", new float[]{1, 0});
-            byText.put("s2 toaster explainer", new float[]{0, 1});
-        }
+		private final Map<String, float[]> byText = new HashMap<>();
 
-        @Override
-        public float[] embed(String text) {
-            embedded.add(text);
-            return byText.get(text);
-        }
-    }
+		private final Set<String> embedded = new HashSet<>();
 
-    @Test
-    void scoreIsTheCosineOfTheQueryAndEntryEmbeddings() {
-        CountingEmbedder embedder = new CountingEmbedder();
-        RealEmbeddingScorer scorer = new RealEmbeddingScorer(embedder);
-        SpecEntry coffee = entry("s1", "coffee machine explainer");
-        SpecEntry toaster = entry("s2", "toaster explainer");
+		CountingEmbedder() {
+			byText.put("q coffee", new float[] { 1, 0 });
+			byText.put("s1 coffee machine explainer", new float[] { 1, 0 });
+			byText.put("s2 toaster explainer", new float[] { 0, 1 });
+		}
 
-        assertThat(scorer.score("q coffee", coffee)).isCloseTo(1.0, within(1e-6));
-        assertThat(scorer.score("q coffee", toaster)).isCloseTo(0.0, within(1e-6));
-    }
+		@Override
+		public float[] embed(String text) {
+			embedded.add(text);
+			return byText.get(text);
+		}
 
-    @Test
-    void eachDistinctQueryAndEntryIsEmbeddedOnlyOnce() {
-        CountingEmbedder embedder = new CountingEmbedder();
-        RealEmbeddingScorer scorer = new RealEmbeddingScorer(embedder);
-        SpecEntry coffee = entry("s1", "coffee machine explainer");
-        SpecEntry toaster = entry("s2", "toaster explainer");
+	}
 
-        for (int i = 0; i < 3; i++) {
-            scorer.score("q coffee", coffee);
-            scorer.score("q coffee", toaster);
-        }
+	@Test
+	void scoreIsTheCosineOfTheQueryAndEntryEmbeddings() {
+		CountingEmbedder embedder = new CountingEmbedder();
+		RealEmbeddingScorer scorer = new RealEmbeddingScorer(embedder);
+		SpecEntry coffee = entry("s1", "coffee machine explainer");
+		SpecEntry toaster = entry("s2", "toaster explainer");
 
-        // one distinct query + two distinct entries, despite six score() calls.
-        assertThat(embedder.embedded).containsExactlyInAnyOrder(
-                "q coffee", "s1 coffee machine explainer", "s2 toaster explainer");
-    }
+		assertThat(scorer.score("q coffee", coffee)).isCloseTo(1.0, within(1e-6));
+		assertThat(scorer.score("q coffee", toaster)).isCloseTo(0.0, within(1e-6));
+	}
 
-    private static SpecEntry entry(String id, String description) {
-        return new SpecEntry(id, id, description, List.of("UserInput"), "BackgroundMessage");
-    }
+	@Test
+	void eachDistinctQueryAndEntryIsEmbeddedOnlyOnce() {
+		CountingEmbedder embedder = new CountingEmbedder();
+		RealEmbeddingScorer scorer = new RealEmbeddingScorer(embedder);
+		SpecEntry coffee = entry("s1", "coffee machine explainer");
+		SpecEntry toaster = entry("s2", "toaster explainer");
+
+		for (int i = 0; i < 3; i++) {
+			scorer.score("q coffee", coffee);
+			scorer.score("q coffee", toaster);
+		}
+
+		// one distinct query + two distinct entries, despite six score() calls.
+		assertThat(embedder.embedded).containsExactlyInAnyOrder("q coffee", "s1 coffee machine explainer",
+				"s2 toaster explainer");
+	}
+
+	private static SpecEntry entry(String id, String description) {
+		return new SpecEntry(id, id, description, List.of("UserInput"), "BackgroundMessage");
+	}
+
 }

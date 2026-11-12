@@ -1,0 +1,40 @@
+# Test-classpath configuration (change: smith-studio-postgres-storage). This file shadows the
+# main application.yml on the test classpath, so it repeats the full configuration and adds the
+# in-memory H2 storage binding: the three @SpringBootTest classes boot and bind H2 with no docker.
+# The settings document lives in a temp dir so a developer's real ~/.smith/studio/storage.json is
+# never loaded during tests.
+server:
+  port: ${SERVER_PORT:8080}
+
+spring:
+  main:
+    web-application-type: SERVLET
+    banner-mode: off
+
+embabel:
+  models:
+    default-llm: ${EMBABEL_MODELS_DEFAULT_LLM:studio-no-endpoint}
+  agent:
+    platform:
+      models:
+        openai:
+          custom:
+            api-key: ${OPENAI_CUSTOM_API_KEY:sk-studio-no-endpoint}
+            base-url: ${OPENAI_CUSTOM_BASE_URL:http://127.0.0.1:9/v1}
+            models: ${OPENAI_CUSTOM_MODELS:studio-no-endpoint}
+
+smith:
+  studio:
+    sources: ${SMITH_STUDIO_SOURCES:}
+    improve-source: ${SMITH_STUDIO_IMPROVE_SOURCE:}
+    trace-dir: ${SMITH_STUDIO_TRACE_DIR:}
+    source-cache-dir: ${SMITH_STUDIO_SOURCE_CACHE_DIR:}
+    # In-memory H2 so the database-backed paths run with no docker.
+    storage:
+      url: jdbc:h2:mem:smith-studio-test;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+      user: sa
+      password: ""
+    storage-dir: ${java.io.tmpdir}/smith-studio-test-storage
+    loop:
+      interval: ${SMITH_STUDIO_LOOP_INTERVAL:60000}
+      auto-publish: ${SMITH_STUDIO_LOOP_AUTO_PUBLISH:false}

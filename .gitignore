@@ -5,6 +5,7 @@
 target
 built-specs
 .poc-runs
+node
 node_modules
 poc/poc-17-gliner-retrieval/models/
 poc/poc-19-small-llm-selector/models/

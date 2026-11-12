@@ -1,44 +1,48 @@
 <template>
-  <q-page padding>
-    <q-card flat bordered class="q-pa-md">
+  <q-page>
+    <div class="pane-stack">
       <PageHeader
         icon="autorenew"
         title="Auto-improve"
         description="Operate the trace-driven self-improvement loop: schedule it, trigger an iteration, and review the gated candidates it produces."
       />
 
-      <q-separator />
-
-      <q-card-section>
-        <div class="row q-gutter-sm items-center">
-          <q-badge
-            :color="status && status.running ? 'positive' : 'grey'"
-            :label="`loop: ${status ? loopStatusLabel(status) : 'unknown'}`"
-          />
-          <q-btn
-            v-if="!status?.running"
-            label="Start schedule"
-            color="primary"
-            icon="play_arrow"
-            @click="doStart"
-            data-test="loop-start"
-          />
-          <q-btn
-            v-else
-            label="Stop schedule"
-            color="negative"
-            icon="stop"
-            @click="doStop"
-            data-test="loop-stop"
-          />
-          <q-btn
-            label="Run iteration"
-            color="secondary"
-            icon="replay"
-            @click="doTrigger"
-            data-test="loop-trigger"
-          />
-          <div class="q-ml-sm">
+      <SectionCard title="Loop control" icon="autorenew">
+        <div class="row q-col-gutter-md items-center">
+          <div class="col-auto">
+            <q-badge
+              :color="status && status.running ? 'positive' : 'grey'"
+              :label="`loop: ${status ? loopStatusLabel(status) : 'unknown'}`"
+            />
+          </div>
+          <div class="col-auto">
+            <q-btn
+              v-if="!status?.running"
+              label="Start schedule"
+              color="primary"
+              icon="play_arrow"
+              @click="doStart"
+              data-test="loop-start"
+            />
+            <q-btn
+              v-else
+              label="Stop schedule"
+              color="negative"
+              icon="stop"
+              @click="doStop"
+              data-test="loop-stop"
+            />
+          </div>
+          <div class="col-auto">
+            <q-btn
+              label="Run iteration"
+              outline
+              icon="replay"
+              @click="doTrigger"
+              data-test="loop-trigger"
+            />
+          </div>
+          <div class="col-auto">
             <q-toggle
               v-model="autoPublish"
               label="Auto-publish"
@@ -61,26 +65,22 @@
             · published: {{ iteration.publishedSpecs.join(', ') }}
           </template>
         </div>
-      </q-card-section>
+      </SectionCard>
 
-      <q-separator />
+      <SectionCard title="Pending candidates" icon="fact_check">
+        <template #actions>
+          <q-btn flat dense round icon="refresh" @click="refresh" data-test="loop-refresh" />
+        </template>
 
-      <q-card-section>
-        <div class="row items-center q-gutter-sm">
-          <div class="text-subtitle2">Pending candidates</div>
-          <q-btn flat dense icon="refresh" @click="refresh" data-test="loop-refresh" />
-        </div>
-
-        <div v-if="error" class="text-negative q-mt-sm" data-test="loop-error">{{ error }}</div>
-        <div
+        <div v-if="error" class="text-negative" data-test="loop-error">{{ error }}</div>
+        <EmptyState
           v-else-if="candidates.length === 0"
-          class="text-grey-6 q-mt-sm"
+          icon="fact_check"
+          title="No pending candidates"
+          hint="Trigger an iteration or start the schedule; gated candidates that beat their baseline will appear here for approval."
           data-test="loop-empty"
-        >
-          No pending candidates.
-        </div>
-
-        <q-list bordered separator class="q-mt-sm" v-else data-test="loop-candidates">
+        />
+        <q-list bordered separator v-else data-test="loop-candidates">
           <q-item v-for="c in candidates" :key="c.id">
             <q-item-section avatar>
               <q-badge :color="lifecycleColor(c.proposedState)" :label="c.proposedState" />
@@ -116,15 +116,17 @@
             </q-item-section>
           </q-item>
         </q-list>
-      </q-card-section>
-    </q-card>
+      </SectionCard>
+    </div>
   </q-page>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 
+import EmptyState from '../components/EmptyState.vue'
 import PageHeader from '../components/PageHeader.vue'
+import SectionCard from '../components/SectionCard.vue'
 import {
   approveCandidate,
   getAutoPublish,

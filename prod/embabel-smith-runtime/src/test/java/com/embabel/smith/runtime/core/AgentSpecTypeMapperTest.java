@@ -13,32 +13,31 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class AgentSpecTypeMapperTest {
 
-    private final AgentSpecTypeMapper mapper = new AgentSpecTypeMapper();
+	private final AgentSpecTypeMapper mapper = new AgentSpecTypeMapper();
 
-    private static AgentSpec packWithTypes() {
-        DynamicTypeDef topicBrief = new DynamicTypeDef("TopicBrief", "The extracted topic",
-                List.of(new PropertyDef("topic", "string", "What to explain")), List.of(), true);
-        return new AgentSpec(null, null, List.of(), List.of(topicBrief));
-    }
+	private static AgentSpec packWithTypes() {
+		DynamicTypeDef topicBrief = new DynamicTypeDef("TopicBrief", "The extracted topic",
+				List.of(new PropertyDef("topic", "string", "What to explain")), List.of(), true);
+		return new AgentSpec(null, null, List.of(), List.of(topicBrief));
+	}
 
-    @Test
-    void mapsPackTypesToDynamicTypes() {
-        DynamicType type = mapper.toDynamicTypes(packWithTypes()).get(0);
+	@Test
+	void mapsPackTypesToDynamicTypes() {
+		DynamicType type = mapper.toDynamicTypes(packWithTypes()).get(0);
 
-        assertThat(type.getName()).isEqualTo("TopicBrief");
-        assertThat(type.getDescription()).isEqualTo("The extracted topic");
-        assertThat(type.getOwnProperties()).extracting(com.embabel.agent.core.PropertyDefinition::getName)
-                .containsExactly("topic");
-    }
+		assertThat(type.getName()).isEqualTo("TopicBrief");
+		assertThat(type.getDescription()).isEqualTo("The extracted topic");
+		assertThat(type.getOwnProperties()).extracting(com.embabel.agent.core.PropertyDefinition::getName)
+			.containsExactly("topic");
+	}
 
-    @Test
-    void allRuntimeTypesCombineBuiltinsAndPackTypes() {
-        List<DomainType> types = mapper.allRuntimeTypes(packWithTypes());
+	@Test
+	void allRuntimeTypesCombineBuiltinsAndPackTypes() {
+		List<DomainType> types = mapper.allRuntimeTypes(packWithTypes());
 
-        assertThat(types).extracting(DomainType::getName)
-                .containsExactlyInAnyOrder(
-                        "com.embabel.agent.domain.io.UserInput",
-                        "com.embabel.agent.spec.model.BackgroundMessage",
-                        "TopicBrief");
-    }
+		assertThat(types).extracting(DomainType::getName)
+			.containsExactlyInAnyOrder("com.embabel.agent.domain.io.UserInput",
+					"com.embabel.agent.spec.model.BackgroundMessage", "TopicBrief");
+	}
+
 }

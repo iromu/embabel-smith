@@ -1,43 +1,43 @@
 <template>
-  <q-page padding>
-    <q-card flat bordered class="q-pa-md">
+  <q-page>
+    <div class="pane-stack">
       <PageHeader
         icon="history"
         title="Traces"
         description="A spec's recent runs, most recent first, with per-step drill-down."
       />
 
-      <q-separator />
+      <SectionCard title="Runs" icon="history">
+        <template #actions>
+          <div class="row items-center q-gutter-sm">
+            <q-select
+              v-model="source"
+              label="Source"
+              outlined
+              :options="sourceOptions"
+              style="width: 220px"
+              data-test="traces-source"
+            />
+            <q-select
+              v-model="spec"
+              label="Spec"
+              outlined
+              :options="specOptions"
+              style="width: 200px"
+              data-test="traces-spec"
+            />
+            <q-btn label="Load" outline icon="history" @click="loadTraces" data-test="traces-btn" />
+          </div>
+        </template>
 
-      <q-card-section>
-        <div class="row q-gutter-sm items-center">
-          <q-select
-            v-model="source"
-            label="Source"
-            dense
-            :options="sourceOptions"
-            style="width: 320px"
-            data-test="traces-source"
-          />
-          <q-select
-            v-model="spec"
-            label="Spec"
-            dense
-            :options="specOptions"
-            style="width: 260px"
-            data-test="traces-spec"
-          />
-          <q-btn label="Load" color="primary" icon="history" @click="loadTraces" data-test="traces-btn" />
-        </div>
-      </q-card-section>
-
-      <q-separator />
-
-      <q-card-section>
         <div v-if="error" class="text-negative" data-test="traces-error">{{ error }}</div>
-        <div v-else-if="traceRows.length === 0" class="text-grey-6" data-test="traces-empty">
-          No traces for this spec yet.
-        </div>
+        <EmptyState
+          v-else-if="traceRows.length === 0"
+          icon="history_toggle_off"
+          title="No traces for this spec yet"
+          hint="Pick a source and a spec that has been run, then load to see its recent runs here."
+          data-test="traces-empty"
+        />
         <q-table
           v-else
           :rows="traceRows"
@@ -89,8 +89,8 @@
             </q-td>
           </template>
         </q-table>
-      </q-card-section>
-    </q-card>
+      </SectionCard>
+    </div>
 
     <q-dialog v-model="stepsOpen">
       <q-card style="min-width: 480px; max-width: 90vw">
@@ -131,7 +131,9 @@
 import { ref } from 'vue'
 import type { QTableColumn } from 'quasar'
 
+import EmptyState from '../components/EmptyState.vue'
 import PageHeader from '../components/PageHeader.vue'
+import SectionCard from '../components/SectionCard.vue'
 import { traces } from '../api/client'
 import type { TraceInfo } from '../api/types'
 import { useSourceSpec } from '../composables/useSourceSpec'

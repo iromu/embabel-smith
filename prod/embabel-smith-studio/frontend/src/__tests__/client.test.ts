@@ -276,6 +276,72 @@ describe('api/client — the single fetch site', () => {
     expect(history[0].docCount).toBe(2)
   })
 
+  it('getStorageSettings GETs /api/storage-settings and parses the settings', async () => {
+    const { calls } = stubFetch({
+      packDb: { url: 'jdbc:postgresql://localhost:5432/smith_studio', user: 'smith', password: 'smith' },
+      trace: { type: 'postgres-same', url: null, user: null, password: null },
+    })
+    const settings = await api.getStorageSettings()
+    expect(calls[0].url).toBe('/api/storage-settings')
+    expect(settings.packDb.url).toBe('jdbc:postgresql://localhost:5432/smith_studio')
+    expect(settings.trace.type).toBe('postgres-same')
+  })
+
+  it('saveStorageSettings PUTs the form and parses the save result', async () => {
+    const { calls } = stubFetch({ ok: true, settings: null, error: null })
+    const res = await api.saveStorageSettings({
+      url: 'jdbc:postgresql://localhost:5432/smith_studio',
+      user: 'smith',
+      password: 'smith',
+      traceType: 'postgres-same',
+    })
+    expect(calls[0].url).toBe('/api/storage-settings')
+    expect(calls[0].init?.method).toBe('PUT')
+    expect(bodyOf(calls[0])).toEqual({
+      url: 'jdbc:postgresql://localhost:5432/smith_studio',
+      user: 'smith',
+      password: 'smith',
+      traceType: 'postgres-same',
+    })
+    expect(res.ok).toBe(true)
+  })
+
+  it('importPack POSTs the path to /api/store/packs/import', async () => {
+    const { calls } = stubFetch({ ok: true, name: 'alpha', error: null })
+    const res = await api.importPack({ path: '/specs/alpha' })
+    expect(calls[0].url).toBe('/api/store/packs/import')
+    expect(calls[0].init?.method).toBe('POST')
+    expect(bodyOf(calls[0])).toEqual({ path: '/specs/alpha' })
+    expect(res.name).toBe('alpha')
+  })
+
+  it('downloadPackZip GETs the download endpoint and returns the blob', async () => {
+    const blob = new Blob(['zip-bytes'], { type: 'application/zip' })
+    const calls: Call[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        calls.push({ url })
+        return { ok: true, status: 200, blob: async () => blob } as unknown as Response
+      }),
+    )
+    const got = await api.downloadPackZip('a b')
+    expect(calls[0].url).toBe(`/api/store/packs/${encodeURIComponent('a b')}/download`)
+    expect(got).toBe(blob)
+  })
+
+  it('downloadPackZip surfaces the backend error on a non-2xx', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: false,
+        status: 500,
+        json: async () => ({ error: 'No pack named x is stored.' }),
+      }) as unknown as Response),
+    )
+    await expect(api.downloadPackZip('x')).rejects.toThrow('No pack named x is stored.')
+  })
+
   it('throws when the endpoint returns a non-2xx status', async () => {
     stubFetch({}, false, 500)
     await expect(api.run({ source: 's', goal: 'g', input: 'i' })).rejects.toThrow(/status 500/)

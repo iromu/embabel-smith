@@ -20,121 +20,128 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class RunCommandTest {
 
-    private final ByteArrayOutputStream out = new ByteArrayOutputStream();
-    private final ByteArrayOutputStream err = new ByteArrayOutputStream();
-    private final PrintStream originalOut = System.out;
-    private final PrintStream originalErr = System.err;
+	private final ByteArrayOutputStream out = new ByteArrayOutputStream();
 
-    private AgentSpecRunService.RunResult nextResult;
-    private RuntimeException nextException;
-    private Path seenTraceFile;
-    private String seenSource;
-    private String seenGoal;
-    private String seenInput;
-    private String seenPlanner;
-    private TrustTier seenTier;
+	private final ByteArrayOutputStream err = new ByteArrayOutputStream();
 
-    @BeforeEach
-    void captureStdStreams() {
-        System.setOut(new PrintStream(out, true));
-        System.setErr(new PrintStream(err, true));
-    }
+	private final PrintStream originalOut = System.out;
 
-    @AfterEach
-    void restoreStdStreams() {
-        System.setOut(originalOut);
-        System.setErr(originalErr);
-    }
+	private final PrintStream originalErr = System.err;
 
-    private RunCommand stubCommand(AgentSpecRunService.RunResult result, RuntimeException exception) {
-        nextResult = result;
-        nextException = exception;
-        return new RunCommand(null) {
-            @Override
-            protected AgentSpecRunService newService(Path traceFile) {
-                seenTraceFile = traceFile;
-                return new AgentSpecRunService(null) {
-                    @Override
-                    public RunResult run(String sourceUri, String goal, String input,
-                                        String planner, TrustTier tier) {
-                        seenSource = sourceUri;
-                        seenGoal = goal;
-                        seenInput = input;
-                        seenPlanner = planner;
-                        seenTier = tier;
-                        if (nextException != null) {
-                            throw nextException;
-                        }
-                        return nextResult;
-                    }
-                };
-            }
-        };
-    }
+	private AgentSpecRunService.RunResult nextResult;
 
-    private static AgentSpecRunService.RunResult result(boolean success, String output, String error) {
-        return new AgentSpecRunService.RunResult(success, output, error,
-                new TraceRecord("id", Instant.now(), null, null, "g", "i", "GOAP",
-                        "standard", List.of(), success, error, output));
-    }
+	private RuntimeException nextException;
 
-    @Test
-    void aSuccessfulRunPrintsTheGoalOutputAndExitsZero(@TempDir Path tmp) {
-        int exit = new CommandLine(stubCommand(result(true, "the goal output", null), null))
-                .execute("--source", "folder:" + tmp, "--goal", "g", "--input", "in",
-                        "--planner", "GOAP", "--trust-tier", "high", "--trace-dir", tmp.toString());
+	private Path seenTraceFile;
 
-        assertThat(exit).isZero();
-        assertThat(out.toString()).contains("the goal output");
-        assertThat(seenSource).isEqualTo("folder:" + tmp);
-        assertThat(seenGoal).isEqualTo("g");
-        assertThat(seenInput).isEqualTo("in");
-        assertThat(seenPlanner).isEqualTo("GOAP");
-        assertThat(seenTier).isEqualTo(TrustTier.HIGH);
-        assertThat(seenTraceFile).isEqualTo(tmp.resolve("runs.jsonl"));
-    }
+	private String seenSource;
 
-    @Test
-    void aFailedRunPrintsTheErrorToStderrAndExitsNonZero(@TempDir Path tmp) {
-        int exit = new CommandLine(stubCommand(result(false, null, "goal not achieved (status=STUCK)"), null))
-                .execute("--source", "folder:" + tmp);
+	private String seenGoal;
 
-        assertThat(exit).isEqualTo(1);
-        assertThat(err.toString()).contains("goal not achieved");
-        assertThat(out.toString()).isEmpty();
-    }
+	private String seenInput;
 
-    @Test
-    void aMissingGoalErrorListsTheAvailableGoals(@TempDir Path tmp) {
-        int exit = new CommandLine(stubCommand(null,
-                new GoalNotFoundException("nope", List.of("briefDone", "explainDone"))))
-                .execute("--source", "folder:" + tmp, "--goal", "nope");
+	private String seenPlanner;
 
-        assertThat(exit).isEqualTo(1);
-        assertThat(err.toString()).contains("briefDone").contains("explainDone");
-    }
+	private TrustTier seenTier;
 
-    @Test
-    void missingRequiredSourceIsAUsageError(@TempDir Path tmp) {
-        int exit = new CommandLine(stubCommand(result(true, "x", null), null))
-                .execute("--goal", "g");
+	@BeforeEach
+	void captureStdStreams() {
+		System.setOut(new PrintStream(out, true));
+		System.setErr(new PrintStream(err, true));
+	}
 
-        assertThat(exit).isEqualTo(2);
-    }
+	@AfterEach
+	void restoreStdStreams() {
+		System.setOut(originalOut);
+		System.setErr(originalErr);
+	}
 
-    @Test
-    void anUnknownTrustTierIsAUsageError(@TempDir Path tmp) {
-        int exit = new CommandLine(stubCommand(result(true, "x", null), null))
-                .execute("--source", "folder:" + tmp, "--trust-tier", "bogus");
+	private RunCommand stubCommand(AgentSpecRunService.RunResult result, RuntimeException exception) {
+		nextResult = result;
+		nextException = exception;
+		return new RunCommand(null) {
+			@Override
+			protected AgentSpecRunService newService(Path traceFile) {
+				seenTraceFile = traceFile;
+				return new AgentSpecRunService(null) {
+					@Override
+					public RunResult run(String sourceUri, String goal, String input, String planner, TrustTier tier) {
+						seenSource = sourceUri;
+						seenGoal = goal;
+						seenInput = input;
+						seenPlanner = planner;
+						seenTier = tier;
+						if (nextException != null) {
+							throw nextException;
+						}
+						return nextResult;
+					}
+				};
+			}
+		};
+	}
 
-        assertThat(exit).isEqualTo(2);
-    }
+	private static AgentSpecRunService.RunResult result(boolean success, String output, String error) {
+		return new AgentSpecRunService.RunResult(success, output, error, new TraceRecord("id", Instant.now(), null,
+				null, "g", "i", "GOAP", "standard", List.of(), success, error, output));
+	}
 
-    @Test
-    void theTrustTierDefaultsToStandard(@TempDir Path tmp) {
-        new CommandLine(stubCommand(result(true, "x", null), null))
-                .execute("--source", "folder:" + tmp);
+	@Test
+	void aSuccessfulRunPrintsTheGoalOutputAndExitsZero(@TempDir Path tmp) {
+		int exit = new CommandLine(stubCommand(result(true, "the goal output", null), null)).execute("--source",
+				"folder:" + tmp, "--goal", "g", "--input", "in", "--planner", "GOAP", "--trust-tier", "high",
+				"--trace-dir", tmp.toString());
 
-        assertThat(seenTier).isEqualTo(TrustTier.STANDARD);
-    }
+		assertThat(exit).isZero();
+		assertThat(out.toString()).contains("the goal output");
+		assertThat(seenSource).isEqualTo("folder:" + tmp);
+		assertThat(seenGoal).isEqualTo("g");
+		assertThat(seenInput).isEqualTo("in");
+		assertThat(seenPlanner).isEqualTo("GOAP");
+		assertThat(seenTier).isEqualTo(TrustTier.HIGH);
+		assertThat(seenTraceFile).isEqualTo(tmp.resolve("runs.jsonl"));
+	}
+
+	@Test
+	void aFailedRunPrintsTheErrorToStderrAndExitsNonZero(@TempDir Path tmp) {
+		int exit = new CommandLine(stubCommand(result(false, null, "goal not achieved (status=STUCK)"), null))
+			.execute("--source", "folder:" + tmp);
+
+		assertThat(exit).isEqualTo(1);
+		assertThat(err.toString()).contains("goal not achieved");
+		assertThat(out.toString()).isEmpty();
+	}
+
+	@Test
+	void aMissingGoalErrorListsTheAvailableGoals(@TempDir Path tmp) {
+		int exit = new CommandLine(
+				stubCommand(null, new GoalNotFoundException("nope", List.of("briefDone", "explainDone"))))
+			.execute("--source", "folder:" + tmp, "--goal", "nope");
+
+		assertThat(exit).isEqualTo(1);
+		assertThat(err.toString()).contains("briefDone").contains("explainDone");
+	}
+
+	@Test
+	void missingRequiredSourceIsAUsageError(@TempDir Path tmp) {
+		int exit = new CommandLine(stubCommand(result(true, "x", null), null)).execute("--goal", "g");
+
+		assertThat(exit).isEqualTo(2);
+	}
+
+	@Test
+	void anUnknownTrustTierIsAUsageError(@TempDir Path tmp) {
+		int exit = new CommandLine(stubCommand(result(true, "x", null), null)).execute("--source", "folder:" + tmp,
+				"--trust-tier", "bogus");
+
+		assertThat(exit).isEqualTo(2);
+	}
+
+	@Test
+	void theTrustTierDefaultsToStandard(@TempDir Path tmp) {
+		new CommandLine(stubCommand(result(true, "x", null), null)).execute("--source", "folder:" + tmp);
+
+		assertThat(seenTier).isEqualTo(TrustTier.STANDARD);
+	}
+
 }

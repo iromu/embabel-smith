@@ -11,27 +11,29 @@ import java.nio.file.Path;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Verifies the on-demand load (task 4.1, offline part): only the goal and the requested action
- * steps are copied, not the whole pack.
+ * Verifies the on-demand load (task 4.1, offline part): only the goal and the requested
+ * action steps are copied, not the whole pack.
  */
 class OnDemandAssemblerTest {
 
-    private final SpecSurface surface = new SpecSurface();
-    private final OnDemandAssembler assembler = new OnDemandAssembler();
+	private final SpecSurface surface = new SpecSurface();
 
-    @Test
-    void copiesOnlyTheGoalAndTheRequestedChain(@TempDir Path dir) throws Exception {
-        Path packDir = new AgentSpecWriter().write(SampleAgentSpecs.explainer(), dir.resolve("pack"));
-        var chain = surface.actionChain(SampleAgentSpecs.explainer());
-        Path target = dir.resolve("on-demand");
+	private final OnDemandAssembler assembler = new OnDemandAssembler();
 
-        assembler.assemble(packDir, target, chain);
+	@Test
+	void copiesOnlyTheGoalAndTheRequestedChain(@TempDir Path dir) throws Exception {
+		Path packDir = new AgentSpecWriter().write(SampleAgentSpecs.explainer(), dir.resolve("pack"));
+		var chain = surface.actionChain(SampleAgentSpecs.explainer());
+		Path target = dir.resolve("on-demand");
 
-        assertThat(Files.isRegularFile(target.resolve("goal.yml"))).isTrue();
-        assertThat(Files.isRegularFile(target.resolve("extractTopic.yml"))).isTrue();
-        assertThat(Files.isRegularFile(target.resolve("writeExplainer.yml"))).isTrue();
-        // manifest and types are not step specs, so they are not copied on demand
-        assertThat(Files.isRegularFile(target.resolve("manifest.yml"))).isFalse();
-        assertThat(Files.isDirectory(target.resolve("types"))).isFalse();
-    }
+		assembler.assemble(packDir, target, chain);
+
+		assertThat(Files.isRegularFile(target.resolve("goal.yml"))).isTrue();
+		assertThat(Files.isRegularFile(target.resolve("extractTopic.yml"))).isTrue();
+		assertThat(Files.isRegularFile(target.resolve("writeExplainer.yml"))).isTrue();
+		// manifest and types are not step specs, so they are not copied on demand
+		assertThat(Files.isRegularFile(target.resolve("manifest.yml"))).isFalse();
+		assertThat(Files.isDirectory(target.resolve("types"))).isFalse();
+	}
+
 }

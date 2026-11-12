@@ -1,39 +1,41 @@
 <template>
-  <q-page padding>
-    <q-card flat bordered class="q-pa-md">
+  <q-page>
+    <div class="pane-stack">
       <PageHeader
         icon="security"
         title="Security"
         description="Scan a spec-pack at install time; pure static analysis, offline."
       />
 
-      <q-separator />
-
-      <q-card-section>
-        <div class="row q-gutter-sm items-center">
-          <q-select
-            v-model="source"
-            label="Source"
-            dense
-            :options="sourceOptions"
-            style="width: 320px"
-            data-test="security-source"
-          />
-          <q-select
-            v-model="spec"
-            label="Spec"
-            dense
-            :options="specOptions"
-            style="width: 260px"
-            data-test="security-spec"
-          />
-          <q-btn label="Scan" color="primary" icon="security" @click="doScan" data-test="security-btn" />
+      <SectionCard title="Scan a pack" icon="security">
+        <div class="row q-col-gutter-md items-start">
+          <div class="col-auto">
+            <q-select
+              v-model="source"
+              label="Source"
+              outlined
+              :options="sourceOptions"
+              style="width: 240px"
+              data-test="security-source"
+            />
+          </div>
+          <div class="col-auto">
+            <q-select
+              v-model="spec"
+              label="Spec"
+              outlined
+              :options="specOptions"
+              style="width: 240px"
+              data-test="security-spec"
+            />
+          </div>
+          <div class="col-auto">
+            <q-btn label="Scan" color="primary" icon="security" @click="doScan" data-test="security-btn" />
+          </div>
         </div>
-      </q-card-section>
+      </SectionCard>
 
-      <q-separator />
-
-      <q-card-section>
+      <SectionCard title="Findings" icon="list_alt">
         <div v-if="error" class="text-negative" data-test="security-error">{{ error }}</div>
         <div v-else-if="result" data-test="security-result">
           <div class="row q-gutter-sm items-center">
@@ -54,16 +56,24 @@
           </q-list>
           <div v-else class="text-positive q-mt-sm">No findings.</div>
         </div>
-        <div v-else class="text-grey-6">Pick a source and a spec, then scan its pack.</div>
-      </q-card-section>
-    </q-card>
+        <EmptyState
+          v-else
+          icon="shield_outlined"
+          title="No scan yet"
+          hint="Pick a source and a spec, then scan its pack to see any findings here."
+          data-test="security-empty"
+        />
+      </SectionCard>
+    </div>
   </q-page>
 </template>
 
 <script setup lang="ts">
 import { ref } from 'vue'
 
+import EmptyState from '../components/EmptyState.vue'
 import PageHeader from '../components/PageHeader.vue'
+import SectionCard from '../components/SectionCard.vue'
 import { scan } from '../api/client'
 import type { ScanInfo } from '../api/types'
 import { useSourceSpec } from '../composables/useSourceSpec'

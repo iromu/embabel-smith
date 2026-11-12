@@ -17,54 +17,55 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * Endpoint-gated tests for the Author pane (POC 22). The compile delegates to POC 2's
- * {@code NlCompileRunner} behind the {@link AuthorController.CompileFn} seam, so the endpoint-present
- * path is stubbed and the no-endpoint path is driven by a real (empty) {@link ModelEndpointConfig}.
+ * {@code NlCompileRunner} behind the {@link AuthorController.CompileFn} seam, so the
+ * endpoint-present path is stubbed and the no-endpoint path is driven by a real (empty)
+ * {@link ModelEndpointConfig}.
  */
 class AuthorControllerTest {
 
-    private final ModelEndpointConfig noEndpoint = new ModelEndpointConfig("", "", "", "");
-    private final ModelEndpointConfig endpoint = new ModelEndpointConfig("http://x", "key", "gpt", "gpt");
+	private final ModelEndpointConfig noEndpoint = new ModelEndpointConfig("", "", "", "");
 
-    private MockMvc with(AuthorController.CompileFn fn, ModelEndpointConfig ep) {
-        return MockMvcBuilders.standaloneSetup(new AuthorController(fn, ep)).build();
-    }
+	private final ModelEndpointConfig endpoint = new ModelEndpointConfig("http://x", "key", "gpt", "gpt");
 
-    @Test
-    void noEndpointIsReportedClearly() throws Exception {
-        MockMvc mvc = with((a, d) -> {
-            throw new IllegalStateException("the compiler must not be reached without an endpoint");
-        }, noEndpoint);
-        mvc.perform(post("/api/compile").contentType(MediaType.APPLICATION_JSON)
-                .content("{\"description\":\"explain something\"}"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.draft").isEmpty())
-                .andExpect(jsonPath("$.error").value(containsString("No resolvable model endpoint")));
-    }
+	private MockMvc with(AuthorController.CompileFn fn, ModelEndpointConfig ep) {
+		return MockMvcBuilders.standaloneSetup(new AuthorController(fn, ep)).build();
+	}
 
-    @Test
-    void aConfiguredEndpointCompilesADraft() throws Exception {
-        AuthorDraft draft = new AuthorDraft(
-                "my-goal", "BackgroundMessage", true,
-                List.of(new ActionInfo("step1", List.of("UserInput"), "BackgroundMessage")),
-                "GOOD", false, "ok", List.of());
-        MockMvc mvc = with((a, d) -> draft, endpoint);
-        mvc.perform(post("/api/compile").contentType(MediaType.APPLICATION_JSON)
-                .content("{\"description\":\"explain something\"}"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.error").isEmpty())
-                .andExpect(jsonPath("$.draft.goalName").value("my-goal"))
-                .andExpect(jsonPath("$.draft.qualityVerdict").value("GOOD"))
-                .andExpect(jsonPath("$.draft.actions[0].name").value("step1"));
-    }
+	@Test
+	void noEndpointIsReportedClearly() throws Exception {
+		MockMvc mvc = with((a, d) -> {
+			throw new IllegalStateException("the compiler must not be reached without an endpoint");
+		}, noEndpoint);
+		mvc.perform(post("/api/compile").contentType(MediaType.APPLICATION_JSON)
+			.content("{\"description\":\"explain something\"}"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.draft").isEmpty())
+			.andExpect(jsonPath("$.error").value(containsString("No resolvable model endpoint")));
+	}
 
-    @Test
-    void aBlankDescriptionIsRejected() throws Exception {
-        MockMvc mvc = with((a, d) -> {
-            throw new IllegalStateException("X");
-        }, endpoint);
-        mvc.perform(post("/api/compile").contentType(MediaType.APPLICATION_JSON)
-                .content("{\"description\":\"\"}"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.error").value(containsString("No description supplied")));
-    }
+	@Test
+	void aConfiguredEndpointCompilesADraft() throws Exception {
+		AuthorDraft draft = new AuthorDraft("my-goal", "BackgroundMessage", true,
+				List.of(new ActionInfo("step1", List.of("UserInput"), "BackgroundMessage")), "GOOD", false, "ok",
+				List.of());
+		MockMvc mvc = with((a, d) -> draft, endpoint);
+		mvc.perform(post("/api/compile").contentType(MediaType.APPLICATION_JSON)
+			.content("{\"description\":\"explain something\"}"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.error").isEmpty())
+			.andExpect(jsonPath("$.draft.goalName").value("my-goal"))
+			.andExpect(jsonPath("$.draft.qualityVerdict").value("GOOD"))
+			.andExpect(jsonPath("$.draft.actions[0].name").value("step1"));
+	}
+
+	@Test
+	void aBlankDescriptionIsRejected() throws Exception {
+		MockMvc mvc = with((a, d) -> {
+			throw new IllegalStateException("X");
+		}, endpoint);
+		mvc.perform(post("/api/compile").contentType(MediaType.APPLICATION_JSON).content("{\"description\":\"\"}"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.error").value(containsString("No description supplied")));
+	}
+
 }

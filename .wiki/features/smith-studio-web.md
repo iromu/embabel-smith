@@ -11,8 +11,10 @@ source_paths:
   - "prod/embabel-smith-studio/src/main/java/com/embabel/smith/studio/config/StudioConfiguration.java"
   - "prod/embabel-smith-studio/frontend/src/api/client.ts"
   - "prod/embabel-smith-studio/frontend/src/panes/AutoImprovePane.vue"
+  - "prod/embabel-smith-studio/frontend/src/panes/StoragePane.vue"
+  - "prod/embabel-smith-studio/src/main/java/com/embabel/smith/studio/rest/StorageSettingsController.java"
   - "prod/embabel-smith-studio/README.md"
-updated_at: "2026-11-08"
+updated_at: "2026-11-12"
 ---
 
 # The smith studio web product
@@ -41,6 +43,9 @@ Evolved from POC 22's SPA (Vue 3 + Quasar + Vite + TypeScript; `npm run build` e
 - **Traces** — per-spec trace history (most-recent-first), step drill-down, failure reason.
 - **Auto-improve** — loop status, pending candidates with their evidence, approve/reject,
   auto-publish toggle, lifecycle badges.
+- **Storage** — point the studio at its Postgres database (endpoint/user/password) and pick the
+  trace backend; save validates the connection and rebinds live, keeping the old binding on failure
+  ([[smith-studio-storage]]).
 - **Four POC-only panes** (Compose, Retrieve, Scale, Remote) carried as disabled reference stubs —
   the production cores have no such features.
 

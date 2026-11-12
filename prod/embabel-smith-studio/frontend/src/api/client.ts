@@ -21,6 +21,8 @@ import type {
   ExtractResponse,
   GenerateRequest,
   GenerateResponse,
+  ImportPackRequest,
+  ImportPackResponse,
   IterationInfo,
   LoopStatus,
   PackInfo,
@@ -37,6 +39,9 @@ import type {
   StatusInfo,
   StoredPackInfo,
   StoredPackResponse,
+  StorageSettings,
+  StorageSettingsSaveRequest,
+  StorageSettingsSaveResponse,
   TraceInfo,
   TrustRequest,
   TrustResponse,
@@ -69,6 +74,22 @@ function put<T>(path: string, body: unknown): Promise<T> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   })
+}
+
+/** Fetches a binary (zip) resource, surfacing a non-2xx (and the backend's error) as a throw. */
+async function download(path: string): Promise<Blob> {
+  const res = await fetch(path)
+  if (!res.ok) {
+    let message = `GET ${path} failed with status ${res.status}`
+    try {
+      const body = (await res.json()) as { error?: string }
+      if (body?.error) message = body.error
+    } catch {
+      // Not a JSON error body; keep the generic status message.
+    }
+    throw new Error(message)
+  }
+  return res.blob()
 }
 
 // ---- Global status ---------------------------------------------------------
@@ -113,6 +134,19 @@ export const savePack = (req: SavePackRequest): Promise<SavePackResponse> =>
   post<SavePackResponse>('/api/store/packs', req)
 export const listDiscoveries = (): Promise<DiscoveryRecord[]> =>
   get<DiscoveryRecord[]>('/api/store/discoveries')
+/** The stored pack as a downloadable zip (binary blob). */
+export const downloadPackZip = (name: string): Promise<Blob> =>
+  download(`/api/store/packs/${encodeURIComponent(name)}/download`)
+/** Import a valid agent-spec directory from the server filesystem into the database. */
+export const importPack = (req: ImportPackRequest): Promise<ImportPackResponse> =>
+  post<ImportPackResponse>('/api/store/packs/import', req)
+
+// ---- Storage settings -------------------------------------------------------
+export const getStorageSettings = (): Promise<StorageSettings> =>
+  get<StorageSettings>('/api/storage-settings')
+/** Validates the endpoint and rebinds on success; the previous binding is kept on failure. */
+export const saveStorageSettings = (req: StorageSettingsSaveRequest): Promise<StorageSettingsSaveResponse> =>
+  put<StorageSettingsSaveResponse>('/api/storage-settings', req)
 
 // ---- Eval (endpoint-gated) --------------------------------------------------
 export const evaluate = (req: EvalRequest): Promise<EvalResponse> =>

@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 Ivan Rodriguez.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 /* Embabel Smith Studio — global theme on top of Quasar (dark mode).
    A modern "developer tool" dark look: slate surfaces, indigo primary, Inter type,
    subtle depth, and consistent spacing. Quasar dark mode is enabled via `body--dark`. */
@@ -13,7 +29,9 @@
   --nav-hover: rgba(148, 163, 184, 0.12);
   --nav-active: #4f46e5;
   --text-strong: #e2e8f0;
-  --text-muted: #94a3b8;
+  /* Brightened from #94a3b8 so small muted text clears WCAG AA (>=4.5:1) even on the darker
+     surface-2 panels, not just the lighter card surface. */
+  --text-muted: #aab6c8;
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.35), 0 2px 8px rgba(0, 0, 0, 0.25);
 }
 
@@ -24,6 +42,28 @@ body {
   color: var(--text-strong);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+}
+
+/* --------------------------------------------------------------- Page shell ---- */
+/* A pane is a stack of section cards on the app background, not one giant card. This gives the
+   content breathing room and lets each section read as its own block. */
+.q-page {
+  padding: 20px 24px !important;
+}
+
+.pane-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 1180px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* The single-card panes that still use the outer card keep a consistent presence. */
+.q-page > .q-card {
+  border-radius: 14px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4), 0 8px 28px rgba(0, 0, 0, 0.28);
 }
 
 /* ---------------------------------------------------------------- Sidebar ---- */
@@ -188,6 +228,17 @@ body {
   max-width: 62ch;
 }
 
+/* A small uppercase section label used inside panes (e.g. "Blueprint", "Pack database"). Replaces
+   the ad-hoc `text-subtitle2` labels so every section header is consistent. */
+.section-label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+
 /* Pane header (PageHeader): an indigo icon tile beside the title + description. */
 .pane-head {
   display: flex;
@@ -242,10 +293,41 @@ body {
   color: var(--text-strong);
 }
 
-/* Buttons: slightly more rounded, tighter. */
+/* Buttons: a clear primary CTA (filled indigo) vs. quiet secondary actions (outline). The old
+   flat equal-weight buttons made every action compete for attention. */
 .q-btn {
-  border-radius: 8px;
+  border-radius: 9px;
   font-weight: 600;
+  letter-spacing: 0.01em;
+  transition: box-shadow 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+
+/* Primary CTA: filled indigo with a soft glow on hover so it reads as "the" action. */
+.q-btn--primary {
+  box-shadow: 0 2px 10px rgba(79, 70, 229, 0.35);
+}
+
+.q-btn--primary:hover:not(.q-btn--disabled) {
+  box-shadow: 0 4px 16px rgba(79, 70, 229, 0.5);
+}
+
+/* Secondary / outline actions: quieter border, subtle fill on hover. */
+.q-btn--outline {
+  border-color: var(--border) !important;
+  color: var(--text-strong) !important;
+}
+
+.q-btn--outline:hover:not(.q-btn--disabled) {
+  background: rgba(148, 163, 184, 0.1) !important;
+  border-color: #3b4d66 !important;
+}
+
+/* Icon-only buttons get a comfortable tap target even when they look small (Quasar's `dense`
+   sets an inline height that would otherwise win). This covers the nav toggle, refresh, and
+   drill-down controls so they meet the touch-target guideline without bloating labeled buttons. */
+.q-btn--round {
+  min-width: 40px !important;
+  min-height: 40px !important;
 }
 
 /* List items (Lifecycle, Traces, candidates): hover affordance + softer dividers. */
@@ -255,4 +337,92 @@ body {
 
 .q-item:hover {
   background: rgba(148, 163, 184, 0.06);
+}
+
+/* --------------------------------------------------------------- Accessibility ---- */
+/* A clear, high-contrast focus ring for every keyboard-focusable control. Quasar's dark
+   theme suppresses the browser default outline, so without this most controls give no
+   visible focus cue (WCAG 2.4.7). The double ring (dark gap + indigo) reads on any surface. */
+:focus-visible {
+  outline: none !important;
+  box-shadow:
+    0 0 0 2px var(--app-bg),
+    0 0 0 4px #6366f1 !important;
+  border-radius: 6px;
+}
+
+/* Inputs/selects keep their own rounded shape; don't force a square ring on them. */
+.q-field :focus-visible,
+.q-field--focused .q-field__control {
+  box-shadow: none !important;
+}
+
+.q-field--focused .q-field__control:before,
+.q-field--focused .q-field__control:after {
+  border-color: #6366f1 !important;
+}
+
+/* Nav drawer items get a ring inset to their own pill radius. */
+.studio-nav-item:focus-visible {
+  box-shadow:
+    0 0 0 2px var(--nav-bg),
+    0 0 0 4px #6366f1 !important;
+}
+
+/* Quasar's text-grey-6 / text-grey-7 utilities are too dim on our dark surfaces for small text
+   (they land around 2.5–3.9:1, below WCAG AA's 4.5:1). Brighten them within page content so
+   pane descriptions, hints, and empty-state copy stay legible. The nav keeps its own palette. */
+.q-page .text-grey-6,
+.q-page .text-grey-7 {
+  color: var(--text-muted) !important;
+}
+
+.q-page .text-grey-5 {
+  color: #c2ccdb !important;
+}
+
+/* A plain "grey" badge (e.g. the loop status pill) has dim text on a mid-grey fill (~2.7:1,
+   below AA). Brighten its label within page content so status pills stay legible. */
+.q-page .q-badge.bg-grey {
+  background-color: #3a4658 !important;
+  color: #dbe3ee !important;
+}
+
+/* --------------------------------------------------------------- Dark overlays ---- */
+/* The app forces `body--dark` on <body>, but Quasar's popup/overlay surfaces (.q-menu select
+   dropdowns, dialogs, tooltips, notifications) are colored from light-mode SASS variables that
+   we never override — so they render with a white (#fff) background while their text is white:
+   invisible white-on-white. Give every overlay surface an explicit dark background + light text. */
+.q-menu,
+.q-dialog__inner > .q-card,
+.q-tooltip,
+.q-notification {
+  background: var(--surface) !important;
+  color: var(--text-strong) !important;
+}
+
+/* Select/menu option rows: transparent bg, light text, indigo on hover. */
+.q-menu .q-item,
+.q-menu .q-item__section {
+  color: var(--text-strong) !important;
+}
+
+.q-menu .q-item:hover,
+.q-menu .q-item--active {
+  background: rgba(99, 102, 241, 0.16) !important;
+}
+
+.q-menu .q-item:hover .q-item__section,
+.q-menu .q-item--active .q-item__section {
+  color: #c7d2fe !important;
+}
+
+/* Dialog body copy + separators inherit the dark surface. */
+.q-dialog__inner .q-separator {
+  background-color: var(--border) !important;
+}
+
+/* The menu's own scrollbar thumb (Quasar styles it for light mode). */
+.q-menu::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.35);
 }

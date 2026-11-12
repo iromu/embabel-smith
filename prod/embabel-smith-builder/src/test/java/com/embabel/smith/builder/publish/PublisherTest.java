@@ -17,89 +17,97 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * Offline tests of publishing (task 4.3): a folder publish writes the pack plus its sidecar; a git
- * publish commits into a local bare repository's working tree and (with push) lands the pack in the
- * remote; a same-named pack collides unless {@code --overwrite} replaces it.
+ * Offline tests of publishing (task 4.3): a folder publish writes the pack plus its
+ * sidecar; a git publish commits into a local bare repository's working tree and (with
+ * push) lands the pack in the remote; a same-named pack collides unless
+ * {@code --overwrite} replaces it.
  */
 class PublisherTest {
 
-    private final AgentSpec pack = SampleAgentSpecs.explainer();
-    private final LifecycleMetadata lifecycle = new LifecycleStamper().stamp(pack, 1.0);
+	private final AgentSpec pack = SampleAgentSpecs.explainer();
 
-    @Test
-    void folderPublishWritesThePackAndSidecar(@TempDir Path library) throws Exception {
-        FolderPublisher publisher = new FolderPublisher(PublishTarget.parse("folder:" + library));
+	private final LifecycleMetadata lifecycle = new LifecycleStamper().stamp(pack, 1.0);
 
-        PublishResult result = publisher.publish(pack, lifecycle, false, false);
+	@Test
+	void folderPublishWritesThePackAndSidecar(@TempDir Path library) throws Exception {
+		FolderPublisher publisher = new FolderPublisher(PublishTarget.parse("folder:" + library));
 
-        assertThat(result.location()).isEqualTo(library.resolve("explainer"));
-        assertThat(result.location().resolve("manifest.yml")).isRegularFile();
-        assertThat(result.location().resolve("lifecycle.yml")).isRegularFile();
-        assertThat(result.pushed()).isFalse();
-    }
+		PublishResult result = publisher.publish(pack, lifecycle, false, false);
 
-    @Test
-    void aFolderCollisionBlocksUnlessOverwrite(@TempDir Path library) throws Exception {
-        FolderPublisher publisher = new FolderPublisher(PublishTarget.parse("folder:" + library));
-        publisher.publish(pack, lifecycle, false, false);
+		assertThat(result.location()).isEqualTo(library.resolve("explainer"));
+		assertThat(result.location().resolve("manifest.yml")).isRegularFile();
+		assertThat(result.location().resolve("lifecycle.yml")).isRegularFile();
+		assertThat(result.pushed()).isFalse();
+	}
 
-        assertThatThrownBy(() -> publisher.publish(pack, lifecycle, false, false))
-                .isInstanceOf(CollisionException.class)
-                .hasMessageContaining("explainer");
+	@Test
+	void aFolderCollisionBlocksUnlessOverwrite(@TempDir Path library) throws Exception {
+		FolderPublisher publisher = new FolderPublisher(PublishTarget.parse("folder:" + library));
+		publisher.publish(pack, lifecycle, false, false);
 
-        PublishResult replaced = publisher.publish(pack, lifecycle, true, false);
-        assertThat(replaced.location().resolve("manifest.yml")).isRegularFile();
-    }
+		assertThatThrownBy(() -> publisher.publish(pack, lifecycle, false, false))
+			.isInstanceOf(CollisionException.class)
+			.hasMessageContaining("explainer");
 
-    @Test
-    void gitPublishCommitsAndPushesIntoALocalRepo(@TempDir Path tmp) throws Exception {
-        Path bare = tmp.resolve("repo.git");
-        runGit("init", "--bare", bare.toString());
+		PublishResult replaced = publisher.publish(pack, lifecycle, true, false);
+		assertThat(replaced.location().resolve("manifest.yml")).isRegularFile();
+	}
 
-        GitPublisher publisher = new GitPublisher(PublishTarget.parse("git:" + bare));
-        try {
-            // Local commit only (no push): the working tree has the pack, the remote does not.
-            PublishResult local = publisher.publish(pack, lifecycle, false, false);
-            assertThat(local.location().resolve("manifest.yml")).isRegularFile();
-            assertThat(local.pushed()).isFalse();
+	@Test
+	void gitPublishCommitsAndPushesIntoALocalRepo(@TempDir Path tmp) throws Exception {
+		Path bare = tmp.resolve("repo.git");
+		runGit("init", "--bare", bare.toString());
 
-            // A same-named pack now exists in the working tree → collision without overwrite.
-            assertThatThrownBy(() -> publisher.publish(pack, lifecycle, false, false))
-                    .isInstanceOf(CollisionException.class);
+		GitPublisher publisher = new GitPublisher(PublishTarget.parse("git:" + bare));
+		try {
+			// Local commit only (no push): the working tree has the pack, the remote does
+			// not.
+			PublishResult local = publisher.publish(pack, lifecycle, false, false);
+			assertThat(local.location().resolve("manifest.yml")).isRegularFile();
+			assertThat(local.pushed()).isFalse();
 
-            // Overwrite + push: the commit lands in the bare repository.
-            PublishResult pushed = publisher.publish(pack, lifecycle, true, true);
-            assertThat(pushed.pushed()).isTrue();
+			// A same-named pack now exists in the working tree → collision without
+			// overwrite.
+			assertThatThrownBy(() -> publisher.publish(pack, lifecycle, false, false))
+				.isInstanceOf(CollisionException.class);
 
-            Path verify = tmp.resolve("verify");
-            runGit("clone", "--quiet", bare.toString(), verify.toString());
-            assertThat(verify.resolve("explainer").resolve("manifest.yml")).isRegularFile();
-            assertThat(verify.resolve("explainer").resolve("lifecycle.yml")).isRegularFile();
+			// Overwrite + push: the commit lands in the bare repository.
+			PublishResult pushed = publisher.publish(pack, lifecycle, true, true);
+			assertThat(pushed.pushed()).isTrue();
 
-            // The commit message names the pack and its baseline score (design D3).
-            assertThat(runGit("-C", verify.toString(), "log", "-1", "--pretty=%s"))
-                    .isEqualTo("smith: publish " + pack.name() + " (baseline 1.000)");
-        } finally {
-            publisher.close();
-        }
-    }
+			Path verify = tmp.resolve("verify");
+			runGit("clone", "--quiet", bare.toString(), verify.toString());
+			assertThat(verify.resolve("explainer").resolve("manifest.yml")).isRegularFile();
+			assertThat(verify.resolve("explainer").resolve("lifecycle.yml")).isRegularFile();
 
-    private static String runGit(String... args) {
-        List<String> command = new java.util.ArrayList<>(List.of("git", "-c", "core.askpass=false"));
-        command.addAll(List.of(args));
-        try {
-            Process process = new ProcessBuilder(command).redirectErrorStream(true).start();
-            String out = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-            int exit = process.waitFor();
-            if (exit != 0) {
-                throw new IllegalStateException("git " + String.join(" ", args) + " failed: " + out);
-            }
-            return out.trim();
-        } catch (IOException e) {
-            throw new IllegalStateException(e);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new IllegalStateException(e);
-        }
-    }
+			// The commit message names the pack and its baseline score (design D3).
+			assertThat(runGit("-C", verify.toString(), "log", "-1", "--pretty=%s"))
+				.isEqualTo("smith: publish " + pack.name() + " (baseline 1.000)");
+		}
+		finally {
+			publisher.close();
+		}
+	}
+
+	private static String runGit(String... args) {
+		List<String> command = new java.util.ArrayList<>(List.of("git", "-c", "core.askpass=false"));
+		command.addAll(List.of(args));
+		try {
+			Process process = new ProcessBuilder(command).redirectErrorStream(true).start();
+			String out = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+			int exit = process.waitFor();
+			if (exit != 0) {
+				throw new IllegalStateException("git " + String.join(" ", args) + " failed: " + out);
+			}
+			return out.trim();
+		}
+		catch (IOException e) {
+			throw new IllegalStateException(e);
+		}
+		catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			throw new IllegalStateException(e);
+		}
+	}
+
 }

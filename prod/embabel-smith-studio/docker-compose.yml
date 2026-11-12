@@ -1,0 +1,32 @@
+# Development database for the studio (change: smith-studio-postgres-storage).
+#
+# `docker compose up -d` brings up a Postgres with a named data volume and fixed
+# development credentials, reachable at the documented local endpoint. The studio's
+# Storage pane points at it with:
+#
+#   url:      jdbc:postgresql://localhost:5432/smith_studio
+#   user:     smith
+#   password: smith
+#
+# Data persists across `docker compose down` / `up` via the named volume;
+# `docker compose down -v` removes it.
+services:
+  postgres:
+    image: postgres:16
+    container_name: smith-studio-postgres
+    environment:
+      POSTGRES_USER: smith
+      POSTGRES_PASSWORD: smith
+      POSTGRES_DB: smith_studio
+    ports:
+      - "5432:5432"
+    volumes:
+      - studio-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U smith -d smith_studio"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  studio-pgdata:

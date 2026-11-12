@@ -19,70 +19,71 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Offline tests for composite export (POC 14): the exported composite is a single, well-formed
- * agent spec whose action chain is the composed plan, and it re-validates cleanly.
+ * Offline tests for composite export (POC 14): the exported composite is a single,
+ * well-formed agent spec whose action chain is the composed plan, and it re-validates
+ * cleanly.
  */
 class CompositeExporterTest {
 
-    private static final String BG = "com.embabel.agent.spec.model.BackgroundMessage";
-    private final CompositeExporter exporter = new CompositeExporter();
+	private static final String BG = "com.embabel.agent.spec.model.BackgroundMessage";
 
-    @Test
-    void buildCompositeUnionsStepsAndTypesUnderOneGoal() {
-        AgentSpec composite = exporter.buildComposite("compose-composite", validCanvas());
+	private final CompositeExporter exporter = new CompositeExporter();
 
-        assertThat(composite.goal().isExported()).isTrue();
-        assertThat(composite.goal().outputTypeName()).isEqualTo(BG);
-        assertThat(composite.steps()).extracting(ActionStepSpec::name)
-                .containsExactly("extractTopic", "writeExplainer");
-        assertThat(composite.types()).extracting(DynamicTypeDef::name).containsExactly("TopicBrief");
-        assertThat(composite.manifest().name()).isEqualTo("compose-composite");
-    }
+	@Test
+	void buildCompositeUnionsStepsAndTypesUnderOneGoal() {
+		AgentSpec composite = exporter.buildComposite("compose-composite", validCanvas());
 
-    @Test
-    void theExportedCompositeRevalidatesCleanly(@TempDir Path tmp) throws IOException {
-        Path compositeDir = exporter.export("compose-composite", validCanvas(), tmp);
+		assertThat(composite.goal().isExported()).isTrue();
+		assertThat(composite.goal().outputTypeName()).isEqualTo(BG);
+		assertThat(composite.steps()).extracting(ActionStepSpec::name)
+			.containsExactly("extractTopic", "writeExplainer");
+		assertThat(composite.types()).extracting(DynamicTypeDef::name).containsExactly("TopicBrief");
+		assertThat(composite.manifest().name()).isEqualTo("compose-composite");
+	}
 
-        AgentSpec reRead = new AgentSpecReader().read(compositeDir);
-        assertThat(reRead.steps()).extracting(ActionStepSpec::name)
-                .containsExactly("extractTopic", "writeExplainer");
-        assertThat(new AgentSpecValidator().validate(compositeDir).isValid())
-                .as("the exported composite is a loadable agent spec")
-                .isTrue();
-    }
+	@Test
+	void theExportedCompositeRevalidatesCleanly(@TempDir Path tmp) throws IOException {
+		Path compositeDir = exporter.export("compose-composite", validCanvas(), tmp);
 
-    private CompositionCanvas validCanvas() {
-        CompositionCanvas canvas = new CompositionCanvas();
-        canvas.addSpec(new SpecNode(extractPack()));
-        canvas.addSpec(new SpecNode(explainPack()));
-        canvas.connect("compose-extract", "compose-explain");
-        return canvas;
-    }
+		AgentSpec reRead = new AgentSpecReader().read(compositeDir);
+		assertThat(reRead.steps()).extracting(ActionStepSpec::name).containsExactly("extractTopic", "writeExplainer");
+		assertThat(new AgentSpecValidator().validate(compositeDir).isValid())
+			.as("the exported composite is a loadable agent spec")
+			.isTrue();
+	}
 
-    // --- fixtures (mirroring the compose-extract / compose-explain samples) ---
+	private CompositionCanvas validCanvas() {
+		CompositionCanvas canvas = new CompositionCanvas();
+		canvas.addSpec(new SpecNode(extractPack()));
+		canvas.addSpec(new SpecNode(explainPack()));
+		canvas.connect("compose-extract", "compose-explain");
+		return canvas;
+	}
 
-    private static AgentSpec extractPack() {
-        AgentSpecManifest manifest = new AgentSpecManifest("compose-extract", "1.0.0", "GOAP", null);
-        GoalStepSpec goal = GoalStepSpec.exportedGoal("topicExtracted", "desc", "TopicBrief");
-        ActionStepSpec action = ActionStepSpec.action("extractTopic", "desc",
-                List.of("com.embabel.agent.domain.io.UserInput"), "TopicBrief",
-                "Extract the topic: {{userInput.content}}");
-        return new AgentSpec(manifest, goal, List.of(action), List.of(topicBrief()));
-    }
+	// --- fixtures (mirroring the compose-extract / compose-explain samples) ---
 
-    private static AgentSpec explainPack() {
-        AgentSpecManifest manifest = new AgentSpecManifest("compose-explain", "1.0.0", "GOAP", null);
-        GoalStepSpec goal = GoalStepSpec.exportedGoal("explainerDone", "desc", BG);
-        ActionStepSpec action = ActionStepSpec.action("writeExplainer", "desc",
-                List.of("TopicBrief"), BG, "Write the explainer: {{topicBrief.topic}}");
-        return new AgentSpec(manifest, goal, List.of(action), List.of(topicBrief()));
-    }
+	private static AgentSpec extractPack() {
+		AgentSpecManifest manifest = new AgentSpecManifest("compose-extract", "1.0.0", "GOAP", null);
+		GoalStepSpec goal = GoalStepSpec.exportedGoal("topicExtracted", "desc", "TopicBrief");
+		ActionStepSpec action = ActionStepSpec.action("extractTopic", "desc",
+				List.of("com.embabel.agent.domain.io.UserInput"), "TopicBrief",
+				"Extract the topic: {{userInput.content}}");
+		return new AgentSpec(manifest, goal, List.of(action), List.of(topicBrief()));
+	}
 
-    private static DynamicTypeDef topicBrief() {
-        return new DynamicTypeDef("TopicBrief", "desc", List.of(
-                new PropertyDef("topic", "string", "what"),
-                new PropertyDef("audience", "string", "who"),
-                new PropertyDef("tone", "string", "voice")),
-                List.of(), true);
-    }
+	private static AgentSpec explainPack() {
+		AgentSpecManifest manifest = new AgentSpecManifest("compose-explain", "1.0.0", "GOAP", null);
+		GoalStepSpec goal = GoalStepSpec.exportedGoal("explainerDone", "desc", BG);
+		ActionStepSpec action = ActionStepSpec.action("writeExplainer", "desc", List.of("TopicBrief"), BG,
+				"Write the explainer: {{topicBrief.topic}}");
+		return new AgentSpec(manifest, goal, List.of(action), List.of(topicBrief()));
+	}
+
+	private static DynamicTypeDef topicBrief() {
+		return new DynamicTypeDef(
+				"TopicBrief", "desc", List.of(new PropertyDef("topic", "string", "what"),
+						new PropertyDef("audience", "string", "who"), new PropertyDef("tone", "string", "voice")),
+				List.of(), true);
+	}
+
 }

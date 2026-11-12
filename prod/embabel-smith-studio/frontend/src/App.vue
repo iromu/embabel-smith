@@ -165,6 +165,12 @@ const navGroups: { label: string; items: NavPane[] }[] = [
       { to: '/scale', label: 'Scale', icon: 'show_chart' },
     ],
   },
+  {
+    label: 'Configure',
+    items: [
+      { to: '/storage', label: 'Storage', icon: 'storage' },
+    ],
+  },
 ]
 
 const currentLabel = computed(() => {

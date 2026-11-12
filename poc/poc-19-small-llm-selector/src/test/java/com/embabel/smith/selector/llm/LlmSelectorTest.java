@@ -21,86 +21,89 @@ import java.util.concurrent.atomic.AtomicReference;
 
 class LlmSelectorTest {
 
-    private static final List<SpecEntry> THREE = List.of(
-            new SpecEntry("http-client", "http-client", "A reusable HTTP client wrapper for REST calls.",
-                    List.of("UserInput"), "HttpResponse"),
-            new SpecEntry("retry-policy", "retry-policy", "Adds retry-with-backoff behaviour to failing operations.",
-                    List.of("Operation"), "Operation"),
-            new SpecEntry("http-mock", "http-mock", "Stubs outgoing HTTP calls in tests.",
-                    List.of("TestContext"), "MockServer"));
+	private static final List<SpecEntry> THREE = List.of(
+			new SpecEntry("http-client", "http-client", "A reusable HTTP client wrapper for REST calls.",
+					List.of("UserInput"), "HttpResponse"),
+			new SpecEntry("retry-policy", "retry-policy", "Adds retry-with-backoff behaviour to failing operations.",
+					List.of("Operation"), "Operation"),
+			new SpecEntry("http-mock", "http-mock", "Stubs outgoing HTTP calls in tests.", List.of("TestContext"),
+					"MockServer"));
 
-    private HttpServer server;
-    private String baseUrl;
-    private final AtomicReference<String> lastRequestBody = new AtomicReference<>();
-    private final AtomicInteger requestCount = new AtomicInteger();
-    private volatile String modelReply = "B";
+	private HttpServer server;
 
-    @BeforeEach
-    void startStub() throws IOException {
-        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-        server.createContext("/v1/chat/completions", exchange -> {
-            requestCount.incrementAndGet();
-            lastRequestBody.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
-            byte[] body = ("{\"choices\":[{\"message\":{\"role\":\"assistant\",\"content\":\""
-                    + modelReply + "\"}}]}").getBytes(StandardCharsets.UTF_8);
-            exchange.getResponseHeaders().add("Content-Type", "application/json");
-            exchange.sendResponseHeaders(200, body.length);
-            try (OutputStream out = exchange.getResponseBody()) {
-                out.write(body);
-            }
-        });
-        server.start();
-        baseUrl = "http://127.0.0.1:" + server.getAddress().getPort() + "/v1";
-    }
+	private String baseUrl;
 
-    @AfterEach
-    void stopStub() {
-        server.stop(0);
-    }
+	private final AtomicReference<String> lastRequestBody = new AtomicReference<>();
 
-    @Test
-    void idSelectorSelectsTheCandidateTheModelNames() {
-        LlmSelector selector = new LlmSelector(baseUrl, "test-model", ID);
-        assertThat(selector.select("Add retries to the HTTP client", THREE)).isEqualTo("retry-policy");
-    }
+	private final AtomicInteger requestCount = new AtomicInteger();
 
-    @Test
-    void idSelectorSendsTheLetteredDecisionPrompt() {
-        new LlmSelector(baseUrl, "test-model", ID)
-                .select("Add retries to the HTTP client", THREE);
-        assertThat(lastRequestBody.get())
-                .contains("\"model\":\"test-model\"")
-                .contains("A. http-client")
-                .contains("Answer with the single letter of the correct option.");
-    }
+	private volatile String modelReply = "B";
 
-    @Test
-    void oodSelectorSelectsTheCandidateTheModelNumbers() {
-        modelReply = "2";
-        LlmSelector selector = new LlmSelector(baseUrl, "test-model", OOD);
-        assertThat(selector.select("Add retries to the HTTP client", THREE)).isEqualTo("retry-policy");
-        assertThat(lastRequestBody.get()).contains("Reply with only the number of the best spec");
-    }
+	@BeforeEach
+	void startStub() throws IOException {
+		server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+		server.createContext("/v1/chat/completions", exchange -> {
+			requestCount.incrementAndGet();
+			lastRequestBody.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+			byte[] body = ("{\"choices\":[{\"message\":{\"role\":\"assistant\",\"content\":\"" + modelReply + "\"}}]}")
+				.getBytes(StandardCharsets.UTF_8);
+			exchange.getResponseHeaders().add("Content-Type", "application/json");
+			exchange.sendResponseHeaders(200, body.length);
+			try (OutputStream out = exchange.getResponseBody()) {
+				out.write(body);
+			}
+		});
+		server.start();
+		baseUrl = "http://127.0.0.1:" + server.getAddress().getPort() + "/v1";
+	}
 
-    @Test
-    void aReplyThatNamesNoCandidateIsAMiss() {
-        modelReply = "I cannot decide between these";
-        LlmSelector selector = new LlmSelector(baseUrl, "test-model", ID);
-        assertThat(selector.select("Add retries to the HTTP client", THREE)).isNull();
-    }
+	@AfterEach
+	void stopStub() {
+		server.stop(0);
+	}
 
-    @Test
-    void anEmptyCandidateSetMakesNoModelCall() {
-        LlmSelector selector = new LlmSelector(baseUrl, "test-model", ID);
-        assertThat(selector.select("anything", List.of())).isNull();
-        assertThat(requestCount.get()).isZero();
-    }
+	@Test
+	void idSelectorSelectsTheCandidateTheModelNames() {
+		LlmSelector selector = new LlmSelector(baseUrl, "test-model", ID);
+		assertThat(selector.select("Add retries to the HTTP client", THREE)).isEqualTo("retry-policy");
+	}
 
-    @Test
-    void aDownEndpointFailsWithAClearErrorNamingIt() {
-        LlmSelector selector = new LlmSelector("http://127.0.0.1:1/v1", "test-model", ID);
-        assertThatThrownBy(() -> selector.select("Add retries to the HTTP client", THREE))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("http://127.0.0.1:1/v1");
-    }
+	@Test
+	void idSelectorSendsTheLetteredDecisionPrompt() {
+		new LlmSelector(baseUrl, "test-model", ID).select("Add retries to the HTTP client", THREE);
+		assertThat(lastRequestBody.get()).contains("\"model\":\"test-model\"")
+			.contains("A. http-client")
+			.contains("Answer with the single letter of the correct option.");
+	}
+
+	@Test
+	void oodSelectorSelectsTheCandidateTheModelNumbers() {
+		modelReply = "2";
+		LlmSelector selector = new LlmSelector(baseUrl, "test-model", OOD);
+		assertThat(selector.select("Add retries to the HTTP client", THREE)).isEqualTo("retry-policy");
+		assertThat(lastRequestBody.get()).contains("Reply with only the number of the best spec");
+	}
+
+	@Test
+	void aReplyThatNamesNoCandidateIsAMiss() {
+		modelReply = "I cannot decide between these";
+		LlmSelector selector = new LlmSelector(baseUrl, "test-model", ID);
+		assertThat(selector.select("Add retries to the HTTP client", THREE)).isNull();
+	}
+
+	@Test
+	void anEmptyCandidateSetMakesNoModelCall() {
+		LlmSelector selector = new LlmSelector(baseUrl, "test-model", ID);
+		assertThat(selector.select("anything", List.of())).isNull();
+		assertThat(requestCount.get()).isZero();
+	}
+
+	@Test
+	void aDownEndpointFailsWithAClearErrorNamingIt() {
+		LlmSelector selector = new LlmSelector("http://127.0.0.1:1/v1", "test-model", ID);
+		assertThatThrownBy(() -> selector.select("Add retries to the HTTP client", THREE))
+			.isInstanceOf(IllegalStateException.class)
+			.hasMessageContaining("http://127.0.0.1:1/v1");
+	}
+
 }

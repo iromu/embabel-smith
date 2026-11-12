@@ -12,71 +12,69 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class DetectorTest {
 
-    private final Detector detector = new Detector();
+	private final Detector detector = new Detector();
 
-    @Test
-    void failedRunQueues() {
-        AgentSpec pack = TestFixtures.pack("extract", "s1", "s2");
-        LifecycleMetadata sidecar = TestFixtures.sidecar(pack, 1.0, LifecycleState.ACTIVE);
-        List<TraceRecord> window = List.of(TestFixtures.failedTrace("r1", "extract", "input",
-                TestFixtures.step("s1", "completed", "ok"),
-                TestFixtures.step("s2", "failed", "bad")));
+	@Test
+	void failedRunQueues() {
+		AgentSpec pack = TestFixtures.pack("extract", "s1", "s2");
+		LifecycleMetadata sidecar = TestFixtures.sidecar(pack, 1.0, LifecycleState.ACTIVE);
+		List<TraceRecord> window = List.of(TestFixtures.failedTrace("r1", "extract", "input",
+				TestFixtures.step("s1", "completed", "ok"), TestFixtures.step("s2", "failed", "bad")));
 
-        Detector.Result result = detector.detect("extract", pack, sidecar, window);
+		Detector.Result result = detector.detect("extract", pack, sidecar, window);
 
-        assertThat(result.queued()).isTrue();
-        assertThat(result.reasons()).contains("failed runs");
-        assertThat(result.failureTraces()).hasSize(1);
-    }
+		assertThat(result.queued()).isTrue();
+		assertThat(result.reasons()).contains("failed runs");
+		assertThat(result.failureTraces()).hasSize(1);
+	}
 
-    @Test
-    void tierBlockDoesNotQueue() {
-        AgentSpec pack = TestFixtures.pack("extract", "s1", "s2");
-        LifecycleMetadata sidecar = TestFixtures.sidecar(pack, 1.0, LifecycleState.ACTIVE);
-        List<TraceRecord> window = List.of(TestFixtures.tierBlockTrace("r1", "extract", "input"));
+	@Test
+	void tierBlockDoesNotQueue() {
+		AgentSpec pack = TestFixtures.pack("extract", "s1", "s2");
+		LifecycleMetadata sidecar = TestFixtures.sidecar(pack, 1.0, LifecycleState.ACTIVE);
+		List<TraceRecord> window = List.of(TestFixtures.tierBlockTrace("r1", "extract", "input"));
 
-        Detector.Result result = detector.detect("extract", pack, sidecar, window);
+		Detector.Result result = detector.detect("extract", pack, sidecar, window);
 
-        assertThat(result.queued()).isFalse();
-        assertThat(result.reasons()).isEmpty();
-        assertThat(result.failureTraces()).isEmpty();
-    }
+		assertThat(result.queued()).isFalse();
+		assertThat(result.reasons()).isEmpty();
+		assertThat(result.failureTraces()).isEmpty();
+	}
 
-    @Test
-    void contentDriftQueues() {
-        AgentSpec pack = TestFixtures.pack("extract", "s1", "s2");
-        // A sidecar that records a different content hash than the current pack (drift).
-        LifecycleMetadata drifted = new LifecycleMetadata("some-other-hash", 1.0,
-                LifecycleState.ACTIVE, "t");
+	@Test
+	void contentDriftQueues() {
+		AgentSpec pack = TestFixtures.pack("extract", "s1", "s2");
+		// A sidecar that records a different content hash than the current pack (drift).
+		LifecycleMetadata drifted = new LifecycleMetadata("some-other-hash", 1.0, LifecycleState.ACTIVE, "t");
 
-        Detector.Result result = detector.detect("extract", pack, drifted, List.of());
+		Detector.Result result = detector.detect("extract", pack, drifted, List.of());
 
-        assertThat(result.queued()).isTrue();
-        assertThat(result.reasons()).contains("content drift");
-    }
+		assertThat(result.queued()).isTrue();
+		assertThat(result.reasons()).contains("content drift");
+	}
 
-    @Test
-    void cleanWindowDoesNotQueue() {
-        AgentSpec pack = TestFixtures.pack("extract", "s1", "s2");
-        LifecycleMetadata sidecar = TestFixtures.sidecar(pack, 1.0, LifecycleState.ACTIVE);
-        List<TraceRecord> window = List.of(TestFixtures.okTrace("r1", "extract", "input",
-                TestFixtures.step("s1", "completed", "ok"),
-                TestFixtures.step("s2", "completed", "ok")));
+	@Test
+	void cleanWindowDoesNotQueue() {
+		AgentSpec pack = TestFixtures.pack("extract", "s1", "s2");
+		LifecycleMetadata sidecar = TestFixtures.sidecar(pack, 1.0, LifecycleState.ACTIVE);
+		List<TraceRecord> window = List.of(TestFixtures.okTrace("r1", "extract", "input",
+				TestFixtures.step("s1", "completed", "ok"), TestFixtures.step("s2", "completed", "ok")));
 
-        Detector.Result result = detector.detect("extract", pack, sidecar, window);
+		Detector.Result result = detector.detect("extract", pack, sidecar, window);
 
-        assertThat(result.queued()).isFalse();
-        assertThat(result.reasons()).isEmpty();
-    }
+		assertThat(result.queued()).isFalse();
+		assertThat(result.reasons()).isEmpty();
+	}
 
-    @Test
-    void reevalBelowBaselineQueues() {
-        AgentSpec pack = TestFixtures.pack("extract", "s1");
-        LifecycleMetadata sidecar = TestFixtures.sidecar(pack, 0.9, LifecycleState.ACTIVE);
+	@Test
+	void reevalBelowBaselineQueues() {
+		AgentSpec pack = TestFixtures.pack("extract", "s1");
+		LifecycleMetadata sidecar = TestFixtures.sidecar(pack, 0.9, LifecycleState.ACTIVE);
 
-        Detector.Result result = detector.detect("extract", pack, sidecar, List.of(), spec -> 0.5);
+		Detector.Result result = detector.detect("extract", pack, sidecar, List.of(), spec -> 0.5);
 
-        assertThat(result.queued()).isTrue();
-        assertThat(result.reasons()).contains("below baseline");
-    }
+		assertThat(result.queued()).isTrue();
+		assertThat(result.reasons()).contains("below baseline");
+	}
+
 }

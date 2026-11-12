@@ -16,76 +16,79 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** Offline tests for the sources surface: the configured sources and the packs' lifecycle + drift. */
+/**
+ * Offline tests for the sources surface: the configured sources and the packs' lifecycle
+ * + drift.
+ */
 class SourceControllerTest {
 
-    @Test
-    void listsConfiguredSourcesWithKind() {
-        SourceService sourceService = new SourceService("folder:/a, git:https://x/repo@main", "");
-        SourceController controller = new SourceController(sourceService);
-        List<SourceInfo> sources = controller.sources();
-        assertThat(sources).containsExactly(
-                new SourceInfo("folder:/a", "folder"),
-                new SourceInfo("git:https://x/repo@main", "git"));
-    }
+	@Test
+	void listsConfiguredSourcesWithKind() {
+		SourceService sourceService = new SourceService("folder:/a, git:https://x/repo@main", "");
+		SourceController controller = new SourceController(sourceService);
+		List<SourceInfo> sources = controller.sources();
+		assertThat(sources).containsExactly(new SourceInfo("folder:/a", "folder"),
+				new SourceInfo("git:https://x/repo@main", "git"));
+	}
 
-    @Test
-    void listsNoSourcesWhenUnconfigured() {
-        SourceController controller = new SourceController(new SourceService("", ""));
-        assertThat(controller.sources()).isEmpty();
-    }
+	@Test
+	void listsNoSourcesWhenUnconfigured() {
+		SourceController controller = new SourceController(new SourceService("", ""));
+		assertThat(controller.sources()).isEmpty();
+	}
 
-    @Test
-    void listsPacksWithLifecycleAndNoDrift(@TempDir Path tmp) throws Exception {
-        AgentSpec active = RestTestFixtures.pack("active", "s1");
-        RestTestFixtures.writePack(tmp, active);
-        // The sidecar records the pack's semantic content hash (what the builder stamps); a matching
-        // hash means no drift, so the pack must not be reported as drifted.
-        writeSidecar(tmp.resolve("active"), SpecContentHash.of(active),
-                LifecycleState.ACTIVE, 1.0);
-        RestTestFixtures.writePack(tmp, RestTestFixtures.pack("plain", "s1"));
+	@Test
+	void listsPacksWithLifecycleAndNoDrift(@TempDir Path tmp) throws Exception {
+		AgentSpec active = RestTestFixtures.pack("active", "s1");
+		RestTestFixtures.writePack(tmp, active);
+		// The sidecar records the pack's semantic content hash (what the builder stamps);
+		// a matching
+		// hash means no drift, so the pack must not be reported as drifted.
+		writeSidecar(tmp.resolve("active"), SpecContentHash.of(active), LifecycleState.ACTIVE, 1.0);
+		RestTestFixtures.writePack(tmp, RestTestFixtures.pack("plain", "s1"));
 
-        SourceController controller = new SourceController(new SourceService("folder:" + tmp, ""));
-        List<PackInfo> packs = controller.packs("folder:" + tmp);
-        assertThat(packs).hasSize(2);
+		SourceController controller = new SourceController(new SourceService("folder:" + tmp, ""));
+		List<PackInfo> packs = controller.packs("folder:" + tmp);
+		assertThat(packs).hasSize(2);
 
-        PackInfo activeInfo = packs.stream().filter(p -> p.name().equals("active")).findFirst().orElseThrow();
-        assertThat(activeInfo.lifecycleState()).isEqualTo("ACTIVE");
-        assertThat(activeInfo.baselinePassRate()).isEqualTo(1.0);
-        assertThat(activeInfo.drift()).isFalse();
+		PackInfo activeInfo = packs.stream().filter(p -> p.name().equals("active")).findFirst().orElseThrow();
+		assertThat(activeInfo.lifecycleState()).isEqualTo("ACTIVE");
+		assertThat(activeInfo.baselinePassRate()).isEqualTo(1.0);
+		assertThat(activeInfo.drift()).isFalse();
 
-        PackInfo plainInfo = packs.stream().filter(p -> p.name().equals("plain")).findFirst().orElseThrow();
-        assertThat(plainInfo.lifecycleState()).isNull();
-        assertThat(plainInfo.baselinePassRate()).isNull();
-        assertThat(plainInfo.drift()).isFalse();
-    }
+		PackInfo plainInfo = packs.stream().filter(p -> p.name().equals("plain")).findFirst().orElseThrow();
+		assertThat(plainInfo.lifecycleState()).isNull();
+		assertThat(plainInfo.baselinePassRate()).isNull();
+		assertThat(plainInfo.drift()).isFalse();
+	}
 
-    @Test
-    void reportsDriftWhenContentHashMovedFromSidecar(@TempDir Path tmp) throws Exception {
-        RestTestFixtures.writePack(tmp, RestTestFixtures.pack("drifted", "s1"));
-        writeSidecar(tmp.resolve("drifted"), "a-stale-hash", LifecycleState.ACTIVE, 0.5);
+	@Test
+	void reportsDriftWhenContentHashMovedFromSidecar(@TempDir Path tmp) throws Exception {
+		RestTestFixtures.writePack(tmp, RestTestFixtures.pack("drifted", "s1"));
+		writeSidecar(tmp.resolve("drifted"), "a-stale-hash", LifecycleState.ACTIVE, 0.5);
 
-        SourceController controller = new SourceController(new SourceService("folder:" + tmp, ""));
-        List<PackInfo> packs = controller.packs("folder:" + tmp);
-        assertThat(packs).hasSize(1);
-        assertThat(packs.get(0).drift()).isTrue();
-        assertThat(packs.get(0).lifecycleState()).isEqualTo("ACTIVE");
-    }
+		SourceController controller = new SourceController(new SourceService("folder:" + tmp, ""));
+		List<PackInfo> packs = controller.packs("folder:" + tmp);
+		assertThat(packs).hasSize(1);
+		assertThat(packs.get(0).drift()).isTrue();
+		assertThat(packs.get(0).lifecycleState()).isEqualTo("ACTIVE");
+	}
 
-    @Test
-    void listsGoalsExportedByPacks(@TempDir Path tmp) {
-        RestTestFixtures.writePack(tmp, RestTestFixtures.pack("alpha", "s1"));
-        RestTestFixtures.writePack(tmp, RestTestFixtures.pack("beta", "s1"));
+	@Test
+	void listsGoalsExportedByPacks(@TempDir Path tmp) {
+		RestTestFixtures.writePack(tmp, RestTestFixtures.pack("alpha", "s1"));
+		RestTestFixtures.writePack(tmp, RestTestFixtures.pack("beta", "s1"));
 
-        SourceController controller = new SourceController(new SourceService("folder:" + tmp, ""));
-        // Each pack exports the goal named in its goal spec; the Run pane runs a goal, not a pack.
-        assertThat(controller.goals("folder:" + tmp)).containsExactlyInAnyOrder("alpha", "beta");
-    }
+		SourceController controller = new SourceController(new SourceService("folder:" + tmp, ""));
+		// Each pack exports the goal named in its goal spec; the Run pane runs a goal,
+		// not a pack.
+		assertThat(controller.goals("folder:" + tmp)).containsExactlyInAnyOrder("alpha", "beta");
+	}
 
-    private static void writeSidecar(Path packDir, String hash, LifecycleState state, double baseline)
-            throws Exception {
-        LifecycleMetadata metadata =
-                new LifecycleMetadata(hash, baseline, state, "2026-01-01T00:00:00Z");
-        Files.writeString(packDir.resolve("lifecycle.yml"), Yaml.mapper().writeValueAsString(metadata));
-    }
+	private static void writeSidecar(Path packDir, String hash, LifecycleState state, double baseline)
+			throws Exception {
+		LifecycleMetadata metadata = new LifecycleMetadata(hash, baseline, state, "2026-01-01T00:00:00Z");
+		Files.writeString(packDir.resolve("lifecycle.yml"), Yaml.mapper().writeValueAsString(metadata));
+	}
+
 }

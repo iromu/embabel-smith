@@ -1,40 +1,38 @@
 <template>
-  <q-page padding>
-    <q-card flat bordered class="q-pa-md">
+  <q-page>
+    <div class="pane-stack">
       <PageHeader
         icon="account_tree"
         title="Author a process"
         description="Describe a business process (or point at its documents), generate the GOAP flow, edit it, simulate a run, and publish a pack."
       />
-      <q-separator />
 
       <!-- 1. Blueprint input -->
-      <q-card-section>
-        <div class="text-subtitle2 q-mb-xs">Blueprint</div>
-        <div class="row q-col-gutter-sm items-start">
+      <SectionCard title="Blueprint" icon="description">
+        <div class="row q-col-gutter-md items-start">
           <div class="col-auto">
             <q-select
               v-model="sourceKind"
               :options="sourceKinds"
               label="Source"
-              dense
-              style="width: 200px"
+              outlined
+              style="width: 180px"
               data-test="pw-source-kind"
             />
           </div>
-          <div class="col">
+          <div class="col" style="min-width: 280px">
             <q-input
               v-if="sourceKind === 'path'"
               v-model="pathInput"
               label="Business-process docs (server path)"
-              dense
+              outlined
               data-test="pw-path"
             />
             <q-input
               v-else-if="sourceKind === 'url'"
               v-model="urlInput"
               label="Repository URL"
-              dense
+              outlined
               data-test="pw-url"
             />
             <q-input
@@ -43,7 +41,7 @@
               label="Process description"
               type="textarea"
               autogrow
-              dense
+              outlined
               data-test="pw-text"
             />
           </div>
@@ -118,44 +116,37 @@
             {{ extracted }}
           </div>
         </q-expansion-item>
-      </q-card-section>
-
-      <q-separator />
+      </SectionCard>
 
       <!-- 2. Progress -->
-      <q-card-section>
-        <div class="row q-gutter-sm items-center no-wrap">
-          <template v-for="(stage, i) in stages" :key="stage.key">
-            <q-badge
-              :color="stage.color"
-              :label="stage.label"
-              :outline="stage.state === 'pending'"
-            />
-            <q-icon
-              v-if="i < stages.length - 1"
-              name="chevron_right"
-              size="14px"
-              class="text-grey-5"
-            />
-          </template>
-        </div>
-      </q-card-section>
-
-      <q-separator />
+      <div class="pw-progress row q-gutter-sm items-center no-wrap">
+        <template v-for="(stage, i) in stages" :key="stage.key">
+          <q-badge
+            :color="stage.color"
+            :label="stage.label"
+            :outline="stage.state === 'pending'"
+          />
+          <q-icon
+            v-if="i < stages.length - 1"
+            name="chevron_right"
+            size="14px"
+            class="text-grey-5"
+          />
+        </template>
+      </div>
 
       <!-- 3. Flow graph -->
-      <q-card-section>
-        <div class="row justify-end no-wrap q-mb-xs">
+      <SectionCard title="Flow graph" icon="account_tree">
+        <template #actions>
           <q-btn
             v-if="nodes.length"
             label="Fit view"
+            outline
             icon="fit_screen"
-            dense
-            flat
             @click="doFitView"
             data-test="pw-fit"
           />
-        </div>
+        </template>
         <div data-test="pw-canvas">
           <div class="pw-canvas">
             <VueFlow
@@ -203,14 +194,18 @@
                 </template>
               </VueFlow>
             </div>
-            <div v-if="nodes.length === 0" class="text-grey-6 text-caption q-mt-xs" data-test="pw-empty">
-              Generate a flow to see the GOAP graph here.
-            </div>
+            <EmptyState
+              v-if="nodes.length === 0"
+              icon="account_tree"
+              title="No flow yet"
+              hint="Generate a flow from your blueprint to see the GOAP graph here."
+              data-test="pw-empty"
+            />
           </div>
 
           <div class="q-mt-md" data-test="pw-editor-wrap">
             <q-card v-if="selected" flat bordered class="q-pa-sm">
-              <div class="text-subtitle2 q-mb-sm">{{ selected.type === 'goal' ? 'Goal' : 'Step' }}</div>
+              <div class="section-label">{{ selected.type === 'goal' ? 'Goal' : 'Step' }}</div>
               <template v-if="stepData">
                 <q-input v-model="stepData.name" label="Name" dense data-test="pw-step-name" />
                 <q-input v-model="stepData.description" label="Description" dense class="q-mt-sm" />
@@ -248,29 +243,30 @@
               Select a step or the goal to edit it.
             </div>
           </div>
-      </q-card-section>
-
-      <q-separator />
+      </SectionCard>
 
       <!-- 4. Simulate + Publish -->
-      <q-card-section>
-        <div class="row q-gutter-sm items-center">
-          <q-input
-            v-model="simInput"
-            label="Sample input (bound to UserInput)"
-            dense
-            style="flex: 1; min-width: 280px"
-            data-test="pw-sim-input"
-          />
-          <q-btn
-            label="Simulate run"
-            icon="play_arrow"
-            outline
-            :disable="nodes.length === 0"
-            :loading="simulating"
-            @click="doSimulate"
-            data-test="pw-simulate"
-          />
+      <SectionCard title="Simulate &amp; publish" icon="play_arrow">
+        <div class="row q-col-gutter-md items-center">
+          <div class="col" style="min-width: 280px; flex: 1">
+            <q-input
+              v-model="simInput"
+              label="Sample input (bound to UserInput)"
+              outlined
+              data-test="pw-sim-input"
+            />
+          </div>
+          <div class="col-auto">
+            <q-btn
+              label="Simulate run"
+              icon="play_arrow"
+              outline
+              :disable="nodes.length === 0"
+              :loading="simulating"
+              @click="doSimulate"
+              data-test="pw-simulate"
+            />
+          </div>
         </div>
 
         <div v-if="simResult" class="q-mt-md" data-test="pw-sim-result">
@@ -297,34 +293,41 @@
           </div>
         </div>
 
-        <q-separator class="q-my-md" />
-
-        <div class="row q-gutter-sm items-center">
-          <q-select
-            v-model="publishSource"
-            label="Publish to (source)"
-            dense
-            :options="sourceOptions"
-            style="width: 320px"
-            data-test="pw-source"
-          />
-          <q-checkbox v-model="overwrite" label="Overwrite" dense />
-          <q-btn
-            label="Save"
-            icon="save"
-            outline
-            :disable="nodes.length === 0"
-            @click="doSave"
-            data-test="pw-save"
-          />
-          <q-btn
-            label="Publish pack"
-            icon="upload"
-            color="primary"
-            :disable="nodes.length === 0"
-            @click="doPublish"
-            data-test="pw-publish"
-          />
+        <div class="section-label q-mt-md">Publish</div>
+        <div class="row q-col-gutter-md items-center no-wrap">
+          <div class="col-auto">
+            <q-select
+              v-model="publishSource"
+              label="Publish to (source)"
+              outlined
+              :options="sourceOptions"
+              style="width: 280px"
+              data-test="pw-source"
+            />
+          </div>
+          <div class="col-auto">
+            <q-checkbox v-model="overwrite" label="Overwrite" dense />
+          </div>
+          <div class="col-auto">
+            <q-btn
+              label="Save"
+              icon="save"
+              outline
+              :disable="nodes.length === 0"
+              @click="doSave"
+              data-test="pw-save"
+            />
+          </div>
+          <div class="col-auto">
+            <q-btn
+              label="Publish pack"
+              icon="upload"
+              color="primary"
+              :disable="nodes.length === 0"
+              @click="doPublish"
+              data-test="pw-publish"
+            />
+          </div>
         </div>
         <div v-if="publishError" class="text-negative text-caption q-mt-sm" data-test="pw-publish-error">
           {{ publishError }}
@@ -340,16 +343,15 @@
           Saved pack '{{ saveResult }}' to the studio library.
         </div>
 
-        <q-separator class="q-my-md" />
-
-        <div class="row q-col-gutter-md" data-test="pw-library">
+        <div class="section-label q-mt-md">Library</div>
+        <div class="row q-col-gutter-lg" data-test="pw-library">
           <div class="col">
             <div class="text-caption text-grey-7 q-mb-xs">Saved packs</div>
             <div v-if="storedPacks.length === 0" class="text-grey-6 text-caption">No saved packs yet.</div>
             <div
               v-for="p in storedPacks"
               :key="p.name"
-              class="row items-center no-wrap q-py-xs"
+              class="row items-center no-wrap q-py-xs pw-lib-row"
               data-test="pw-saved-pack"
             >
               <q-icon name="inventory_2" size="16px" class="q-mr-sm text-grey-6" />
@@ -366,6 +368,15 @@
                 @click="doLoadStored(p.name)"
                 data-test="pw-load-stored"
               />
+              <q-btn
+                label="Download"
+                dense
+                size="sm"
+                outline
+                icon="download"
+                @click="doDownload(p.name)"
+                data-test="pw-download-stored"
+              />
             </div>
           </div>
           <div class="col">
@@ -376,7 +387,7 @@
             <div
               v-for="(d, i) in discoveries"
               :key="i"
-              class="row items-center no-wrap q-py-xs"
+              class="row items-center no-wrap q-py-xs pw-lib-row"
               data-test="pw-discovery"
             >
               <q-icon name="folder_open" size="16px" class="q-mr-sm text-grey-6" />
@@ -387,8 +398,36 @@
             </div>
           </div>
         </div>
-      </q-card-section>
-    </q-card>
+
+        <div class="section-label q-mt-md">Import</div>
+        <div class="row q-col-gutter-md items-center">
+          <div class="col" style="min-width: 280px; flex: 1">
+            <q-input
+              v-model="importPath"
+              label="Pack directory path"
+              outlined
+              data-test="pw-import-path"
+            />
+          </div>
+          <div class="col-auto">
+            <q-btn
+              label="Import"
+              icon="input"
+              outline
+              :loading="importing"
+              @click="doImport"
+              data-test="pw-import"
+            />
+          </div>
+        </div>
+        <div v-if="importError" class="text-negative text-caption q-mt-sm" data-test="pw-import-error">
+          {{ importError }}
+        </div>
+        <div v-else-if="importResult" class="text-positive text-caption q-mt-sm" data-test="pw-imported">
+          Imported pack '{{ importResult }}'.
+        </div>
+      </SectionCard>
+    </div>
   </q-page>
 </template>
 
@@ -397,12 +436,16 @@ import { computed, onMounted, ref } from 'vue'
 import { Handle, Position, useVueFlow, VueFlow } from '@vue-flow/core'
 import type { Connection } from '@vue-flow/core'
 
+import EmptyState from '../components/EmptyState.vue'
 import PageHeader from '../components/PageHeader.vue'
+import SectionCard from '../components/SectionCard.vue'
 import {
   compose,
   discover,
+  downloadPackZip,
   extract,
   generate,
+  importPack,
   listDiscoveries,
   listSources,
   listStoredPacks,
@@ -543,6 +586,10 @@ const saveError = ref<string | null>(null)
 const saveResult = ref<string | null>(null)
 const storedPacks = ref<StoredPackInfo[]>([])
 const discoveries = ref<DiscoveryRecord[]>([])
+const importPath = ref('')
+const importing = ref(false)
+const importResult = ref<string | null>(null)
+const importError = ref<string | null>(null)
 
 // ---- Progress stages ----
 type StageState = 'pending' | 'active' | 'done'
@@ -713,6 +760,45 @@ async function doLoadStored(name: string) {
   }
 }
 
+/** Fetches the stored pack as a zip and triggers a browser download. */
+async function doDownload(name: string) {
+  saveError.value = null
+  try {
+    const blob = await downloadPackZip(name)
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${name}.zip`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+  } catch (e) {
+    saveError.value = e instanceof Error ? e.message : String(e)
+  }
+}
+
+async function doImport() {
+  importError.value = null
+  importResult.value = null
+  const path = importPath.value.trim()
+  if (!path) return
+  importing.value = true
+  try {
+    const res = await importPack({ path })
+    if (res.error || !res.name) {
+      importError.value = res.error ?? 'Import failed.'
+    } else {
+      importResult.value = res.name
+      await refreshLibrary()
+    }
+  } catch (e) {
+    importError.value = e instanceof Error ? e.message : String(e)
+  } finally {
+    importing.value = false
+  }
+}
+
 async function refreshLibrary() {
   try {
     storedPacks.value = await listStoredPacks()
@@ -738,6 +824,20 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+/* The progress strip sits on its own subtle surface between the blueprint and the canvas. */
+.pw-progress {
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--surface-2, #172033);
+  border: 1px solid var(--border, #2b3a4f);
+}
+
+/* Library rows get a touch of hover affordance. */
+.pw-lib-row:hover {
+  background: rgba(148, 163, 184, 0.06);
+  border-radius: 6px;
+}
+
 .pw-canvas {
   height: 560px;
   border: 1px solid var(--border, #2b3a4f);

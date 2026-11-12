@@ -1,75 +1,84 @@
 <template>
-  <q-page padding>
-    <q-card flat bordered class="q-pa-md">
+  <q-page>
+    <div class="pane-stack">
       <PageHeader
         icon="play_arrow"
         title="Run"
         description="Pick a source and a goal it exports, submit an input, and run it through the runtime."
       />
 
-      <q-separator />
-
-      <q-card-section>
-        <div class="col q-gutter-y-sm">
-          <div class="row q-gutter-sm items-start">
+      <SectionCard title="Run a goal" icon="play_arrow">
+        <div class="row q-col-gutter-md items-start">
+          <div class="col-auto">
             <q-select
               v-model="source"
               label="Source"
-              dense
+              outlined
               :options="sourceOptions"
-              style="width: 320px"
+              style="width: 240px"
               data-test="run-source"
             />
+          </div>
+          <div class="col-auto">
             <q-select
               v-model="goal"
               label="Goal"
-              dense
+              outlined
               :options="goalOptions"
               :loading="loadingGoals"
-              style="width: 260px"
+              style="width: 240px"
               data-test="run-goal"
             />
           </div>
-          <div class="row q-gutter-sm items-start">
-            <q-input v-model="input" label="Input" dense style="flex: 1; min-width: 220px" data-test="run-input" />
-            <q-input v-model="planner" label="Planner (optional)" dense style="width: 180px" data-test="run-planner" />
+          <div class="col-auto">
             <q-select
               v-model="tier"
               label="Trust tier"
-              dense
+              outlined
               :options="tiers"
               style="width: 150px"
               data-test="run-tier"
             />
+          </div>
+          <div class="col" style="min-width: 200px">
+            <q-input v-model="input" label="Input" outlined data-test="run-input" />
+          </div>
+          <div class="col-auto">
             <q-btn label="Run" color="primary" icon="play_arrow" @click="doRun" data-test="run-btn" />
           </div>
         </div>
-      </q-card-section>
+      </SectionCard>
 
-      <q-separator />
-
-      <q-card-section>
+      <SectionCard title="Result" icon="terminal">
         <div v-if="noEndpoint" class="text-warning" data-test="run-no-endpoint">
           <q-badge color="warning" label="model not configured" />
           <div class="q-mt-sm text-grey-7">{{ error }}</div>
         </div>
         <div v-else-if="error" class="text-negative" data-test="run-error">{{ error }}</div>
         <div v-else-if="output !== null" data-test="run-output">
-          <div class="text-subtitle2">Goal output</div>
+          <div class="section-label">Goal output</div>
           <q-card flat bordered class="q-pa-sm bg-grey-1">
             <pre class="text-body2" style="white-space: pre-wrap; margin: 0">{{ output }}</pre>
           </q-card>
         </div>
-        <div v-else class="text-grey-6">Pick a source and a goal, enter an input, then run it.</div>
-      </q-card-section>
-    </q-card>
+        <EmptyState
+          v-else
+          icon="play_circle_outline"
+          title="No run yet"
+          hint="Pick a source and a goal, enter an input, then run it to see the goal output here."
+          data-test="run-empty"
+        />
+      </SectionCard>
+    </div>
   </q-page>
 </template>
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 
+import EmptyState from '../components/EmptyState.vue'
 import PageHeader from '../components/PageHeader.vue'
+import SectionCard from '../components/SectionCard.vue'
 import { listGoals, run } from '../api/client'
 import { isModelNotConfigured } from '../api/types'
 import type { RunResponse } from '../api/types'

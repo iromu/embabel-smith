@@ -70,6 +70,7 @@ scan, the trust check, and reading traces — work regardless.
 | Trust | trust-tier policy | Check a spec's tool groups against a trust tier; offline. |
 | Traces | change-03 trace store | A spec's recent runs, most recent first, with per-step drill-down. |
 | Auto-improve | change-05 loop | Loop control, pending candidates with evidence, approve/reject, auto-publish. |
+| Storage | storage context | Point the studio at its Postgres database and pick the trace backend; save validates and rebinds live. |
 | Compose / Retrieve / Scale / Remote | — | POC-only panes, kept for reference and disabled in the product. |
 
 ## REST surface
@@ -91,9 +92,31 @@ scan, the trust check, and reading traces — work regardless.
 | `POST /api/loop/start` · `stop` | Start / stop the interval schedule. |
 | `GET /api/loop/status` | Loop schedule + auto-publish state. |
 | `GET` · `PUT` `/api/loop/auto-publish` | Read / set auto-publish. |
+| `GET` · `PUT` `/api/storage-settings` | Read / set the database endpoint + trace backend (PUT validates the connection and rebinds live). |
+| `GET /api/store/packs` · `GET /api/store/packs/{name}` | List saved packs / load one by name. |
+| `POST /api/store/packs` | Save a pack to the database. |
+| `GET /api/store/packs/{name}/download` | A saved pack as a zip. |
+| `POST /api/store/packs/import` | Import an agent-spec directory from a filesystem path into the database. |
+| `GET /api/store/discoveries` | The recorded discovery history. |
 
 The request/response DTOs mirror the TypeScript types in `frontend/src/api/types.ts`;
 `vue-tsc --noEmit` catches a field rename on either side.
+
+## Durable storage (Postgres)
+
+Saved packs, the discovery history, and run traces live in a Postgres database the user points at
+from the **Storage** pane. The app **boots and stays usable with no database** — the datasource and
+JPA auto-configurations are excluded, and storage is bound **programmatically and hot-swapped** on
+rebind (nothing JPA-related is a Spring bean, so a rebind never orphans live beans). When unbound,
+listing endpoints return empty and writes report "storage not configured".
+
+- **Dev database:** `docker compose up -d` (in this directory) starts a `postgres:16` at
+  `jdbc:postgresql://localhost:5432/smith_studio` (user/password `smith`/`smith`, db `smith_studio`,
+  named volume `studio-pgdata`). Point the Storage pane at it.
+- **Settings** persist as `~/.smith/studio/storage.json` (mode 0600) — they cannot live in the
+  database they configure.
+- **Trace backends** are pluggable and switchable at runtime: `jsonl` (default, the change-03 file
+  store), `postgres-same` (the packs' database), or `postgres-separate` (an independent database).
 
 ## Operating the loop
 

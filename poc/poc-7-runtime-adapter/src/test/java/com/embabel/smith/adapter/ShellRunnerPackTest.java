@@ -18,31 +18,31 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class ShellRunnerPackTest {
 
-    private final AgentSpecReader reader = new AgentSpecReader();
-    private final AgentSpecValidator validator = new AgentSpecValidator();
+	private final AgentSpecReader reader = new AgentSpecReader();
 
-    @Test
-    void theCliPackIsValidAndItsActionUsesTheShellToolGroup() throws IOException {
-        Path pack = repoRoot().resolve("agent-specs/shell-runner");
+	private final AgentSpecValidator validator = new AgentSpecValidator();
 
-        assertThat(validator.validate(pack).isValid())
-                .as("issues: " + validator.validate(pack).issues())
-                .isTrue();
+	@Test
+	void theCliPackIsValidAndItsActionUsesTheShellToolGroup() throws IOException {
+		Path pack = repoRoot().resolve("agent-specs/shell-runner");
 
-        AgentSpec loaded = reader.read(pack);
-        ActionStepSpec action = loaded.step("runCli");
-        assertThat(action).isNotNull();
-        assertThat(action.toolGroups()).containsExactly(ShellToolGroup.ROLE);
-    }
+		assertThat(validator.validate(pack).isValid()).as("issues: " + validator.validate(pack).issues()).isTrue();
 
-    private static Path repoRoot() {
-        Path dir = Path.of("").toAbsolutePath();
-        while (dir != null) {
-            if (Files.isDirectory(dir.resolve("agent-specs/shell-runner"))) {
-                return dir;
-            }
-            dir = dir.getParent();
-        }
-        throw new IllegalStateException("Could not locate repo root (agent-specs/shell-runner not found)");
-    }
+		AgentSpec loaded = reader.read(pack);
+		ActionStepSpec action = loaded.step("runCli");
+		assertThat(action).isNotNull();
+		assertThat(action.toolGroups()).containsExactly(ShellToolGroup.ROLE);
+	}
+
+	private static Path repoRoot() {
+		Path dir = Path.of("").toAbsolutePath();
+		while (dir != null) {
+			if (Files.isDirectory(dir.resolve("agent-specs/shell-runner"))) {
+				return dir;
+			}
+			dir = dir.getParent();
+		}
+		throw new IllegalStateException("Could not locate repo root (agent-specs/shell-runner not found)");
+	}
+
 }

@@ -11,30 +11,33 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class DriftDetectorTest {
 
-    private final DriftDetector drift = new DriftDetector();
-    private final AgentSpec pack = LifecycleSpec.healthy();
-    private final String hash = SpecContentHash.of(pack);
+	private final DriftDetector drift = new DriftDetector();
 
-    @Test
-    void noContentDriftWhenThePackIsUnchanged() {
-        assertThat(drift.contentDrift(hash, pack)).isFalse();
-    }
+	private final AgentSpec pack = LifecycleSpec.healthy();
 
-    @Test
-    void contentDriftWhenThePackChanges() {
-        assertThat(drift.contentDrift(hash, LifecycleSpec.reworded())).isTrue();
-        assertThat(drift.contentDrift(hash, LifecycleSpec.regressed())).isTrue();
-    }
+	private final String hash = SpecContentHash.of(pack);
 
-    @Test
-    void noScoreDriftWithinTolerance() {
-        assertThat(drift.scoreDrift(1.0, 0.95, 0.1)).isFalse();
-        assertThat(drift.scoreDrift(1.0, 0.9, 0.1)).isFalse();
-    }
+	@Test
+	void noContentDriftWhenThePackIsUnchanged() {
+		assertThat(drift.contentDrift(hash, pack)).isFalse();
+	}
 
-    @Test
-    void scoreDriftBeyondTolerance() {
-        assertThat(drift.scoreDrift(1.0, 0.8, 0.1)).isTrue();
-        assertThat(drift.scoreDrift(1.0, 0.0, 0.1)).isTrue();
-    }
+	@Test
+	void contentDriftWhenThePackChanges() {
+		assertThat(drift.contentDrift(hash, LifecycleSpec.reworded())).isTrue();
+		assertThat(drift.contentDrift(hash, LifecycleSpec.regressed())).isTrue();
+	}
+
+	@Test
+	void noScoreDriftWithinTolerance() {
+		assertThat(drift.scoreDrift(1.0, 0.95, 0.1)).isFalse();
+		assertThat(drift.scoreDrift(1.0, 0.9, 0.1)).isFalse();
+	}
+
+	@Test
+	void scoreDriftBeyondTolerance() {
+		assertThat(drift.scoreDrift(1.0, 0.8, 0.1)).isTrue();
+		assertThat(drift.scoreDrift(1.0, 0.0, 0.1)).isTrue();
+	}
+
 }

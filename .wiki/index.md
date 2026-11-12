@@ -93,8 +93,11 @@ Three entry points matter:
 - **Built packs** are written by the builder to `./built-specs/<name>/` (configurable via
   `builder.output-dir`).
 - **Intermediate types** are pure data in the pack's `types/` directory — no compiled classes.
-- There is **no database**; persistence is plain files on disk. The runtime assembles a temp
-  directory per run and leaves the source pack untouched.
+- The POCs, the `smith run` runtime, and the `smith build` builder have **no database** —
+  persistence is plain files on disk (the runtime assembles a temp directory per run and leaves the
+  source pack untouched). The **studio** optionally adds a **Postgres** database for saved packs,
+  the discovery history, and run traces — hot-swappable from the UI, and the app still boots with
+  none ([[smith-studio-storage]]).
 
 ## 6. What are the important moving parts?
 
@@ -157,6 +160,7 @@ Three entry points matter:
 | How does the `smith build` builder work (pipeline + publish)? | [[smith-builder]] |
 | How does a spec self-improve from its traces? | [[smith-studio]] |
 | How is the studio exposed as a web product (REST + UI + loop control)? | [[smith-studio-web]] |
+| How does the studio store packs/traces in Postgres (hot-swap + pluggable traces)? | [[smith-studio-storage]] |
 
 ## Page catalog
 
@@ -169,6 +173,7 @@ Three entry points matter:
 **Features** — [[nl-compile]] · [[spec-format-on-demand]] · [[runtime-adapter]] ·
 [[retrieval-shadowing]] · [[shadowing-remedies]] · [[spec-lifecycle]] · [[trust-tiers]] ·
 [[spec-security-scanning]] · [[progressive-disclosure]] · [[spec-composer]] · [[spec-sources]] ·
-[[smith-runtime]] · [[smith-builder]] · [[smith-studio]] · [[smith-studio-web]]
+[[smith-runtime]] · [[smith-builder]] · [[smith-studio]] · [[smith-studio-web]] ·
+[[smith-studio-storage]]
 **Risks** — [[validate-before-write]]
 **Reference** — [[validation-codes]] · [[sample-explainer]]

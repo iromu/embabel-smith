@@ -188,6 +188,49 @@ export interface DiscoveryRecord {
   docCount: number
 }
 
+/** The pack database endpoint as persisted in the storage settings. */
+export interface StorageDbSettings {
+  url: string | null
+  user: string | null
+  password: string | null
+}
+/** The trace backend selection; `type` is jsonl / postgres-same / postgres-separate. */
+export interface StorageTraceSettings {
+  type: string
+  url: string | null
+  user: string | null
+  password: string | null
+}
+export interface StorageSettings {
+  packDb: StorageDbSettings
+  trace: StorageTraceSettings
+}
+/** The Storage pane's save form (mirrors the backend PUT body). */
+export interface StorageSettingsSaveRequest {
+  url: string
+  user: string
+  password: string
+  traceType: string
+  traceUrl?: string
+  traceUser?: string
+  tracePassword?: string
+}
+export interface StorageSettingsSaveResponse {
+  ok: boolean
+  settings: StorageSettings | null
+  error: string | null
+}
+
+// ---- Pack import -----------------------------------------------------------
+export interface ImportPackRequest {
+  path: string
+}
+export interface ImportPackResponse {
+  ok: boolean
+  name: string | null
+  error: string | null
+}
+
 // ---- Traces ----------------------------------------------------------------
 export interface StepInfo {
   name: string

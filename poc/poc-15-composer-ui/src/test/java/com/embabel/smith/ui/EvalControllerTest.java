@@ -11,47 +11,43 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Offline tests for the eval/refinement pane (POC 15). The live eval + rewrite are endpoint-gated, so
- * these pin the offline scaffolding: no spec selected, an unknown spec, and a missing endpoint
- * (naming the missing vars) — each returns before any model call, so the controller is built with no
- * {@code AgentPlatform}.
+ * Offline tests for the eval/refinement pane (POC 15). The live eval + rewrite are
+ * endpoint-gated, so these pin the offline scaffolding: no spec selected, an unknown
+ * spec, and a missing endpoint (naming the missing vars) — each returns before any model
+ * call, so the controller is built with no {@code AgentPlatform}.
  */
 class EvalControllerTest {
 
-    MockMvc mockMvc;
+	MockMvc mockMvc;
 
-    @BeforeEach
-    void setUp() {
-        SpecCatalog catalog = new SpecCatalog("");
-        EvalController controller = new EvalController(catalog, null, "", "", "", "");
-        mockMvc = MockMvcBuilders.standaloneSetup(controller).build();
-    }
+	@BeforeEach
+	void setUp() {
+		SpecCatalog catalog = new SpecCatalog("");
+		EvalController controller = new EvalController(catalog, null, "", "", "", "");
+		mockMvc = MockMvcBuilders.standaloneSetup(controller).build();
+	}
 
-    @Test
-    void noSpecSelectedIsRejected() throws Exception {
-        mockMvc.perform(post("/api/eval").contentType(MediaType.APPLICATION_JSON)
-                .content("{\"specName\":\"\"}"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.error")
-                        .value(org.hamcrest.Matchers.containsString("No spec selected")));
-    }
+	@Test
+	void noSpecSelectedIsRejected() throws Exception {
+		mockMvc.perform(post("/api/eval").contentType(MediaType.APPLICATION_JSON).content("{\"specName\":\"\"}"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.error").value(org.hamcrest.Matchers.containsString("No spec selected")));
+	}
 
-    @Test
-    void anUnknownSpecIsRejected() throws Exception {
-        mockMvc.perform(post("/api/eval").contentType(MediaType.APPLICATION_JSON)
-                .content("{\"specName\":\"nope\"}"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.error")
-                        .value(org.hamcrest.Matchers.containsString("Unknown spec")));
-    }
+	@Test
+	void anUnknownSpecIsRejected() throws Exception {
+		mockMvc.perform(post("/api/eval").contentType(MediaType.APPLICATION_JSON).content("{\"specName\":\"nope\"}"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.error").value(org.hamcrest.Matchers.containsString("Unknown spec")));
+	}
 
-    @Test
-    void aKnownSpecWithoutAnEndpointReturnsAClearConfigError() throws Exception {
-        mockMvc.perform(post("/api/eval").contentType(MediaType.APPLICATION_JSON)
-                .content("{\"specName\":\"explainer\"}"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.error")
-                        .value(org.hamcrest.Matchers.containsString("OPENAI_CUSTOM_BASE_URL")))
-                .andExpect(jsonPath("$.failingInputs").isEmpty());
-    }
+	@Test
+	void aKnownSpecWithoutAnEndpointReturnsAClearConfigError() throws Exception {
+		mockMvc
+			.perform(post("/api/eval").contentType(MediaType.APPLICATION_JSON).content("{\"specName\":\"explainer\"}"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.error").value(org.hamcrest.Matchers.containsString("OPENAI_CUSTOM_BASE_URL")))
+			.andExpect(jsonPath("$.failingInputs").isEmpty());
+	}
+
 }

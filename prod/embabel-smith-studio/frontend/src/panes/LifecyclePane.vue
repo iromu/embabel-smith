@@ -1,36 +1,36 @@
 <template>
-  <q-page padding>
-    <q-card flat bordered class="q-pa-md">
+  <q-page>
+    <div class="pane-stack">
       <PageHeader
         icon="cycle"
         title="Lifecycle"
         description="Each pack's lifecycle state, baseline pass-rate, and content-hash drift status."
       />
 
-      <q-separator />
+      <SectionCard title="Packs" icon="inventory_2">
+        <template #actions>
+          <div class="row items-center q-gutter-sm">
+            <q-select
+              v-model="source"
+              label="Source"
+              outlined
+              :options="sourceOptions"
+              style="width: 240px"
+              data-test="lifecycle-source"
+            />
+            <q-btn label="Refresh" outline icon="refresh" @click="loadSpecs" data-test="lifecycle-refresh" />
+          </div>
+        </template>
 
-      <q-card-section>
-        <div class="row q-gutter-sm items-center">
-          <q-select
-            v-model="source"
-            label="Source"
-            dense
-            :options="sourceOptions"
-            style="width: 320px"
-            data-test="lifecycle-source"
-          />
-          <q-btn label="Refresh" color="primary" icon="refresh" @click="loadSpecs" data-test="lifecycle-refresh" />
-        </div>
-      </q-card-section>
-
-      <q-separator />
-
-      <q-card-section>
         <div v-if="error" class="text-negative" data-test="lifecycle-error">{{ error }}</div>
         <div v-else-if="loading" class="text-grey-6">loading…</div>
-        <div v-else-if="specs.length === 0" class="text-grey-6" data-test="lifecycle-empty">
-          No packs in this source.
-        </div>
+        <EmptyState
+          v-else-if="specs.length === 0"
+          icon="inventory_2"
+          title="No packs in this source"
+          hint="Pick a source that contains built packs to see their lifecycle state here."
+          data-test="lifecycle-empty"
+        />
         <q-list dense v-else data-test="lifecycle-list">
           <q-item v-for="pack in specs" :key="pack.name" class="q-py-sm">
             <q-item-section>
@@ -53,15 +53,17 @@
             </q-item-section>
           </q-item>
         </q-list>
-      </q-card-section>
-    </q-card>
+      </SectionCard>
+    </div>
   </q-page>
 </template>
 
 <script setup lang="ts">
 import { ref } from 'vue'
 
+import EmptyState from '../components/EmptyState.vue'
 import PageHeader from '../components/PageHeader.vue'
+import SectionCard from '../components/SectionCard.vue'
 import { useSourceSpec } from '../composables/useSourceSpec'
 import { lifecycleColor } from '../improve/model'
 

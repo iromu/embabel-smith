@@ -13,6 +13,7 @@ import TracesPane from './panes/TracesPane.vue'
 import AutoImprovePane from './panes/AutoImprovePane.vue'
 import RemotePane from './panes/RemotePane.vue'
 import ScalePane from './panes/ScalePane.vue'
+import StoragePane from './panes/StoragePane.vue'
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -31,5 +32,6 @@ export const router = createRouter({
     { path: '/improve', name: 'improve', component: AutoImprovePane },
     { path: '/remote', name: 'remote', component: RemotePane },
     { path: '/scale', name: 'scale', component: ScalePane },
+    { path: '/storage', name: 'storage', component: StoragePane },
   ],
 })

@@ -9,6 +9,7 @@ import AutoImprovePane from '../panes/AutoImprovePane.vue'
 import ComposePane from '../panes/ComposePane.vue'
 import RunPane from '../panes/RunPane.vue'
 import SecurityPane from '../panes/SecurityPane.vue'
+import StoragePane from '../panes/StoragePane.vue'
 import * as api from '../api/client'
 
 // jsdom has no ResizeObserver; Quasar's QResizeObserver needs it to render.
@@ -36,6 +37,8 @@ vi.mock('../api/client', async (importOriginal) => {
     listCandidates: vi.fn(),
     getAutoPublish: vi.fn(),
     triggerLoop: vi.fn(),
+    getStorageSettings: vi.fn(),
+    saveStorageSettings: vi.fn(),
   }
 })
 
@@ -49,6 +52,8 @@ const loopStatus = api.loopStatus as Mock
 const listCandidates = api.listCandidates as Mock
 const getAutoPublish = api.getAutoPublish as Mock
 const triggerLoop = api.triggerLoop as Mock
+const getStorageSettings = api.getStorageSettings as Mock
+const saveStorageSettings = api.saveStorageSettings as Mock
 
 afterEach(() => {
   vi.clearAllMocks()
@@ -224,5 +229,51 @@ describe('ComposePane (GOAP flow editor)', () => {
       }),
     )
     expect(wrapper.find('[data-test="compose-exported"]').exists()).toBe(true)
+  })
+})
+
+describe('StoragePane', () => {
+  it('prefills the form from the stored settings and saves a new endpoint', async () => {
+    getStorageSettings.mockResolvedValue({
+      packDb: { url: 'jdbc:postgresql://localhost:5432/smith_studio', user: 'smith', password: 'smith' },
+      trace: { type: 'jsonl', url: null, user: null, password: null },
+    })
+    saveStorageSettings.mockResolvedValue({ ok: true, settings: null, error: null })
+    const wrapper = mountPane(StoragePane)
+    await flushPromises()
+
+    // The stored endpoint is loaded into the form.
+    const urlInput = wrapper.find('[data-test="storage-url"]') as unknown as {
+      element: HTMLInputElement
+    }
+    expect(urlInput.element.value).toBe('jdbc:postgresql://localhost:5432/smith_studio')
+
+    await wrapper.find('[data-test="storage-save"]').trigger('click')
+    await flushPromises()
+
+    expect(saveStorageSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ url: 'jdbc:postgresql://localhost:5432/smith_studio', traceType: 'jsonl' }),
+    )
+    expect(wrapper.find('[data-test="storage-error"]').exists()).toBe(false)
+  })
+
+  it('shows the connection-failure message when the endpoint is unreachable', async () => {
+    getStorageSettings.mockResolvedValue({
+      packDb: { url: null, user: null, password: null },
+      trace: { type: 'jsonl', url: null, user: null, password: null },
+    })
+    saveStorageSettings.mockResolvedValue({
+      ok: false,
+      settings: null,
+      error: 'Cannot connect to the storage database: connection refused',
+    })
+    const wrapper = mountPane(StoragePane)
+    await flushPromises()
+
+    await wrapper.find('[data-test="storage-url"]').setValue('jdbc:postgresql://nowhere:5432/none')
+    await wrapper.find('[data-test="storage-save"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="storage-error"]').text()).toContain('connection refused')
   })
 })

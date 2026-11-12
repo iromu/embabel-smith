@@ -12,32 +12,29 @@ import static org.assertj.core.api.Assertions.assertThat;
 /** Offline tests for the Security pane: the static scan of a pack from a source. */
 class SecurityControllerTest {
 
-    @Test
-    void scansPackAndReturnsVerdict(@TempDir Path tmp) {
-        RestTestFixtures.writePack(tmp, RestTestFixtures.pack("summarizer", "summarize"));
-        SecurityController controller =
-                new SecurityController(new SourceService("folder:" + tmp, ""));
-        SecurityResponse response =
-                controller.scan(new SecurityRequest("folder:" + tmp, "summarizer"));
-        assertThat(response.error()).isNull();
-        assertThat(response.scan().specName()).isEqualTo("summarizer");
-        assertThat(response.scan().verdict()).isIn("SAFE", "REVIEW", "BLOCK");
-        assertThat(response.scan().summary()).isNotBlank();
-    }
+	@Test
+	void scansPackAndReturnsVerdict(@TempDir Path tmp) {
+		RestTestFixtures.writePack(tmp, RestTestFixtures.pack("summarizer", "summarize"));
+		SecurityController controller = new SecurityController(new SourceService("folder:" + tmp, ""));
+		SecurityResponse response = controller.scan(new SecurityRequest("folder:" + tmp, "summarizer"));
+		assertThat(response.error()).isNull();
+		assertThat(response.scan().specName()).isEqualTo("summarizer");
+		assertThat(response.scan().verdict()).isIn("SAFE", "REVIEW", "BLOCK");
+		assertThat(response.scan().summary()).isNotBlank();
+	}
 
-    @Test
-    void returnsErrorWhenNoSourceOrSpec() {
-        SecurityController controller = new SecurityController(new SourceService("", ""));
-        SecurityResponse response = controller.scan(new SecurityRequest("", ""));
-        assertThat(response.error()).contains("No source or spec");
-    }
+	@Test
+	void returnsErrorWhenNoSourceOrSpec() {
+		SecurityController controller = new SecurityController(new SourceService("", ""));
+		SecurityResponse response = controller.scan(new SecurityRequest("", ""));
+		assertThat(response.error()).contains("No source or spec");
+	}
 
-    @Test
-    void returnsErrorForUnknownSpec(@TempDir Path tmp) {
-        SecurityController controller =
-                new SecurityController(new SourceService("folder:" + tmp, ""));
-        SecurityResponse response =
-                controller.scan(new SecurityRequest("folder:" + tmp, "nope"));
-        assertThat(response.error()).contains("not found");
-    }
+	@Test
+	void returnsErrorForUnknownSpec(@TempDir Path tmp) {
+		SecurityController controller = new SecurityController(new SourceService("folder:" + tmp, ""));
+		SecurityResponse response = controller.scan(new SecurityRequest("folder:" + tmp, "nope"));
+		assertThat(response.error()).contains("not found");
+	}
+
 }

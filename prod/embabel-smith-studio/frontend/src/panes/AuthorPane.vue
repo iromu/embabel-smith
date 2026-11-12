@@ -1,38 +1,42 @@
 <template>
-  <q-page padding>
-    <q-card flat bordered class="q-pa-md">
+  <q-page>
+    <div class="pane-stack">
       <PageHeader
         icon="edit"
         title="Build"
         description="Describe a spec and publish it to a source through the builder (compile → eval → security → lifecycle)."
       />
 
-      <q-separator />
-
-      <q-card-section>
-        <div class="row q-gutter-sm items-start">
-          <q-input
-            v-model="description"
-            label="Describe the spec"
-            dense
-            style="flex: 1; min-width: 320px"
-            data-test="build-description"
-          />
-          <q-select
-            v-model="outputSource"
-            label="Publish to (source)"
-            dense
-            :options="sources"
-            style="width: 320px"
-            data-test="build-output"
-          />
-          <q-btn label="Build" color="primary" icon="edit" @click="doBuild" data-test="build-btn" />
+      <SectionCard title="Describe &amp; publish" icon="edit">
+        <div class="row q-col-gutter-md items-start">
+          <div class="col" style="min-width: 320px; flex: 1">
+            <q-input
+              v-model="description"
+              label="Describe the spec"
+              outlined
+              type="textarea"
+              autogrow
+              rows="2"
+              data-test="build-description"
+            />
+          </div>
+          <div class="col-auto">
+            <q-select
+              v-model="outputSource"
+              label="Publish to (source)"
+              outlined
+              :options="sources"
+              style="width: 280px"
+              data-test="build-output"
+            />
+          </div>
+          <div class="col-auto">
+            <q-btn label="Build" color="primary" icon="edit" @click="doBuild" data-test="build-btn" />
+          </div>
         </div>
-      </q-card-section>
+      </SectionCard>
 
-      <q-separator />
-
-      <q-card-section>
+      <SectionCard title="Result" icon="terminal">
         <div v-if="noEndpoint" class="text-warning" data-test="build-no-endpoint">
           <q-badge color="warning" label="model not configured" />
           <div class="q-mt-sm text-grey-7">{{ error }}</div>
@@ -60,16 +64,24 @@
             published: {{ report.published.location }}{{ report.published.pushed ? ' (pushed)' : '' }}
           </div>
         </div>
-        <div v-else class="text-grey-6">Describe a spec and pick where to publish it, then build.</div>
-      </q-card-section>
-    </q-card>
+        <EmptyState
+          v-else
+          icon="construction"
+          title="Nothing built yet"
+          hint="Describe a spec and pick where to publish it, then build."
+          data-test="build-empty"
+        />
+      </SectionCard>
+    </div>
   </q-page>
 </template>
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 
+import EmptyState from '../components/EmptyState.vue'
 import PageHeader from '../components/PageHeader.vue'
+import SectionCard from '../components/SectionCard.vue'
 import { build, listSources } from '../api/client'
 import { isModelNotConfigured } from '../api/types'
 import type { BuildResponse } from '../api/types'

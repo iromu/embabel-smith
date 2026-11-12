@@ -1,39 +1,35 @@
 <template>
-  <q-page padding>
-    <q-card flat bordered class="q-pa-md">
+  <q-page>
+    <div class="pane-stack">
       <PageHeader
         icon="account_tree"
         title="Compose"
         description="Place steps, connect them with type-checked edges, and export a composite spec-pack."
       />
 
-      <q-separator />
+      <SectionCard title="Canvas" icon="account_tree">
+        <template #actions>
+          <div class="row items-center q-gutter-sm">
+            <q-btn label="Add step" outline icon="add" @click="addStep" data-test="compose-add-step" />
+            <q-btn
+              label="Add goal"
+              outline
+              icon="flag"
+              :disable="goalNode !== null"
+              @click="addGoal"
+              data-test="compose-add-goal"
+            />
+            <q-btn label="Validate" outline icon="check" @click="doValidate" data-test="compose-validate" />
+            <q-btn
+              label="Export"
+              icon="upload"
+              color="primary"
+              @click="doExport"
+              data-test="compose-export"
+            />
+          </div>
+        </template>
 
-      <q-card-section>
-        <div class="row q-gutter-sm items-center">
-          <q-btn label="Add step" icon="add" @click="addStep" data-test="compose-add-step" />
-          <q-btn
-            label="Add goal"
-            icon="flag"
-            :disable="goalNode !== null"
-            @click="addGoal"
-            data-test="compose-add-goal"
-          />
-          <q-space />
-          <q-btn label="Validate" icon="check" outline @click="doValidate" data-test="compose-validate" />
-          <q-btn
-            label="Export"
-            icon="upload"
-            color="primary"
-            @click="doExport"
-            data-test="compose-export"
-          />
-        </div>
-      </q-card-section>
-
-      <q-separator />
-
-      <q-card-section>
         <div class="row q-col-gutter-md items-start">
           <div class="col" data-test="compose-canvas">
             <div class="compose-canvas">
@@ -81,9 +77,13 @@
                 </template>
               </VueFlow>
             </div>
-            <div v-if="nodes.length === 0" class="text-grey-6 text-caption q-mt-xs" data-test="compose-empty">
-              Add a step to begin, then add a goal for the type the run returns.
-            </div>
+            <EmptyState
+              v-if="nodes.length === 0"
+              icon="account_tree"
+              title="An empty canvas"
+              hint="Add a step to begin, then add a goal for the type the run returns."
+              data-test="compose-empty"
+            />
           </div>
 
           <div class="col" style="width: 320px">
@@ -199,11 +199,9 @@
             </div>
           </div>
         </div>
-      </q-card-section>
+      </SectionCard>
 
-      <q-separator />
-
-      <q-card-section>
+      <SectionCard title="Validation &amp; export" icon="publish">
         <div v-if="problems" class="q-mb-md">
           <div v-if="problems.length === 0" class="text-positive" data-test="compose-valid">
             Flow is sound: the goal is reachable and every input is fed.
@@ -214,17 +212,23 @@
           </div>
         </div>
 
-        <div class="row q-gutter-sm items-center">
-          <q-select
-            v-model="source"
-            label="Publish to (source)"
-            dense
-            :options="sourceOptions"
-            style="width: 320px"
-            data-test="compose-source"
-          />
-          <q-checkbox v-model="overwrite" label="Overwrite" dense data-test="compose-overwrite" />
-          <q-checkbox v-model="push" label="Push" dense data-test="compose-push" />
+        <div class="row q-col-gutter-md items-center">
+          <div class="col-auto">
+            <q-select
+              v-model="source"
+              label="Publish to (source)"
+              outlined
+              :options="sourceOptions"
+              style="width: 280px"
+              data-test="compose-source"
+            />
+          </div>
+          <div class="col-auto">
+            <q-checkbox v-model="overwrite" label="Overwrite" dense data-test="compose-overwrite" />
+          </div>
+          <div class="col-auto">
+            <q-checkbox v-model="push" label="Push" dense data-test="compose-push" />
+          </div>
         </div>
 
         <div v-if="exportError" class="text-negative q-mt-sm" data-test="compose-error">
@@ -235,8 +239,8 @@
           {{ exportResult.published?.location }}
           {{ exportResult.published?.pushed ? '(pushed)' : '' }} — run it from the Run pane.
         </div>
-      </q-card-section>
-    </q-card>
+      </SectionCard>
+    </div>
   </q-page>
 </template>
 
@@ -245,7 +249,9 @@ import { computed, ref } from 'vue'
 import { Handle, Position, VueFlow } from '@vue-flow/core'
 import type { Connection } from '@vue-flow/core'
 
+import EmptyState from '../components/EmptyState.vue'
 import PageHeader from '../components/PageHeader.vue'
+import SectionCard from '../components/SectionCard.vue'
 import { compose, listSources } from '../api/client'
 import type { ComposeResponse, SourceInfo } from '../api/types'
 import {
