@@ -113,7 +113,7 @@
   poms, enforcer ban still effective)
 - [x] 9.2 `openspec validate` passes for the change and all 11 main specs;
   `openspec list --specs` shows 11 capabilities, none with "skill" in the id
-- [ ] 9.3 Re-publish the wiki to GitHub Pages and verify the published pages use the new
+- [x] 9.3 Re-publish the wiki to GitHub Pages and verify the published pages use the new
   vocabulary
 - [x] 9.4 Commit the change as a single rename-heavy commit (git detects renames); update the
   project memory entries that cite the old vocabulary
