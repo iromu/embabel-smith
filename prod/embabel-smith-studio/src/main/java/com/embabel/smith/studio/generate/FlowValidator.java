@@ -1,54 +1,73 @@
-package com.embabel.smith.studio.generate;
+/*
+ * Copyright 2026 Ivan Rodriguez.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
-import com.embabel.smith.common.model.ActionStepSpec;
-import com.embabel.smith.common.model.AgentSpec;
+package com.embabel.smith.studio.generate;
 
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import com.embabel.smith.common.model.ActionStepSpec;
+import com.embabel.smith.common.model.AgentSpec;
+
 /**
- * The flow-soundness check for a generated (or authored) pack, mirroring the Compose editor's
- * client-side rule: the goal must be reachable (some step produces its output type) and every step
- * input must be fed (produced by some step, or an initial type). Returns the list of problems —
- * empty when the flow is sound.
+ * The flow-soundness check for a generated (or authored) pack, mirroring the Compose
+ * editor's client-side rule: the goal must be reachable (some step produces its output
+ * type) and every step input must be fed (produced by some step, or an initial type).
+ * Returns the list of problems — empty when the flow is sound.
+ *
+ * @author Ivan Rodriguez
  */
 public final class FlowValidator {
 
-    private static final List<String> INITIAL_TYPES = List.of("UserInput");
+	private static final List<String> INITIAL_TYPES = List.of("UserInput");
 
-    private FlowValidator() {
-    }
+	private FlowValidator() {
+	}
 
-    public static List<String> issues(AgentSpec pack) {
-        List<String> issues = new ArrayList<>();
-        if (pack.goal() == null || !pack.goal().isExported()) {
-            issues.add("The flow needs an exported goal (the type the run returns).");
-        }
-        if (pack.steps().isEmpty()) {
-            issues.add("The flow needs at least one action step.");
-        }
-        String goalOutput = pack.goal() == null ? null : pack.goal().outputTypeName();
-        boolean goalProduced = pack.steps().stream()
-                .anyMatch(s -> goalOutput != null && goalOutput.equals(s.outputTypeName()));
-        if (!goalProduced) {
-            issues.add("No step produces the goal's output type '" + goalOutput + "'; the goal is unreachable.");
-        }
-        Set<String> produced = new HashSet<>();
-        for (ActionStepSpec s : pack.steps()) {
-            if (s.outputTypeName() != null) {
-                produced.add(s.outputTypeName());
-            }
-        }
-        for (ActionStepSpec s : pack.steps()) {
-            for (String input : s.inputTypeNames()) {
-                if (!produced.contains(input) && !INITIAL_TYPES.contains(input)) {
-                    issues.add("Step '" + s.name() + "' needs input '" + input
-                            + "', which no step produces.");
-                }
-            }
-        }
-        return issues;
-    }
+	public static List<String> issues(AgentSpec pack) {
+		List<String> issues = new ArrayList<>();
+		if (pack.goal() == null || !pack.goal().isExported()) {
+			issues.add("The flow needs an exported goal (the type the run returns).");
+		}
+		if (pack.steps().isEmpty()) {
+			issues.add("The flow needs at least one action step.");
+		}
+		String goalOutput = (pack.goal() == null) ? null : pack.goal().outputTypeName();
+		boolean goalProduced = pack.steps()
+			.stream()
+			.anyMatch((s) -> goalOutput != null && goalOutput.equals(s.outputTypeName()));
+		if (!goalProduced) {
+			issues.add("No step produces the goal's output type '" + goalOutput + "'; the goal is unreachable.");
+		}
+		Set<String> produced = new HashSet<>();
+		for (ActionStepSpec s : pack.steps()) {
+			if (s.outputTypeName() != null) {
+				produced.add(s.outputTypeName());
+			}
+		}
+		for (ActionStepSpec s : pack.steps()) {
+			for (String input : s.inputTypeNames()) {
+				if (!produced.contains(input) && !INITIAL_TYPES.contains(input)) {
+					issues.add("Step '" + s.name() + "' needs input '" + input + "', which no step produces.");
+				}
+			}
+		}
+		return issues;
+	}
+
 }

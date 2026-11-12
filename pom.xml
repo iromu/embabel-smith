@@ -38,6 +38,8 @@
         <maven-surefire-plugin.version>3.2.5</maven-surefire-plugin.version>
         <maven-failsafe-plugin.version>3.2.5</maven-failsafe-plugin.version>
         <maven-enforcer-plugin.version>3.6.3</maven-enforcer-plugin.version>
+        <checkstyle.version>12.3.1</checkstyle.version>
+        <io.spring.javaformat.version>0.0.48</io.spring.javaformat.version>
     </properties>
 
     <modules>
@@ -316,5 +318,38 @@
                 </plugin>
             </plugins>
         </pluginManagement>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-checkstyle-plugin</artifactId>
+                <version>3.6.0</version>
+                <dependencies>
+                    <dependency>
+                        <groupId>com.puppycrawl.tools</groupId>
+                        <artifactId>checkstyle</artifactId>
+                        <version>${checkstyle.version}</version>
+                    </dependency>
+                    <dependency>
+                        <groupId>io.spring.javaformat</groupId>
+                        <artifactId>spring-javaformat-checkstyle</artifactId>
+                        <version>${io.spring.javaformat.version}</version>
+                    </dependency>
+                </dependencies>
+                <executions>
+                    <execution>
+                        <id>checkstyle-validation</id>
+                        <phase>validate</phase>
+                        <inherited>true</inherited>
+                        <configuration>
+                            <configLocation>${maven.multiModuleProjectDirectory}/checkstyle.xml</configLocation>
+                            <includeTestSourceDirectory>false</includeTestSourceDirectory>
+                        </configuration>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
     </build>
 </project>

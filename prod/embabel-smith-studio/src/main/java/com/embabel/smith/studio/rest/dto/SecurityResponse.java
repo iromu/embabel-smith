@@ -1,13 +1,35 @@
+/*
+ * Copyright 2026 Ivan Rodriguez.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.embabel.smith.studio.rest.dto;
 
-/** The result of scanning a agent spec (the Security pane): the scan report, or the error. */
+/**
+ * The result of scanning a agent spec (the Security pane): the scan report, or the error.
+ *
+ * @param error the structured error (null on success).
+ * @param scan the scan report (null on failure).
+ * @author Ivan Rodriguez
+ */
 public record SecurityResponse(String error, ScanInfo scan) {
 
-    public static SecurityResponse ok(ScanInfo scan) {
-        return new SecurityResponse(null, scan);
-    }
+	public static SecurityResponse ok(ScanInfo scan) {
+		return new SecurityResponse(null, scan);
+	}
 
-    public static SecurityResponse error(String error) {
-        return new SecurityResponse(error, null);
-    }
+	public static SecurityResponse error(String error) {
+		return new SecurityResponse(error, null);
+	}
 }

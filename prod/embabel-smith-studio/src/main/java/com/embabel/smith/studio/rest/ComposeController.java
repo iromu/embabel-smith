@@ -1,3 +1,19 @@
+/*
+ * Copyright 2026 Ivan Rodriguez.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.embabel.smith.studio.rest;
 
 import com.embabel.smith.builder.lifecycle.LifecycleMetadata;
@@ -13,80 +29,89 @@ import com.embabel.smith.studio.rest.dto.ComposeRequest;
 import com.embabel.smith.studio.rest.dto.ComposeResponse;
 import com.embabel.smith.studio.rest.dto.LifecycleInfo;
 import com.embabel.smith.studio.rest.dto.PublishInfo;
+
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * The Compose pane (change 07): export an assembled GOAP flow — a goal plus its action steps, wired
- * by type names — as a agent spec to a source. Unlike the Author pane's builder, no model is in the
- * loop: the client has already authored the pack in the graph editor, so this endpoint only
- * validates its shape and writes it. A fresh pack is stamped {@code INCUBATING} with a 0.0 baseline
- * (not yet eval'd) and published through the same folder/git publishers the builder uses, so the
- * result is immediately runnable from the Run pane.
+ * The Compose pane (change 07): export an assembled GOAP flow — a goal plus its action
+ * steps, wired by type names — as a agent spec to a source. Unlike the Author pane's
+ * builder, no model is in the loop: the client has already authored the pack in the graph
+ * editor, so this endpoint only validates its shape and writes it. A fresh pack is
+ * stamped {@code INCUBATING} with a 0.0 baseline (not yet eval'd) and published through
+ * the same folder/git publishers the builder uses, so the result is immediately runnable
+ * from the Run pane.
+ *
+ * @author Ivan Rodriguez
  */
 @RestController
 public class ComposeController {
 
-    private final LifecycleStamper stamper = new LifecycleStamper();
+	private final LifecycleStamper stamper = new LifecycleStamper();
 
-    @PostMapping("/api/compose")
-    public ComposeResponse compose(@RequestBody ComposeRequest request) {
-        String validationError = validate(request);
-        if (validationError != null) {
-            return ComposeResponse.failed(validationError);
-        }
-        AgentSpec pack = request.pack();
-        try {
-            PublishTarget target = PublishTarget.parse(request.source());
-            LifecycleMetadata lifecycle = stamper.stamp(pack, 0.0);
-            try (Publisher publisher = publisherFor(target)) {
-                PublishResult published = publisher.publish(pack, lifecycle,
-                        request.overwrite() != null && request.overwrite(),
-                        request.push() != null && request.push());
-                return ComposeResponse.published(pack.name(), pack.goal().name(),
-                        PublishInfo.of(published), LifecycleInfo.of(lifecycle));
-            }
-        } catch (CollisionException e) {
-            return ComposeResponse.failed(e.getMessage());
-        } catch (Exception e) {
-            String message = e.getMessage() == null ? e.toString() : e.getMessage();
-            return ComposeResponse.failed(message);
-        }
-    }
+	@PostMapping("/api/compose")
+	public ComposeResponse compose(@RequestBody ComposeRequest request) {
+		String validationError = validate(request);
+		if (validationError != null) {
+			return ComposeResponse.failed(validationError);
+		}
+		AgentSpec pack = request.pack();
+		try {
+			PublishTarget target = PublishTarget.parse(request.source());
+			LifecycleMetadata lifecycle = this.stamper.stamp(pack, 0.0);
+			try (Publisher publisher = publisherFor(target)) {
+				PublishResult published = publisher.publish(pack, lifecycle,
+						request.overwrite() != null && request.overwrite(), request.push() != null && request.push());
+				return ComposeResponse.published(pack.name(), pack.goal().name(), PublishInfo.of(published),
+						LifecycleInfo.of(lifecycle));
+			}
+		}
+		catch (CollisionException ex) {
+			return ComposeResponse.failed(ex.getMessage());
+		}
+		catch (Exception ex) {
+			String message = (ex.getMessage() == null) ? ex.toString() : ex.getMessage();
+			return ComposeResponse.failed(message);
+		}
+	}
 
-    /**
-     * The shape check for a composed pack: it must name a source, carry an exported goal, at least
-     * one action step, and the goal's output type must be produced by some step — a GOAP flow that
-     * can never reach its goal is not exportable.
-     */
-    private static String validate(ComposeRequest request) {
-        if (request.source() == null || request.source().isBlank()) {
-            return "No source provided; pick where to publish the pack.";
-        }
-        AgentSpec pack = request.pack();
-        if (pack == null) {
-            return "No pack provided; author a goal and at least one step.";
-        }
-        if (pack.goal() == null || !pack.goal().isExported()) {
-            return "The flow needs an exported goal (the type the run returns).";
-        }
-        if (pack.steps().isEmpty()) {
-            return "The flow needs at least one action step.";
-        }
-        String goalOutput = pack.goal().outputTypeName();
-        boolean goalProduced = pack.steps().stream()
-                .anyMatch(s -> goalOutput != null && goalOutput.equals(s.outputTypeName()));
-        if (!goalProduced) {
-            return "No step produces the goal's output type '" + goalOutput + "'; the goal is unreachable.";
-        }
-        return null;
-    }
+	/**
+	 * The shape check for a composed pack: it must name a source, carry an exported goal,
+	 * at least one action step, and the goal's output type must be produced by some step
+	 * — a GOAP flow that can never reach its goal is not exportable.
+	 * @param request the compose request to validate.
+	 * @return the validation error, or {@code null} when the pack is exportable.
+	 */
+	private static String validate(ComposeRequest request) {
+		if (request.source() == null || request.source().isBlank()) {
+			return "No source provided; pick where to publish the pack.";
+		}
+		AgentSpec pack = request.pack();
+		if (pack == null) {
+			return "No pack provided; author a goal and at least one step.";
+		}
+		if (pack.goal() == null || !pack.goal().isExported()) {
+			return "The flow needs an exported goal (the type the run returns).";
+		}
+		if (pack.steps().isEmpty()) {
+			return "The flow needs at least one action step.";
+		}
+		String goalOutput = pack.goal().outputTypeName();
+		boolean goalProduced = pack.steps()
+			.stream()
+			.anyMatch((s) -> goalOutput != null && goalOutput.equals(s.outputTypeName()));
+		if (!goalProduced) {
+			return "No step produces the goal's output type '" + goalOutput + "'; the goal is unreachable.";
+		}
+		return null;
+	}
 
-    private static Publisher publisherFor(PublishTarget target) {
-        return switch (target.type()) {
-            case FOLDER -> new FolderPublisher(target);
-            case GIT -> new GitPublisher(target);
-        };
-    }
+	private static Publisher publisherFor(PublishTarget target) {
+		return switch (target.type()) {
+			case FOLDER -> new FolderPublisher(target);
+			case GIT -> new GitPublisher(target);
+		};
+	}
+
 }

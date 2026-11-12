@@ -1,14 +1,31 @@
+/*
+ * Copyright 2026 Ivan Rodriguez.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.embabel.smith.builder.eval;
 
 /**
- * Rewrites an action step's prompt in response to eval failures (extracted from POC 9's refiner).
- * The production implementation asks the model for a revised prompt; offline tests inject a fake.
+ * Rewrites an action step's prompt in response to eval failures (extracted from POC 9's
+ * refiner). The production implementation asks the model for a revised prompt; offline
+ * tests inject a fake.
  *
- * @param currentPrompt   the prompt to revise
- * @param failureFeedback a description of the failing eval tasks
- * @return the revised prompt
+ * @author Ivan Rodriguez
  */
 @FunctionalInterface
 public interface PromptRewriter {
-    String rewrite(String currentPrompt, String failureFeedback);
+
+	String rewrite(String currentPrompt, String failureFeedback);
+
 }

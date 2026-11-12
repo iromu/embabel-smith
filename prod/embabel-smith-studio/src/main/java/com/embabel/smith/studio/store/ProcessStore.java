@@ -1,188 +1,201 @@
+/*
+ * Copyright 2026 Ivan Rodriguez.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.embabel.smith.studio.store;
 
-import com.embabel.smith.common.io.AgentSpecReader;
-import com.embabel.smith.common.io.AgentSpecWriter;
-import com.embabel.smith.common.model.AgentSpec;
-import com.fasterxml.jackson.databind.ObjectMapper;
-
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Objects;
-import java.util.stream.Stream;
+
+import com.embabel.smith.common.model.AgentSpec;
+import com.embabel.smith.studio.storage.StorageBinding;
+import com.embabel.smith.studio.storage.StorageContext;
+import com.embabel.smith.studio.storage.entity.DiscoveryEntity;
+import com.embabel.smith.studio.storage.entity.PackEntity;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
- * The durable store for generated agent specs and discovery history (task 5.2). Rooted at a
- * configurable directory, it outlives a run so previously generated packs can be listed and
- * reloaded and prior discoveries reviewed.
+ * The durable store for generated agent specs and discovery history (change:
+ * smith-studio-postgres-storage). Every operation delegates to the current
+ * {@link StorageBinding}; the public API is unchanged from the former file-based store. A
+ * saved pack is one row whose {@code content} is the {@link AgentSpec} serialized as
+ * JSON. When no database is bound, mutating operations and loads report "storage not
+ * configured" while the listing operations return an empty list, so the studio boots and
+ * stays usable with no storage.
  *
- * <p>Saved packs are full pack directories written by the shared {@link AgentSpecWriter} under
- * {@code packs/<name>/}; listing derives each record by reading the pack (manifest name, goal,
- * step count, directory mtime), so there is no separate index to drift from. Discovery history is
- * an append-only {@code discovery-history.jsonl} — one record per successful discovery.
+ * @author Ivan Rodriguez
  */
 public class ProcessStore {
 
-    /** A saved pack's listing metadata. */
-    public record PackRecord(String name, String goal, int steps, String savedAt) {
-    }
+	private final StorageContext storage;
 
-    /** A recorded discovery. */
-    public record DiscoveryRecord(String timestamp, String sourceType, String location, int docCount) {
-    }
+	private final ObjectMapper json = new ObjectMapper().setSerializationInclusion(JsonInclude.Include.NON_NULL)
+		.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
-    private static final String HISTORY_FILE = "discovery-history.jsonl";
+	public ProcessStore(StorageContext storage) {
+		this.storage = storage;
+	}
 
-    private final Path root;
-    private final AgentSpecWriter writer = new AgentSpecWriter();
-    private final AgentSpecReader reader = new AgentSpecReader();
-    private final ObjectMapper json = new ObjectMapper();
+	// ---- Packs --------------------------------------------------------------
 
-    public ProcessStore(Path root) {
-        this.root = root;
-    }
+	/**
+	 * Saves the pack to the database and returns its listing record.
+	 * @param pack the agent spec to save.
+	 * @return the saved pack's listing record.
+	 */
+	public PackRecord savePack(AgentSpec pack) {
+		String name = requireName(pack);
+		StorageBinding b = this.storage.requireMain();
+		return b.tx().execute((status) -> {
+			PackEntity e = new PackEntity();
+			e.setName(name);
+			e.setGoal((pack.goal() == null) ? null : pack.goal().name());
+			e.setSteps(pack.steps().size());
+			e.setSavedAt(Instant.now());
+			e.setContent(toJson(pack));
+			b.packs().save(e);
+			return new PackRecord(name, e.getGoal(), e.getSteps(), e.getSavedAt().toString());
+		});
+	}
 
-    public Path root() {
-        return root;
-    }
+	/**
+	 * The saved packs, most recently saved first.
+	 * @return the saved packs.
+	 */
+	public List<PackRecord> listPacks() {
+		StorageBinding b = this.storage.main();
+		if (b == null) {
+			return List.of();
+		}
+		List<PackEntity> entities = b.tx().execute((status) -> b.packs().findAll());
+		return entities.stream()
+			.map((e) -> new PackRecord(e.getName(), e.getGoal(), e.getSteps(),
+					(e.getSavedAt() == null) ? "" : e.getSavedAt().toString()))
+			.sorted(Comparator.comparing(ProcessStore.PackRecord::savedAt).reversed())
+			.toList();
+	}
 
-    // ---- Packs --------------------------------------------------------------
+	/**
+	 * Loads a saved pack by name, or {@code null} when no such pack is stored.
+	 * @param name the pack name to load.
+	 * @return the stored agent spec, or {@code null} when no such pack is stored.
+	 */
+	public AgentSpec loadPack(String name) {
+		StorageBinding b = this.storage.requireMain();
+		PackEntity e = b.tx().execute((status) -> b.packs().findById(name).orElse(null));
+		if (e == null) {
+			return null;
+		}
+		return fromJson(e.getContent());
+	}
 
-    /** Writes the pack to the store and returns its listing record. */
-    public PackRecord savePack(AgentSpec pack) {
-        String name = requireName(pack);
-        Path dir = packsDir().resolve(name);
-        try {
-            writer.write(pack, dir);
-        } catch (IOException e) {
-            throw new IllegalStateException("Failed to save pack '" + name + "': " + e.getMessage(), e);
-        }
-        return recordOf(dir, pack);
-    }
+	// ---- Discovery history --------------------------------------------------
 
-    /** The saved packs, most recently saved first. */
-    public List<PackRecord> listPacks() {
-        Path dir = packsDir();
-        if (!Files.isDirectory(dir)) {
-            return List.of();
-        }
-        List<Path> candidates;
-        try (Stream<Path> subs = Files.list(dir)) {
-            candidates = subs
-                    .filter(Files::isDirectory)
-                    .filter(p -> Files.isRegularFile(p.resolve("manifest.yml")))
-                    .toList();
-        } catch (IOException e) {
-            throw new IllegalStateException("Failed to list saved packs: " + e.getMessage(), e);
-        }
-        return candidates.stream()
-                .map(this::recordOf)
-                .sorted(Comparator.comparing(ProcessStore.PackRecord::savedAt).reversed())
-                .toList();
-    }
+	/**
+	 * Records a discovery in the database.
+	 * @param sourceType the discovery source type.
+	 * @param location the discovery location.
+	 * @param docCount the number of discovered documents.
+	 */
+	public void recordDiscovery(String sourceType, String location, int docCount) {
+		StorageBinding b = this.storage.requireMain();
+		b.tx().executeWithoutResult((status) -> {
+			DiscoveryEntity e = new DiscoveryEntity();
+			e.setTs(Instant.now());
+			e.setSourceType(sourceType);
+			e.setLocation(location);
+			e.setDocCount(docCount);
+			b.discoveries().save(e);
+		});
+	}
 
-    /** Loads a saved pack by name, or {@code null} when no such pack is stored. */
-    public AgentSpec loadPack(String name) {
-        Path dir = packsDir().resolve(sanitize(name));
-        if (!Files.isRegularFile(dir.resolve("manifest.yml"))) {
-            return null;
-        }
-        try {
-            return reader.read(dir);
-        } catch (IOException e) {
-            throw new IllegalStateException("Failed to load pack '" + name + "': " + e.getMessage(), e);
-        }
-    }
+	/**
+	 * The recorded discoveries, most recent first.
+	 * @return the recorded discoveries.
+	 */
+	public List<DiscoveryRecord> discoveries() {
+		StorageBinding b = this.storage.main();
+		if (b == null) {
+			return List.of();
+		}
+		List<DiscoveryEntity> entities = b.tx().execute((status) -> b.discoveries().findAll());
+		return entities.stream()
+			.sorted(Comparator.comparing(DiscoveryEntity::getId).reversed())
+			.map((e) -> new DiscoveryRecord((e.getTs() == null) ? "" : e.getTs().toString(), e.getSourceType(),
+					e.getLocation(), e.getDocCount()))
+			.toList();
+	}
 
-    private PackRecord recordOf(Path dir, AgentSpec pack) {
-        return new PackRecord(
-                pack.name(),
-                pack.goal() == null ? null : pack.goal().name(),
-                pack.steps().size(),
-                savedAt(dir));
-    }
+	private static String requireName(AgentSpec pack) {
+		String name = pack.name();
+		if (name == null || name.isBlank()) {
+			throw new IllegalArgumentException("The pack has no name to save");
+		}
+		return sanitize(name);
+	}
 
-    private PackRecord recordOf(Path dir) {
-        try {
-            return recordOf(dir, reader.read(dir));
-        } catch (IOException e) {
-            // A directory that cannot be read is surfaced as a minimal record rather than dropped.
-            return new PackRecord(dir.getFileName().toString(), null, 0, savedAt(dir));
-        }
-    }
+	/**
+	 * A pack name must be a single safe key.
+	 * @param name the raw pack name.
+	 * @return the sanitized pack name.
+	 */
+	private static String sanitize(String name) {
+		return name.replaceAll("[^A-Za-z0-9._-]", "_");
+	}
 
-    private String savedAt(Path dir) {
-        try {
-            return Instant.ofEpochMilli(Files.getLastModifiedTime(dir).toMillis()).toString();
-        } catch (IOException e) {
-            return "";
-        }
-    }
+	private String toJson(AgentSpec pack) {
+		try {
+			return this.json.writeValueAsString(pack);
+		}
+		catch (Exception ex) {
+			throw new IllegalStateException("Failed to serialize pack: " + ex.getMessage(), ex);
+		}
+	}
 
-    // ---- Discovery history --------------------------------------------------
+	private AgentSpec fromJson(String content) {
+		try {
+			return this.json.readValue(content, AgentSpec.class);
+		}
+		catch (Exception ex) {
+			throw new IllegalStateException("Failed to deserialize stored pack: " + ex.getMessage(), ex);
+		}
+	}
 
-    /** Appends a discovery record to the durable history. */
-    public void recordDiscovery(String sourceType, String location, int docCount) {
-        DiscoveryRecord rec =
-                new DiscoveryRecord(Instant.now().toString(), sourceType, location, docCount);
-        try {
-            Files.createDirectories(root);
-            Path file = root.resolve(HISTORY_FILE);
-            Files.writeString(file, json.writeValueAsString(rec) + System.lineSeparator(),
-                    StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
-        } catch (IOException e) {
-            throw new IllegalStateException("Failed to record discovery: " + e.getMessage(), e);
-        }
-    }
+	/**
+	 * A saved pack's listing metadata.
+	 *
+	 * @param name the pack name.
+	 * @param goal the pack goal name.
+	 * @param steps the number of steps.
+	 * @param savedAt the save timestamp as a string.
+	 */
+	public record PackRecord(String name, String goal, int steps, String savedAt) {
+	}
 
-    /** The recorded discoveries, most recent first. */
-    public List<DiscoveryRecord> discoveries() {
-        Path file = root.resolve(HISTORY_FILE);
-        if (!Files.isRegularFile(file)) {
-            return List.of();
-        }
-        List<String> lines;
-        try {
-            lines = Files.readAllLines(file, StandardCharsets.UTF_8);
-        } catch (IOException e) {
-            throw new IllegalStateException("Failed to read discovery history: " + e.getMessage(), e);
-        }
-        List<DiscoveryRecord> all = new ArrayList<>();
-        for (String line : lines) {
-            if (line.isBlank()) {
-                continue;
-            }
-            try {
-                all.add(json.readValue(line, DiscoveryRecord.class));
-            } catch (IOException ignored) {
-                // A malformed line is skipped rather than failing the whole history read.
-            }
-        }
-        Collections.reverse(all);
-        return all;
-    }
+	/**
+	 * A recorded discovery.
+	 *
+	 * @param timestamp the discovery timestamp as a string.
+	 * @param sourceType the discovery source type.
+	 * @param location the discovery location.
+	 * @param docCount the number of discovered documents.
+	 */
+	public record DiscoveryRecord(String timestamp, String sourceType, String location, int docCount) {
+	}
 
-    private Path packsDir() {
-        return root.resolve("packs");
-    }
-
-    private static String requireName(AgentSpec pack) {
-        String name = pack.name();
-        if (name == null || name.isBlank()) {
-            throw new IllegalArgumentException("The pack has no name to save");
-        }
-        return sanitize(name);
-    }
-
-    /** A pack directory name must be a single safe path segment. */
-    private static String sanitize(String name) {
-        return name.replaceAll("[^A-Za-z0-9._-]", "_");
-    }
 }
