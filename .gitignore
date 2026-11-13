@@ -12,3 +12,5 @@ poc/poc-19-small-llm-selector/models/
 poc/poc-20-semantic-embedding/models/
 poc/poc-22-unified-ui/src/main/resources/static/
 prod/embabel-smith-studio/src/main/resources/static/
+# Dev-only studio config: points at the local Docker Postgres; never committed or packaged.
+prod/embabel-smith-studio/application-local.yaml

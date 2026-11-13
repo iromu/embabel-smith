@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.embabel.smith</groupId>
+        <artifactId>embabel-smith-poc</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>poc-25-skill-generation</artifactId>
+    <name>poc-25-skill-generation</name>
+    <description>
+        POC 25: generates an Agent Skill (SKILL.md) from a business-process blueprint and
+        validates it the way the Anthropic skill-creator does — an evals.json suite of scenario
+        prompts is run against a general-purpose agent both WITH the generated skill loaded and
+        WITHOUT it (the baseline), graded against verifiable expectations, and the with-skill
+        pass rate is compared to the no-skill baseline. Two arms run side by side: a raw
+        OpenAI-compatible call and the Embabel Ai runtime.
+    </description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.embabel.smith</groupId>
+            <artifactId>smith-common</artifactId>
+        </dependency>
+        <!-- The Ai LLM abstraction (embabel runtime arm) + the OpenAI-compatible provider. -->
+        <dependency>
+            <groupId>com.embabel.agent</groupId>
+            <artifactId>embabel-agent-starter</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.embabel.agent</groupId>
+            <artifactId>embabel-agent-starter-openai-custom</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>

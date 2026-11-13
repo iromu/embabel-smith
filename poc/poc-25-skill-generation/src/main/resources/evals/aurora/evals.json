@@ -1,0 +1,49 @@
+{
+  "skill_name": "aurora",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "A customer orders 200 units of a refrigerated vaccine. The nearest authorised distribution centre has two in-stock batches of the product: Batch A expires in 3 months, Batch B expires in 11 months. Which batch does AURORA allocate and why?",
+      "expected_output": "AURORA selects Batch A (the earlier expiry) under FEFO, subject to the product's minimum remaining shelf-life requirement.",
+      "files": [],
+      "expectations": [
+        "Applies FEFO (First Expired, First Out) to the batch selection",
+        "Selects Batch A, the batch with the earlier expiry date",
+        "Notes the selection is subject to the product's minimum remaining shelf-life requirement"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "A purchase order arrives. The customer-authorisation check passes, but the product is subject to an import suspension in the destination country. What must happen before the order can proceed?",
+      "expected_output": "Both the customer-authorisation check and the regulatory/product check must pass; the affected product lines are held or rejected and the regulatory uncertainty is escalated.",
+      "files": [],
+      "expectations": [
+        "States that BOTH the customer-authorisation check AND the regulatory/product check must pass before the order proceeds",
+        "Does not proceed on the customer-authorisation check alone",
+        "Escalates the regulatory uncertainty to the compliance team / a Compliance Officer, or places the affected lines on hold"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "The carrier reports that a shipment has arrived at the hospital, but the receiving staff have not yet confirmed receipt and the temperature indicator shows a brief excursion. Can AURORA close the shipment as delivered?",
+      "expected_output": "No — AURORA does not close a shipment on the carrier's arrival report alone; it requires recipient confirmation and routes the shipment to a quality hold because of the temperature excursion.",
+      "files": [],
+      "expectations": [
+        "States the shipment must NOT be closed as delivered on the carrier's arrival report alone",
+        "Requires recipient confirmation of receipt, authorisation, and documentation",
+        "Routes the shipment to a quality hold / excursion investigation and prevents delivery release until quality assurance decides"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "A critical-priority order is missing required information and the customer has not responded after 72 hours. What does AURORA do with the order?",
+      "expected_output": "AURORA does not auto-close a critical order for an unanswered request; it escalates to the Incident Management Team.",
+      "files": [],
+      "expectations": [
+        "Does NOT auto-close the order because of the unanswered information request",
+        "Escalates to the Incident Management Team because the order is critical priority",
+        "Distinguishes this from the non-critical case (which is marked customer-unresponsive and closed)"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+You create an evals.json suite for an agent skill, in the Anthropic skill-creator format.
+Given a business-process description and the skill name, produce 3 to 4 realistic scenario
+tasks that a user of this process would actually face, plus verifiable expectations for each.
+
+Each scenario is a CONCRETE situation — specific products, numbers, dates, or actors — that
+exercises a decision point or an exception in the process. Each expectation is an OBJECTIVELY
+CHECKABLE statement about what a correct answer must contain (e.g. "must apply FEFO", "must
+flag the shelf-life risk", "must escalate to the quality team", "must not auto-close a
+critical order"). Write expectations so a grader can decide pass/fail without guessing.
+
+The scenarios should target the parts of the process that are easy to get wrong — the
+decision branches and the hard constraints — not the obvious happy path.
+
+Output ONLY a JSON object of the form:
+{"skill_name": "<the skill name>", "evals": [{"id": 1, "prompt": "<the scenario task>", "expected_output": "<a human-readable description of a correct result>", "files": [], "expectations": ["<verifiable statement>", "<verifiable statement>"]}]}
+No markdown fences, no commentary before or after.

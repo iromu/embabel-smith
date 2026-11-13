@@ -2,6 +2,19 @@ server:
   port: ${SERVER_PORT:8080}
 
 spring:
+  # `local` is the default profile so a plain dev run picks up the gitignored application-local.yaml
+  # (which points storage at the Docker Postgres and auto-starts it). A packaged or production run
+  # sets its own profile, so the local config — and the container it spawns — never apply there.
+  profiles:
+    default: local
+  docker:
+    compose:
+      # Off by default; the `local` profile turns it on so the dev Postgres auto-starts.
+      enabled: false
+      # A failure to bring the container up (e.g. the port is already taken) must not kill the boot:
+      # the studio is designed to start and stay usable with no database, so it degrades to unbound
+      # storage rather than failing.
+      required: false
   main:
     web-application-type: SERVLET
     banner-mode: off

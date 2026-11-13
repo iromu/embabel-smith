@@ -44,5 +44,6 @@
         <module>poc-22-unified-ui</module>
         <module>poc-23-remote-embedding-scale</module>
         <module>poc-24-generation-approaches</module>
+        <module>poc-25-skill-generation</module>
     </modules>
 </project>

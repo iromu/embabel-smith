@@ -109,9 +109,12 @@ export interface ComposeResponse {
 }
 
 // ---- Generate (endpoint-gated) ---------------------------------------------
+export type GenerateTechnique = 'single-shot' | 'embabel'
+
 export interface GenerateRequest {
   blueprint?: string
   path?: string
+  technique?: GenerateTechnique
 }
 export interface GenerateResponse {
   pack: ComposePack | null

@@ -7,6 +7,12 @@ server:
   port: ${SERVER_PORT:8080}
 
 spring:
+  # Keep the dev Postgres auto-start off in tests: this file shadows the main application.yml, so the
+  # default profile and the docker-compose setting there do not carry over. Storage uses the H2 binding
+  # below; no docker is needed.
+  docker:
+    compose:
+      enabled: false
   main:
     web-application-type: SERVLET
     banner-mode: off

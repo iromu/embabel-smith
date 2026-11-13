@@ -29,9 +29,11 @@ import org.springframework.web.bind.annotation.RestController;
  * The Author-a-Process workspace's generation step: a blueprint (a description, or a path
  * to business-process docs) in, a generated agent spec (GOAP goal + action steps + types)
  * out — not published, so the UI can render and edit it before publishing via
- * {@code /api/compose}. Endpoint-gated: without a model endpoint it returns the
- * structured {@code MODEL_NOT_CONFIGURED} error. The model-dependent generation is behind
- * the {@link GenerateFn} seam so the endpoint-present path is stub-testable.
+ * {@code /api/compose}. The request carries a generation {@code technique} (the single-shot
+ * prompt, or Embabel's NL compiler); the workspace lets the user pick either. Endpoint-gated:
+ * without a model endpoint it returns the structured {@code MODEL_NOT_CONFIGURED} error. The
+ * model-dependent generation is behind the {@link GenerateFn} seam so the endpoint-present
+ * path is stub-testable.
  *
  * @author Ivan Rodriguez
  */
@@ -66,16 +68,17 @@ public class GenerateController {
 		if (blueprint == null || blueprint.isBlank()) {
 			return GenerateResponse.failed("No blueprint: provide a description or a path to business-process docs.");
 		}
-		return this.generator.generate(blueprint);
+		return this.generator.generate(blueprint, request.technique());
 	}
 
 	/**
-	 * The model-dependent generation: a blueprint to a generated pack (plus flow issues).
+	 * The model-dependent generation: a blueprint and a generation technique to a generated
+	 * pack (plus flow issues).
 	 */
 	@FunctionalInterface
 	public interface GenerateFn {
 
-		GenerateResponse generate(String blueprint);
+		GenerateResponse generate(String blueprint, String technique);
 
 	}
 

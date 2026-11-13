@@ -52,6 +52,7 @@ import com.embabel.smith.studio.generate.BlueprintLoader;
 import com.embabel.smith.studio.generate.FlowPromptCaller;
 import com.embabel.smith.studio.generate.FlowValidator;
 import com.embabel.smith.studio.generate.LlmFlowPromptCaller;
+import com.embabel.smith.studio.generate.NlCompilerFlowGenerator;
 import com.embabel.smith.studio.generate.ProcessExtractor;
 import com.embabel.smith.studio.generate.ProcessFlowGenerator;
 import com.embabel.smith.studio.improve.ImprovementLoop;
@@ -190,16 +191,30 @@ public class StudioConfiguration {
 	}
 
 	/**
-	 * The workspace's model-dependent generation: blueprint to a generated pack plus flow
-	 * issues.
-	 * @param generator the generation core to run.
+	 * The embabel NL-compiler generation technique: the builder's compile seam (backed by
+	 * Embabel's NL compiler) plus the shared agent-spec mapper.
+	 * @param ai the Embabel AI service that drives the NL compiler.
+	 * @param platform the platform, which provides the shared type dictionary.
+	 * @return the embabel NL-compiler generation core.
+	 */
+	@Bean
+	public NlCompilerFlowGenerator nlCompilerFlowGenerator(Ai ai, AgentPlatform platform) {
+		return new NlCompilerFlowGenerator(new DefaultAgentSpecCompiler(ai), platform);
+	}
+
+	/**
+	 * The workspace's model-dependent generation: a blueprint and a technique to a generated
+	 * pack plus flow issues. The technique picks the single-shot prompt or the embabel NL
+	 * compiler; anything other than {@code embabel} uses the single-shot generator.
+	 * @param singleShot the single-shot generation core.
+	 * @param embabel the embabel NL-compiler generation core.
 	 * @return the model-dependent generation for the workspace.
 	 */
 	@Bean
-	public GenerateController.GenerateFn generateFn(ProcessFlowGenerator generator) {
-		return (blueprint) -> {
+	public GenerateController.GenerateFn generateFn(ProcessFlowGenerator singleShot, NlCompilerFlowGenerator embabel) {
+		return (blueprint, technique) -> {
 			try {
-				AgentSpec pack = generator.generate(blueprint);
+				AgentSpec pack = isEmbabel(technique) ? embabel.generate(blueprint) : singleShot.generate(blueprint);
 				return GenerateResponse.of(pack, FlowValidator.issues(pack));
 			}
 			catch (Exception ex) {
@@ -207,6 +222,16 @@ public class StudioConfiguration {
 				return GenerateResponse.failed("Generation failed: " + message);
 			}
 		};
+	}
+
+	/**
+	 * Whether the requested generation technique is the embabel NL compiler (the default,
+	 * for any other value, is the single-shot prompt).
+	 * @param technique the requested technique.
+	 * @return true when the embabel NL compiler should be used.
+	 */
+	private static boolean isEmbabel(String technique) {
+		return "embabel".equals(technique);
 	}
 
 	/**

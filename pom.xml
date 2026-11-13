@@ -335,15 +335,17 @@
                         <version>${io.spring.javaformat.version}</version>
                     </dependency>
                 </dependencies>
+                <!-- Plugin-level configuration so the bare CLI goal (mvn checkstyle:check)
+                     uses the project config instead of the plugin's sun_checks.xml default. -->
+                <configuration>
+                    <configLocation>${maven.multiModuleProjectDirectory}/checkstyle.xml</configLocation>
+                    <includeTestSourceDirectory>false</includeTestSourceDirectory>
+                </configuration>
                 <executions>
                     <execution>
                         <id>checkstyle-validation</id>
                         <phase>validate</phase>
                         <inherited>true</inherited>
-                        <configuration>
-                            <configLocation>${maven.multiModuleProjectDirectory}/checkstyle.xml</configLocation>
-                            <includeTestSourceDirectory>false</includeTestSourceDirectory>
-                        </configuration>
                         <goals>
                             <goal>check</goal>
                         </goals>

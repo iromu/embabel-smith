@@ -20,6 +20,16 @@
               data-test="pw-source-kind"
             />
           </div>
+          <div class="col-auto">
+            <q-select
+              v-model="technique"
+              :options="techniqueOptions"
+              label="Generation technique"
+              outlined
+              style="width: 210px"
+              data-test="pw-technique"
+            />
+          </div>
           <div class="col" style="min-width: 280px">
             <q-input
               v-if="sourceKind === 'path'"
@@ -458,6 +468,7 @@ import type {
   ComposeResponse,
   DiscoveryRecord,
   DiscoverResponse,
+  GenerateRequest,
   SimulateResponse,
   SourceInfo,
   StoredPackInfo,
@@ -480,6 +491,11 @@ const sourceKinds = [
   { label: 'Text', value: 'text' },
 ]
 const sourceKind = ref<'path' | 'url' | 'text'>('path')
+const techniqueOptions = [
+  { label: 'Single-shot', value: 'single-shot' },
+  { label: 'Embabel NL compiler', value: 'embabel' },
+]
+const technique = ref<'single-shot' | 'embabel'>('single-shot')
 const pathInput = ref(DEFAULT_DOCS_PATH)
 const urlInput = ref('')
 const textInput = ref('')
@@ -659,14 +675,14 @@ async function doGenerate() {
   generating.value = true
   try {
     // A previously extracted process is the generation blueprint; otherwise the raw source is.
-    const req = extracted.value
+    const source = extracted.value
       ? { blueprint: extracted.value }
       : sourceKind.value === 'path'
         ? { path: pathInput.value.trim() }
         : sourceKind.value === 'url'
           ? { url: urlInput.value.trim() }
           : { blueprint: textInput.value.trim() }
-    const res = await generate(req as { blueprint?: string; path?: string })
+    const res = await generate({ ...source, technique: technique.value } as GenerateRequest)
     if (res.errorCode === 'MODEL_NOT_CONFIGURED') {
       genError.value = 'Model not configured: ' + res.error
     } else if (res.error || !res.pack) {

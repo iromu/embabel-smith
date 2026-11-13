@@ -2,14 +2,15 @@
 #
 # `docker compose up -d` brings up a Postgres with a named data volume and fixed
 # development credentials, reachable at the documented local endpoint. The studio's
-# Storage pane points at it with:
+# Storage pane (and the gitignored application-local.yaml) point at it with:
 #
-#   url:      jdbc:postgresql://localhost:5432/smith_studio
+#   url:      jdbc:postgresql://localhost:5433/smith_studio
 #   user:     smith
 #   password: smith
 #
-# Data persists across `docker compose down` / `up` via the named volume;
-# `docker compose down -v` removes it.
+# Host port 5433 (container port stays 5432) so it coexists with a Postgres already
+# running on the conventional 5432. Data persists across `docker compose down` / `up`
+# via the named volume; `docker compose down -v` removes it.
 services:
   postgres:
     image: postgres:16
@@ -19,7 +20,7 @@ services:
       POSTGRES_PASSWORD: smith
       POSTGRES_DB: smith_studio
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - studio-pgdata:/var/lib/postgresql/data
     healthcheck:

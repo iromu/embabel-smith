@@ -86,9 +86,13 @@ changing.
 ## Development database and test profile
 
 `docker-compose.yml` brings up a `postgres:16` with a named volume (`studio-pgdata`) and fixed dev
-credentials (smith/smith, db `smith_studio`, port 5432, `pg_isready` healthcheck) — the documented
-endpoint the Storage pane points at. The test-classpath `application.yml` points
-`smith.studio.storage.url` at in-memory H2, so the `@SpringBootTest` classes pass with no docker.
+credentials (smith/smith, db `smith_studio`, host port 5433 → container 5432, `pg_isready`
+healthcheck) — the documented endpoint the Storage pane points at (5433 so it coexists with a
+Postgres already on the conventional 5432). A gitignored `application-local.yaml` (module root,
+activated by the default `local` profile) sets `smith.studio.storage.url` to that endpoint and turns
+on `spring.docker.compose`, so a plain dev run auto-starts the container and binds to it; the
+test-classpath `application.yml` keeps docker-compose off and points `smith.studio.storage.url` at
+in-memory H2, so the `@SpringBootTest` classes pass with no docker.
 
 ## A web-server gotcha worth knowing
 
