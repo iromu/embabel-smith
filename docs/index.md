@@ -9,10 +9,10 @@ builder on the Embabel platform (v1.5.4). Read in order:
   is and already ships: the architecture, the decisive evidence (verified against the 1.5.4 source),
   the system design, and implementation code samples. Verdict: feasible — ~70% of the pieces exist;
   the missing piece is the builder UI itself.
-- [02 — Agent Spec Research](02-agent-spec-research.md) — the "specs, not agents" paradigm: an
-  arXiv-primary survey of the agent-specs literature (progressive disclosure, composable/versioned/
-  portable specs, extending a general agent without retraining) plus the "advanced" layer —
-  retrieval at scale, self-evolving spec libraries, and security/trust governance.
+- [02 — Agent Skill Research](02-skill-research.md) — the "skills, not agents" paradigm: an
+  arXiv-primary survey of the agent-skills literature (progressive disclosure, composable/versioned/
+  portable skills, extending a general agent without retraining) plus the "advanced" layer —
+  retrieval at scale, self-evolving skill libraries, and security/trust governance.
 - [03 — Spec-First Agent Builder: Design](03-embabel-spec-agent-builder-design.md) — the
   synthesis: how the "specs, not agents" paradigm maps onto Embabel's primitives (exported goals,
   tool groups, MCP), and the revised spec-first builder architecture (Spec Registry, Spec Composer,
