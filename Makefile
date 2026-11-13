@@ -23,6 +23,9 @@ test-module: ## Test one module + its upstream deps (MODULE=prod/embabel-smith-s
 	@[ -f "$$HOME/.config/env/llm.env" ] && . "$$HOME/.config/env/llm.env" && export OPENAI_CUSTOM_BASE_URL OPENAI_CUSTOM_API_KEY OPENAI_CUSTOM_MODELS EMBABEL_MODELS_DEFAULT_LLM; \
 	$(MVN) test -pl $(MODULE) -am
 
+lint: ## Project SpringChecks on the full reactor (0 violations expected)
+	$(MVN) checkstyle:check
+
 checkstyle: ## Project SpringChecks on the full reactor (0 violations expected)
 	$(MVN) checkstyle:check
 

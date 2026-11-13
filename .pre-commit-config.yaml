@@ -1,10 +1,4 @@
 repos:
-  # Note: no pre-commit-java hooks (pmd/checkstyle) — their dockerized tools
-  # run stock rulesets: checkstyle cannot load the SpringChecks module
-  # (spring-javaformat-checkstyle is not on its classpath), and pmd's default
-  # ruleset flags the project's own license header (CommentSize). The Maven
-  # build enforces the project checkstyle at the validate phase instead (root
-  # pom, checkstyle-validation execution).
   - repo: https://github.com/gitleaks/gitleaks
     rev: v8.30.0
     hooks:
@@ -14,11 +8,11 @@ repos:
     hooks:
       - id: end-of-file-fixer
       - id: trailing-whitespace
-  # Run the project test suite on every commit.
+  # Run the project lint suite on every commit.
   - repo: local
     hooks:
-      - id: make-test
-        name: make test
-        entry: make test
+      - id: make-lint
+        name: make lint
+        entry: make lint
         language: system
         pass_filenames: false
