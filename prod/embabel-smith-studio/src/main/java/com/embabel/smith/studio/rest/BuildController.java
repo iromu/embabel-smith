@@ -20,6 +20,7 @@ import java.util.List;
 
 import com.embabel.smith.builder.BuildOptions;
 import com.embabel.smith.builder.BuildResult;
+import com.embabel.smith.builder.core.GenerationTechnique;
 import com.embabel.smith.builder.publish.PublishTarget;
 import com.embabel.smith.common.config.ModelEndpointConfig;
 import com.embabel.smith.studio.rest.dto.BuildRequest;
@@ -71,7 +72,7 @@ public class BuildController {
 			BuildOptions options = new BuildOptions(
 					(request.maxRefine() == null) ? BuildOptions.DEFAULT_MAX_REFINE : request.maxRefine(),
 					BuildOptions.DEFAULT_SCORE_GATE, request.overwrite() != null && request.overwrite(),
-					request.push() != null && request.push());
+					request.push() != null && request.push(), GenerationTechnique.SINGLE_SHOT);
 			return BuildResponse.of(this.builder.build(request.description(), target, options));
 		}
 		catch (Exception ex) {

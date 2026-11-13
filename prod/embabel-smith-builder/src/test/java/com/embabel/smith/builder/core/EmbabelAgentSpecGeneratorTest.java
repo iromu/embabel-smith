@@ -1,9 +1,10 @@
-package com.embabel.smith.studio.generate;
+package com.embabel.smith.builder.core;
 
 import com.embabel.agent.core.DataDictionary;
 import com.embabel.agent.core.DynamicType;
 import com.embabel.agent.core.ValuePropertyDefinition;
 import com.embabel.agent.spec.compile.AgentCompilationResult;
+import com.embabel.agent.spec.compile.CompilationError;
 import com.embabel.agent.spec.model.GoalSpec;
 import com.embabel.agent.spec.model.PromptedActionSpec;
 import com.embabel.common.ai.model.LlmOptions;
@@ -18,10 +19,11 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Offline tests for the embabel NL-compiler generation technique: the compile seam is stubbed
- * (no LLM) and the mapping of the compiler's result to the shared agent spec is checked.
+ * Offline tests for the embabel generation technique: the compile seam is stubbed (no
+ * LLM) and the mapping of the compiler's result to the shared agent spec is checked,
+ * including the name derivation and the compiler's issue passthrough.
  */
-class NlCompilerFlowGeneratorTest {
+class EmbabelAgentSpecGeneratorTest {
 
 	// The compiler seam is stubbed and ignores the dictionary, so null is fine here.
 	private final DataDictionary dictionary = null;
@@ -37,8 +39,9 @@ class NlCompilerFlowGeneratorTest {
 		AgentCompilationResult result = new AgentCompilationResult(List.of(extract), goal, List.of(topicBrief),
 				List.of());
 
-		AgentSpec pack = new NlCompilerFlowGenerator((name, description, dd) -> result, dictionary)
-			.generate("a business process");
+		AgentSpec pack = new EmbabelAgentSpecGenerator((name, description, dd) -> result, this.dictionary)
+			.generate("a business process")
+			.pack();
 
 		assertThat(pack.goal().isExported()).isTrue();
 		assertThat(pack.goalOutputType()).isEqualTo("BackgroundMessage");
@@ -52,20 +55,35 @@ class NlCompilerFlowGeneratorTest {
 	}
 
 	@Test
-	void compilesWithTheNameSluggedFromTheBlueprint() {
+	void compilesWithTheNameSluggedFromTheDescription() {
 		GoalSpec goal = new GoalSpec("g", "done", "BackgroundMessage", true, "goal");
 		AgentCompilationResult result = new AgentCompilationResult(List.of(), goal, List.of(), List.of());
 		AtomicReference<String> seenName = new AtomicReference<>();
 
-		NlCompilerFlowGenerator generator = new NlCompilerFlowGenerator((name, description, dd) -> {
+		EmbabelAgentSpecGenerator generator = new EmbabelAgentSpecGenerator((name, description, dd) -> {
 			seenName.set(name);
 			return result;
-		}, dictionary);
-		AgentSpec pack = generator.generate("Order Intake Process");
+		}, this.dictionary);
+		CompiledDraft draft = generator.generate("Order Intake Process");
 
 		assertThat(seenName.get()).isEqualTo("order-intake-process");
-		assertThat(pack.name()).isEqualTo("order-intake-process");
-		assertThat(pack.goal().isExported()).isTrue();
+		assertThat(draft.agentName()).isEqualTo("order-intake-process");
+		assertThat(draft.pack().name()).isEqualTo("order-intake-process");
+		assertThat(draft.pack().goal().isExported()).isTrue();
+	}
+
+	@Test
+	void passesCompilerIssuesThroughWithTheDraftForReview() {
+		GoalSpec goal = new GoalSpec("g", "done", "BackgroundMessage", true, "goal");
+		AgentCompilationResult result = new AgentCompilationResult(List.of(), goal, List.of(),
+				List.of(new CompilationError("ambiguous goal: cannot determine the spec's intent", "compiler", null)));
+
+		CompiledDraft draft = new EmbabelAgentSpecGenerator((name, description, dd) -> result, this.dictionary)
+			.generate("ambiguous");
+
+		assertThat(draft.hasIssues()).isTrue();
+		assertThat(draft.issues()).anyMatch(issue -> issue.contains("ambiguous"));
+		assertThat(draft.pack()).isNotNull();
 	}
 
 }

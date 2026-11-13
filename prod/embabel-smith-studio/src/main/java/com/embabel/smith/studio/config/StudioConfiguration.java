@@ -22,13 +22,16 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 
 import com.embabel.agent.api.common.Ai;
 import com.embabel.agent.core.AgentPlatform;
 import com.embabel.smith.builder.BuildOptions;
 import com.embabel.smith.builder.BuilderService;
+import com.embabel.smith.builder.core.AgentSpecGenerator;
+import com.embabel.smith.builder.core.AgentSpecGenerators;
 import com.embabel.smith.builder.core.BuilderAgent;
-import com.embabel.smith.builder.core.DefaultAgentSpecCompiler;
+import com.embabel.smith.builder.core.GenerationTechnique;
 import com.embabel.smith.builder.eval.AgentSpecInvokerFactory;
 import com.embabel.smith.builder.eval.EvalTask;
 import com.embabel.smith.builder.eval.InvokerFactory;
@@ -52,9 +55,7 @@ import com.embabel.smith.studio.generate.BlueprintLoader;
 import com.embabel.smith.studio.generate.FlowPromptCaller;
 import com.embabel.smith.studio.generate.FlowValidator;
 import com.embabel.smith.studio.generate.LlmFlowPromptCaller;
-import com.embabel.smith.studio.generate.NlCompilerFlowGenerator;
 import com.embabel.smith.studio.generate.ProcessExtractor;
-import com.embabel.smith.studio.generate.ProcessFlowGenerator;
 import com.embabel.smith.studio.improve.ImprovementLoop;
 import com.embabel.smith.studio.loop.LoopSchedulerState;
 import com.embabel.smith.studio.rest.BuildController;
@@ -142,7 +143,7 @@ public class StudioConfiguration {
 	public BuilderService builderService(AgentPlatform platform, Ai ai, ModelEndpointConfig endpoint)
 			throws IOException {
 		Path scratch = Files.createTempDirectory("smith-studio-builder-scratch-");
-		BuilderAgent agent = new BuilderAgent(new DefaultAgentSpecCompiler(ai), platform, scratch.toString());
+		BuilderAgent agent = new BuilderAgent(AgentSpecGenerators.production(ai, platform), scratch.toString());
 		InvokerFactory invokerFactory = new AgentSpecInvokerFactory(platform);
 		PromptRewriter rewriter = new LlmPromptRewriter(endpoint.baseUrl(), endpoint.apiKey(), model(endpoint));
 		return new BuilderService(agent, invokerFactory, rewriter, defaultEvalTasks());
@@ -179,42 +180,29 @@ public class StudioConfiguration {
 	}
 
 	/**
-	 * The generation core: the process-to-flow prompt plus the endpoint-gated model
-	 * caller.
-	 * @param endpoint the model endpoint configuration.
-	 * @return the generation core.
-	 */
-	@Bean
-	public ProcessFlowGenerator processFlowGenerator(ModelEndpointConfig endpoint) {
-		FlowPromptCaller caller = new LlmFlowPromptCaller(endpoint.baseUrl(), endpoint.apiKey(), model(endpoint));
-		return new ProcessFlowGenerator(caller, loadPrompt("process_to_flow.jinja"));
-	}
-
-	/**
-	 * The embabel NL-compiler generation technique: the builder's compile seam (backed by
-	 * Embabel's NL compiler) plus the shared agent-spec mapper.
-	 * @param ai the Embabel AI service that drives the NL compiler.
-	 * @param platform the platform, which provides the shared type dictionary.
-	 * @return the embabel NL-compiler generation core.
-	 */
-	@Bean
-	public NlCompilerFlowGenerator nlCompilerFlowGenerator(Ai ai, AgentPlatform platform) {
-		return new NlCompilerFlowGenerator(new DefaultAgentSpecCompiler(ai), platform);
-	}
-
-	/**
 	 * The workspace's model-dependent generation: a blueprint and a technique to a generated
-	 * pack plus flow issues. The technique picks the single-shot prompt or the embabel NL
-	 * compiler; anything other than {@code embabel} uses the single-shot generator.
-	 * @param singleShot the single-shot generation core.
-	 * @param embabel the embabel NL-compiler generation core.
+	 * pack plus flow issues. Both techniques are the builder's engine — the studio owns no
+	 * generator — and any value other than {@code embabel} means the single-shot default.
+	 * @param ai the Embabel AI service both techniques call through.
+	 * @param platform the platform, which provides the shared type dictionary.
 	 * @return the model-dependent generation for the workspace.
 	 */
 	@Bean
-	public GenerateController.GenerateFn generateFn(ProcessFlowGenerator singleShot, NlCompilerFlowGenerator embabel) {
+	public GenerateController.GenerateFn generateFn(Ai ai, AgentPlatform platform) {
+		return generateFn(AgentSpecGenerators.production(ai, platform));
+	}
+
+	/**
+	 * The dispatch over the builder's generators: the technique picks the generator, and
+	 * any value other than {@code embabel} means the single-shot default. A generator
+	 * failure is reported as a structured failure, not an exception.
+	 * @param generators the builder's generators, keyed by technique.
+	 * @return the model-dependent generation for the workspace.
+	 */
+	static GenerateController.GenerateFn generateFn(Map<GenerationTechnique, AgentSpecGenerator> generators) {
 		return (blueprint, technique) -> {
 			try {
-				AgentSpec pack = isEmbabel(technique) ? embabel.generate(blueprint) : singleShot.generate(blueprint);
+				AgentSpec pack = generators.get(GenerationTechnique.from(technique)).generate(blueprint).pack();
 				return GenerateResponse.of(pack, FlowValidator.issues(pack));
 			}
 			catch (Exception ex) {
@@ -222,16 +210,6 @@ public class StudioConfiguration {
 				return GenerateResponse.failed("Generation failed: " + message);
 			}
 		};
-	}
-
-	/**
-	 * Whether the requested generation technique is the embabel NL compiler (the default,
-	 * for any other value, is the single-shot prompt).
-	 * @param technique the requested technique.
-	 * @return true when the embabel NL compiler should be used.
-	 */
-	private static boolean isEmbabel(String technique) {
-		return "embabel".equals(technique);
 	}
 
 	/**

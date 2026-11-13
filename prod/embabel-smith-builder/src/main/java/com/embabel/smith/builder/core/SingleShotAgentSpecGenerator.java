@@ -14,14 +14,18 @@
  * limitations under the License.
  */
 
-package com.embabel.smith.studio.generate;
+package com.embabel.smith.builder.core;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import com.embabel.agent.api.common.Ai;
 import com.embabel.smith.common.model.ActionStepSpec;
 import com.embabel.smith.common.model.AgentSpec;
 import com.embabel.smith.common.model.AgentSpecManifest;
@@ -30,16 +34,22 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
- * The generation core: a business-process blueprint in, a {@link AgentSpec} (goal +
- * action steps + intermediate types) out. It runs the {@code process_to_flow} prompt
- * against the model and parses the answer into the shared pack format, so the result is
- * exactly what the runtime ingests and the Compose editor renders. The model call is
- * behind the {@link FlowPromptCaller} seam; parsing and normalisation are pure and
- * offline-testable.
+ * The single-shot generation technique: one model call emits the whole spec as JSON. It
+ * renders the {@code process_to_flow} prompt against the model and parses the answer into
+ * the shared agent-spec format, so the result is exactly what the runtime ingests and the
+ * studio's editor renders. POC 24 measured this as the stronger technique for the
+ * single-pack path, so it is the build's default.
+ *
+ * <p>
+ * The model call is behind the {@link SpecPromptCaller} seam; parsing and normalisation
+ * are pure and offline-testable.
  *
  * @author Ivan Rodriguez
  */
-public class ProcessFlowGenerator {
+public class SingleShotAgentSpecGenerator implements AgentSpecGenerator {
+
+	/** Classpath location of the bundled generation prompt. */
+	private static final String PROMPT_RESOURCE = "/prompts/process_to_flow.jinja";
 
 	/**
 	 * Matches a Jinja2 template reference such as {@code {{userInput}}} or
@@ -48,29 +58,49 @@ public class ProcessFlowGenerator {
 	private static final Pattern PROMPT_REF = Pattern
 		.compile("\\{\\{\\s*([a-zA-Z0-9_]+)(?:\\.([a-zA-Z0-9_]+))?\\s*\\}\\}");
 
-	private final FlowPromptCaller caller;
+	private final SpecPromptCaller caller;
 
 	private final String template;
 
 	private final ObjectMapper json = new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES,
 			false);
 
-	public ProcessFlowGenerator(FlowPromptCaller caller, String template) {
+	public SingleShotAgentSpecGenerator(Ai ai) {
+		this(new AiSpecPromptCaller(ai), defaultPrompt());
+	}
+
+	public SingleShotAgentSpecGenerator(Ai ai, String template) {
+		this(new AiSpecPromptCaller(ai), template);
+	}
+
+	public SingleShotAgentSpecGenerator(SpecPromptCaller caller, String template) {
 		this.caller = caller;
 		this.template = template;
 	}
 
 	/**
-	 * Generates the agent spec for the given blueprint. Throws if the model answer is not
-	 * parseable.
-	 * @param blueprint the business-process description to generate from.
-	 * @return the generated agent spec.
+	 * The bundled {@code process_to_flow} prompt, which asks for the agent-spec JSON.
+	 * @return the prompt template text.
 	 */
-	public AgentSpec generate(String blueprint) {
+	public static String defaultPrompt() {
+		try (InputStream in = SingleShotAgentSpecGenerator.class.getResourceAsStream(PROMPT_RESOURCE)) {
+			if (in == null) {
+				throw new IllegalStateException("prompt resource not found: " + PROMPT_RESOURCE);
+			}
+			return new String(in.readAllBytes(), StandardCharsets.UTF_8);
+		}
+		catch (IOException ex) {
+			throw new IllegalStateException("Failed to load prompt " + PROMPT_RESOURCE + ": " + ex.getMessage(), ex);
+		}
+	}
+
+	@Override
+	public CompiledDraft generate(String description) {
 		String user = "Below is a business-process description. Produce the agent spec JSON for the "
-				+ "core end-to-end process.\n\n" + blueprint;
+				+ "core end-to-end process.\n\n" + description;
 		String raw = this.caller.call(this.template, user);
-		return parse(raw);
+		AgentSpec pack = parse(raw);
+		return new CompiledDraft(pack.name(), pack, List.of());
 	}
 
 	private AgentSpec parse(String raw) {

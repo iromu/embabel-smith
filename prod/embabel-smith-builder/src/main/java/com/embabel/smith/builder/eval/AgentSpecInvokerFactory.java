@@ -22,10 +22,12 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 
-import com.embabel.agent.api.invocation.AgentInvocation;
 import com.embabel.agent.core.Agent;
 import com.embabel.agent.core.AgentPlatform;
+import com.embabel.agent.core.AgentProcess;
+import com.embabel.agent.core.AgentProcessStatusCode;
 import com.embabel.agent.core.DataDictionary;
+import com.embabel.agent.core.ProcessOptions;
 import com.embabel.agent.domain.io.UserInput;
 import com.embabel.agent.spec.StepSpecAgentScopeBuilder;
 import com.embabel.agent.spec.model.BackgroundMessage;
@@ -35,8 +37,10 @@ import com.embabel.smith.common.model.AgentSpec;
 
 /**
  * The production {@link InvokerFactory}: deploys the pack just built and returns an
- * invoker that runs it as a single typed goal run (the non-chat invocation path, POC 5).
- * Endpoint-gated — each call deploys the pack and the invocation calls the model.
+ * invoker that runs the pack's <em>own</em> goal to completion — the same
+ * {@code runAgentFrom} path the product runtime uses — so a spec is evaluated whatever
+ * type its goal produces. Endpoint-gated — each call deploys the pack and the invocation
+ * calls the model.
  *
  * @author Ivan Rodriguez
  */
@@ -73,11 +77,22 @@ public class AgentSpecInvokerFactory implements InvokerFactory {
 		Agent agent = builder.deploy()
 			.createAgent("builder-eval-agent-" + suffix, "eval-spec", "Builder eval: " + pack.name());
 		this.platform.deploy(agent);
-		AgentInvocation<BackgroundMessage> invocation = AgentInvocation.create(this.platform,
-				BackgroundMessage.class);
 		return (input) -> {
-			BackgroundMessage result = invocation.invoke(Map.of("userInput", new UserInput(input)));
-			return (result != null) ? result.getContent() : null;
+			// Run the pack's own goal, whatever its output type is — a spec's goal output
+			// is the deliverable it was generated to produce (a domain type), so looking
+			// the agent up by a fixed output class would never find it.
+			AgentProcess process = this.platform.runAgentFrom(agent, ProcessOptions.DEFAULT,
+					Map.of("userInput", new UserInput(input)));
+			if (process.getStatus() != AgentProcessStatusCode.COMPLETED) {
+				// The goal was not achieved: no output, so the eval task fails and the
+				// refinement loop gets the chance to fix it.
+				return null;
+			}
+			Object last = process.lastResult();
+			if (last == null) {
+				return null;
+			}
+			return (last instanceof BackgroundMessage message) ? message.getContent() : String.valueOf(last);
 		};
 	}
 

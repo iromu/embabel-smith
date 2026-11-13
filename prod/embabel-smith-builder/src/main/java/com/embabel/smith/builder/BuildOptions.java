@@ -16,18 +16,24 @@
 
 package com.embabel.smith.builder;
 
+import com.embabel.smith.builder.core.GenerationTechnique;
+
 /**
- * The per-build knobs (design D1): the refinement iteration bound, the eval score gate,
- * and the publish flags. Defaults: up to 3 refinement rounds, a score gate of 1.0 (every
- * eval task must pass), no overwrite, no push.
+ * The per-build knobs (design D1): the generation technique, the refinement iteration
+ * bound, the eval score gate, and the publish flags. Defaults: the single-shot technique,
+ * up to 3 refinement rounds, a score gate of 1.0 (every eval task must pass), no
+ * overwrite, no push.
  *
  * @param maxRefine the maximum number of refinement rounds to run.
  * @param scoreGate the minimum eval score required to pass the build gate.
  * @param overwrite whether to overwrite an existing published pack.
  * @param push whether to push the published pack to a remote.
+ * @param technique the generation technique the build compiles with; {@code null} means
+ *        the {@link GenerationTechnique#SINGLE_SHOT} default.
  * @author Ivan Rodriguez
  */
-public record BuildOptions(int maxRefine, double scoreGate, boolean overwrite, boolean push) {
+public record BuildOptions(int maxRefine, double scoreGate, boolean overwrite, boolean push,
+		GenerationTechnique technique) {
 
 	/** Default value for {@link #maxRefine}: up to 3 refinement rounds. */
 	public static final int DEFAULT_MAX_REFINE = 3;
@@ -35,7 +41,12 @@ public record BuildOptions(int maxRefine, double scoreGate, boolean overwrite, b
 	/** Default value for {@link #scoreGate}: a score gate of 1.0. */
 	public static final double DEFAULT_SCORE_GATE = 1.0;
 
+	public BuildOptions {
+		technique = (technique != null) ? technique : GenerationTechnique.SINGLE_SHOT;
+	}
+
 	public static BuildOptions defaults() {
-		return new BuildOptions(DEFAULT_MAX_REFINE, DEFAULT_SCORE_GATE, false, false);
+		return new BuildOptions(DEFAULT_MAX_REFINE, DEFAULT_SCORE_GATE, false, false,
+				GenerationTechnique.SINGLE_SHOT);
 	}
 }

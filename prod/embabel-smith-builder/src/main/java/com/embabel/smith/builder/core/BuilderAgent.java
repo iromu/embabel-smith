@@ -19,15 +19,13 @@ package com.embabel.smith.builder.core;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 
 import com.embabel.agent.api.annotation.AchievesGoal;
 import com.embabel.agent.api.annotation.Action;
 import com.embabel.agent.api.annotation.Agent;
 import com.embabel.agent.api.common.PlannerType;
-import com.embabel.agent.core.DataDictionary;
 import com.embabel.agent.domain.io.UserInput;
-import com.embabel.agent.spec.compile.AgentCompilationResult;
-import com.embabel.agent.spec.compile.CompilationError;
 import com.embabel.smith.common.io.AgentSpecReader;
 import com.embabel.smith.common.io.AgentSpecWriter;
 import com.embabel.smith.common.model.AgentSpec;
@@ -45,13 +43,14 @@ import com.embabel.smith.common.validation.ValidationIssue;
  *           --writeAgentSpec------------> AgentSpecRef   (goal)
  * </pre>
  *
- * The model is called only inside {@link #compileFromDescription(UserInput)}, and only
- * through the injected {@link AgentSpecCompiler} (endpoint-gated); the validate and write
- * steps are pure Java, so the pipeline order is deterministic and the offline behaviour
- * is testable. Design D5 is enforced here: an invalid draft is never written.
+ * The model is called only inside the compile step, and only through the injected
+ * {@link AgentSpecGenerator} for the build's {@link GenerationTechnique}
+ * (endpoint-gated); the validate and write steps are pure Java, so the pipeline order is
+ * deterministic and the offline behaviour is testable. Design D5 is enforced here: an
+ * invalid draft is never written.
  *
  * <p>
- * The {@link BuilderService} drives these actions directly (the same order the GOAP
+ * The {@code BuilderService} drives these actions directly (the same order the GOAP
  * planner would take), keeping the pipeline an Embabel agent while staying deterministic
  * and offline-testable.
  *
@@ -60,13 +59,9 @@ import com.embabel.smith.common.validation.ValidationIssue;
 @Agent(planner = PlannerType.GOAP, description = "Builds a validated agent spec from a natural-language description")
 public class BuilderAgent {
 
-	private final AgentSpecCompiler compiler;
-
-	private final DataDictionary dataDictionary;
+	private final Map<GenerationTechnique, AgentSpecGenerator> generators;
 
 	private final Path outputDir;
-
-	private final DraftToAgentSpec mapper = new DraftToAgentSpec();
 
 	private final AgentSpecValidator validator = new AgentSpecValidator();
 
@@ -74,25 +69,46 @@ public class BuilderAgent {
 
 	private final AgentSpecReader reader = new AgentSpecReader();
 
-	public BuilderAgent(AgentSpecCompiler compiler, DataDictionary dataDictionary, String outputDir) {
-		this.compiler = compiler;
-		this.dataDictionary = dataDictionary;
+	public BuilderAgent(Map<GenerationTechnique, AgentSpecGenerator> generators, String outputDir) {
+		this.generators = Map.copyOf(generators);
 		this.outputDir = Path.of(outputDir);
 	}
 
 	/**
-	 * Compiles a natural-language description into a draft spec via the injected
-	 * {@link AgentSpecCompiler}. Endpoint-gated for the production compiler.
+	 * Convenience for callers with a single generator — an offline test, or a build that
+	 * does not vary the technique — which then serves every technique.
+	 * @param generator the generator to use for all techniques.
+	 * @param outputDir the directory the validated spec is written to.
+	 */
+	public BuilderAgent(AgentSpecGenerator generator, String outputDir) {
+		this(Map.of(GenerationTechnique.SINGLE_SHOT, generator, GenerationTechnique.EMBABEL, generator), outputDir);
+	}
+
+	/**
+	 * Compiles a natural-language description into a draft spec with the default
+	 * {@link GenerationTechnique}.
 	 * @param description the natural-language description to compile.
 	 * @return the compiled draft spec.
 	 */
 	@Action(description = "Compile a natural-language description into a draft agent spec")
 	public CompiledDraft compileFromDescription(UserInput description) {
-		String name = PackName.slug(description.getContent());
-		AgentCompilationResult result = this.compiler.compile(name, description.getContent(), this.dataDictionary);
-		List<String> issues = result.getErrors().stream().map(CompilationError::getMessage).toList();
-		AgentSpec pack = this.mapper.toAgentSpec(result, name);
-		return new CompiledDraft(name, pack, issues);
+		return compileFromDescription(description, GenerationTechnique.SINGLE_SHOT);
+	}
+
+	/**
+	 * Compiles a natural-language description into a draft spec with the named technique.
+	 * Not an {@code @Action}: the technique is a build option, not a domain type the
+	 * planner could produce, so it stays out of the action's inputs.
+	 * @param description the natural-language description to compile.
+	 * @param technique the generation technique to use.
+	 * @return the compiled draft spec.
+	 */
+	public CompiledDraft compileFromDescription(UserInput description, GenerationTechnique technique) {
+		AgentSpecGenerator generator = this.generators.get(technique);
+		if (generator == null) {
+			throw new IllegalStateException("No generator wired for technique " + technique);
+		}
+		return generator.generate(description.getContent());
 	}
 
 	/**

@@ -5,7 +5,7 @@ import com.embabel.smith.builder.BuildResult;
 import com.embabel.smith.builder.BuilderService;
 import com.embabel.smith.builder.TestFixtures;
 import com.embabel.smith.builder.core.BuilderAgent;
-import com.embabel.smith.builder.core.AgentSpecCompiler;
+import com.embabel.smith.builder.core.EmbabelAgentSpecGenerator;
 import com.embabel.smith.builder.eval.EvalTask;
 import com.embabel.smith.builder.eval.InvokerFactory;
 import com.embabel.smith.builder.eval.PromptRewriter;
@@ -51,8 +51,9 @@ class AgentSpecSecurityScannerTest {
 	void theBuilderBlocksABuildWithACriticalFinding(@TempDir Path tmp) {
 		Path scratch = tmp.resolve("scratch");
 		Path library = tmp.resolve("library");
-		AgentSpecCompiler compiler = (name, desc, dd) -> TestFixtures.malicious(name);
-		BuilderAgent agent = new BuilderAgent(compiler, null, scratch.toString());
+		BuilderAgent agent = new BuilderAgent(
+				new EmbabelAgentSpecGenerator((name, desc, dd) -> TestFixtures.malicious(name), null),
+				scratch.toString());
 		InvokerFactory factory = pack -> input -> "output: " + input;
 		PromptRewriter rewriter = (current, feedback) -> current;
 		BuilderService service = new BuilderService(agent, factory, rewriter,

@@ -28,14 +28,16 @@ import com.embabel.agent.core.AgentPlatform;
 import com.embabel.smith.builder.BuildOptions;
 import com.embabel.smith.builder.BuildResult;
 import com.embabel.smith.builder.BuilderService;
+import com.embabel.smith.builder.core.AgentSpecGenerators;
 import com.embabel.smith.builder.core.BuilderAgent;
-import com.embabel.smith.builder.core.DefaultAgentSpecCompiler;
+import com.embabel.smith.builder.core.GenerationTechnique;
 import com.embabel.smith.builder.eval.AgentSpecInvokerFactory;
 import com.embabel.smith.builder.eval.EvalTask;
 import com.embabel.smith.builder.eval.InvokerFactory;
 import com.embabel.smith.builder.eval.LlmPromptRewriter;
 import com.embabel.smith.builder.eval.PromptRewriter;
 import com.embabel.smith.builder.publish.PublishTarget;
+import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
@@ -67,6 +69,11 @@ public class BuildCommand implements Callable<Integer> {
 	@Option(names = "--push", description = "Push the git commit to the remote (default: local commit only)")
 	boolean push;
 
+	@Option(names = "--technique", converter = TechniqueConverter.class,
+			description = "Generation technique: single-shot (default, one model call emits the spec) "
+					+ "or embabel (the Embabel NL compiler)")
+	GenerationTechnique technique = GenerationTechnique.SINGLE_SHOT;
+
 	private final AgentPlatform platform;
 
 	private final Ai ai;
@@ -91,7 +98,8 @@ public class BuildCommand implements Callable<Integer> {
 	 * @return the build service wired with the default compiler, invoker factory and rewriter.
 	 */
 	protected BuilderService newService(Path scratch) {
-		BuilderAgent agent = new BuilderAgent(new DefaultAgentSpecCompiler(this.ai), this.platform, scratch.toString());
+		BuilderAgent agent = new BuilderAgent(AgentSpecGenerators.production(this.ai, this.platform),
+				scratch.toString());
 		InvokerFactory factory = new AgentSpecInvokerFactory(this.platform);
 		PromptRewriter rewriter = new LlmPromptRewriter(this.baseUrl, this.apiKey, this.model);
 		return new BuilderService(agent, factory, rewriter, defaultEvalTasks());
@@ -127,7 +135,8 @@ public class BuildCommand implements Callable<Integer> {
 		}
 		try {
 			PublishTarget target = PublishTarget.parse(this.out);
-			BuildOptions options = new BuildOptions(this.maxRefine, BuildOptions.DEFAULT_SCORE_GATE, this.overwrite, this.push);
+			BuildOptions options = new BuildOptions(this.maxRefine, BuildOptions.DEFAULT_SCORE_GATE, this.overwrite,
+					this.push, this.technique);
 			BuildResult result = newService(scratch).build(this.description, target, options);
 			System.out.print(result.report());
 			return result.isBuilt() ? 0 : 1;
@@ -158,6 +167,19 @@ public class BuildCommand implements Callable<Integer> {
 		catch (IOException ignored) {
 			// best-effort cleanup; ignore failures
 		}
+	}
+
+	/**
+	 * Accepts a technique by its user-facing name ({@code single-shot} / {@code embabel}),
+	 * so a typo is a usage error (exit 2) rather than a silent fallback.
+	 */
+	public static class TechniqueConverter implements CommandLine.ITypeConverter<GenerationTechnique> {
+
+		@Override
+		public GenerationTechnique convert(String value) {
+			return GenerationTechnique.parse(value);
+		}
+
 	}
 
 }

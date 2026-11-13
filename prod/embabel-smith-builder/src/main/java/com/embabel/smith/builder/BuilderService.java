@@ -83,11 +83,12 @@ public class BuilderService {
 	}
 
 	public BuildResult build(String description, PublishTarget target, BuildOptions options) {
-		// 1. Build: compile → validate → write (D5)
-		CompiledDraft compiled = this.builder.compileFromDescription(new UserInput(description));
+		// 1. Build: generate → validate → write (D5)
+		CompiledDraft compiled = this.builder.compileFromDescription(new UserInput(description),
+				options.technique());
 		if (compiled.hasIssues()) {
 			// The description could not be resolved (ambiguous/unsupported) — report the
-			// compiler's issues
+			// generator's issues
 			// and retain the draft for review.
 			return BuildResult.blocked("build", compiled.pack().name(), compiled.issues(), null, null, compiled.pack());
 		}
