@@ -43,5 +43,6 @@
         <module>poc-21-agent-spec-security</module>
         <module>poc-22-unified-ui</module>
         <module>poc-23-remote-embedding-scale</module>
+        <module>poc-24-generation-approaches</module>
     </modules>
 </project>
