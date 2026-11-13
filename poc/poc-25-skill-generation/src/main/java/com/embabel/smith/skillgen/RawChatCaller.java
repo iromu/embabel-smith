@@ -37,7 +37,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
  */
 public class RawChatCaller implements ChatCaller {
 
-	private static final int MAX_TOKENS = 4000;
+	private static final int MAX_TOKENS = 8000;
 
 	private static final Duration TIMEOUT = Duration.ofSeconds(180);
 

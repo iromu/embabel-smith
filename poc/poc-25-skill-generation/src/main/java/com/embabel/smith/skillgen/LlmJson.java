@@ -44,16 +44,33 @@ public final class LlmJson {
 			ThrowingJsonParser<T> parser) {
 		Exception last = null;
 		for (int attempt = 0; attempt < attempts; attempt++) {
-			String raw = caller.call(system, user);
 			try {
+				String raw = caller.call(system, user);
 				return parser.parse(extractJson(raw));
 			}
 			catch (Exception ex) {
 				last = ex;
+				if (attempt < attempts - 1) {
+					backoff(attempt);
+				}
 			}
 		}
-		throw new IllegalStateException("Failed to parse " + label + " after " + attempts + " attempts: "
+		throw new IllegalStateException("Failed to obtain " + label + " after " + attempts + " attempts: "
 				+ ((last != null) ? last.getMessage() : "unknown"), last);
+	}
+
+	/**
+	 * Rides out transient endpoint blips — a 500 from the upstream, a dropped connection — with a
+	 * short linear backoff between attempts, so one brief hiccup does not abort a whole run.
+	 * @param attempt the zero-based attempt that just failed.
+	 */
+	private static void backoff(int attempt) {
+		try {
+			Thread.sleep(2000L * (attempt + 1));
+		}
+		catch (InterruptedException ex) {
+			Thread.currentThread().interrupt();
+		}
 	}
 
 	/**

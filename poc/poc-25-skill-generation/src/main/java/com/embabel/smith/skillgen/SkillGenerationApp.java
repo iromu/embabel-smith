@@ -34,20 +34,20 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 /**
- * POC 25 launcher: for each business-process blueprint, generate an Agent Skill
- * ({@code SKILL.md}), load (or draft) its {@code evals.json} suite, then run every eval against
- * a general-purpose agent both with the skill loaded and without it (the baseline) — over two
- * arms side by side (a raw OpenAI-compatible call and the Embabel {@code Ai} runtime) — grade
+ * POC 25 launcher: for each business-process blueprint, first DECOMPOSE it into the set of Agent
+ * Skills required to compartmentalize the process (the extraction step), then — for each skill —
+ * generate its {@code SKILL.md}, draft its per-skill {@code evals.json} suite, and run every eval
+ * against a general-purpose agent both with the skill loaded and without it (the baseline), grade
  * each run against the expectations, and report the with-skill pass rate versus the no-skill
- * baseline.
+ * baseline. The with/without-skill comparison is measured per skill.
  *
  * <p>
  * Run (with a live OpenAI-compatible endpoint): <pre>
  *   export OPENAI_CUSTOM_BASE_URL=... OPENAI_CUSTOM_API_KEY=... OPENAI_CUSTOM_MODELS=... EMBABEL_MODELS_DEFAULT_LLM=...
  *   mvn -pl poc/poc-25-skill-generation spring-boot:run
  * </pre>
- * Filter with {@code -Dskillgen.blueprints=TradingAgents}, {@code -Dskillgen.arms=raw}, or
- * {@code -Dskillgen.evalsource=generated}.
+ * Filter with {@code -Dskillgen.blueprints=TradingAgents} or {@code -Dskillgen.arms=embabel} (the
+ * default arm is {@code raw}).
  *
  * @author Ivan Rodriguez
  */
@@ -70,14 +70,12 @@ public class SkillGenerationApp implements CommandLineRunner {
 
 	private final String arms;
 
-	private final String evalSource;
-
 	public SkillGenerationApp(Ai ai, @Value("${OPENAI_CUSTOM_BASE_URL:}") String baseUrl,
 			@Value("${OPENAI_CUSTOM_API_KEY:}") String apiKey, @Value("${OPENAI_CUSTOM_MODELS:}") String models,
 			@Value("${EMBABEL_MODELS_DEFAULT_LLM:}") String defaultLlm,
 			@Value("${skillgen.examples:../../examples/blueprints}") String examplesDir,
 			@Value("${skillgen.blueprints:Aurora,Sentinel,TradingAgents}") String blueprints,
-			@Value("${skillgen.arms:raw,embabel}") String arms, @Value("${skillgen.evalsource:bundled}") String evalSource) {
+			@Value("${skillgen.arms:raw}") String arms) {
 		this.ai = ai;
 		this.endpoint = new ModelEndpointConfig(baseUrl, apiKey, models, defaultLlm);
 		this.baseUrl = baseUrl;
@@ -86,7 +84,6 @@ public class SkillGenerationApp implements CommandLineRunner {
 		this.examplesDir = examplesDir;
 		this.blueprints = blueprints;
 		this.arms = arms;
-		this.evalSource = evalSource;
 	}
 
 	public static void main(String... args) {
@@ -104,6 +101,7 @@ public class SkillGenerationApp implements CommandLineRunner {
 		RawChatCaller raw = new RawChatCaller(this.baseUrl, this.apiKey, this.model);
 		EmbabelChatCaller embabel = new EmbabelChatCaller(this.ai);
 
+		String decompose = loadPrompt("skill_decomposition.jinja");
 		String generateSkill = loadPrompt("generate_skill.jinja");
 		String generateEvals = loadPrompt("generate_evals.jinja");
 		String withSkill = loadPrompt("agent_with_skill.jinja");
@@ -113,15 +111,16 @@ public class SkillGenerationApp implements CommandLineRunner {
 		List<String> report = new ArrayList<>();
 		report.add("# POC 25 — blueprint → Agent Skill generation + with/without-skill eval");
 		report.add("");
-		report.add("Each blueprint is turned into a `SKILL.md`; its `evals.json` suite is then run");
-		report.add("against a general-purpose agent **with the skill loaded** and **without it** (the");
-		report.add("baseline), graded against verifiable expectations. The skill lift is the");
-		report.add("with-skill pass rate minus the no-skill pass rate.");
+		report.add("Each blueprint is first DECOMPOSED into the set of skills required to compartmentalize");
+		report.add("the process (the extraction step); each skill is generated into its own `SKILL.md`, and its");
+		report.add("per-skill `evals.json` suite is then run against a general-purpose agent **with the skill");
+		report.add("loaded** and **without it** (the baseline), graded against verifiable expectations. The");
+		report.add("skill lift is the with-skill pass rate minus the no-skill pass rate, per skill.");
 		report.add("");
 		for (String blueprint : split(this.blueprints)) {
 			try {
-				report.addAll(runBlueprint(blueprint, raw, embabel, generateSkill, generateEvals, withSkill, baseline,
-						grade));
+				report.addAll(runBlueprint(blueprint, raw, embabel, decompose, generateSkill, generateEvals, withSkill,
+						baseline, grade));
 			}
 			catch (Exception ex) {
 				report.add("## Blueprint: " + blueprint);
@@ -136,18 +135,41 @@ public class SkillGenerationApp implements CommandLineRunner {
 		writeResults(output);
 	}
 
-	private List<String> runBlueprint(String blueprint, RawChatCaller raw, EmbabelChatCaller embabel,
+	private List<String> runBlueprint(String blueprint, RawChatCaller raw, EmbabelChatCaller embabel, String decompose,
 			String generateSkill, String generateEvals, String withSkill, String baseline, String grade) {
 		String text = readBlueprint(blueprint);
-		String skillName = slug(blueprint);
 
+		SkillDecomposer decomposer = new SkillDecomposer(raw, decompose);
+		List<SkillDecomposer.SkillScope> scopes = decomposer.decompose(text);
+
+		List<String> lines = new ArrayList<>();
+		lines.add("## Blueprint: " + blueprint);
+		lines.add("");
+		lines.add("Decomposed into " + scopes.size() + " skill(s): " + String.join(", ", names(scopes)) + ".");
+		lines.add("");
+		for (SkillDecomposer.SkillScope scope : scopes) {
+			try {
+				lines.addAll(runSkill(blueprint, scope, raw, embabel, generateSkill, generateEvals, withSkill, baseline,
+						grade));
+			}
+			catch (Exception ex) {
+				lines.add("### Skill: " + scope.name());
+				lines.add("");
+				lines.add("FAILED: " + ex.getMessage());
+				lines.add("");
+			}
+		}
+		return lines;
+	}
+
+	private List<String> runSkill(String blueprint, SkillDecomposer.SkillScope scope, RawChatCaller raw,
+			EmbabelChatCaller embabel, String generateSkill, String generateEvals, String withSkill, String baseline,
+			String grade) {
 		SkillGenerator generator = new SkillGenerator(raw, generateSkill);
-		Skill skill = generator.generate(skillName, text);
+		Skill skill = generator.generate(scope.name(), scope.scope());
 		List<String> skillIssues = SkillMdValidator.validate(skill.name(), skill.description());
 
-		EvalSuite evals = (this.evalSource.equals("generated"))
-				? EvalSource.generate(raw, generateEvals, skillName, text)
-				: EvalSource.load(skillName);
+		EvalSuite evals = EvalSource.generate(raw, generateEvals, skill.name(), scope.scope());
 
 		List<ComparisonReport.Arm> arms = new ArrayList<>();
 		List<String> armErrors = new ArrayList<>();
@@ -164,7 +186,7 @@ public class SkillGenerationApp implements CommandLineRunner {
 			}
 		}
 
-		List<String> lines = ComparisonReport.render(blueprint, skill, evals, this.evalSource, arms);
+		List<String> lines = ComparisonReport.renderSkill(skill, evals, arms);
 		if (!armErrors.isEmpty()) {
 			lines.add("Arm errors:");
 			for (String error : armErrors) {
@@ -180,8 +202,16 @@ public class SkillGenerationApp implements CommandLineRunner {
 			lines.add("");
 		}
 		writeSkill(blueprint, skill);
-		writeEvals(blueprint, evals);
+		writeEvals(blueprint, skill, evals);
 		return lines;
+	}
+
+	private static List<String> names(List<SkillDecomposer.SkillScope> scopes) {
+		List<String> out = new ArrayList<>();
+		for (SkillDecomposer.SkillScope scope : scopes) {
+			out.add(scope.name());
+		}
+		return out;
 	}
 
 	private void writeSkill(String blueprint, Skill skill) {
@@ -195,14 +225,15 @@ public class SkillGenerationApp implements CommandLineRunner {
 		}
 	}
 
-	private void writeEvals(String blueprint, EvalSuite evals) {
+	private void writeEvals(String blueprint, Skill skill, EvalSuite evals) {
 		try {
-			Path dir = Path.of("results", blueprint);
+			Path dir = Path.of("results", blueprint, skill.name());
 			Files.createDirectories(dir);
 			Files.writeString(dir.resolve("evals.json"), evals.toString(), StandardCharsets.UTF_8);
 		}
 		catch (IOException ex) {
-			System.err.println("Failed to write evals.json for " + blueprint + ": " + ex.getMessage());
+			System.err.println("Failed to write evals.json for " + blueprint + "/" + skill.name() + ": "
+					+ ex.getMessage());
 		}
 	}
 
@@ -260,11 +291,6 @@ public class SkillGenerationApp implements CommandLineRunner {
 			}
 		}
 		return out;
-	}
-
-	private static String slug(String name) {
-		String s = name.toLowerCase().replaceAll("[^a-z0-9]+", "-").replaceAll("^-+|-+$", "");
-		return s.isEmpty() ? "generated-skill" : s;
 	}
 
 	private void writeResults(String output) {
