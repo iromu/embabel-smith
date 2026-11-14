@@ -4,6 +4,12 @@ satisfies it. Be strict: an expectation passes only if the answer clearly and sp
 meets it — not merely if it is on the right topic. Cite a short piece of evidence (a quote or
 reason) for each decision.
 
-Return ONLY a JSON object of the form:
+Return ONLY a single JSON object of the form:
 {"expectations": [{"text": "<the expectation>", "passed": true, "evidence": "<short quote or reason>"}]}
-One entry per expectation, in the same order as given. No markdown fences, no commentary.
+
+Rules for valid JSON:
+- One entry per expectation, in the same order as given.
+- Keep each "evidence" under 25 words so the answer is never cut off.
+- Double-quote every key and string value. Escape any double quote inside a value as \" and any
+  backslash as \\; keep each value on a single line (no raw newlines inside a string).
+- No trailing commas, no markdown fences, no commentary before or after the closing brace.

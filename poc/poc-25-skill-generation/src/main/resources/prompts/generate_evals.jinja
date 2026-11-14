@@ -12,6 +12,11 @@ critical order"). Write expectations so a grader can decide pass/fail without gu
 The scenarios should target the parts of the process that are easy to get wrong — the
 decision branches and the hard constraints — not the obvious happy path.
 
-Output ONLY a JSON object of the form:
+Output ONLY a single JSON object of the form:
 {"skill_name": "<the skill name>", "evals": [{"id": 1, "prompt": "<the scenario task>", "expected_output": "<a human-readable description of a correct result>", "files": [], "expectations": ["<verifiable statement>", "<verifiable statement>"]}]}
-No markdown fences, no commentary before or after.
+
+Rules for valid JSON:
+- Double-quote every key and string value. Escape any double quote inside a value as \" and any
+  backslash as \\; keep every prompt and expectation on a single line (no raw newlines inside a
+  string).
+- No trailing commas, no markdown fences, no commentary before or after the closing brace.

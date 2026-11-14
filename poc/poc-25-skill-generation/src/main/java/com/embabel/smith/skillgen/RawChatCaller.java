@@ -59,11 +59,26 @@ public class RawChatCaller implements ChatCaller {
 
 	@Override
 	public String call(String system, String user) {
+		return doCall(system, user, false);
+	}
+
+	@Override
+	public String callJson(String system, String user) {
+		return doCall(system, user, true);
+	}
+
+	private String doCall(String system, String user, boolean jsonMode) {
 		try {
 			ObjectNode body = this.json.createObjectNode();
 			body.put("model", this.model);
 			body.put("max_tokens", MAX_TOKENS);
 			body.put("temperature", 0.2);
+			if (jsonMode) {
+				// Constrained decoding: the backend returns syntactically valid JSON, so the
+				// decomposer, generator, eval-drafter and grader never choke on a stray quote or
+				// an unterminated array.
+				body.putObject("response_format").put("type", "json_object");
+			}
 			ArrayNode messages = body.putArray("messages");
 			if (system != null && !system.isBlank()) {
 				ObjectNode sys = messages.addObject();

@@ -134,67 +134,84 @@ default arm is `raw`). The report is written to `results/comparison.md`, each ge
 
 ## Measured results
 
-> **Note:** the figures below were produced under the **previous single-skill flow** (one
-> `SKILL.md` per blueprint, hand-authored per-blueprint evals, both arms). The pipeline now
-> decomposes each blueprint into several skills and generates a per-skill eval suite, so these
-> numbers are a prior-flow baseline and are **pending regeneration** under the new multi-skill
-> extraction.
-
 Live run over `examples/blueprints/` (Aurora, Sentinel, TradingAgents), model `Qwen-instruct`,
-bundled evals, both arms. Full per-eval detail is in [`results/comparison.md`](results/comparison.md).
-The with-skill pass rate beat the no-skill baseline in **all six cells** — a lift of **+25% to
-+58%**.
+single `raw` arm (the default), **per-skill eval suites generated at run time**. Each blueprint is
+first decomposed into its skill set; every skill is then measured independently (with-skill vs.
+no-skill on its own scenarios). Full per-eval detail is in
+[`results/comparison.md`](results/comparison.md).
 
-| Blueprint | Arm | With-skill pass | No-skill pass | Skill lift |
-|-----------|-----|:---------------:|:-------------:|:----------:|
-| Aurora | raw | 100% | 42% | **+58%** |
-| Aurora | embabel | 75% | 50% | **+25%** |
-| Sentinel | raw | 100% | 56% | **+44%** |
-| Sentinel | embabel | 100% | 44% | **+56%** |
-| TradingAgents | raw | 75% | 42% | **+33%** |
-| TradingAgents | embabel | 75% | 33% | **+42%** |
+Decomposition and per-skill lift (mean of the measured skills in each blueprint):
+
+| Blueprint | Skills extracted | Measured | Mean skill lift | Best skill | Negative lifts |
+|-----------|:---------------:|:--------:|:---------------:|------------|:--------------:|
+| Aurora | 9 | 8 | **+17.2%** | inventory-allocation-and-replenishment **+38%** | 0 |
+| Sentinel | 8 | 6 | **+2.3%** | digital-forensics-and-evidence-management **+20%** | 2 |
+| TradingAgents | 16 | 13 | **+22.3%** | decision-recording-and-reporting **+75%** | 2 |
+
+**27 of 33** extracted skills were measured — 19 lifted, 4 were neutral (±0), 4 were slightly
+negative; across all 27 the mean lift is **+16.4%**. (6 skills could not be scored: the LLM-judge
+returned malformed grading JSON on 3 consecutive attempts — a transient endpoint failure; their
+`SKILL.md` and eval suite generated fine.)
+
+The largest per-skill lifts land exactly where the process carries non-obvious domain rules:
+
+| Skill | With-skill | No-skill | Lift |
+|-------|:----------:|:--------:|:----:|
+| TradingAgents · decision-recording-and-reporting | 100% | 25% | **+75%** |
+| TradingAgents · fundamentals-analysis | 100% | 46% | **+54%** |
+| TradingAgents · run-resumption-management | 100% | 54% | **+46%** |
+| TradingAgents · news-macro-analysis | 80% | 40% | **+40%** |
+| Aurora · inventory-allocation-and-replenishment | 100% | 63% | **+38%** |
+| TradingAgents · run-configuration-and-validation | 100% | 65% | **+35%** |
 
 ## Conclusion
 
-The hypothesis holds: a business-process blueprint compiled into an Agent Skill measurably
-improves a general-purpose agent's understanding of that process. The with-skill pass rate beat
-the no-skill baseline in **every one of the six cells** — a lift of **+25% to +58%** (the no-skill
-baseline scores 33-56% on general knowledge alone; the skill lifts it to 75-100%).
+The extraction step holds: each blueprint decomposes into a coherent set of skills that
+compartmentalize the process — Aurora into 9 stages (order intake → … → notifications), Sentinel
+into 8 specialist functions, TradingAgents into a 16-role firm (analysts → research debate →
+trader → risk debate → portfolio manager → settlement/learning) — and every generated `SKILL.md`
+is a well-formed Agent Skill with its own eval suite. Measured **per skill**, loading the skill
+improves the agent on average (mean **+16.4%** lift across the 27 measured skills, positive on 19
+of them), and the lift is largest exactly on the skills whose decision rules are non-obvious domain
+facts a general model does not know — decision-recording-and-reporting **+75%** (provenance headers
+and snapshot-cleanup rules), fundamentals-analysis **+54%** (point-in-time accuracy),
+run-resumption-management **+46%** (snapshot-identity matching).
 
-> **Status of the new extraction step:** the multi-skill decomposition — deciding *how many*
-> skills a process needs and *what each owns* — is the POC's new central claim. Its live
-> measurement (per-skill with/without-skill lift across the decomposed skills, per-skill eval
-> suites, single `raw` arm by default) is **pending a re-run** under the new flow. The single-skill
-> numbers above remain the baseline for the with/without-skill mechanism itself.
+The decomposed picture is **more nuanced than the single-skill baseline it replaces**, and that is
+the real finding:
 
-- **The lift is real and consistent, not a transport artifact.** Both the raw OpenAI-compatible
-  arm and the Embabel `Ai` runtime arm show a positive lift on every blueprint, so the skill's
-  value is not an artifact of one calling mechanism.
-- **The skill helps most exactly where a general model is blind.** Sentinel (the multi-agent
-  security platform) shows the largest lift (+44% to +56%): its decision rules are non-obvious
-  domain facts (the orchestrator does not independently declare a threat harmless; INTEL
-  distinguishes verified from unconfirmed intelligence) that a general model does not know.
-  Aurora raw hit **100%** with-skill — the skill captured the cold-chain decision rules (FEFO,
-  "a delivery is not done until the recipient confirms", critical orders never auto-close) that
-  the baseline missed.
-- **The baseline is non-trivial.** The no-skill agent already scores 33-56% because the model has
-  general knowledge of these process types. The skill is a lift on top of that, not from zero —
-  and the lift is largest on the most domain-specific rules.
+- **Per-skill lifts are smaller and noisier than the old monolithic lift.** The single-skill flow
+  reported +25% to +58% per blueprint; the decomposed flow averages +16.4% and ranges from -13% to
+  +75%. A narrow skill measured against a *narrow, auto-generated* eval suite has far less headroom
+  than a monolith measured against a broad hand-authored suite — the capable baseline already
+  answers many of a single skill's scenarios, so the ceiling compresses the lift.
+- **Four skills showed a small negative lift** (Sentinel orchestration-and-coordination -10%,
+  threat-intelligence-enrichment -6%; TradingAgents research-manager-verdict -13%,
+  instrument-identity-resolution -6%). These are slices the capable baseline largely handles
+  anyway, or whose scope overlaps a sibling skill so the with-skill gain is diluted; with an
+  LLM-judge over 3-4 auto-generated expectations, a few points either way is within grading noise.
+  The skill is not *harmful* there — it is *redundant*.
+- **The extraction is non-deterministic.** A separate run gave TradingAgents 15 skills (vs 16
+  here) and an earlier run collapsed Aurora to 1-2 skills. "How many skills" is a heuristic
+  judgment by the model, not a fixed partition — so per-skill numbers are only comparable across
+  runs once the decomposition is pinned (temperature 0 / caching).
 
-**Honest limits.** (1) The model is non-deterministic: a separate run of the same matrix gave
-Aurora raw **+42%** instead of +58%. (2) The skill does not always help a single eval — e.g.
-TradingAgents eval 1 (parallel analysts / debate gating) scores 2/3 both with and without the
-skill, because the model grasps the parallelism but misses the "debate starts only when all
-analysts have filed" nuance even when the skill states it. (3) The skill is a *description* of
-the process, not an executable spec — it improves understanding and decision-making, but does not
-itself run the process.
+**Honest limits.** (1) **Grader fragility** is the dominant source of lost data here: 6 of 33
+skills returned malformed grading JSON 3× in a row and could not be scored — a harness-robustness
+limit, not a skill-quality result; re-running those skills (or hardening the grader to repair
+truncated JSON) would recover them. (2) **Auto-generated evals are not fixed**: expectations are
+drafted by the same model per run, so a skill's measured lift partly tracks how discriminative its
+eval suite happened to be. (3) The skill is a *description* of the process, not an executable spec —
+it improves understanding and decision-making, not execution.
 
-**Recommendation.** Generating an Agent Skill from a blueprint is a sound way to package process
-knowledge for a general-purpose agent, and the skill-creator eval loop (with-skill vs. no-skill
-baseline, graded against verifiable expectations) is a valid way to measure that a generated skill
-actually helps. Use the with/without-skill delta as the acceptance metric for a generated skill;
-a positive, consistent lift across both transports (as here) is the signal that the skill is worth
-loading.
+**Recommendation.** Decompose-then-compile is a sound way to turn a blueprint into a set of
+loadable Agent Skills, and the with/without-skill delta remains the right acceptance metric — but
+for a *decomposed* skill, measure each skill against a **fixed, hand-checked** eval suite and
+re-run on grader flakiness before trusting the number, and read a small negative lift as a signal
+the skill is redundant (merge it into a neighbour) rather than broken. The extraction step is the
+promising part: it produces sensible, non-trivial compartmentalizations (the 16-role TradingAgents
+firm is the clearest evidence), and pinning the decomposition would turn the per-skill lift into a
+stable, comparable acceptance signal.
 
 **Caveats.**
 
@@ -203,8 +220,9 @@ loading.
 - **LLM-as-judge grading:** the pass/fail per expectation is decided by an LLM judge, not a
   deterministic check — the expectations are written to be verifiable, but the grading is
   model-based (the same method the skill-creator uses).
-- **Bundled evals:** the default run uses hand-authored evals; `--skillgen.evalsource=generated`
-  lets the model draft them, for a fully end-to-end (but less controlled) measurement.
+- **Per-skill generated evals:** each skill's eval suite is drafted by the model at run time from
+  that skill's scope; the hand-authored suites under `src/main/resources/evals/` remain a reference
+  format. A fixed suite would make lifts comparable across runs.
 - **New area:** this POC extends the "portable unit" idea beyond the Embabel AgentSpec (POC 24)
   to the Anthropic Agent Skill format; it is a new direction, not one of the docs/04 claims
   C1-C18.

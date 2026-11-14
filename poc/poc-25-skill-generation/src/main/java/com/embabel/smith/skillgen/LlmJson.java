@@ -45,7 +45,7 @@ public final class LlmJson {
 		Exception last = null;
 		for (int attempt = 0; attempt < attempts; attempt++) {
 			try {
-				String raw = caller.call(system, user);
+				String raw = caller.callJson(system, user);
 				return parser.parse(extractJson(raw));
 			}
 			catch (Exception ex) {
