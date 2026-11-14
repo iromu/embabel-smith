@@ -45,5 +45,6 @@
         <module>poc-23-remote-embedding-scale</module>
         <module>poc-24-generation-approaches</module>
         <module>poc-25-skill-generation</module>
+        <module>poc-26-graaljs-skill-scripts</module>
     </modules>
 </project>

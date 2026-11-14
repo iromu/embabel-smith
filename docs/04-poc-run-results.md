@@ -128,7 +128,7 @@ The POCs were scoped to test the **feasibility core** of this, not the full spec
 | C8 | **Specs compose** — GOAP chains multiple exported goals into a workflow | doc03 §2.2, doc02 §0 idea 2 | POC 6 (live) | ✅ **Proven** (two-spec GOAP chain) |
 | C9 | **LLM-authored specs are good** (or eval-guided refinement makes them good) | doc02 §5 caveat 2 | POC run (degenerate drafts) + **POC 9** | ⚠️ **Negative at source; proven fix** — raw drafts are weak, but eval-guided refinement lifts 0% → 100% |
 | C10 | **Spec selection at scale** — retrieval/routing as the library grows (spec shadowing) | doc03 §2.1, doc02 §5 caveat 1 | **POC 8** (lexical) + **POC 12** (200+ scale) + **POC 17** (GLiNER2 transformer) + **POC 19** (0.6B small LLM) + **POC 20** (real `EmbeddingService`) + **POC 23** (remote `EmbeddingService` + scaling) | ✅ **Proven at scale — and the shadowing tie is now broken** — clean (P@1 100%) at 191 distinct specs; POC 12 shows near-duplicate shadowing collapses P@1 for *both* lexical and dense retrievers; POC 17 shows a GLiNER2 transformer that *understands* meaning recovers it (strict **100%**, matching **83%**) where text-similarity cannot (lexical 33%/17%, dense 0%); POC 19 shows a 0.6B decision-tuned LLM (served in Docker, dev-services managed) also beats text similarity (strict **67%** free-form / **50%** its own decision format, matching **50%**/**0%**) but trails the transformer; **POC 20 shows a real semantic `EmbeddingService` (ONNX MiniLM, not a stand-in) retrieves cleanly at the distinct scale (100%) and, under shadowing, beats lexical (17%) and dense (0%) at 33% — but shares the near-duplicate ambiguity, so curation (POC 18) remains the real fix**; **POC 23 shows a *remote* `EmbeddingService` (nomic-embed-text-v2 over the OpenAI-compatible endpoint, not a bundled model) retrieves cleanly to 1000 specs (P@1 100%) with sub-millisecond-to-~1 ms per-query cost and zero per-query model calls — the selection mechanism of choice as the library scales** |
-| C11 | **Specs invoke CLIs/scripts** — the "normal agent harness" (`toolGroups`/`remote`/MCP) | doc03 §2.3, §4.2 | **POC 7** (local CLI) + **POC 13** (remote/MCP) | ✅ **Proven (both halves)** — POC 7: a `shell` tool group ran a real command; POC 13: an exported goal published as an MCP tool and invoked over Streamable HTTP |
+| C11 | **Specs invoke CLIs/scripts** — the "normal agent harness" (`toolGroups`/`remote`/MCP) | doc03 §2.3, §4.2 | **POC 7** (local CLI) + **POC 13** (remote/MCP) + **POC 26** (an Agent Skill's own `scripts/*.js`, in-JVM) | ✅ **Proven (all three halves)** — POC 7: a `shell` tool group ran a real command; POC 13: an exported goal published as an MCP tool and invoked over Streamable HTTP; POC 26: Embabel's script SPI was already there but had no in-JVM JavaScript runner (default logs *"script execution is not yet supported"*, the shipped one spawns `node`) — embedding GraalJS on a plain JDK closes it, the script becomes a callable tool, and its ECMAScript 2026 surface measures 14/14 |
 | C12 | **Security / trust tiers** (T1–T4, guardrails, allowlists) | doc02 §5 caveat 3, doc03 §2.1 | **POC 10** (live) | ✅ **Proven** — per-tier allowlist refused `shell` under T1; a global guardrail blocked a prompt-injection |
 | C13 | **Progressive disclosure** — load only what's needed; unbounded on-disk knowledge | doc02 §2, doc03 §1 | **POC 11** (stress) | ✅ **Proven** — plan context constant while a reference grows 3 KB → 313 KB (×100) |
 | C14 | **Spec Composer** — chain exported goals into a workflow, export as a new composite spec | doc03 §2.2 | **POC 14** (offline + live) | ✅ **Proven** — type-checked canvas chains specs; the exported composite pack re-validates and runs end-to-end via GOAP |
@@ -999,6 +999,41 @@ content, not a semantic detector. Shared sections:
 [`poc/poc-10-trust-tiers`](poc/poc-10-trust-tiers/README.md) ·
 [`poc/poc-21-agent-spec-security`](poc/poc-21-agent-spec-security/README.md).
 
+### 7.4 Skill scripts (C11) — POC 26
+
+The fourth harness seam: not a CLI a spec declares, not a remote tool, but **the portable unit's
+own `scripts/` folder** — an [Agent Skill](https://agentskills.io/) shipping JavaScript next to its
+`SKILL.md` and the agent executing it. The [Embabel Agent Skills
+reference](https://hub.embabel.com/reference/agent_skills) states *"script execution is not yet
+supported"*, and at 1.5.4 that is exactly half true: the SPI (`SkillScriptExecutionEngine`,
+`Skills.withScriptExecutionEngine`) and the tool wiring (`LoadedSkill.getScriptTools`) are shipped,
+but the only JavaScript runner among the four engines spawns an external `node`, and the default
+`NoOpExecutionEngine` offers no script tool at all.
+
+| arm | engine | script tool offered | runs the script in | host dependency |
+| --- | --- | --- | --- | --- |
+| baseline | `NoOpExecutionEngine` (Embabel's default) | **no** — logs *"…contains scripts, but script execution is not yet supported"* | — | — |
+| shipped | `ProcessSkillScriptExecutionEngine` | yes | a spawned `node` process | `node` on the PATH |
+| **POC 26** | `GraalJsSkillScriptExecutionEngine` | yes | **the agent's own JVM** (GraalJS 25.4.4.1.1 as two Maven deps) | none — no GraalVM, no `node` |
+
+Tool surface, same skill, same loader: `[activate, listResources, readResource]` →
+`[activate, listResources, readResource, invoice-totalling_compute_totals]`.
+
+| measure | result |
+| --- | --- |
+| script output (in-JVM) | `netTotal 1259.88`, `vatTotal 50.4`, `payable 1310.28`; rule violations exit 2 (`REJECTED: a 20% discount needs an --approval=<who> argument`) |
+| ECMAScript 2026 (each probe executed as a real script) | **14/14** — `Math.sumPrecise`, `Iterator.concat`, `Array.fromAsync`, `Error.isError`, `Map.getOrInsert`/`getOrInsertComputed`, `WeakMap.getOrInsert`, `Uint8Array` base64/hex, `JSON.rawJSON`, `JSON.parse` reviver source, `Float16Array` (+ ES2025 iterator helpers, ES2024 `Object.groupBy`, ESM top-level await) |
+| identical CPU-bound script, median of 3 | in-JVM **396 ms** vs external `node` **38 ms** — interpreter-only (RunOnJDK.md's optional `--upgrade-module-path` step skipped), so in-JVM loses on raw throughput and wins on per-call cost and dependencies |
+| sandbox | `HostAccess.EXPLICIT`, no host-class lookup, no IO, no environment, no threads, no processes; 25 000 000-statement limit + 5 s watchdog; `writeFile` outputs returned as `ScriptArtifact`s |
+| model demo (endpoint-gated) | tool loop offered `…_compute_totals`, the model called it, script answered in **18 ms** inside an **18 s** model turn; the reply reproduced the script's figures |
+
+Shared section: [`poc/poc-26-graaljs-skill-scripts`](poc/poc-26-graaljs-skill-scripts/README.md).
+Honest limits: interpreter speed (recoverable only by adding Graal's compiler, which pins the
+deployment to a JVMCI-capable JVM), the statement budget is a real ceiling, no `require`/npm/
+`process.env`/filesystem, `SandboxPolicy.CONSTRAINED` and above cannot be used because they reject
+a builder that captures stdout/stderr (so this is *hardened*, not a boundary against a determined
+guest — untrusted scripts belong in the Docker/Podman engines), and 31 offline tests pin all of it.
+
 ---
 
 ## 8. How to re-run
@@ -1103,6 +1138,17 @@ mvn -pl poc/poc-18-agent-spec-lifecycle spring-boot:run # POC 18 — lifecycle /
 SERVER_PORT=18080 BUILDER_MCP_URL="http://localhost:18080" \
 BUILDER_TOPIC="how a coffee machine works" \
     mvn -pl poc/poc-13-remote-mcp spring-boot:run
+```
+
+**POC 26 — GraalJS skill scripts (C11).** Runs the skill's `scripts/*.js` inside the agent's own
+JVM. Sections 1–5 print before Spring starts, so they need no endpoint; section 6 — the model
+calling the script through the tool loop — uses the env vars above.
+
+```bash
+mvn -pl poc/poc-26-graaljs-skill-scripts spring-boot:run
+# → "with the GraalJS engine installed : [..., invoice-totalling_compute_totals]"
+#   → "exit code 0" + the audited figures → "14/14 probes executed successfully"
+#   → the in-JVM vs external-node table → (with an endpoint) "calling tool …_compute_totals"
 ```
 
 Per-POC commands (using `BUILDER_*` env vars, not `-D`) are in `README` "Per-POC run commands".

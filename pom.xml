@@ -30,6 +30,9 @@
         <spring-boot.version>4.1.1</spring-boot.version>
         <jackson.version>2.19.0</jackson.version>
         <picocli.version>4.7.7</picocli.version>
+        <!-- GraalJS embedded engine (POC 26). The "js" artifact is a POM that pulls the
+             js-language + regex + truffle runtime; works on a plain JDK (interpreter-only). -->
+        <graalvm.version>25.4.4.1.1</graalvm.version>
         <junit.version>5.11.4</junit.version>
         <assertj.version>3.26.3</assertj.version>
         <slf4j.version>2.0.13</slf4j.version>
@@ -107,6 +110,24 @@
                 <groupId>com.embabel.agent</groupId>
                 <artifactId>embabel-agent-starter-mcpserver</artifactId>
                 <version>${embabel-agent.version}</version>
+            </dependency>
+            <!-- Agent Skills (Agent Skills spec + the SkillScriptExecutionEngine SPI, POC 26). -->
+            <dependency>
+                <groupId>com.embabel.agent</groupId>
+                <artifactId>embabel-agent-skills</artifactId>
+                <version>${embabel-agent.version}</version>
+            </dependency>
+            <!-- GraalJS as an in-JVM script engine for skill scripts (POC 26). -->
+            <dependency>
+                <groupId>org.graalvm.polyglot</groupId>
+                <artifactId>polyglot</artifactId>
+                <version>${graalvm.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.graalvm.polyglot</groupId>
+                <artifactId>js</artifactId>
+                <version>${graalvm.version}</version>
+                <type>pom</type>
             </dependency>
             <!-- MCP client SDK (POC 13 consumes the published server over Streamable HTTP). -->
             <dependency>
