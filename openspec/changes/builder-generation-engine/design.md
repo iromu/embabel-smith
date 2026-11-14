@@ -55,11 +55,31 @@ does not have. See proposal.md for motivation.
   `LlmFlowPromptCaller` if nothing else uses them) and `NlCompilerFlowGenerator` are removed. The
   `GenerateRequest.technique` field now drives the builder's generator directly.
 
+- **The eval invoker runs the pack's own goal.** Found during verification: the single-shot
+  technique could never pass the eval gate. `AgentSpecInvokerFactory` invoked the built pack with
+  `AgentInvocation.create(platform, BackgroundMessage.class)`, which only matches a pack whose goal
+  outputs `BackgroundMessage`; the `process_to_flow` prompt asks the model for the *deliverable*
+  type (e.g. `CoffeeMachineExplanation`), so no agent was ever found and the build aborted. Only
+  the embabel path survived, and only when `DraftToAgentSpec` happened to normalize a degenerate
+  goal to `BackgroundMessage`. The invoker now runs the deployed pack's own goal through
+  `platform.runAgentFrom` — the same path the product runtime uses — so a pack is evaluated
+  whatever type its goal produces, and a goal that is not achieved returns no output, which fails
+  the eval task and lets the refinement loop act on it instead of aborting the build.
+
 ## Risks / Trade-offs
 
 - [Single-shot is non-deterministic and weaker on multi-agent] → This change only adopts single-shot
   for the single-pack path (its strongest case per POC 24); multi-agent is deferred to change C
   with its own validator. The deterministic downstream gate (eval) still bounds the result.
+- [The embabel technique cannot publish a multi-step pack] → Embabel's NL compiler returns its
+  actions with no intermediate types — it omits any type a step already outputs — so step and goal
+  output types reach the validator undeclared and the build blocks at `build` with
+  `DANGLING_TYPE_REF` (POC 24: 0/6 valid). Accepted for this change: the technique stays selectable
+  and its output is still the shared `AgentSpec`, but `LiveBuildIntegrationTest` asserts it at the
+  generation seam while the single-shot default is asserted through to a published pack, and the
+  README records the limitation. Synthesizing a declaration for each undeclared output would let it
+  publish, at the cost of `types/` entries carrying names with no properties — deferred rather than
+  done silently.
 - [Changing the compile seam signature touches the studio] → The studio is refactored in the same
   change, and it already depends on the builder; the studio's observable generate behavior is
   unchanged, so no studio spec delta is required.
