@@ -5,9 +5,6 @@
 
 package org.iromu.embabel.smith.skillevaluator.spi;
 
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -18,6 +15,10 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.TreeSet;
+
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.iromu.embabel.smith.skillevaluator.model.Finding;
 import org.iromu.embabel.smith.skillevaluator.model.Severity;
 import org.iromu.embabel.smith.skillevaluator.model.ValidationResult;
@@ -26,17 +27,12 @@ import org.iromu.embabel.smith.skillevaluator.util.Constants;
 /**
  * Built-in {@link SecretsScanner}: a faithful driver of the Gitleaks CLI, ported from
  * {@code validators/secrets.py}.
- *
- * <h2>What this port is</h2>
- *
- * Upstream performs no detection of its own — {@code secrets.py} writes a TOML config,
- * shells out to {@code gitleaks detect}, and shapes the JSON report into findings. This
- * port keeps that contract exactly: the config bytes, the argv, the exit-code triage,
- * every category / check name / message / suggestion and the severity map are
- * byte-identical to the Python source.
- *
+ * <h2>What this port is</h2> Upstream performs no detection of its own —
+ * {@code secrets.py} writes a TOML config, shells out to {@code gitleaks detect}, and
+ * shapes the JSON report into findings. This port keeps that contract exactly: the config
+ * bytes, the argv, the exit-code triage, every category / check name / message /
+ * suggestion and the severity map are byte-identical to the Python source.
  * <h2>Documented deviations</h2>
- *
  * <ul>
  * <li><b>Install hint.</b> The "gitleaks not installed" warning keeps the upstream text
  * verbatim ({@code brew install gitleaks} / {@code go install ...}). It is still the
@@ -58,6 +54,8 @@ import org.iromu.embabel.smith.skillevaluator.util.Constants;
  * the result; the finding carries only the rule description, path, line and rule id. That
  * is the redaction guarantee, and it is preserved (asserted by the tests).</li>
  * </ul>
+ *
+ * @author Ivan Rodriguez
  */
 public final class GitleaksSecretsScanner implements SecretsScanner {
 
@@ -132,12 +130,17 @@ public final class GitleaksSecretsScanner implements SecretsScanner {
 	/**
 	 * Python {@code SecretsValidator(scan_git_history=True)} is reachable through this
 	 * constructor.
+	 * @param scanGitHistory scan the git history instead of the working tree: no
+	 * {@code --no-git} flag, and the absolute scan root is passed as the source
 	 */
 	public GitleaksSecretsScanner(boolean scanGitHistory) {
 		this(new SecretsGitleaksCli(), scanGitHistory);
 	}
 
-	/** Test seam: run the same driver logic against a faked Gitleaks CLI. */
+	/**
+	 * Test seam: run the same driver logic against a faked Gitleaks CLI.
+	 * @param tool the CLI stand-in to drive, with git-history scanning off
+	 */
 	public GitleaksSecretsScanner(SecretsScannerTool tool) {
 		this(tool, false);
 	}
@@ -148,7 +151,7 @@ public final class GitleaksSecretsScanner implements SecretsScanner {
 	}
 
 	public boolean isScanGitHistory() {
-		return scanGitHistory;
+		return this.scanGitHistory;
 	}
 
 	@Override
@@ -158,15 +161,15 @@ public final class GitleaksSecretsScanner implements SecretsScanner {
 
 	@Override
 	public boolean isAvailable() {
-		return tool.isAvailable();
+		return this.tool.isAvailable();
 	}
 
 	@Override
 	public ValidationResult scan(Path skillPath) {
 		ValidationResult result = new ValidationResult();
 
-		if (!tool.isAvailable()) {
-			result.addWarning("gitleaks not installed - secrets scanning skipped. " + tool.installHint());
+		if (!this.tool.isAvailable()) {
+			result.addWarning("gitleaks not installed - secrets scanning skipped. " + this.tool.installHint());
 			result.markScanIncomplete(SCANNER_NAME);
 			return result;
 		}
@@ -174,7 +177,7 @@ public final class GitleaksSecretsScanner implements SecretsScanner {
 		Path scanRoot = resolve(skillPath);
 		String source;
 		Path cwd;
-		if (scanGitHistory) {
+		if (this.scanGitHistory) {
 			source = scanRoot.toString();
 			cwd = null;
 		}
@@ -193,19 +196,19 @@ public final class GitleaksSecretsScanner implements SecretsScanner {
 			List<String> args = new ArrayList<>(List.of("detect", "--source", source, "--report-format", "json",
 					"--report-path", "-", "--exit-code", String.valueOf(GITLEAKS_FINDINGS_EXIT_CODE), "--config",
 					configPath.toString()));
-			if (!scanGitHistory) {
+			if (!this.scanGitHistory) {
 				args.add("--no-git");
 			}
 
-			SecretsScannerTool.RunResult toolResult = tool.run(args, cwd);
+			SecretsScannerTool.RunResult toolResult = this.tool.run(args, cwd);
 
 			if (toolResult.errorMessage() != null) {
-				String hint = toolResult.errorMessage().startsWith("couldn't ") ? tool.installHint() : "";
+				String hint = toolResult.errorMessage().startsWith("couldn't ") ? this.tool.installHint() : "";
 				result.addWarning(rstripDotSpace(toolResult.errorMessage() + ". " + hint));
 				result.markScanIncomplete(SCANNER_NAME);
 				return result;
 			}
-			result.recordScanner(SCANNER_NAME, tool.version());
+			result.recordScanner(SCANNER_NAME, this.tool.version());
 
 			// The custom findings code disambiguates findings from Gitleaks'
 			// default exit 1, which is also used for operational failures.
@@ -267,6 +270,8 @@ public final class GitleaksSecretsScanner implements SecretsScanner {
 	 * <p>
 	 * Test/example/fixture/mock skips are directory path components, not substrings —
 	 * {@code (.*)?test(.*)?} would also skip {@code latest} and {@code attestation}.
+	 * @return the full TOML config: allowlist head, one escaped path entry per Tier 1
+	 * artifact dir, allowlist tail, then the NVIDIA rules
 	 */
 	static String buildConfig() {
 		StringBuilder artifactPaths = new StringBuilder();
@@ -280,21 +285,27 @@ public final class GitleaksSecretsScanner implements SecretsScanner {
 		return ALLOWLIST_HEAD + artifactPaths + ALLOWLIST_TAIL + NVIDIA_RULES;
 	}
 
-	/** Python {@code create_temp_config(content, suffix=".toml")}: caller cleans up. */
+	/**
+	 * Python {@code create_temp_config(content, suffix=".toml")}: caller cleans up.
+	 * @param content the config text to write
+	 * @return the path of the UTF-8 {@code .toml} file now holding it
+	 */
 	static Path createTempConfig(String content) {
 		try {
 			Path configPath = Files.createTempFile("skillevaluator_", ".toml");
 			Files.writeString(configPath, content, StandardCharsets.UTF_8);
 			return configPath;
 		}
-		catch (IOException e) {
-			throw new java.io.UncheckedIOException(e);
+		catch (IOException ex) {
+			throw new java.io.UncheckedIOException(ex);
 		}
 	}
 
 	/**
 	 * Python 3.7+ {@code re.escape}: escapes exactly the special set, leaving
 	 * alphanumerics alone.
+	 * @param text the directory name to embed in a regex
+	 * @return {@code text} with a backslash before every character of that set
 	 */
 	static String pythonReEscape(String text) {
 		StringBuilder out = new StringBuilder(text.length() + 4);
@@ -315,6 +326,8 @@ public final class GitleaksSecretsScanner implements SecretsScanner {
 	 * findings list. Package-private: the conversion is unit-tested from this package
 	 * (see {@code GitleaksSecretsScannerTest}) so nothing here is widened for test
 	 * access.
+	 * @param findings the validated, nonempty Gitleaks findings array
+	 * @param result the result that receives the count message and one finding per entry
 	 */
 	static void processFindings(JsonNode findings, ValidationResult result) {
 		result.addMessage("Gitleaks found " + findings.size() + " potential secret(s)");
@@ -329,12 +342,14 @@ public final class GitleaksSecretsScanner implements SecretsScanner {
 	/**
 	 * Python {@code Finding(category="SECRET", ...)} construction inside
 	 * {@code _process_findings}.
+	 * @param finding one entry of the Gitleaks JSON report
+	 * @return the SECRET finding naming the rule, file and line — never the matched value
 	 */
 	static Finding convertFinding(JsonNode finding) {
 		String ruleId = textOr(finding.get("RuleID"), "unknown");
 		String description = textOr(finding.get("Description"), "Secret detected");
 		String filePath = textOr(finding.get("File"), "unknown");
-		int line = finding.get("StartLine") != null && finding.get("StartLine").isNumber()
+		int line = (finding.get("StartLine") != null && finding.get("StartLine").isNumber())
 				? finding.get("StartLine").intValue() : 0;
 
 		String message = description + " in " + filePath + ":" + line + " [" + ruleId + "]";
@@ -343,7 +358,12 @@ public final class GitleaksSecretsScanner implements SecretsScanner {
 				"Remove the secret from " + filePath + ", revoke it, and read it from an environment variable", null);
 	}
 
-	/** Python {@code _determine_severity(rule_id, tags)} for one report entry. */
+	/**
+	 * Python {@code _determine_severity(rule_id, tags)} for one report entry.
+	 * @param finding one entry of the Gitleaks JSON report, read for {@code RuleID} and
+	 * {@code Tags}
+	 * @return the severity of that entry, defaulting to {@code HIGH}
+	 */
 	static Severity determineSeverity(JsonNode finding) {
 		List<String> tags = new ArrayList<>();
 		JsonNode tagsNode = finding.get("Tags");
@@ -352,13 +372,16 @@ public final class GitleaksSecretsScanner implements SecretsScanner {
 				tags.add(tag.isTextual() ? tag.textValue() : String.valueOf(tag));
 			}
 		}
-		return determineSeverity(finding.get("RuleID") != null && finding.get("RuleID").isTextual()
+		return determineSeverity((finding.get("RuleID") != null && finding.get("RuleID").isTextual())
 				? finding.get("RuleID").textValue() : "unknown", tags);
 	}
 
 	/**
 	 * Python {@code _determine_severity}: tags first (more specific), then the rule id,
 	 * else HIGH.
+	 * @param ruleId the rule identifier, lowercased before the keyword search
+	 * @param tags the rule's tags, searched before {@code ruleId}
+	 * @return the severity of the first keyword hit, or {@code HIGH} when none matches
 	 */
 	static Severity determineSeverity(String ruleId, List<String> tags) {
 		for (String tag : tags) {
@@ -368,7 +391,7 @@ public final class GitleaksSecretsScanner implements SecretsScanner {
 			}
 		}
 		Severity fromRule = keywordSeverity(ruleId.toLowerCase(Locale.ROOT));
-		return fromRule != null ? fromRule : Severity.HIGH;
+		return (fromRule != null) ? fromRule : Severity.HIGH;
 	}
 
 	private static Severity keywordSeverity(String haystack) {
@@ -384,6 +407,8 @@ public final class GitleaksSecretsScanner implements SecretsScanner {
 
 	/**
 	 * Port of {@code parse_json_output}: parsed JSON or null when it cannot be parsed.
+	 * @param output the raw stdout of one Gitleaks run
+	 * @return the parsed tree, or {@code null} for blank or malformed output
 	 */
 	static JsonNode parseJsonOutput(String output) {
 		if (output == null || output.isBlank()) {
@@ -392,12 +417,16 @@ public final class GitleaksSecretsScanner implements SecretsScanner {
 		try {
 			return MAPPER.readTree(output);
 		}
-		catch (IOException e) {
+		catch (IOException ex) {
 			return null;
 		}
 	}
 
-	/** Python {@code findings == []}. */
+	/**
+	 * Python {@code findings == []}.
+	 * @param node the parsed report, possibly {@code null}
+	 * @return {@code true} for an array with no elements
+	 */
 	private static boolean isEmptyJsonArray(JsonNode node) {
 		return node != null && node.isArray() && node.isEmpty();
 	}
@@ -405,6 +434,8 @@ public final class GitleaksSecretsScanner implements SecretsScanner {
 	/**
 	 * Python
 	 * {@code isinstance(findings, list) and findings and all(isinstance(i, dict) ...)}.
+	 * @param node the parsed report, possibly {@code null}
+	 * @return {@code true} for an array of one or more JSON objects
 	 */
 	private static boolean isNonEmptyObjectList(JsonNode node) {
 		if (node == null || !node.isArray() || node.isEmpty()) {
@@ -421,19 +452,25 @@ public final class GitleaksSecretsScanner implements SecretsScanner {
 	/**
 	 * Python {@code Path.resolve()}: absolute, symlinks resolved, normalised; falls back
 	 * when it cannot.
+	 * @param path the requested scan root
+	 * @return its real path, or the absolute normalized path when it does not exist yet
 	 */
 	private static Path resolve(Path path) {
 		Path absolute = path.toAbsolutePath().normalize();
 		try {
 			return absolute.toRealPath();
 		}
-		catch (IOException e) {
+		catch (IOException ex) {
 			// Python resolve(strict=False) keeps a path that does not exist yet.
 			return absolute;
 		}
 	}
 
-	/** Python {@code str.rstrip(". ")}: trim dots and spaces from the end. */
+	/**
+	 * Python {@code str.rstrip(". ")}: trim dots and spaces from the end.
+	 * @param text the assembled warning message
+	 * @return {@code text} without trailing dots and spaces
+	 */
 	static String rstripDotSpace(String text) {
 		int end = text.length();
 		while (end > 0 && (text.charAt(end - 1) == '.' || text.charAt(end - 1) == ' ')) {
@@ -442,7 +479,12 @@ public final class GitleaksSecretsScanner implements SecretsScanner {
 		return text.substring(0, end);
 	}
 
-	/** Python code-point truncation ({@code s[:limit]}). */
+	/**
+	 * Python code-point truncation ({@code s[:limit]}).
+	 * @param text the value to shorten, {@code null} treated as empty
+	 * @param limit the code points to keep
+	 * @return the first {@code limit} code points of {@code text}
+	 */
 	static String truncate(String text, int limit) {
 		if (text == null) {
 			return "";
@@ -455,6 +497,11 @@ public final class GitleaksSecretsScanner implements SecretsScanner {
 
 	/**
 	 * Python {@code dict.get(key, default)}: the default applies only to a MISSING key.
+	 * @param node the value read from a report entry, {@code null} when the key was
+	 * absent
+	 * @param fallback the value to use for an absent or missing key
+	 * @return the value in Python's spelling: its text, {@code None} for JSON null,
+	 * {@code True}/{@code False} for booleans, else its JSON form
 	 */
 	private static String textOr(JsonNode node, String fallback) {
 		if (node == null || node.isMissingNode()) {

@@ -5,15 +5,16 @@
 
 package org.iromu.embabel.smith.skillevaluator.spi;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.MissingNode;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.MissingNode;
 import org.iromu.embabel.smith.skillevaluator.model.Finding;
 import org.iromu.embabel.smith.skillevaluator.model.Severity;
 import org.iromu.embabel.smith.skillevaluator.model.ValidationResult;
@@ -22,7 +23,6 @@ import org.iromu.embabel.smith.skillevaluator.util.ToolRunner;
 /**
  * The built-in {@link SecurityScanner}: run the SkillSpector CLI and turn its JSON report
  * into findings.
- *
  * <p>
  * Command: {@code skillspector scan <absolute path> --format json --no-llm}, the
  * deterministic stage upstream always runs first. {@code --no-llm} is unconditional here
@@ -33,9 +33,7 @@ import org.iromu.embabel.smith.skillevaluator.util.ToolRunner;
  * overridable through {@code SKILLEVALUATOR_SKILLSPECTOR_TIMEOUT_SECONDS}. Exit codes 0
  * and 1 are the scanner's policy codes (clean and findings); anything else fails the
  * stage.
- *
  * <h2>This engine is deliberately minimal — and replaceable</h2>
- *
  * <p>
  * Upstream does a great deal between "skillspector printed JSON" and "findings exist":
  * generated-artifact/SPDX-comment/passwd-mount issue filters, content-type control-path
@@ -48,16 +46,13 @@ import org.iromu.embabel.smith.skillevaluator.util.ToolRunner;
  * {@code _convert_skillspector_issue}; the aggregate risk-score gate stays; and a scan
  * that cannot be trusted says so through {@code addError} plus
  * {@code markScanIncomplete}.
- *
  * <p>
  * That gap is why the scanner sits behind an SPI rather than inside the validator: an
  * integrator who needs the full triage layer — or a different scanner entirely —
  * implements {@link SecurityScanner} and registers it (ServiceLoader, or
  * {@code SecurityValidator(SecurityScanner)}) instead of patching this class. Treat the
  * class below as the reference engine, not as parity.
- *
  * <h2>Documented deviations</h2>
- *
  * <ul>
  * <li><b>Scanner version source.</b> Upstream records the version of the installed binary
  * (probed once at tool detection). Here {@code recordScanner} gets the report's
@@ -73,6 +68,8 @@ import org.iromu.embabel.smith.skillevaluator.util.ToolRunner;
  * scan root. Upstream rewrites staged-copy prefixes back to the original skill, which
  * only matters with staging (not implemented).</li>
  * </ul>
+ *
+ * @author Ivan Rodriguez
  */
 public final class SkillspectorSecurityScanner implements SecurityScanner {
 
@@ -158,6 +155,8 @@ public final class SkillspectorSecurityScanner implements SecurityScanner {
 	/**
 	 * Python's {@code _process_skillspector_cli_result}, minus its filtering and scoring
 	 * layers.
+	 * @param data the parsed report object
+	 * @param result the result each issue becomes a finding in, plus the risk-score gate
 	 */
 	private void convertIssues(JsonNode data, ValidationResult result) {
 		int issueCount = 0;
@@ -191,7 +190,12 @@ public final class SkillspectorSecurityScanner implements SecurityScanner {
 		summarize(issueCount, hasCriticalOrHigh, result);
 	}
 
-	/** Python {@code _convert_skillspector_issue}. */
+	/**
+	 * Python {@code _convert_skillspector_issue}.
+	 * @param issue one {@code issues[]} entry of the report
+	 * @return its SECURITY finding, with the snippet truncated to 200 code points and the
+	 * snippet and suggestion dropped when empty
+	 */
 	static Finding toFinding(JsonNode issue) {
 		String severity = text(issue, "severity", "UNKNOWN").toUpperCase(Locale.ROOT);
 		String explanation = text(issue, "explanation", "");
@@ -214,7 +218,12 @@ public final class SkillspectorSecurityScanner implements SecurityScanner {
 				issueMetadata(issue));
 	}
 
-	/** Python {@code _build_issue_metadata}. */
+	/**
+	 * Python {@code _build_issue_metadata}.
+	 * @param issue one {@code issues[]} entry of the report
+	 * @return the confidence when the report carries one, plus the intent when it is not
+	 * empty
+	 */
 	static Map<String, Object> issueMetadata(JsonNode issue) {
 		Map<String, Object> metadata = new LinkedHashMap<>();
 		JsonNode confidence = issue.get("confidence");
@@ -228,7 +237,15 @@ public final class SkillspectorSecurityScanner implements SecurityScanner {
 		return metadata;
 	}
 
-	/** Python {@code _build_issue_message}. */
+	/**
+	 * Python {@code _build_issue_message}.
+	 * @param category the issue category, prefixed to the text when not empty
+	 * @param findingText the issue's own finding, preferred over the explanation
+	 * @param explanation the explanation, clipped to 120 code points and used only when
+	 * {@code findingText} is empty
+	 * @param patternName the pattern name, the answer when neither of the others is set
+	 * @return the message to report for the issue
+	 */
 	static String buildIssueMessage(String category, String findingText, String explanation, String patternName) {
 		if (!findingText.isEmpty()) {
 			return category.isEmpty() ? findingText : category + ": " + findingText;
@@ -243,6 +260,9 @@ public final class SkillspectorSecurityScanner implements SecurityScanner {
 	/**
 	 * Python {@code _summarize_skillspector_results}, without the baseline/applicability
 	 * branches.
+	 * @param issueCount the number of issues converted from the report
+	 * @param hasCriticalOrHigh whether any of them was critical or high severity
+	 * @param result the result the success or message entry is added to
 	 */
 	private static void summarize(int issueCount, boolean hasCriticalOrHigh, ValidationResult result) {
 		if (issueCount == 0) {
@@ -263,6 +283,7 @@ public final class SkillspectorSecurityScanner implements SecurityScanner {
 	/**
 	 * Upstream's {@code _skillspector_timeout_seconds}: the operator override when it
 	 * parses as a positive integer, else the 1200-second default.
+	 * @return the watchdog, in seconds, for one CLI invocation
 	 */
 	static long timeoutSeconds() {
 		String raw = System.getenv(TIMEOUT_ENV_VAR);
@@ -282,6 +303,8 @@ public final class SkillspectorSecurityScanner implements SecurityScanner {
 
 	/**
 	 * Python {@code parse_json_output}: null on anything but a well-formed JSON value.
+	 * @param stdout the raw output of the CLI run
+	 * @return the parsed tree, or {@code null} for blank or malformed output
 	 */
 	private static JsonNode parseJson(String stdout) {
 		if (stdout == null || stdout.isBlank()) {
@@ -290,26 +313,32 @@ public final class SkillspectorSecurityScanner implements SecurityScanner {
 		try {
 			return MAPPER.readTree(stdout);
 		}
-		catch (JsonProcessingException e) {
+		catch (JsonProcessingException ex) {
 			return null;
 		}
 	}
 
 	private static String reportVersion(JsonNode data) {
 		JsonNode version = object(data.get("metadata")).get("skillspector_version");
-		return version == null || version.isNull() || version.asText().isEmpty() ? null : version.asText();
+		return (version == null || version.isNull() || version.asText().isEmpty()) ? null : version.asText();
 	}
 
 	/**
 	 * {@code data["risk_assessment"]["score"]} when the report carries an integer score.
+	 * @param data the parsed report
+	 * @return the aggregate score, or {@code null} when the report has no numeric one
 	 */
 	private static Integer riskScore(JsonNode data) {
 		JsonNode assessment = object(data.get("risk_assessment"));
 		JsonNode score = assessment.get("score");
-		return score != null && score.isNumber() ? score.asInt() : null;
+		return (score != null && score.isNumber()) ? score.asInt() : null;
 	}
 
-	/** {@code (data.get("skill") or {}).get("source") or "SKILL.md"}. */
+	/**
+	 * {@code (data.get("skill") or {}).get("source") or "SKILL.md"}.
+	 * @param data the parsed report
+	 * @return the scanned skill's source, or {@code SKILL.md} when the report omits it
+	 */
 	private static String skillSource(JsonNode data) {
 		String source = text(object(data.get("skill")), "source", "");
 		return source.isEmpty() ? "SKILL.md" : source;
@@ -317,15 +346,21 @@ public final class SkillspectorSecurityScanner implements SecurityScanner {
 
 	/**
 	 * Python's {@code issue.get(key) or default}: a falsy JSON value takes the fallback.
+	 * @param node the object to read a field from
+	 * @param key the field name
+	 * @param fallback the value to use when the field is absent or falsy
+	 * @return the field as text, or {@code fallback}
 	 */
 	private static String text(JsonNode node, String key, String fallback) {
 		JsonNode value = node.get(key);
-		return value == null || falsy(value) ? fallback : value.isTextual() ? value.asText() : value.toString();
+		return (value == null || falsy(value)) ? fallback : value.isTextual() ? value.asText() : value.toString();
 	}
 
 	/**
 	 * Python truthiness over a JSON value: null, {@code false}, 0, {@code ""} and empty
 	 * containers.
+	 * @param value the JSON value to test
+	 * @return {@code true} when Python would treat {@code value} as false
 	 */
 	private static boolean falsy(JsonNode value) {
 		if (value.isNull() || value.isBoolean() && !value.asBoolean()) {
@@ -339,6 +374,10 @@ public final class SkillspectorSecurityScanner implements SecurityScanner {
 
 	/**
 	 * {@code loc.get("start_line") or loc.get("line")}: first truthy integer-ish value.
+	 * @param node the object to read, typically an issue location
+	 * @param first the preferred field name
+	 * @param second the field tried when {@code first} is absent or not a number
+	 * @return the first non-zero numeric field, or {@code null} when neither is one
 	 */
 	private static Integer firstInt(JsonNode node, String first, String second) {
 		for (String key : List.of(first, second)) {
@@ -360,19 +399,28 @@ public final class SkillspectorSecurityScanner implements SecurityScanner {
 		return node.asText();
 	}
 
-	/** Python's {@code x if isinstance(x, dict) else {}}. */
+	/**
+	 * Python's {@code x if isinstance(x, dict) else {}}.
+	 * @param node the value to read as an object, possibly {@code null}
+	 * @return {@code node} when it is a JSON object, else the missing node
+	 */
 	private static JsonNode object(JsonNode node) {
-		return node == null || !node.isObject() ? MissingNode.getInstance() : node;
+		return (node == null || !node.isObject()) ? MissingNode.getInstance() : node;
 	}
 
 	private static Iterable<JsonNode> iterable(JsonNode node) {
-		return node != null && node.isArray() ? node : List.of();
+		return (node != null && node.isArray()) ? node : List.of();
 	}
 
-	/** Python's {@code value[:200]}: a code-point bound, not a UTF-16 one. */
+	/**
+	 * Python's {@code value[:200]}: a code-point bound, not a UTF-16 one.
+	 * @param value the text to shorten
+	 * @param maxCodePoints the code points to keep
+	 * @return {@code value}, cut at {@code maxCodePoints} when it is longer
+	 */
 	static String truncate(String value, int maxCodePoints) {
 		int count = value.codePointCount(0, value.length());
-		return count <= maxCodePoints ? value : value.substring(0, value.offsetByCodePoints(0, maxCodePoints));
+		return (count <= maxCodePoints) ? value : value.substring(0, value.offsetByCodePoints(0, maxCodePoints));
 	}
 
 }

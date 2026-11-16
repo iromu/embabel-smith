@@ -24,6 +24,7 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
+
 import org.iromu.embabel.smith.skillevaluator.model.Finding;
 import org.iromu.embabel.smith.skillevaluator.model.Severity;
 import org.iromu.embabel.smith.skillevaluator.model.ValidationResult;
@@ -37,7 +38,6 @@ import org.yaml.snakeyaml.constructor.SafeConstructor;
 /**
  * License compliance validation for Skills (and the rule/workflow frontmatter the Python
  * validator also reads). Port of {@code validators/license.py}.
- *
  * <p>
  * Multi-tier detection:
  * <ol>
@@ -47,7 +47,6 @@ import org.yaml.snakeyaml.constructor.SafeConstructor;
  * <li>{@code SPDX-License-Identifier} headers in the first
  * {@link Constants#LICENSE_HEADER_SCAN_LINES} lines of scannable source files.</li>
  * </ol>
- *
  * <p>
  * Allowlist, blocklist, exception list, detection patterns and proprietary indicators
  * come from {@code org/skillevaluator/config/license_config.yaml} on the classpath.
@@ -55,6 +54,8 @@ import org.yaml.snakeyaml.constructor.SafeConstructor;
  * ({@code AND}/{@code OR}/ {@code WITH} and parentheses) are parsed by
  * {@link #parseLicenseExpression} exactly as the Python grammar does, so a blocked id
  * fails even when the value does not parse.
+ *
+ * @author Ivan Rodriguez
  */
 public class LicenseValidator extends ValidatorBase {
 
@@ -109,6 +110,7 @@ public class LicenseValidator extends ValidatorBase {
 	private Set<String> normalizedExceptionAllowlist;
 
 	/**
+	 * Create a validator with the given strictness.
 	 * @param strictMode when true, unknown licenses and a missing license fail instead of
 	 * warn
 	 */
@@ -121,7 +123,7 @@ public class LicenseValidator extends ValidatorBase {
 	}
 
 	public boolean isStrictMode() {
-		return strictMode;
+		return this.strictMode;
 	}
 
 	@Override
@@ -146,33 +148,36 @@ public class LicenseValidator extends ValidatorBase {
 	// Configuration
 	// ------------------------------------------------------------------
 
-	/** Lazy config load, mirroring the Python {@code config} cached property. */
+	/**
+	 * Lazy config load, mirroring the Python {@code config} cached property.
+	 * @return the parsed license config, loaded from the classpath on first access
+	 */
 	public Map<String, Object> getConfig() {
-		if (config == null) {
-			config = LicenseConfig.load();
+		if (this.config == null) {
+			this.config = LicenseConfig.load();
 		}
-		return config;
+		return this.config;
 	}
 
 	private Set<String> normalizedAllowlist() {
-		if (normalizedAllowlist == null) {
-			normalizedAllowlist = normalizeAll(getStringList("allowed_licenses"));
+		if (this.normalizedAllowlist == null) {
+			this.normalizedAllowlist = normalizeAll(getStringList("allowed_licenses"));
 		}
-		return normalizedAllowlist;
+		return this.normalizedAllowlist;
 	}
 
 	private Set<String> normalizedBlocklist() {
-		if (normalizedBlocklist == null) {
-			normalizedBlocklist = normalizeAll(getStringList("blocked_licenses"));
+		if (this.normalizedBlocklist == null) {
+			this.normalizedBlocklist = normalizeAll(getStringList("blocked_licenses"));
 		}
-		return normalizedBlocklist;
+		return this.normalizedBlocklist;
 	}
 
 	private Set<String> normalizedExceptionAllowlist() {
-		if (normalizedExceptionAllowlist == null) {
-			normalizedExceptionAllowlist = normalizeAll(getStringList("allowed_license_exceptions"));
+		if (this.normalizedExceptionAllowlist == null) {
+			this.normalizedExceptionAllowlist = normalizeAll(getStringList("allowed_license_exceptions"));
 		}
-		return normalizedExceptionAllowlist;
+		return this.normalizedExceptionAllowlist;
 	}
 
 	private Set<String> normalizeAll(List<String> ids) {
@@ -203,6 +208,9 @@ public class LicenseValidator extends ValidatorBase {
 	/**
 	 * Python {@code _is_asset_directory}: a skill, workflow-rules, or any {@code *.mdc}
 	 * file.
+	 * @param path folder to classify
+	 * @return {@code true} when it holds a skill manifest, {@code workflow-rules.mdc} or
+	 * any {@code *.mdc} file
 	 */
 	private boolean isAssetDirectory(Path path) {
 		if (findSkillManifest(path) != null) {
@@ -212,9 +220,9 @@ public class LicenseValidator extends ValidatorBase {
 			return true;
 		}
 		try (Stream<Path> children = Files.list(path)) {
-			return children.anyMatch(child -> child.getFileName().toString().endsWith(".mdc"));
+			return children.anyMatch((child) -> child.getFileName().toString().endsWith(".mdc"));
 		}
-		catch (IOException e) {
+		catch (IOException ex) {
 			return false;
 		}
 	}
@@ -245,10 +253,13 @@ public class LicenseValidator extends ValidatorBase {
 		return result;
 	}
 
-	/** Python {@code _handle_no_license}. */
+	/**
+	 * Python {@code _handle_no_license}.
+	 * @param result result to record the strict-mode error or lenient warning on
+	 */
 	private void handleNoLicense(ValidationResult result) {
 		String msg = "No license information found";
-		if (strictMode) {
+		if (this.strictMode) {
 			result.addError(msg + " - cannot verify compliance");
 		}
 		else {
@@ -256,7 +267,13 @@ public class LicenseValidator extends ValidatorBase {
 		}
 	}
 
-	/** Python {@code _detect_license}: the three-tier detection ladder. */
+	/**
+	 * Python {@code _detect_license}: the three-tier detection ladder.
+	 * @param assetPath skill folder or asset file to inspect
+	 * @param result result the tier messages and terminal findings are recorded on
+	 * @return the winning detection, or {@code null} when no tier detected a license or a
+	 * conflict/unrecognized status was recorded
+	 */
 	private LicenseDetection detectLicense(Path assetPath, ValidationResult result) {
 		LicenseFileScan scan = collectLicenseFiles(assetPath);
 
@@ -294,7 +311,12 @@ public class LicenseValidator extends ValidatorBase {
 		return null;
 	}
 
-	/** Python {@code _check_frontmatter}: Tier 1. */
+	/**
+	 * Python {@code _check_frontmatter}: Tier 1.
+	 * @param assetPath folder whose manifests are read for a {@code license} key
+	 * @return a detection from the first manifest declaring {@code license}, or
+	 * {@code null} when none does
+	 */
 	private LicenseDetection checkFrontmatter(Path assetPath) {
 		List<Path> manifests = new ArrayList<>();
 		manifests.add(assetPath.resolve("SKILL.md"));
@@ -308,14 +330,14 @@ public class LicenseValidator extends ValidatorBase {
 			}
 			try {
 				Frontmatter.FrontmatterOutcome outcome = Frontmatter.parse(manifest);
-				Map<String, Object> yamlData = outcome.parsed() == null ? null : outcome.parsed().yamlData();
+				Map<String, Object> yamlData = (outcome.parsed() == null) ? null : outcome.parsed().yamlData();
 				if (yamlData != null && yamlData.containsKey("license")) {
 					return new LicenseDetection(pythonStr(yamlData.get("license")).strip(),
 							"frontmatter (" + manifest.getFileName() + ")", "high", manifest.getFileName().toString(),
 							null);
 				}
 			}
-			catch (RuntimeException e) {
+			catch (RuntimeException ex) {
 				// Python logs the parse failure at debug level and keeps looking.
 			}
 		}
@@ -324,17 +346,25 @@ public class LicenseValidator extends ValidatorBase {
 
 	/**
 	 * Python {@code asset_path.glob("*.mdc")} — non-recursive, case-sensitive on Linux.
+	 * @param assetPath folder whose direct children are filtered
+	 * @return the {@code .mdc} files directly inside the folder, empty when it cannot be
+	 * listed
 	 */
 	private List<Path> listMdcFiles(Path assetPath) {
 		try (Stream<Path> children = Files.list(assetPath)) {
-			return children.filter(child -> child.getFileName().toString().endsWith(".mdc")).toList();
+			return children.filter((child) -> child.getFileName().toString().endsWith(".mdc")).toList();
 		}
-		catch (IOException e) {
+		catch (IOException ex) {
 			return List.of();
 		}
 	}
 
-	/** Python {@code _is_file_reference}. */
+	/**
+	 * Python {@code _is_file_reference}.
+	 * @param licenseValue frontmatter {@code license} string
+	 * @return {@code true} when the value points at a license file instead of naming a
+	 * license
+	 */
 	static boolean isFileReference(String licenseValue) {
 		String lower = licenseValue.toLowerCase(Locale.ROOT);
 		for (String ref : FILE_REFERENCE_KEYWORDS) {
@@ -349,7 +379,12 @@ public class LicenseValidator extends ValidatorBase {
 	// Tier 2: license files
 	// ------------------------------------------------------------------
 
-	/** Python {@code _collect_license_files}. */
+	/**
+	 * Python {@code _collect_license_files}.
+	 * @param assetPath folder whose configured license file names are read
+	 * @return detections from pattern matches and proprietary indicators, plus the names
+	 * of declaration files that could not be identified
+	 */
 	private LicenseFileScan collectLicenseFiles(Path assetPath) {
 		List<LicenseDetection> detections = new ArrayList<>();
 		List<String> unrecognized = new ArrayList<>();
@@ -388,19 +423,29 @@ public class LicenseValidator extends ValidatorBase {
 
 	/**
 	 * Python {@code _is_license_declaration_filename}: LICENSE/COPYING names, not NOTICE.
+	 * @param name a configured license file name
+	 * @return {@code true} when its stem is license, licence or copying
 	 */
 	private static boolean isLicenseDeclarationFilename(String name) {
 		return LICENSE_DECLARATION_STEMS.contains(stem(name).toLowerCase(Locale.ROOT));
 	}
 
-	/** Python {@code Path(name).stem}: the basename without its last suffix. */
+	/**
+	 * Python {@code Path(name).stem}: the basename without its last suffix.
+	 * @param name file name to shorten
+	 * @return {@code name} up to its last dot, or unchanged when the dot is leading or
+	 * absent
+	 */
 	private static String stem(String name) {
 		int dot = name.lastIndexOf('.');
-		return dot > 0 ? name.substring(0, dot) : name;
+		return (dot > 0) ? name.substring(0, dot) : name;
 	}
 
 	/**
 	 * Python {@code read_text(encoding="utf-8", errors="ignore")}; null when unreadable.
+	 * @param path file to read
+	 * @return the text with malformed UTF-8 bytes dropped, or {@code null} when reading
+	 * failed
 	 */
 	private static String readTextIgnoringErrors(Path path) {
 		try {
@@ -410,7 +455,7 @@ public class LicenseValidator extends ValidatorBase {
 				.onUnmappableCharacter(CodingErrorAction.IGNORE);
 			return decoder.decode(ByteBuffer.wrap(bytes)).toString();
 		}
-		catch (IOException | RuntimeException e) {
+		catch (IOException | RuntimeException ex) {
 			return null;
 		}
 	}
@@ -418,6 +463,9 @@ public class LicenseValidator extends ValidatorBase {
 	/**
 	 * Python {@code _identify_all_licenses_from_content}: every configured pattern that
 	 * matches.
+	 * @param content license file text to test
+	 * @return one match per configured pattern whose required strings all occur and whose
+	 * exclude strings occur nowhere
 	 */
 	private List<ContentMatch> identifyAllLicensesFromContent(String content) {
 		String contentUpper = content.toUpperCase(Locale.ROOT);
@@ -442,6 +490,10 @@ public class LicenseValidator extends ValidatorBase {
 	/**
 	 * Python {@code _all_patterns_match}: {@code |}-bearing patterns are regexes, the
 	 * rest substrings.
+	 * @param patterns required patterns of one configured license
+	 * @param content original-case text the regex patterns are matched against
+	 * @param contentUpper upper-cased text the substring patterns are compared against
+	 * @return {@code true} when every pattern is present
 	 */
 	private static boolean allPatternsMatch(List<String> patterns, String content, String contentUpper) {
 		for (String pattern : patterns) {
@@ -458,7 +510,12 @@ public class LicenseValidator extends ValidatorBase {
 		return true;
 	}
 
-	/** Python {@code _any_pattern_matches}. */
+	/**
+	 * Python {@code _any_pattern_matches}.
+	 * @param patterns exclude patterns of one configured license
+	 * @param contentUpper upper-cased text to search
+	 * @return {@code true} when any pattern occurs
+	 */
 	private static boolean anyPatternMatches(List<String> patterns, String contentUpper) {
 		for (String pattern : patterns) {
 			if (contentUpper.contains(pattern.toUpperCase(Locale.ROOT))) {
@@ -471,6 +528,8 @@ public class LicenseValidator extends ValidatorBase {
 	/**
 	 * Python {@code _find_proprietary_indicator}: plain case-insensitive substring
 	 * search.
+	 * @param content license file text
+	 * @return the first configured proprietary indicator found in it, or {@code null}
 	 */
 	private String findProprietaryIndicator(String content) {
 		String contentLower = content.toLowerCase(Locale.ROOT);
@@ -482,7 +541,13 @@ public class LicenseValidator extends ValidatorBase {
 		return null;
 	}
 
-	/** Python {@code _choose_from_license_files}. */
+	/**
+	 * Python {@code _choose_from_license_files}.
+	 * @param scan the Tier 2 detections and unidentified declaration files
+	 * @param result result the unrecognized-file or mismatch finding is recorded on
+	 * @return the license to enforce, or {@code null} when nothing was detected or the
+	 * detections conflict
+	 */
 	private LicenseDetection chooseFromLicenseFiles(LicenseFileScan scan, ValidationResult result) {
 		if (!scan.unrecognizedDeclarationFiles.isEmpty()) {
 			recordUnrecognizedLicenseFile(result, scan.unrecognizedDeclarationFiles, null);
@@ -505,7 +570,14 @@ public class LicenseValidator extends ValidatorBase {
 		return null;
 	}
 
-	/** Python {@code _resolve_frontmatter_and_files}. */
+	/**
+	 * Python {@code _resolve_frontmatter_and_files}.
+	 * @param frontmatter the Tier 1 declaration
+	 * @param scan the Tier 2 detections and unidentified declaration files
+	 * @param result result the mismatch messages and findings are recorded on
+	 * @return the license to enforce: the frontmatter when it covers the files, a blocked
+	 * or unknown file detection otherwise, or {@code null} on a recorded conflict
+	 */
 	private LicenseDetection resolveFrontmatterAndFiles(LicenseDetection frontmatter, LicenseFileScan scan,
 			ValidationResult result) {
 		if (!scan.unrecognizedDeclarationFiles.isEmpty()) {
@@ -565,6 +637,8 @@ public class LicenseValidator extends ValidatorBase {
 
 	/**
 	 * Collapse detections by normalized id, first occurrence winning, skipping empty ids.
+	 * @param detections detections to deduplicate
+	 * @return the first detection per normalized license id, in discovery order
 	 */
 	private Map<String, LicenseDetection> uniqueById(List<LicenseDetection> detections) {
 		Map<String, LicenseDetection> unique = new LinkedHashMap<>();
@@ -584,6 +658,9 @@ public class LicenseValidator extends ValidatorBase {
 	/**
 	 * Python {@code _scan_source_headers}: the most common header id wins, first seen on
 	 * a tie.
+	 * @param assetPath folder whose scannable source files are searched for SPDX headers
+	 * @return a detection for the most common header id, or {@code null} when no file
+	 * carries one
 	 */
 	private LicenseDetection scanSourceHeaders(Path assetPath) {
 		Map<String, List<String>> foundLicenses = new LinkedHashMap<>();
@@ -591,7 +668,7 @@ public class LicenseValidator extends ValidatorBase {
 		for (Path file : ScanPaths.iterScannableFiles(assetPath, Constants.LICENSE_HEADER_EXTENSIONS)) {
 			String licenseId = extractSpdxFromFile(file);
 			if (licenseId != null) {
-				foundLicenses.computeIfAbsent(licenseId, key -> new ArrayList<>())
+				foundLicenses.computeIfAbsent(licenseId, (key) -> new ArrayList<>())
 					.add(assetPath.relativize(file).toString());
 			}
 		}
@@ -609,11 +686,15 @@ public class LicenseValidator extends ValidatorBase {
 			}
 		}
 		List<String> files = foundLicenses.get(mostCommon);
-		return new LicenseDetection(mostCommon, "spdx_header", files.size() > 1 ? "high" : "medium", files.get(0),
+		return new LicenseDetection(mostCommon, "spdx_header", (files.size() > 1) ? "high" : "medium", files.get(0),
 				"Found in " + files.size() + " file(s)");
 	}
 
-	/** Python {@code _extract_spdx_from_file}. */
+	/**
+	 * Python {@code _extract_spdx_from_file}.
+	 * @param file source file whose header window is searched
+	 * @return the raw value after the SPDX tag, or {@code null} when the header has none
+	 */
 	static String extractSpdxFromFile(Path file) {
 		String header = firstLines(file, Constants.LICENSE_HEADER_SCAN_LINES);
 		if (header == null) {
@@ -631,6 +712,10 @@ public class LicenseValidator extends ValidatorBase {
 	/**
 	 * Read the first {@code lineLimit} lines the way Python's text-mode read with
 	 * errors="ignore" does.
+	 * @param file file to read
+	 * @param lineLimit number of leading lines to keep
+	 * @return the leading lines up to and including the last newline, the whole text when
+	 * shorter, or {@code null} when unreadable
 	 */
 	private static String firstLines(Path file, int lineLimit) {
 		String text = readTextIgnoringErrors(file);
@@ -646,7 +731,7 @@ public class LicenseValidator extends ValidatorBase {
 			index = next + 1;
 		}
 		int end = text.indexOf('\n', index);
-		return end < 0 ? text : text.substring(0, end + 1);
+		return (end < 0) ? text : text.substring(0, end + 1);
 	}
 
 	/**
@@ -654,6 +739,10 @@ public class LicenseValidator extends ValidatorBase {
 	 * source after the SPDX value. A backtick or {@code |} ends the value only when the
 	 * same delimiter opens before the tag on that line, so {@code MIT | GPL-3.0} is not
 	 * shortened to {@code MIT}.
+	 * @param raw text captured after the SPDX tag
+	 * @param linePrefix text before the tag on that line, deciding whether a backtick or
+	 * pipe closes the value
+	 * @return the capture stripped of comment terminators, trailing source and whitespace
 	 */
 	private static String stripSpdxCapture(String raw, String linePrefix) {
 		int hash = raw.indexOf('#');
@@ -676,7 +765,11 @@ public class LicenseValidator extends ValidatorBase {
 		return rstrip(rstripChar(raw.strip(), ';'));
 	}
 
-	/** Python {@code str.rstrip()} over the whole string. */
+	/**
+	 * Python {@code str.rstrip()} over the whole string.
+	 * @param value string to trim
+	 * @return {@code value} without trailing whitespace
+	 */
 	private static String rstrip(String value) {
 		int end = value.length();
 		while (end > 0 && Character.isWhitespace(value.charAt(end - 1))) {
@@ -685,7 +778,12 @@ public class LicenseValidator extends ValidatorBase {
 		return value.substring(0, end);
 	}
 
-	/** Python {@code str.rstrip(char)}. */
+	/**
+	 * Python {@code str.rstrip(char)}.
+	 * @param value string to trim
+	 * @param ch character to drop from the end
+	 * @return {@code value} without trailing occurrences of {@code ch}
+	 */
 	private static String rstripChar(String value, char ch) {
 		int end = value.length();
 		while (end > 0 && value.charAt(end - 1) == ch) {
@@ -698,7 +796,12 @@ public class LicenseValidator extends ValidatorBase {
 	// Policy
 	// ------------------------------------------------------------------
 
-	/** Python {@code _license_bucket}. */
+	/**
+	 * Python {@code _license_bucket}.
+	 * @param licenseId license value, possibly an SPDX expression
+	 * @return the policy status: {@code blocked}, {@code unsupported}, {@code unknown} or
+	 * {@code allowed}
+	 */
 	private String licenseBucket(String licenseId) {
 		if (!isTruthy(licenseId)) {
 			return "unknown";
@@ -710,6 +813,7 @@ public class LicenseValidator extends ValidatorBase {
 	 * Python {@code _license_policy}: the first blocked name blocks the value, a syntax
 	 * error makes it unsupported, and it is allowed only when every license and every
 	 * {@code WITH} exception is listed.
+	 * @param expression parsed license value
 	 * @return {@code {status, decidingName}} where the name may be null
 	 */
 	private String[] licensePolicy(LicenseExpression expression) {
@@ -738,6 +842,9 @@ public class LicenseValidator extends ValidatorBase {
 	 * Python {@code _is_blocked_license}: true for a blocked id or one of its SPDX
 	 * variants ({@code -only}/{@code -or-later}/{@code +}, and the deprecated
 	 * {@code -with-*-exception} ids).
+	 * @param licenseId license name to test
+	 * @return {@code true} when the normalized id or one of its SPDX variants is
+	 * blocklisted
 	 */
 	private boolean isBlockedLicense(String licenseId) {
 		String normalized = normalizeLicenseId(licenseId);
@@ -758,6 +865,10 @@ public class LicenseValidator extends ValidatorBase {
 	/**
 	 * Python {@code _normalize_license_id}: case-insensitive, separator-insensitive
 	 * comparison key.
+	 * @param licenseId raw id as written
+	 * @return the comparison key: lower-cased with separators unified, the {@code the-}
+	 * prefix and {@code -license} suffix dropped and a trailing {@code +} expanded to
+	 * {@code -or-later}
 	 */
 	static String normalizeLicenseId(String licenseId) {
 		String normalized = licenseId.strip().toLowerCase(Locale.ROOT).replace(' ', '-').replace('_', '-');
@@ -780,6 +891,9 @@ public class LicenseValidator extends ValidatorBase {
 	 * the names the value references. Adjacent words without an operator form one name,
 	 * so free-text values such as {@code MIT License} keep working; a value that does not
 	 * parse but names no upper-case SPDX operator collapses to a single free-text name.
+	 * @param value license field to parse
+	 * @return the parsed expression: licenses and {@code WITH} exceptions when the
+	 * grammar accepts the value, otherwise the syntax error alongside every name written
 	 */
 	static LicenseExpression parseLicenseExpression(String value) {
 		List<String[]> items = new ArrayList<>();
@@ -821,7 +935,11 @@ public class LicenseValidator extends ValidatorBase {
 		return new LicenseExpression(expression.licenses, expression.exceptions, expression.error, names);
 	}
 
-	/** Python {@code any(text in _SPDX_OPERATORS ...)}, comparing the raw token. */
+	/**
+	 * Python {@code any(text in _SPDX_OPERATORS ...)}, comparing the raw token.
+	 * @param items tokenized expression items
+	 * @return {@code true} when any item's raw text is an upper-case SPDX operator
+	 */
 	private static boolean namesOfAnyOperator(List<String[]> items) {
 		for (String[] item : items) {
 			if (SPDX_OPERATORS.contains(item[1])) {
@@ -831,7 +949,11 @@ public class LicenseValidator extends ValidatorBase {
 		return false;
 	}
 
-	/** Python {@code _parse_expression_items}: the grammar walk over grouped tokens. */
+	/**
+	 * Python {@code _parse_expression_items}: the grammar walk over grouped tokens.
+	 * @param items tokenized expression items
+	 * @return the collected licenses and exceptions, or the first syntax error hit
+	 */
 	private static LicenseExpression parseExpressionItems(List<String[]> items) {
 		List<String> licenses = new ArrayList<>();
 		List<String[]> exceptions = new ArrayList<>();
@@ -893,11 +1015,16 @@ public class LicenseValidator extends ValidatorBase {
 	// Reporting
 	// ------------------------------------------------------------------
 
-	/** Python {@code _record_unrecognized_license_file}. */
+	/**
+	 * Python {@code _record_unrecognized_license_file}.
+	 * @param result result the finding and unrecognized metadata are recorded on
+	 * @param filenames declaration files that could not be identified
+	 * @param frontmatter declaration quoted in the message, or {@code null}
+	 */
 	private void recordUnrecognizedLicenseFile(ValidationResult result, List<String> filenames,
 			LicenseDetection frontmatter) {
 		String joined = String.join(", ", filenames);
-		String declared = frontmatter != null && isTruthy(frontmatter.licenseId)
+		String declared = (frontmatter != null && isTruthy(frontmatter.licenseId))
 				? " Frontmatter declares '" + frontmatter.licenseId + "'." : "";
 		result
 			.addStructuredFinding(
@@ -908,12 +1035,19 @@ public class LicenseValidator extends ValidatorBase {
 							"Identify the license in the file, add a detection pattern, or remove the file.", null),
 					true);
 		Map<String, Object> metadata = result.getMetadata();
-		metadata.put("license", frontmatter == null ? null : frontmatter.licenseId);
+		metadata.put("license", (frontmatter != null) ? frontmatter.licenseId : null);
 		metadata.put("license_status", "unrecognized");
 		metadata.put("license_source", "license_file");
 	}
 
-	/** Python {@code _add_license_mismatch_finding}. */
+	/**
+	 * Python {@code _add_license_mismatch_finding}.
+	 * @param result result the finding and conflict metadata are recorded on
+	 * @param first first conflicting detection
+	 * @param second detection it conflicts with
+	 * @param checkName {@code license_file_mismatch} or
+	 * {@code frontmatter_license_mismatch}
+	 */
 	private void addLicenseMismatchFinding(ValidationResult result, LicenseDetection first, LicenseDetection second,
 			String checkName) {
 		String filePath = isTruthy(second.filePath) ? second.filePath
@@ -930,7 +1064,11 @@ public class LicenseValidator extends ValidatorBase {
 				first.source.startsWith("frontmatter") ? "frontmatter+license_file" : "license_file");
 	}
 
-	/** Python {@code _validate_license}. */
+	/**
+	 * Python {@code _validate_license}.
+	 * @param detection license chosen by the detection ladder
+	 * @param result result the status metadata, messages and findings are recorded on
+	 */
 	private void validateLicense(LicenseDetection detection, ValidationResult result) {
 		String licenseId = detection.licenseId;
 		if (!isTruthy(licenseId)) {
@@ -948,7 +1086,7 @@ public class LicenseValidator extends ValidatorBase {
 			result.addMessage("License: " + licenseId + " (ALLOWED - permissive)");
 		}
 		else if (status.equals("blocked")) {
-			String subject = isTruthy(name) && expression.names.size() > 1 ? name : licenseId;
+			String subject = (isTruthy(name) && expression.names.size() > 1) ? name : licenseId;
 			if (!subject.equals(licenseId)) {
 				result.addMessage("SPDX expression '" + licenseId + "' includes blocked license '" + subject + "'");
 			}
@@ -962,13 +1100,18 @@ public class LicenseValidator extends ValidatorBase {
 			addUnsupportedLicenseExpressionFinding(result, licenseId, detection.filePath, expression.error);
 		}
 		else {
-			String subject = isTruthy(name) && (expression.licenses.size() > 1 || !expression.exceptions.isEmpty())
+			String subject = (isTruthy(name) && (expression.licenses.size() > 1 || !expression.exceptions.isEmpty()))
 					? name : licenseId;
 			handleUnknownLicense(result, subject, detection.filePath);
 		}
 	}
 
-	/** Python {@code _set_license_metadata}. */
+	/**
+	 * Python {@code _set_license_metadata}.
+	 * @param result result whose metadata map is updated
+	 * @param detection enforced detection supplying the id and source
+	 * @param status policy status to record
+	 */
 	private static void setLicenseMetadata(ValidationResult result, LicenseDetection detection, String status) {
 		Map<String, Object> metadata = result.getMetadata();
 		metadata.put("license", detection.licenseId);
@@ -976,33 +1119,50 @@ public class LicenseValidator extends ValidatorBase {
 		metadata.put("license_source", detection.source);
 	}
 
-	/** Python {@code _add_blocked_license_finding}. */
+	/**
+	 * Python {@code _add_blocked_license_finding}.
+	 * @param result result the finding is added to
+	 * @param licenseId blocked id or expression member
+	 * @param filePath file named in the finding, {@code null} becomes {@code unknown}
+	 */
 	private static void addBlockedLicenseFinding(ValidationResult result, String licenseId, String filePath) {
 		result.addStructuredFinding(new Finding("LICENSE", Severity.HIGH, "blocked_license",
 				"License '" + licenseId + "' is not allowed (restrictive/copyleft)",
-				filePath == null ? "unknown" : filePath, null, null,
+				(filePath != null) ? filePath : "unknown", null, null,
 				"This asset uses a restrictive license that is not permitted. Contact the asset owner"
 						+ " about re-licensing, or find an alternative.",
 				null), true);
 	}
 
-	/** Python {@code _add_unsupported_license_expression_finding}. */
+	/**
+	 * Python {@code _add_unsupported_license_expression_finding}.
+	 * @param result result the finding is added to
+	 * @param licenseId expression that failed to parse
+	 * @param filePath file named in the finding, {@code null} becomes {@code unknown}
+	 * @param reason grammar error from the expression parser
+	 */
 	private static void addUnsupportedLicenseExpressionFinding(ValidationResult result, String licenseId,
 			String filePath, String reason) {
 		result.addStructuredFinding(new Finding("LICENSE", Severity.HIGH, "unsupported_license_expression",
 				"License expression '" + licenseId + "' is not valid SPDX syntax: " + reason,
-				filePath == null ? "unknown" : filePath, null, null,
+				(filePath != null) ? filePath : "unknown", null, null,
 				"Use a valid SPDX license expression, such as 'MIT OR Apache-2.0'.", null), true);
 	}
 
-	/** Python {@code _handle_unknown_license}. */
+	/**
+	 * Python {@code _handle_unknown_license}.
+	 * @param result result the finding or warning is added to
+	 * @param licenseId id missing from the allowlist
+	 * @param filePath file named in the strict-mode finding, {@code null} becomes
+	 * {@code unknown}
+	 */
 	private void handleUnknownLicense(ValidationResult result, String licenseId, String filePath) {
-		if (strictMode) {
+		if (this.strictMode) {
 			result
 				.addStructuredFinding(
 						new Finding("LICENSE", Severity.MEDIUM, "unknown_license",
 								"License '" + licenseId + "' is not in the allowlist",
-								filePath == null ? "unknown" : filePath, null, null,
+								(filePath != null) ? filePath : "unknown", null, null,
 								"Review license '" + licenseId + "' and add to allowlist if permissive, or blocklist"
 										+ " if restrictive. See skillevaluator/config/license_config.yaml",
 								null),
@@ -1019,20 +1179,24 @@ public class LicenseValidator extends ValidatorBase {
 
 	private String licenseStatus(ValidationResult result) {
 		Object value = result.getMetadata().get("license_status");
-		return value == null ? "" : String.valueOf(value);
+		return (value != null) ? String.valueOf(value) : "";
 	}
 
-	/** Python truthiness for the strings this validator inspects. */
+	/**
+	 * Python truthiness for the strings this validator inspects.
+	 * @param value string to test, may be {@code null}
+	 * @return {@code true} when the value is non-null and non-empty
+	 */
 	private static boolean isTruthy(String value) {
 		return value != null && !value.isEmpty();
 	}
 
 	private static String orEmpty(String value) {
-		return value == null ? "" : value;
+		return (value != null) ? value : "";
 	}
 
 	private static String stringOrFallback(Object value, String fallback) {
-		String text = value == null ? "" : String.valueOf(value);
+		String text = (value != null) ? String.valueOf(value) : "";
 		return text.isEmpty() ? fallback : text;
 	}
 
@@ -1040,6 +1204,9 @@ public class LicenseValidator extends ValidatorBase {
 	 * Render a YAML scalar the way Python's {@code str()} would for the values a
 	 * frontmatter can carry, so a YAML {@code true} reads as {@code True} rather than
 	 * {@code true}.
+	 * @param value parsed YAML value
+	 * @return its Python rendering: {@code None}, {@code True}/{@code False}, or the
+	 * string form
 	 */
 	private static String pythonStr(Object value) {
 		if (value == null) {
@@ -1053,7 +1220,7 @@ public class LicenseValidator extends ValidatorBase {
 
 	@SuppressWarnings("unchecked")
 	private static Map<String, Object> asMap(Object value) {
-		return value instanceof Map ? (Map<String, Object>) value : new LinkedHashMap<>();
+		return (value instanceof Map) ? (Map<String, Object>) value : new LinkedHashMap<>();
 	}
 
 	private static List<String> asStringList(Object value) {
@@ -1098,29 +1265,29 @@ public class LicenseValidator extends ValidatorBase {
 		}
 
 		public String getLicenseId() {
-			return licenseId;
+			return this.licenseId;
 		}
 
 		public String getSource() {
-			return source;
+			return this.source;
 		}
 
 		public String getConfidence() {
-			return confidence;
+			return this.confidence;
 		}
 
 		public String getFilePath() {
-			return filePath;
+			return this.filePath;
 		}
 
 		public String getDetails() {
-			return details;
+			return this.details;
 		}
 
 		@Override
 		public String toString() {
-			return "LicenseDetection(license_id=" + licenseId + ", source=" + source + ", confidence=" + confidence
-					+ ", file_path=" + filePath + ", details=" + details + ")";
+			return "LicenseDetection(license_id=" + this.licenseId + ", source=" + this.source + ", confidence="
+					+ this.confidence + ", file_path=" + this.filePath + ", details=" + this.details + ")";
 		}
 
 	}
@@ -1188,7 +1355,7 @@ public class LicenseValidator extends ValidatorBase {
 		@SuppressWarnings("unchecked")
 		static Map<String, Object> load() {
 			ClassLoader loader = LicenseValidator.class.getClassLoader();
-			InputStream in = loader != null ? loader.getResourceAsStream(RESOURCE_PATH) : null;
+			InputStream in = (loader != null) ? loader.getResourceAsStream(RESOURCE_PATH) : null;
 			if (in == null) {
 				in = ClassLoader.getSystemResourceAsStream(RESOURCE_PATH);
 			}
@@ -1202,8 +1369,8 @@ public class LicenseValidator extends ValidatorBase {
 				}
 				return (Map<String, Object>) data;
 			}
-			catch (IOException e) {
-				throw new UncheckedIOException(e);
+			catch (IOException ex) {
+				throw new UncheckedIOException(ex);
 			}
 		}
 

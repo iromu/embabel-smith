@@ -23,6 +23,7 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
 import org.iromu.embabel.smith.skillevaluator.model.Finding;
 import org.iromu.embabel.smith.skillevaluator.model.Severity;
 import org.iromu.embabel.smith.skillevaluator.model.SuccessDetail;
@@ -37,16 +38,16 @@ import org.yaml.snakeyaml.error.MarkedYAMLException;
 
 /**
  * Validates skill schema and repository structure per the SkillEvaluator spec.
- *
  * <p>
  * Checks: frontmatter schema, folder hierarchy, naming conventions, directory-name
  * consistency, required/forbidden fields.
- *
  * <p>
  * Port of {@code validators/schema.py}. Author attribution and {@code metadata.id} are
  * policy-driven: the active {@link SchemaPolicy} decides whether a missing author, a name
  * without an email, or a missing ID blocks, and may restrict the author email domain.
  * Malformed or unsafe author values and invalid IDs are always reported.
+ *
+ * @author Ivan Rodriguez
  */
 public class SchemaValidator extends ValidatorBase {
 
@@ -121,7 +122,7 @@ public class SchemaValidator extends ValidatorBase {
 			ValidationResult skillResult = validateSingleSkill(skillDir);
 			Object metadataId = skillResult.getMetadata().get("metadata_id");
 			if (metadataId instanceof String id) {
-				declaredIds.computeIfAbsent(id, key -> new ArrayList<>()).add(skillDir);
+				declaredIds.computeIfAbsent(id, (key) -> new ArrayList<>()).add(skillDir);
 			}
 			String skillName = skillDir.getFileName().toString();
 			if (skillResult.isPassed()) {
@@ -136,7 +137,7 @@ public class SchemaValidator extends ValidatorBase {
 				rollup.put("total_checks", checkDetails.size());
 				rollup.put("advisory_findings", advisories);
 				result.addSuccess(skillName,
-						advisories == 0 ? "All schema and structure checks passed"
+						(advisories == 0) ? "All schema and structure checks passed"
 								: "No blocking schema or structure findings (" + advisories + " advisory finding(s))",
 						rollup);
 				// A passing child can still carry policy advisories. Keep them named
@@ -161,6 +162,11 @@ public class SchemaValidator extends ValidatorBase {
 	 * Report {@code metadata.id} values declared by more than one skill in this
 	 * collection. Uniqueness is evaluated only across the skills discovered together in
 	 * one run; it does not consult a registry or a saved catalog.
+	 * @param declaredIds the declared ``metadata.id`` values, each mapped to its
+	 * declaring skill directories
+	 * @param root the collection root the reported labels are made relative to
+	 * @return findings for each duplicated ID, or the uniqueness success when there are
+	 * none
 	 */
 	private ValidationResult validateMetadataIdUniqueness(Map<String, List<Path>> declaredIds, Path root) {
 		ValidationResult result = new ValidationResult();
@@ -175,8 +181,8 @@ public class SchemaValidator extends ValidatorBase {
 					"metadata.id '" + value + "' is declared by " + relative.size() + " skills in this collection: "
 							+ String.join(", ", relative),
 					root.toString(), null, null, "Give each skill its own metadata.id.",
-					meta("metadata_id", value, "skills", relative, "profile", policy.getProfile(),
-							"metadata_id_requirement", policy.getMetadataIdRequirement())));
+					meta("metadata_id", value, "skills", relative, "profile", this.policy.getProfile(),
+							"metadata_id_requirement", this.policy.getMetadataIdRequirement())));
 		}
 		if (duplicates.isEmpty()) {
 			int count = declaredIds.values().stream().mapToInt(List::size).sum();
@@ -187,16 +193,25 @@ public class SchemaValidator extends ValidatorBase {
 		return result;
 	}
 
-	/** Severity of a duplicate {@code metadata.id} (HIGH only when IDs are required). */
+	/**
+	 * Severity of a duplicate {@code metadata.id} (HIGH only when IDs are required).
+	 * @return ``HIGH`` when IDs are required, else the policy's severity for
+	 * ``metadata_id_duplicate`` (default ``MEDIUM``)
+	 */
 	private Severity metadataIdDuplicateSeverity() {
-		Severity defaultSeverity = "require".equals(policy.getMetadataIdRequirement()) ? Severity.HIGH
+		Severity defaultSeverity = "require".equals(this.policy.getMetadataIdRequirement()) ? Severity.HIGH
 				: Severity.MEDIUM;
-		return policy.severityFor(CATEGORY, "metadata_id_duplicate", defaultSeverity);
+		return this.policy.severityFor(CATEGORY, "metadata_id_duplicate", defaultSeverity);
 	}
 
 	/**
 	 * Maps each {@code metadata.id} declared by more than one skill to sorted skill
 	 * labels under {@code root}.
+	 * @param declaredIds the declared ``metadata.id`` values, each mapped to its skill
+	 * directories
+	 * @param root the root the labels are made relative to
+	 * @return each duplicated ID mapped to its sorted skill labels, keyed in sorted ID
+	 * order
 	 */
 	private static Map<String, List<String>> duplicateMetadataIds(Map<String, List<Path>> declaredIds, Path root) {
 		Map<String, List<String>> out = new LinkedHashMap<>();
@@ -205,7 +220,7 @@ public class SchemaValidator extends ValidatorBase {
 		for (String value : keys) {
 			List<Path> dirs = declaredIds.get(value);
 			if (dirs.size() > 1) {
-				List<String> labels = dirs.stream().map(dir -> relativeLabel(dir, root)).sorted().toList();
+				List<String> labels = dirs.stream().map((dir) -> relativeLabel(dir, root)).sorted().toList();
 				out.put(value, labels);
 			}
 		}
@@ -216,7 +231,7 @@ public class SchemaValidator extends ValidatorBase {
 		try {
 			return toPosix(root.relativize(skillDir));
 		}
-		catch (IllegalArgumentException e) {
+		catch (IllegalArgumentException ex) {
 			return toPosix(skillDir);
 		}
 	}
@@ -225,7 +240,11 @@ public class SchemaValidator extends ValidatorBase {
 		return path.toString().replace(java.io.File.separatorChar, '/');
 	}
 
-	/** Runs all schema validation checks on a single skill directory. */
+	/**
+	 * Runs all schema validation checks on a single skill directory.
+	 * @param skillPath the skill directory to validate
+	 * @return the combined result of every schema and structure check
+	 */
 	private ValidationResult validateSingleSkill(Path skillPath) {
 		ValidationResult result = new ValidationResult();
 		Path skillMd = findSkillManifest(skillPath);
@@ -273,7 +292,11 @@ public class SchemaValidator extends ValidatorBase {
 		return result;
 	}
 
-	/** True when the manifest exists only under the non-canonical lowercase name. */
+	/**
+	 * True when the manifest exists only under the non-canonical lowercase name.
+	 * @param skillPath the skill directory to inspect
+	 * @return ``true`` when ``skill.md`` is present and ``SKILL.md`` is not
+	 */
 	private boolean isLowercaseManifest(Path skillPath) {
 		Path canonical = ScanPaths.findExactChild(skillPath, "SKILL.md");
 		Path lowercase = ScanPaths.findExactChild(skillPath, "skill.md");
@@ -284,7 +307,12 @@ public class SchemaValidator extends ValidatorBase {
 	// Frontmatter
 	// ------------------------------------------------------------------
 
-	/** Parses SKILL.md and validates its YAML frontmatter against the schema. */
+	/**
+	 * Parses SKILL.md and validates its YAML frontmatter against the schema.
+	 * @param skillMd the SKILL.md to parse and validate
+	 * @return the frontmatter result, carrying the parsed frontmatter in metadata when
+	 * valid
+	 */
 	private ValidationResult validateFrontmatter(Path skillMd) {
 		ValidationResult result = new ValidationResult();
 		String filePath = skillMd.toString();
@@ -293,8 +321,8 @@ public class SchemaValidator extends ValidatorBase {
 		try {
 			content = Files.readString(skillMd, StandardCharsets.UTF_8);
 		}
-		catch (IOException | RuntimeException e) {
-			result.addFinding(finding("file_readable", Severity.HIGH, "Failed to read file: " + e.getMessage(),
+		catch (IOException | RuntimeException ex) {
+			result.addFinding(finding("file_readable", Severity.HIGH, "Failed to read file: " + ex.getMessage(),
 					filePath, null, null, "Check file permissions and encoding", null));
 			return result;
 		}
@@ -326,15 +354,15 @@ public class SchemaValidator extends ValidatorBase {
 			data = new Yaml(new SafeConstructor(options))
 				.load(new java.io.ByteArrayInputStream(frontmatterYaml.getBytes(StandardCharsets.UTF_8)));
 		}
-		catch (MarkedYAMLException e) {
+		catch (MarkedYAMLException ex) {
 			result.addFinding(finding("yaml_syntax", Severity.HIGH,
-					"Invalid YAML syntax in frontmatter: " + e.getMessage(), filePath, problemLine(e), null,
+					"Invalid YAML syntax in frontmatter: " + ex.getMessage(), filePath, problemLine(ex), null,
 					"Fix YAML syntax errors (check indentation, quotes, colons)", null));
 			return result;
 		}
-		catch (RuntimeException e) {
+		catch (RuntimeException ex) {
 			result.addFinding(
-					finding("yaml_syntax", Severity.HIGH, "Invalid YAML syntax in frontmatter: " + e.getMessage(),
+					finding("yaml_syntax", Severity.HIGH, "Invalid YAML syntax in frontmatter: " + ex.getMessage(),
 							filePath, 2, null, "Fix YAML syntax errors (check indentation, quotes, colons)", null));
 			return result;
 		}
@@ -348,7 +376,8 @@ public class SchemaValidator extends ValidatorBase {
 
 		for (SchemaYaml.DuplicateKey duplicate : SchemaYaml.duplicateFrontmatterKeys(frontmatterYaml)) {
 			String key = duplicate.key();
-			result.addFinding(finding("duplicate_key", policy.severityFor(CATEGORY, "duplicate_key", Severity.HIGH),
+			result.addFinding(finding("duplicate_key",
+					this.policy.severityFor(CATEGORY, "duplicate_key", Severity.HIGH),
 					"Duplicate frontmatter key '" + key + "': YAML parsers disagree on it "
 							+ "(Codex, OpenCode, Copilot CLI and OpenClaw drop the skill; others keep the last value)",
 					filePath, duplicate.line(), null, "Keep a single '" + key + "' entry", meta("key", key)));
@@ -378,6 +407,8 @@ public class SchemaValidator extends ValidatorBase {
 
 	/**
 	 * The 1-based frontmatter line a YAML parse error names, or 2 when it does not say.
+	 * @param e the caught YAML parse exception
+	 * @return the 1-based frontmatter line, or ``2`` when the exception names no mark
 	 */
 	private static Integer problemLine(MarkedYAMLException e) {
 		Mark mark = e.getProblemMark();
@@ -398,7 +429,11 @@ public class SchemaValidator extends ValidatorBase {
 	// Structure and naming
 	// ------------------------------------------------------------------
 
-	/** Verifies the skill sits in a valid folder hierarchy (skills/ or team-skills/). */
+	/**
+	 * Verifies the skill sits in a valid folder hierarchy (skills/ or team-skills/).
+	 * @param skillPath the skill directory to check
+	 * @return the folder-hierarchy findings and successes
+	 */
 	private ValidationResult validateFolderStructure(Path skillPath) {
 		ValidationResult result = new ValidationResult();
 		List<String> parts = pathParts(skillPath);
@@ -453,7 +488,11 @@ public class SchemaValidator extends ValidatorBase {
 		return parts;
 	}
 
-	/** Verifies the folder name follows the kebab-case convention (1-64 chars). */
+	/**
+	 * Verifies the folder name follows the kebab-case convention (1-64 chars).
+	 * @param skillPath the skill directory whose folder name is checked
+	 * @return the naming-convention finding or success
+	 */
 	private ValidationResult validateNamingConventions(Path skillPath) {
 		ValidationResult result = new ValidationResult();
 		String name = skillPath.getFileName().toString();
@@ -488,7 +527,12 @@ public class SchemaValidator extends ValidatorBase {
 		return result;
 	}
 
-	/** Ensures the directory name matches the frontmatter {@code name} field. */
+	/**
+	 * Ensures the directory name matches the frontmatter {@code name} field.
+	 * @param skillPath the skill directory
+	 * @param frontmatter the parsed frontmatter whose ``name`` is compared
+	 * @return the consistency finding or success
+	 */
 	private ValidationResult validateNameMatchesDirectory(Path skillPath, SchemaFrontmatter frontmatter) {
 		ValidationResult result = new ValidationResult();
 		String dirName = skillPath.getFileName().toString();
@@ -511,7 +555,11 @@ public class SchemaValidator extends ValidatorBase {
 	// Body content
 	// ------------------------------------------------------------------
 
-	/** Warns when SKILL.md exceeds the recommended line count. */
+	/**
+	 * Warns when SKILL.md exceeds the recommended line count.
+	 * @param skillMd the SKILL.md whose line count is measured
+	 * @return the line-count finding or success
+	 */
 	private ValidationResult validateLineCount(Path skillMd) {
 		ValidationResult result = new ValidationResult();
 		String filePath = skillMd.toString();
@@ -535,8 +583,8 @@ public class SchemaValidator extends ValidatorBase {
 						Map.of("line_count", lineCount, "limit", Constants.MAX_SKILL_MD_LINES));
 			}
 		}
-		catch (IOException | RuntimeException e) {
-			result.addFinding(finding("line_count", Severity.LOW, "Could not check line count: " + e.getMessage(),
+		catch (IOException | RuntimeException ex) {
+			result.addFinding(finding("line_count", Severity.LOW, "Could not check line count: " + ex.getMessage(),
 					filePath, null, null, null, null), false, false);
 		}
 		return result;
@@ -551,6 +599,8 @@ public class SchemaValidator extends ValidatorBase {
 	 * Per agentskills.io the body has no format restrictions, so only a missing top-level
 	 * title hard-fails. Section headings are convention nudges: {@code ## Instructions}
 	 * (or {@code ## Usage}) and {@code ## Examples} are MEDIUM.
+	 * @param skillMd the SKILL.md whose body is checked
+	 * @return the body findings and successes
 	 */
 	private ValidationResult validateBodyContent(Path skillMd) {
 		ValidationResult result = new ValidationResult();
@@ -560,7 +610,7 @@ public class SchemaValidator extends ValidatorBase {
 		try {
 			content = readUtf8Stripped(skillMd);
 		}
-		catch (IOException | RuntimeException e) {
+		catch (IOException | RuntimeException ex) {
 			return result;
 		}
 
@@ -616,26 +666,30 @@ public class SchemaValidator extends ValidatorBase {
 	 * each with its own check name so a policy can set its severity independently:
 	 * {@code author_missing}, {@code author_without_email}, {@code author_format}
 	 * (malformed, unsafe, or outside the policy's email domain), or success.
+	 * @param frontmatter the parsed frontmatter whose ``metadata.author`` is classified
+	 * @param filePath the manifest path reported with any finding
+	 * @return the author finding or success
 	 */
 	private ValidationResult validateAuthor(SchemaFrontmatter frontmatter, String filePath) {
 		ValidationResult result = new ValidationResult();
 		Map<String, Object> metadata = frontmatter.getMetadata();
-		String author = metadata != null && metadata.get("author") instanceof String value ? value.strip() : "";
+		String author = (metadata != null && metadata.get("author") instanceof String value) ? value.strip() : "";
 
 		if (author.isEmpty()) {
-			result.addFinding(finding("author_missing", policy.severityFor(CATEGORY, "author_missing", Severity.LOW),
-					"Author not specified in metadata", filePath, null, null,
-					"Add 'metadata.author' with a person, team, or organization name, "
-							+ "or 'Name <email@example.com>' to include a contact address",
-					meta("profile", policy.getProfile())));
+			result
+				.addFinding(finding("author_missing", this.policy.severityFor(CATEGORY, "author_missing", Severity.LOW),
+						"Author not specified in metadata", filePath, null, null,
+						"Add 'metadata.author' with a person, team, or organization name, "
+								+ "or 'Name <email@example.com>' to include a contact address",
+						meta("profile", this.policy.getProfile())));
 			return result;
 		}
 
 		String problem = SchemaAuthor.authorValueProblem(author);
 		boolean shapeOk = problem == null && SchemaPolicy.AUTHOR_SHAPE_PATTERN.matcher(author).matches();
-		boolean domainOk = shapeOk && policy.isAuthorEmailAcceptable(author);
+		boolean domainOk = shapeOk && this.policy.isAuthorEmailAcceptable(author);
 		Map<String, Object> findingMetadata = meta("current_author", SchemaAuthor.truncate(author, AUTHOR_MAX_LENGTH),
-				"profile", policy.getProfile(), "shape_ok", shapeOk, "domain_ok", domainOk);
+				"profile", this.policy.getProfile(), "shape_ok", shapeOk, "domain_ok", domainOk);
 
 		String message;
 		String suggestion;
@@ -647,10 +701,10 @@ public class SchemaValidator extends ValidatorBase {
 			result.addSuccess("author_format", "Valid author format: " + author);
 			return result;
 		}
-		else if (policy.getAuthorEmailRegex() != null) {
+		else if (this.policy.getAuthorEmailRegex() != null) {
 			String subject = shapeOk ? "Author email does not match" : "Author has no email address matching";
-			message = subject + " the required domain (profile '" + policy.getProfile() + "', pattern: "
-					+ policy.getAuthorEmailRegex().pattern() + ")";
+			message = subject + " the required domain (profile '" + this.policy.getProfile() + "', pattern: "
+					+ this.policy.getAuthorEmailRegex().pattern() + ")";
 			suggestion = "Use 'Name <email>' with an email matching the active profile's author_email_regex, "
 					+ "or review whether that domain restriction is appropriate for your repository.";
 		}
@@ -658,7 +712,7 @@ public class SchemaValidator extends ValidatorBase {
 			result
 				.addFinding(
 						finding("author_without_email",
-								policy.severityFor(CATEGORY, "author_without_email", Severity.INFO),
+								this.policy.severityFor(CATEGORY, "author_without_email", Severity.INFO),
 								"Author has no email address: " + author, filePath, null, "author: " + author,
 								"A name is accepted as attribution unless the profile requires a contact address "
 										+ "(such as 'registry'); then use 'Name <email@example.com>'",
@@ -666,7 +720,7 @@ public class SchemaValidator extends ValidatorBase {
 			return result;
 		}
 
-		result.addFinding(finding("author_format", policy.severityFor(CATEGORY, "author_format", Severity.HIGH),
+		result.addFinding(finding("author_format", this.policy.severityFor(CATEGORY, "author_format", Severity.HIGH),
 				message, filePath, null, "author: " + SchemaAuthor.truncate(author, AUTHOR_MAX_LENGTH), suggestion,
 				findingMetadata));
 		return result;
@@ -677,12 +731,15 @@ public class SchemaValidator extends ValidatorBase {
 	 * present ID must be an exact 1-64 character lowercase ASCII slug in every policy
 	 * mode; {@code metadata_id_requirement} decides whether absence is ignored,
 	 * recommended (LOW) or required (HIGH), and whether an invalid ID blocks.
+	 * @param frontmatter the parsed frontmatter whose ``metadata.id`` is checked
+	 * @param filePath the manifest path reported with any finding
+	 * @return the ID finding or success, storing a valid ID in metadata
 	 */
 	private ValidationResult validateMetadataId(SchemaFrontmatter frontmatter, String filePath) {
 		ValidationResult result = new ValidationResult();
-		String requirement = policy.getMetadataIdRequirement();
+		String requirement = this.policy.getMetadataIdRequirement();
 		Map<String, Object> extra = frontmatter.getMetadata();
-		Map<String, Object> details = meta("profile", policy.getProfile(), "metadata_id_requirement", requirement);
+		Map<String, Object> details = meta("profile", this.policy.getProfile(), "metadata_id_requirement", requirement);
 
 		if (extra == null || !extra.containsKey("id")) {
 			if ("ignore".equals(requirement)) {
@@ -690,14 +747,13 @@ public class SchemaValidator extends ValidatorBase {
 			}
 			Severity defaultSeverity = "require".equals(requirement) ? Severity.HIGH : Severity.LOW;
 			String verb = "require".equals(requirement) ? "requires" : "recommends";
-			result
-				.addFinding(finding("metadata_id_missing",
-						policy.severityFor(CATEGORY, "metadata_id_missing", defaultSeverity),
-						"metadata.id not specified; profile '" + policy.getProfile() + "' " + verb
-								+ " a stable skill ID",
-						filePath, null, null,
-						"Add 'metadata.id' with a lowercase slug such as 'my-skill' that stays fixed across versions",
-						details));
+			result.addFinding(finding("metadata_id_missing",
+					this.policy.severityFor(CATEGORY, "metadata_id_missing", defaultSeverity),
+					"metadata.id not specified; profile '" + this.policy.getProfile() + "' " + verb
+							+ " a stable skill ID",
+					filePath, null, null,
+					"Add 'metadata.id' with a lowercase slug such as 'my-skill' that stays fixed across versions",
+					details));
 			return result;
 		}
 
@@ -706,7 +762,7 @@ public class SchemaValidator extends ValidatorBase {
 		if (problem != null) {
 			Severity defaultSeverity = "require".equals(requirement) ? Severity.HIGH : Severity.MEDIUM;
 			result.addFinding(finding("metadata_id_format",
-					policy.severityFor(CATEGORY, "metadata_id_format", defaultSeverity), "metadata.id " + problem,
+					this.policy.severityFor(CATEGORY, "metadata_id_format", defaultSeverity), "metadata.id " + problem,
 					filePath, null, "id: " + SchemaYaml.displayMetadataId(value),
 					"Use a lowercase slug such as 'my-skill' (1-64 characters: a-z, 0-9, single hyphens)", details));
 			return result;
@@ -726,6 +782,8 @@ public class SchemaValidator extends ValidatorBase {
 
 	/**
 	 * Checks whether the folder carries the standard skills/ or team-skills/ directories.
+	 * @param folderPath the folder checked for ``skills/`` or ``team-skills/``
+	 * @return the folder-structure findings and successes
 	 */
 	private ValidationResult validateFolderCompliance(Path folderPath) {
 		ValidationResult result = new ValidationResult();
@@ -767,7 +825,7 @@ public class SchemaValidator extends ValidatorBase {
 		try (var stream = Files.list(dir)) {
 			return (int) stream.count();
 		}
-		catch (IOException e) {
+		catch (IOException ex) {
 			return 0;
 		}
 	}
@@ -776,6 +834,7 @@ public class SchemaValidator extends ValidatorBase {
 	 * Allowed skill-root subdirectories: the built-in defaults plus per-repo extras from
 	 * {@code SKILLEVALUATOR_SCHEMA_ALLOWED_DIRS} (comma- or whitespace-separated), which
 	 * can extend but never shrink the set.
+	 * @return the built-in defaults plus any configured extras, as a sorted set
 	 */
 	private static Set<String> allowedSkillDirs() {
 		Set<String> dirs = new TreeSet<>(Constants.DEFAULT_ALLOWED_SKILL_DIRS);
@@ -790,7 +849,11 @@ public class SchemaValidator extends ValidatorBase {
 		return dirs;
 	}
 
-	/** Checks for optional supporting files and warns about unexpected items. */
+	/**
+	 * Checks for optional supporting files and warns about unexpected items.
+	 * @param skillPath the skill directory whose root entries are listed
+	 * @return the optional-file successes and the unexpected-item advisories
+	 */
 	private ValidationResult validateOptionalFiles(Path skillPath) {
 		ValidationResult result = new ValidationResult();
 		Set<String> allowedDirs = allowedSkillDirs();
@@ -811,14 +874,14 @@ public class SchemaValidator extends ValidatorBase {
 					Map.of("files_found", found));
 		}
 
-		String allowedHint = allowedDirs.stream().map(dir -> dir + "/").reduce((a, b) -> a + ", " + b).orElse("");
+		String allowedHint = allowedDirs.stream().map((dir) -> dir + "/").reduce((a, b) -> a + ", " + b).orElse("");
 		List<String> unexpectedItems = new ArrayList<>();
 		List<Path> entries = new ArrayList<>();
 		try (var stream = Files.list(skillPath)) {
-			stream.sorted(Comparator.<Path, String>comparing(path -> path.getFileName().toString()))
+			stream.sorted(Comparator.<Path, String>comparing((path) -> path.getFileName().toString()))
 				.forEach(entries::add);
 		}
-		catch (IOException e) {
+		catch (IOException ex) {
 			entries.clear();
 		}
 		for (Path item : entries) {
@@ -848,6 +911,11 @@ public class SchemaValidator extends ValidatorBase {
 	/**
 	 * Flags spec-valid patterns that common agent harnesses load differently or not at
 	 * all.
+	 * @param skillPath the skill directory, searched for nested manifests
+	 * @param skillMd the manifest checked for symlink, BOM, size and description issues
+	 * @param frontmatter the parsed frontmatter supplying the description and extra
+	 * fields
+	 * @return the portability advisories
 	 */
 	private ValidationResult validatePortability(Path skillPath, Path skillMd, SchemaFrontmatter frontmatter) {
 		ValidationResult result = new ValidationResult();
@@ -864,7 +932,7 @@ public class SchemaValidator extends ValidatorBase {
 		try {
 			raw = Files.readAllBytes(skillMd);
 		}
-		catch (IOException e) {
+		catch (IOException ex) {
 			raw = new byte[0];
 		}
 		if (startsWith(raw, UTF8_BOM)) {
@@ -938,6 +1006,8 @@ public class SchemaValidator extends ValidatorBase {
 
 	/**
 	 * Manifest variants found below the skill root, excluding non-shipped directories.
+	 * @param skillPath the skill root walked for manifests
+	 * @return nested manifest paths, sorted; empty when the walk fails
 	 */
 	private static List<Path> nestedManifests(Path skillPath) {
 		List<Path> found = new ArrayList<>();
@@ -952,7 +1022,7 @@ public class SchemaValidator extends ValidatorBase {
 					try {
 						relative = skillPath.relativize(file);
 					}
-					catch (IllegalArgumentException e) {
+					catch (IllegalArgumentException ex) {
 						return FileVisitResult.CONTINUE;
 					}
 					if (relative.getNameCount() <= 1) {
@@ -973,7 +1043,7 @@ public class SchemaValidator extends ValidatorBase {
 				}
 			});
 		}
-		catch (IOException e) {
+		catch (IOException ex) {
 			return List.of();
 		}
 		found.sort(Comparator.comparing(Path::toString));
@@ -982,8 +1052,8 @@ public class SchemaValidator extends ValidatorBase {
 
 	private Finding portabilityFinding(String checkName, Severity defaultSeverity, String message, String filePath,
 			String suggestion, Map<String, Object> metadata) {
-		return finding(checkName, policy.severityFor(CATEGORY, checkName, defaultSeverity), message, filePath, null,
-				null, suggestion, metadata);
+		return finding(checkName, this.policy.severityFor(CATEGORY, checkName, defaultSeverity), message, filePath,
+				null, null, suggestion, metadata);
 	}
 
 	// ------------------------------------------------------------------
@@ -993,7 +1063,7 @@ public class SchemaValidator extends ValidatorBase {
 	private static Finding finding(String checkName, Severity severity, String message, String filePath,
 			Integer lineNumber, String lineContent, String suggestion, Map<String, Object> metadata) {
 		return new Finding(CATEGORY, severity, checkName, message, filePath, lineNumber, lineContent, suggestion,
-				metadata == null ? Map.of() : metadata);
+				(metadata != null) ? metadata : Map.of());
 	}
 
 	private static Map<String, Object> meta(Object... keyValues) {
@@ -1007,13 +1077,19 @@ public class SchemaValidator extends ValidatorBase {
 	/**
 	 * Reads a file as UTF-8 with a leading byte-order mark removed (Python's utf-8-sig
 	 * read).
+	 * @param path the file to read
+	 * @return the file's text without a leading byte-order mark
 	 */
 	private static String readUtf8Stripped(Path path) throws IOException {
 		String text = Files.readString(path, StandardCharsets.UTF_8);
 		return text.startsWith("\uFEFF") ? text.substring(1) : text;
 	}
 
-	/** Python's {@code len(text.splitlines())} for \n, \r\n and \r breaks. */
+	/**
+	 * Python's {@code len(text.splitlines())} for \n, \r\n and \r breaks.
+	 * @param text the text to count
+	 * @return the number of lines, as Python's ``str.splitlines()`` counts them
+	 */
 	static int pySplitLinesCount(String text) {
 		int breaks = 0;
 		boolean trailingContent = false;
@@ -1041,7 +1117,12 @@ public class SchemaValidator extends ValidatorBase {
 		return breaks + (trailingContent ? 1 : 0);
 	}
 
-	/** Python's {@code str.rstrip(chars)} for a single character. */
+	/**
+	 * Python's {@code str.rstrip(chars)} for a single character.
+	 * @param value the string to trim
+	 * @param ch the character to strip from the end
+	 * @return the value with all trailing ``ch`` characters removed
+	 */
 	private static String trimTrailing(String value, char ch) {
 		int end = value.length();
 		while (end > 0 && value.charAt(end - 1) == ch) {
@@ -1062,7 +1143,11 @@ public class SchemaValidator extends ValidatorBase {
 		return true;
 	}
 
-	/** Python's {@code f"{value:,}"} thousands formatting. */
+	/**
+	 * Python's {@code f"{value:,}"} thousands formatting.
+	 * @param value the number to format
+	 * @return the value with US-style thousands separators
+	 */
 	private static String formatThousands(long value) {
 		return String.format(java.util.Locale.US, "%,d", value);
 	}
@@ -1070,6 +1155,12 @@ public class SchemaValidator extends ValidatorBase {
 	/**
 	 * The parsed manifest, mirroring the Python {@code SkillManifest} stored in result
 	 * metadata.
+	 *
+	 * @param frontmatter the parsed frontmatter
+	 * @param content the markdown body after the frontmatter
+	 * @param filePath the manifest's path
+	 * @param lineCount the Python ``splitlines()`` count of the whole file
+	 * @author Ivan Rodriguez
 	 */
 	record SchemaManifest(SchemaFrontmatter frontmatter, String content, String filePath, int lineCount) {
 	}
