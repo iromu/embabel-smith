@@ -43,7 +43,7 @@
                             <rules>
                                 <bannedDependencies>
                                     <excludes>
-                                        <exclude>com.embabel.smith:poc-*</exclude>
+                                        <exclude>org.iromu.embabel.smith:poc-*</exclude>
                                     </excludes>
                                 </bannedDependencies>
                             </rules>

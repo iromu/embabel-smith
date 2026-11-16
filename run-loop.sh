@@ -34,8 +34,11 @@ PLANNER="${PLANNER:-GOAP}"
 # Absolute by default so the built pack is found regardless of the forked app's working directory.
 OUTPUT_DIR="${BUILDER_OUTPUT_DIR:-$(pwd)/built-specs}"
 
+# The POC reactor sits behind the `poc` Maven profile, off by default.
+MVN_PROFILE="-Ppoc"
+
 echo "==> [0/2] Building modules to the local repo (mvn install -DskipTests)"
-mvn -q install -DskipTests
+mvn -q $MVN_PROFILE install -DskipTests
 
 # Per-run inputs are passed as OS environment variables, NOT -D system properties:
 # spring-boot:run forks the app with the module dir as CWD and does NOT forward Maven -D
@@ -45,7 +48,7 @@ echo "==> [1/2] Builder — description: $DESCRIPTION"
 BUILD_LOG="$(mktemp)"
 trap 'rm -f "$BUILD_LOG"' EXIT
 if ! BUILDER_DESCRIPTION="$DESCRIPTION" BUILDER_OUTPUT_DIR="$OUTPUT_DIR" \
-      mvn -pl poc/poc-3-builder-agent spring-boot:run 2>&1 | tee "$BUILD_LOG"; then
+      mvn ${MVN_PROFILE} -pl poc/poc-3-builder-agent spring-boot:run 2>&1 | tee "$BUILD_LOG"; then
   echo "==> Builder failed (see output above)." >&2
   exit 1
 fi
@@ -59,6 +62,6 @@ echo "    built agent spec: $PACK_PATH"
 
 echo "==> [2/2] No-code runtime — input: $INPUT (planner=$PLANNER)"
 BUILDER_PACK_DIR="$PACK_PATH" BUILDER_INPUT="$INPUT" BUILDER_PLANNER="$PLANNER" \
-  mvn -pl poc/poc-1-no-code-runtime spring-boot:run
+  mvn ${MVN_PROFILE} -pl poc/poc-1-no-code-runtime spring-boot:run
 
 echo "==> Loop complete."

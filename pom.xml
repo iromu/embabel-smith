@@ -47,9 +47,20 @@
 
     <modules>
         <module>smith-common</module>
-        <module>poc</module>
         <module>prod</module>
     </modules>
+
+    <profiles>
+        <!-- The POCs are frozen evidence, not shipped code: they are slow to build (large model
+             downloads) and their interesting tests are endpoint-gated. Keep them out of the
+             default reactor — build them with -Ppoc. -->
+        <profile>
+            <id>poc</id>
+            <modules>
+                <module>poc</module>
+            </modules>
+        </profile>
+    </profiles>
 
     <repositories>
         <!-- Embabel release binaries (also mirrored on Maven Central). -->

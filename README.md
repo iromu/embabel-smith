@@ -79,11 +79,15 @@ mvn -q verify
 Every module's offline tests are green without a model endpoint. Tests that exercise the model are
 **endpoint-gated** and are not run offline.
 
+The 26 POC modules are **not** in the default reactor — they sit behind the `poc` Maven profile, so
+the commands above cover `smith-common` and `prod/` only. Add `-Ppoc` (or `POC=1` to a `make`
+target) to build or test them too.
+
 To run a POC launcher, install the modules once (so `smith-common` and sibling modules resolve from
 the local repo), then run a single module by `-pl`:
 
 ```bash
-mvn install -DskipTests          # one-time (re-run after changes)
+mvn -Ppoc install -DskipTests    # one-time (re-run after changes)
 ```
 
 ## Model endpoint (env-driven, design D4)
@@ -126,6 +130,11 @@ before.
 
 Each command runs the POC's launcher for a single module (deps resolve from the local repo after
 `mvn install`). The endpoint-gated ones need the env vars above.
+
+**Add `-Ppoc` to every command below.** The POC reactor is off by default (see
+[Build & test](#build--test-offline)), and Maven can only select a module that is in the reactor, so
+`mvn -pl poc/…` without the profile fails with *"Could not find the selected project in the
+reactor"*.
 
 Per-run inputs are **OS environment variables**, not `-D` Maven properties: `spring-boot:run`
 forks the app with the module dir as its working directory and does **not** forward `-D` system
