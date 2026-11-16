@@ -1,0 +1,5 @@
+stepType: goal
+name: explainerComplete
+description: "A complete explainer has been produced for the user"
+outputTypeName: com.embabel.agent.spec.model.BackgroundMessage
+export: true

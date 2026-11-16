@@ -1,0 +1,8 @@
+stepType: action
+name: bStep
+description: "Pack B's step"
+inputTypeNames:
+  - com.embabel.agent.domain.io.UserInput
+outputTypeName: com.embabel.agent.spec.model.BackgroundMessage
+prompt: |
+  Respond to the request. User request: {{userInput.content}}

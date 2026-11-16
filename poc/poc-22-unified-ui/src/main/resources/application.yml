@@ -1,0 +1,14 @@
+# The unified builder UI (POC 22). The offline panes work with no model endpoint; the endpoint-gated
+# panes (Run, Author, Eval, Lifecycle re-eval) need the OpenAI-compatible env vars.
+server:
+  # Default port is 18080 to avoid colliding with a local service on 8080; override with SERVER_PORT.
+  port: ${SERVER_PORT:18080}
+spring:
+  main:
+    banner-mode: off
+builder:
+  # Where /api/compose writes exported composite packs (relative to the working dir).
+  compose-output-dir: ${COMPOSE_OUTPUT_DIR:target/composed-ui}
+  # Remote pane (POC 16/13): the RestAction sidecar and the MCP server. Override to point elsewhere.
+  remote-sidecar-url: ${BUILDER_REMOTE_SIDECAR_URL:http://localhost:18090}
+  remote-mcp-url: ${BUILDER_REMOTE_MCP_URL:http://localhost:8080}

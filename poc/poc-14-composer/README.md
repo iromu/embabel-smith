@@ -1,0 +1,78 @@
+# POC 14 — The spec Composer (visual spec-chain editor, headless)
+
+The **Spec Composer** that doc 03 §2.2 asks for: a way to chain exported goals (specs) into a
+workflow and export the result as a **new composite spec** — "an exported goal whose action chain
+*is* the plan". This POC builds the substance of that as a **headless, offline** model of the
+"visual spec-chain editor" (the drag-and-drop pixels are a thin frontend over this graph model;
+the substance — the canvas, the type-checked connections, the composed plan, and the composite
+export — is what is proven here).
+
+Fully offline and deterministic — no model endpoint. (Running the exported composite end-to-end is
+a one-off live check via the no-code runtime; see `docs/04-poc-run-results.md` §5.)
+
+## What it proves
+
+- **Specs are nodes on a canvas; connections are type-checked.** A spec's *output* is its
+  exported goal's output type; its *external inputs* are the action input types it does not produce
+  itself. An edge (spec A → spec B) is valid only when A's output type is one of B's external
+  inputs — the drag-and-drop "snap". Invalid connections are rejected.
+- **A valid canvas is a single entry→exit chain.** The canvas must have exactly one entry spec
+  (input `UserInput`) and one exit spec (output `BackgroundMessage`), with every intermediate edge
+  type-compatible and the path covering every spec. This is the "GOAP shows the computed chain"
+  half.
+- **A valid canvas exports as a single new composite agent spec.** The composite is the union of the
+  component specs' action steps and intermediate types, under one new exported goal whose output
+  is the exit spec's output type. The component specs' own goals are dropped — only their typed
+  actions matter, and the non-LLM GOAP planner re-derives the chain from those actions. The exported
+  pack re-validates cleanly and is a plain, loadable agent spec.
+
+## How it works
+
+```mermaid
+flowchart LR
+    PA["compose-extract<br/>(agent spec)"]
+    PB["compose-explain<br/>(agent spec)"]
+    SK["SpecNode<br/>output + external input types"]
+    CANVAS["CompositionCanvas<br/>type-checked edges"]
+    VALID["validate() + chain()<br/>one entry→exit path"]
+    EXP["CompositeExporter<br/>union of steps + types"]
+    OUT["composite agent spec<br/>one new exported goal"]
+    PA --> SK
+    PB --> SK
+    SK --> CANVAS --> VALID --> EXP --> OUT
+```
+
+- **`SpecNode`** — one spec (an exported goal + its action steps); exposes its output type and
+  external input types.
+- **`CompositionCanvas`** — the graph (specs + directed edges); `validate()` reports type-in
+  compatible edges, missing entry/exit, and structural problems; `chain()` returns the ordered
+  entry→exit path (the composed plan).
+- **`CompositeExporter`** — builds the composite `AgentSpec` (union of steps + types, one composite
+  goal) and writes it to disk via `smith-common`'s `AgentSpecWriter`.
+- **`ComposerApp`** — the offline demo: loads `compose-extract` + `compose-explain`, builds the
+  canvas, validates it, prints the chain, exports the composite, and re-validates the export.
+
+## Run it
+
+Offline (no endpoint):
+
+```bash
+mvn -pl poc/poc-14-composer exec:java
+```
+
+Paths are overridable via `COMPOSE_PACK_A`, `COMPOSE_PACK_B`, `COMPOSE_NAME`, and
+`COMPOSE_OUTPUT_DIR` (the composite is written to `COMPOSE_OUTPUT_DIR/<name>`, default
+`target/composed/compose-composite`).
+
+## Conclusion
+
+Against the hypothesis (claim C14): **proven.** Specs are nodes on a canvas whose connections are
+type-checked (an edge is valid only when the source's output type is one of the target's external
+inputs); a valid canvas is a single entry→exit chain; and the canvas exports as a **single new
+composite agent spec** — the union of the component specs' steps and intermediate types under one
+new exported goal — that re-validates cleanly (0 issues) and runs end-to-end through the no-code
+runtime (the GOAP planner chains `extractTopic → writeExplainer` from the one pack; live: goal
+achieved in ~12.5–16.1 s). This closes the last Phase 1 component doc 03 lists; POC 15 puts the
+browser pixels on this same model.
+
+See `docs/04-poc-run-results.md`.

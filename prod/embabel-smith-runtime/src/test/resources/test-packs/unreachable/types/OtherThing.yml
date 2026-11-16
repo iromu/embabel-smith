@@ -1,0 +1,8 @@
+name: OtherThing
+description: "An unrelated output"
+ownProperties:
+  - name: note
+    type: string
+    description: "A note"
+parents: []
+creationPermitted: true

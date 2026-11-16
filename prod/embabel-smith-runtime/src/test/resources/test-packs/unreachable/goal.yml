@@ -1,0 +1,5 @@
+stepType: goal
+name: ghostDone
+description: "A ghost thing has been produced (nothing in this pack can do that)"
+outputTypeName: GhostThing
+export: true

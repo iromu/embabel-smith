@@ -1,0 +1,14 @@
+# Model server for POC 19: the Qwen3-0.6B-openjev decision model (Q8_0 GGUF) served
+# OpenAI-compatible by llama.cpp. Spring Boot Dev Services (spring-boot-docker-compose)
+# runs `docker compose up` at app start and `docker compose stop` at shutdown; the
+# server can also be run standalone with plain `docker compose up` from this directory.
+services:
+  model:
+    # Pinned by the 2026-11-03 benchmark run: sha256:0b0212befa4facc6fd1e34ee04e19f13b570d0b9ec87d26edf4c402dc0dd636f
+    image: ghcr.io/ggml-org/llama.cpp:server
+    container_name: poc-19-model
+    volumes:
+      - ./models:/models:ro
+    command: ["-m", "/models/Qwen3-0.6B-openjev-Q8_0.gguf", "--port", "8080", "-c", "2048"]
+    ports:
+      - "18081:8080"

@@ -1,0 +1,401 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>org.iromu.embabel.smith</groupId>
+    <artifactId>embabel-smith-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+
+    <name>Embabel Smith</name>
+    <description>
+        A GOAP-based Embabel agent builder: a general-purpose builder agent that emits
+        deployable, no-code agent specs — declarative YAML step definitions — plus the fixed
+        no-code runtime that ingests them. Greenfield POC multi-module project on
+        Embabel 1.5.4 / Java 21.
+    </description>
+
+    <properties>
+        <embabel-agent.version>1.5.4</embabel-agent.version>
+        <!-- Experimental modules (spec/eval/remote) live in embabel-agent-experimental, which has
+             not cut a 1.5.4 release yet — track them on the 1.5.4-SNAPSHOT line (libs-snapshot). -->
+        <embabel-agent-experimental.version>1.5.4-SNAPSHOT</embabel-agent-experimental.version>
+        <java.version>21</java.version>
+        <maven.compiler.release>21</maven.compiler.release>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+
+        <spring-boot.version>4.1.1</spring-boot.version>
+        <jackson.version>2.19.0</jackson.version>
+        <picocli.version>4.7.7</picocli.version>
+        <!-- GraalJS embedded engine (POC 26). The "js" artifact is a POM that pulls the
+             js-language + regex + truffle runtime; works on a plain JDK (interpreter-only). -->
+        <graalvm.version>25.4.4.1.1</graalvm.version>
+        <junit.version>5.11.4</junit.version>
+        <assertj.version>3.26.3</assertj.version>
+        <slf4j.version>2.0.13</slf4j.version>
+
+        <maven-compiler-plugin.version>3.13.0</maven-compiler-plugin.version>
+        <maven-surefire-plugin.version>3.2.5</maven-surefire-plugin.version>
+        <maven-failsafe-plugin.version>3.2.5</maven-failsafe-plugin.version>
+        <maven-enforcer-plugin.version>3.6.3</maven-enforcer-plugin.version>
+        <checkstyle.version>12.3.1</checkstyle.version>
+        <io.spring.javaformat.version>0.0.48</io.spring.javaformat.version>
+    </properties>
+
+    <modules>
+        <module>smith-common</module>
+        <module>poc</module>
+        <module>prod</module>
+    </modules>
+
+    <repositories>
+        <!-- Embabel release binaries (also mirrored on Maven Central). -->
+        <repository>
+            <id>embabel-releases</id>
+            <name>Embabel Releases</name>
+            <url>https://repo.embabel.com/artifactory/libs-release</url>
+            <releases>
+                <enabled>true</enabled>
+            </releases>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
+        </repository>
+        <!-- Embabel experimental modules (spec/eval/remote) — 1.5.4-SNAPSHOT. -->
+        <repository>
+            <id>embabel-snapshots</id>
+            <name>Embabel Snapshots</name>
+            <url>https://repo.embabel.com/artifactory/libs-snapshot</url>
+            <releases>
+                <enabled>false</enabled>
+            </releases>
+            <snapshots>
+                <enabled>true</enabled>
+            </snapshots>
+        </repository>
+    </repositories>
+
+    <dependencyManagement>
+        <dependencies>
+            <!-- Embabel platform starters (pull in the matching Spring Boot). -->
+            <dependency>
+                <groupId>com.embabel.agent</groupId>
+                <artifactId>embabel-agent-starter</artifactId>
+                <version>${embabel-agent.version}</version>
+            </dependency>
+            <!-- Pin the main platform modules to the release version: the 1.5.4-SNAPSHOT
+                 experimental modules (spec/eval/remote) were built against 1.5.3 and would
+                 otherwise drag api/ai back to 1.5.3, which lacks classes the 1.5.4
+                 openai/byok need (e.g. com.embabel.agent.common.http.ClientTimeoutProperties). -->
+            <dependency>
+                <groupId>com.embabel.agent</groupId>
+                <artifactId>embabel-agent-api</artifactId>
+                <version>${embabel-agent.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.embabel.agent</groupId>
+                <artifactId>embabel-agent-ai</artifactId>
+                <version>${embabel-agent.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.embabel.agent</groupId>
+                <artifactId>embabel-agent-starter-openai</artifactId>
+                <version>${embabel-agent.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.embabel.agent</groupId>
+                <artifactId>embabel-agent-starter-openai-custom</artifactId>
+                <version>${embabel-agent.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.embabel.agent</groupId>
+                <artifactId>embabel-agent-starter-anthropic</artifactId>
+                <version>${embabel-agent.version}</version>
+            </dependency>
+            <!-- MCP server publishing: goals annotated @Export(remote=true) become MCP tools. -->
+            <dependency>
+                <groupId>com.embabel.agent</groupId>
+                <artifactId>embabel-agent-starter-mcpserver</artifactId>
+                <version>${embabel-agent.version}</version>
+            </dependency>
+            <!-- Agent Skills (Agent Skills spec + the SkillScriptExecutionEngine SPI, POC 26). -->
+            <dependency>
+                <groupId>com.embabel.agent</groupId>
+                <artifactId>embabel-agent-skills</artifactId>
+                <version>${embabel-agent.version}</version>
+            </dependency>
+            <!-- GraalJS as an in-JVM script engine for skill scripts (POC 26). -->
+            <dependency>
+                <groupId>org.graalvm.polyglot</groupId>
+                <artifactId>polyglot</artifactId>
+                <version>${graalvm.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.graalvm.polyglot</groupId>
+                <artifactId>js</artifactId>
+                <version>${graalvm.version}</version>
+                <type>pom</type>
+            </dependency>
+            <!-- MCP client SDK (POC 13 consumes the published server over Streamable HTTP). -->
+            <dependency>
+                <groupId>io.modelcontextprotocol.sdk</groupId>
+                <artifactId>mcp</artifactId>
+                <version>2.1.0</version>
+            </dependency>
+            <!-- Remote-action bridge (POC 16): pull a sidecar's actions in as RestActions. -->
+            <dependency>
+                <groupId>com.embabel.agent</groupId>
+                <artifactId>embabel-agent-remote</artifactId>
+                <version>${embabel-agent-experimental.version}</version>
+            </dependency>
+            <!-- The no-compilation YAML ingestion engine + NL compiler. -->
+            <dependency>
+                <groupId>com.embabel.agent</groupId>
+                <artifactId>embabel-agent-spec</artifactId>
+                <version>${embabel-agent-experimental.version}</version>
+            </dependency>
+            <!-- LLM eval harness (conversational-oriented; adapted in poc-5-eval). -->
+            <dependency>
+                <groupId>com.embabel.agent</groupId>
+                <artifactId>embabel-agent-eval</artifactId>
+                <version>${embabel-agent-experimental.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.embabel.agent</groupId>
+                <artifactId>embabel-agent-test</artifactId>
+                <version>${embabel-agent.version}</version>
+            </dependency>
+
+            <!-- Smith internal modules. -->
+            <dependency>
+                <groupId>org.iromu.embabel.smith</groupId>
+                <artifactId>smith-common</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <!-- Production modules. -->
+            <dependency>
+                <groupId>org.iromu.embabel.smith</groupId>
+                <artifactId>embabel-smith-specsource</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.iromu.embabel.smith</groupId>
+                <artifactId>embabel-smith-runtime</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.iromu.embabel.smith</groupId>
+                <artifactId>embabel-smith-builder</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.iromu.embabel.smith</groupId>
+                <artifactId>embabel-smith-studio</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.iromu.embabel.smith</groupId>
+                <artifactId>poc-1-no-code-runtime</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.iromu.embabel.smith</groupId>
+                <artifactId>poc-2-nl-compile</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.iromu.embabel.smith</groupId>
+                <artifactId>poc-8-retrieval</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.iromu.embabel.smith</groupId>
+                <artifactId>poc-9-quality-refinement</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.iromu.embabel.smith</groupId>
+                <artifactId>poc-12-semantic-retrieval</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.iromu.embabel.smith</groupId>
+                <artifactId>poc-14-composer</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.iromu.embabel.smith</groupId>
+                <artifactId>poc-17-gliner-retrieval</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.iromu.embabel.smith</groupId>
+                <artifactId>poc-18-agent-spec-lifecycle</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.iromu.embabel.smith</groupId>
+                <artifactId>poc-20-semantic-embedding</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <!-- POC 21 reuses POC 10's trust tiers for its recommended-load-tier computation. -->
+            <dependency>
+                <groupId>org.iromu.embabel.smith</groupId>
+                <artifactId>poc-10-trust-tiers</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.iromu.embabel.smith</groupId>
+                <artifactId>poc-21-agent-spec-security</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <!-- Remote transports (POC 22 Remote pane): the RestAction sidecar and the MCP server. -->
+            <dependency>
+                <groupId>org.iromu.embabel.smith</groupId>
+                <artifactId>poc-13-remote-mcp</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.iromu.embabel.smith</groupId>
+                <artifactId>poc-16-remote-action</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <!-- Jackson (used by smith-common for agent-spec YAML I/O and by the runtime for trace JSONL). -->
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-databind</artifactId>
+                <version>${jackson.version}</version>
+            </dependency>
+            <!-- picocli (used by the runtime CLI). -->
+            <dependency>
+                <groupId>info.picocli</groupId>
+                <artifactId>picocli</artifactId>
+                <version>${picocli.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.dataformat</groupId>
+                <artifactId>jackson-dataformat-yaml</artifactId>
+                <version>${jackson.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.datatype</groupId>
+                <artifactId>jackson-datatype-jsr310</artifactId>
+                <version>2.21.5</version>
+            </dependency>
+
+            <!-- Test dependencies. -->
+            <dependency>
+                <groupId>org.junit.jupiter</groupId>
+                <artifactId>junit-jupiter</artifactId>
+                <version>${junit.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.assertj</groupId>
+                <artifactId>assertj-core</artifactId>
+                <version>${assertj.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.slf4j</groupId>
+                <artifactId>slf4j-simple</artifactId>
+                <version>${slf4j.version}</version>
+            </dependency>
+
+            <!-- Import the Spring Boot BOM so the POC modules resolve a consistent
+                 Spring Boot (4.1.1, the version Embabel 1.5.4 is built against). -->
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-dependencies</artifactId>
+                <version>${spring-boot.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <version>${maven-compiler-plugin.version}</version>
+                    <configuration>
+                        <release>${java.version}</release>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-surefire-plugin</artifactId>
+                    <version>${maven-surefire-plugin.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-failsafe-plugin</artifactId>
+                    <version>${maven-failsafe-plugin.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-maven-plugin</artifactId>
+                    <version>${spring-boot.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-enforcer-plugin</artifactId>
+                    <version>${maven-enforcer-plugin.version}</version>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+        <plugins>
+            <plugin>
+                <groupId>io.spring.javaformat</groupId>
+                <artifactId>spring-javaformat-maven-plugin</artifactId>
+                <version>${io.spring.javaformat.version}</version>
+                <executions>
+                    <execution>
+                        <phase>process-sources</phase>
+                        <goals>
+                            <goal>apply</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-checkstyle-plugin</artifactId>
+                <version>3.6.0</version>
+                <dependencies>
+                    <dependency>
+                        <groupId>com.puppycrawl.tools</groupId>
+                        <artifactId>checkstyle</artifactId>
+                        <version>${checkstyle.version}</version>
+                    </dependency>
+                    <dependency>
+                        <groupId>io.spring.javaformat</groupId>
+                        <artifactId>spring-javaformat-checkstyle</artifactId>
+                        <version>${io.spring.javaformat.version}</version>
+                    </dependency>
+                </dependencies>
+                <!-- Plugin-level configuration so the bare CLI goal (mvn checkstyle:check)
+                     uses the project config instead of the plugin's sun_checks.xml default. -->
+                <configuration>
+                    <configLocation>${maven.multiModuleProjectDirectory}/checkstyle.xml</configLocation>
+                    <includeTestSourceDirectory>false</includeTestSourceDirectory>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>checkstyle-validation</id>
+                        <phase>validate</phase>
+                        <inherited>true</inherited>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

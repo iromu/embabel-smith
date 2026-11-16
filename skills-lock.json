@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "skills": {
+    "ai-meta-comment-review": {
+      "source": "iromu/awesome-qwen",
+      "sourceType": "github",
+      "skillPath": "skills/ai-meta-comment-review/SKILL.md",
+      "computedHash": "b1d1533bae2bc6dcf103ef987acd26e47301b1cccb7d37b240585b3c07eb4b77"
+    },
+    "code-review": {
+      "source": "iromu/awesome-qwen",
+      "sourceType": "github",
+      "skillPath": "skills/code-review/SKILL.md",
+      "computedHash": "bb7158fff1ff2a98ad3f1ab638f60db7efaf21dbcfed51cc63a317000f902615"
+    },
+    "embabel-agent": {
+      "source": "iromu/awesome-qwen",
+      "sourceType": "github",
+      "skillPath": "skills/embabel-agent/SKILL.md",
+      "computedHash": "511b95b4d05b2ccda9d83bca1218ddbf71c8ffe61cbd4014272dacdd481b000d"
+    },
+    "embabel-worlds-realm-spec": {
+      "source": "iromu/awesome-qwen",
+      "sourceType": "github",
+      "skillPath": "skills/embabel-worlds-realm-spec/SKILL.md",
+      "computedHash": "bf3cd3d32f98b0aff3534be476c0bf65387153b02d6262f7366bcb94e8f7a32a"
+    },
+    "git-wiki": {
+      "source": "yysun/awesome-agent-world",
+      "sourceType": "github",
+      "skillPath": "skills/git-wiki/SKILL.md",
+      "computedHash": "7a0c766675ee104158a9957ed185731411446b5b2e00ef475581b7b8aa9a6349"
+    }
+  }
+}

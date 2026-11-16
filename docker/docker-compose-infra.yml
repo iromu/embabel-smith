@@ -1,0 +1,33 @@
+# Development database for the studio (change: smith-studio-postgres-storage).
+#
+# `docker compose up -d` brings up a Postgres with a named data volume and fixed
+# development credentials, reachable at the documented local endpoint. The studio's
+# Storage pane (and the gitignored application-local.yaml) point at it with:
+#
+#   url:      jdbc:postgresql://localhost:5433/smith_studio
+#   user:     smith
+#   password: smith
+#
+# Host port 5433 (container port stays 5432) so it coexists with a Postgres already
+# running on the conventional 5432. Data persists across `docker compose down` / `up`
+# via the named volume; `docker compose down -v` removes it.
+services:
+  postgres:
+    image: postgres:16
+    container_name: smith-studio-postgres
+    environment:
+      POSTGRES_USER: embabel_smith
+      POSTGRES_PASSWORD: embabel_smith
+      POSTGRES_DB: embabel_smith
+    ports:
+      - "5433:5432"
+    volumes:
+      - studio-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U embabel_smith -d embabel_smith"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  studio-pgdata:

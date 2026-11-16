@@ -1,0 +1,5 @@
+stepType: goal
+name: domainAnswer
+description: "A question about coffee brewing has been answered from the bundled domain guide"
+outputTypeName: com.embabel.agent.spec.model.BackgroundMessage
+export: true

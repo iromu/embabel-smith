@@ -1,0 +1,15 @@
+<!--
+  SPDX-FileCopyrightText: Copyright (c) 2026 Ivan Rodriguez. All rights reserved.
+  SPDX-License-Identifier: Apache-2.0
+-->
+<template>
+  <PocOnlyPane
+    title="Retrieve"
+    poc="POC 12 / 18"
+    detail="Rank the spec library by a pluggable scorer, curation-aware."
+  />
+</template>
+
+<script setup lang="ts">
+import PocOnlyPane from './PocOnlyPane.vue'
+</script>

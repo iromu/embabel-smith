@@ -1,0 +1,105 @@
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2026 Ivan Rodriguez. All rights reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package com.embabel.smith.selector.llm;
+
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
+import java.util.List;
+
+import com.embabel.smith.retrieval.SpecEntry;
+import com.embabel.smith.retrieval.gliner.SpecSelector;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
+/**
+ * A {@link SpecSelector} backed by the small decision LLM served by the module's Docker
+ * container (llama.cpp, OpenAI-compatible {@code /v1}). One instance per
+ * {@link DecisionPrompt.Format}: the selector asks the model to choose among the
+ * candidates and parses the reply into the top-1 selection. The contract answer is one
+ * token, so the request is temperature 0 with a small {@code max_tokens}.
+ *
+ * @author Ivan Rodriguez
+ */
+public final class LlmSelector implements SpecSelector {
+
+	/**
+	 * The model name the container serves (its mounted GGUF path).
+	 */
+	public static final String DEFAULT_MODEL = "/models/Qwen3-0.6B-openjev-Q8_0.gguf";
+
+	/**
+	 * The default local endpoint — the compose.yml port mapping.
+	 */
+	public static final String DEFAULT_BASE_URL = "http://localhost:18081/v1";
+
+	private final String baseUrl;
+
+	private final String model;
+
+	private final DecisionPrompt.Format format;
+
+	private final HttpClient http;
+
+	private final ObjectMapper json;
+
+	public LlmSelector(String baseUrl, String model, DecisionPrompt.Format format) {
+		this(baseUrl, model, format, HttpClient.newHttpClient());
+	}
+
+	LlmSelector(String baseUrl, String model, DecisionPrompt.Format format, HttpClient http) {
+		this.baseUrl = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
+		this.model = model;
+		this.format = format;
+		this.http = http;
+		this.json = new ObjectMapper();
+	}
+
+	@Override
+	public String select(String query, List<SpecEntry> candidates) {
+		if (candidates.isEmpty()) {
+			return null;
+		}
+		String reply = complete(DecisionPrompt.build(this.format, query, candidates));
+		return DecisionPrompt.parse(this.format, reply, candidates);
+	}
+
+	private String complete(String prompt) {
+		try {
+			ObjectNode body = this.json.createObjectNode();
+			body.put("model", this.model);
+			body.put("temperature", 0);
+			body.put("max_tokens", 16);
+			ObjectNode message = body.putArray("messages").addObject();
+			message.put("role", "user");
+			message.put("content", prompt);
+			HttpRequest request = HttpRequest.newBuilder()
+				.uri(URI.create(this.baseUrl + "/chat/completions"))
+				.timeout(Duration.ofSeconds(60))
+				.header("Content-Type", "application/json")
+				.POST(HttpRequest.BodyPublishers.ofString(this.json.writeValueAsString(body)))
+				.build();
+			HttpResponse<String> response = this.http.send(request, HttpResponse.BodyHandlers.ofString());
+			if (response.statusCode() / 100 != 2) {
+				throw new IllegalStateException(
+						"model endpoint " + this.baseUrl + " returned HTTP " + response.statusCode());
+			}
+			JsonNode root = this.json.readTree(response.body());
+			return root.path("choices").path(0).path("message").path("content").asText("");
+		}
+		catch (InterruptedException ex) {
+			Thread.currentThread().interrupt();
+			throw new IllegalStateException("interrupted while calling the model endpoint", ex);
+		}
+		catch (Exception ex) {
+			throw new IllegalStateException("calling the model endpoint " + this.baseUrl + " failed: " + ex, ex);
+		}
+	}
+
+}

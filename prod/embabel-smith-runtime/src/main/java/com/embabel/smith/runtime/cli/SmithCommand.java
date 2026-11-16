@@ -1,0 +1,20 @@
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2026 Ivan Rodriguez. All rights reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package com.embabel.smith.runtime.cli;
+
+import picocli.CommandLine.Command;
+
+/**
+ * The CLI root: {@code smith run ...}. The {@code run} subcommand is registered by the
+ * launcher ({@link com.embabel.smith.runtime.SmithRuntimeApplication}) with the booted
+ * platform.
+ *
+ * @author Ivan Rodriguez
+ */
+@Command(name = "smith", description = "The Embabel Smith spec runtime")
+public class SmithCommand {
+
+}

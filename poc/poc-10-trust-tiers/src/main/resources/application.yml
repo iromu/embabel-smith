@@ -1,0 +1,18 @@
+# The model endpoint is fully env-driven (design D4) — nothing is hardcoded here.
+embabel:
+  agent:
+    platform:
+      models:
+        openai:
+          custom:
+            api-key: ${OPENAI_CUSTOM_API_KEY:}
+            base-url: ${OPENAI_CUSTOM_BASE_URL:}
+            models: ${OPENAI_CUSTOM_MODELS:}
+    # Global user-input guardrail (POC 10): applied to every LLM call on the platform. A CRITICAL
+    # finding blocks the operation before it runs.
+    guardrails:
+      user-input: com.embabel.smith.trust.InputSanitizerGuardRail
+spring:
+  main:
+    web-application-type: none
+    banner-mode: off

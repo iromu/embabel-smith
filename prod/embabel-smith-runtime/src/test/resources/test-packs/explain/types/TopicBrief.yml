@@ -1,0 +1,14 @@
+name: TopicBrief
+description: "The extracted topic, audience and tone"
+ownProperties:
+  - name: topic
+    type: string
+    description: "What to explain"
+  - name: audience
+    type: string
+    description: "Who it is for"
+  - name: tone
+    type: string
+    description: "Voice and style"
+parents: []
+creationPermitted: true

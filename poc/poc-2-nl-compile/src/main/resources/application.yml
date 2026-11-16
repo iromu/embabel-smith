@@ -1,0 +1,15 @@
+# Model endpoint is fully env-driven (design D4) — nothing hardcoded.
+#   OPENAI_CUSTOM_BASE_URL, OPENAI_CUSTOM_API_KEY, OPENAI_CUSTOM_MODELS, EMBABEL_MODELS_DEFAULT_LLM
+embabel:
+  agent:
+    platform:
+      models:
+        openai:
+          custom:
+            api-key: ${OPENAI_CUSTOM_API_KEY:}
+            base-url: ${OPENAI_CUSTOM_BASE_URL:}
+            models: ${OPENAI_CUSTOM_MODELS:}
+spring:
+  main:
+    web-application-type: none
+    banner-mode: off

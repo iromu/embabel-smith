@@ -1,0 +1,5 @@
+stepType: goal
+name: sameGoal
+description: "Pack A's goal"
+outputTypeName: com.embabel.agent.spec.model.BackgroundMessage
+export: true

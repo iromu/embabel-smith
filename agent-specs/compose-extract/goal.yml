@@ -1,0 +1,5 @@
+stepType: goal
+name: topicExtracted
+description: "The topic, audience and tone have been extracted from the request"
+outputTypeName: TopicBrief
+export: true

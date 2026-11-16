@@ -1,0 +1,65 @@
+server:
+  port: ${SERVER_PORT:8080}
+
+spring:
+  # `local` is the default profile so a plain dev run picks up the gitignored application-local.yaml
+  # (which points storage at the Docker Postgres and auto-starts it). A packaged or production run
+  # sets its own profile, so the local config — and the container it spawns — never apply there.
+  profiles:
+    default: local
+  docker:
+    compose:
+      # Off by default; the `local` profile turns it on so the dev Postgres auto-starts.
+      enabled: false
+      # A failure to bring the container up (e.g. the port is already taken) must not kill the boot:
+      # the studio is designed to start and stay usable with no database, so it degrades to unbound
+      # storage rather than failing.
+      required: false
+  main:
+    web-application-type: SERVLET
+    banner-mode: off
+
+# The model endpoint is fully env-driven (same convention as the runtime and builder) — nothing real
+# is hardcoded here. The platform's OpenAI-custom model bean requires a non-blank API key to
+# instantiate, so the defaults are inert placeholders: with no real endpoint the app still boots and
+# serves the UI, while the studio's own ModelEndpointConfig (which reads the raw env) reports
+# "model not configured" for every model-backed action.
+embabel:
+  # The default LLM must name a registered model or the platform will not boot; the placeholder
+  # matches the placeholder model below, so the two stay coherent when no real endpoint is set.
+  models:
+    default-llm: ${EMBABEL_MODELS_DEFAULT_LLM:studio-no-endpoint}
+  agent:
+    platform:
+      models:
+        openai:
+          # OpenAI and Anthropic fail to boot on a null key, hence the same inert placeholder
+          # treatment as the custom provider. The provider a run talks to is detected from the
+          # environment (see ModelEndpointConfig).
+          api-key: ${OPENAI_API_KEY:sk-studio-no-endpoint}
+          custom:
+            api-key: ${OPENAI_CUSTOM_API_KEY:sk-studio-no-endpoint}
+            base-url: ${OPENAI_CUSTOM_BASE_URL:http://127.0.0.1:9/v1}
+            models: ${OPENAI_CUSTOM_MODELS:studio-no-endpoint}
+        anthropic:
+          api-key: ${ANTHROPIC_API_KEY:sk-studio-no-endpoint}
+
+# The studio's configuration (change 06).
+smith:
+  studio:
+    # The spec sources the studio offers (comma-separated source URIs: folder:<path> or
+    # git:<url>[@ref]). The panes let the user pick one of these to operate on.
+    sources: ${SMITH_STUDIO_SOURCES:}
+    # The source the self-improvement loop watches and refines (a source URI; defaults to the first
+    # entry of `sources` when unset).
+    improve-source: ${SMITH_STUDIO_IMPROVE_SOURCE:}
+    # The trace store directory (defaults to ~/.smith/traces; the store file is <dir>/runs.jsonl).
+    trace-dir: ${SMITH_STUDIO_TRACE_DIR:}
+    # The git source cache root (defaults to ~/.smith/spec-sources).
+    source-cache-dir: ${SMITH_STUDIO_SOURCE_CACHE_DIR:}
+    loop:
+      # The interval between scheduled loop iterations, in milliseconds (the schedule is off by
+      # default and started from the UI).
+      interval: ${SMITH_STUDIO_LOOP_INTERVAL:60000}
+      # Whether gated candidates are auto-published instead of held for approval (default: hold).
+      auto-publish: ${SMITH_STUDIO_LOOP_AUTO_PUBLISH:false}

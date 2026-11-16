@@ -1,0 +1,11 @@
+stepType: action
+name: writeExplainer
+description: "Write the explainer based on the extracted topic, audience and tone"
+inputTypeNames:
+  - TopicBrief
+outputTypeName: com.embabel.agent.spec.model.BackgroundMessage
+prompt: |
+  Write a short, upbeat explainer (about 150 words) about: {{topicBrief.topic}}
+  Target audience: {{topicBrief.audience}}
+  Tone: {{topicBrief.tone}}
+  Use simple words and one concrete analogy. Do not use markdown headings.

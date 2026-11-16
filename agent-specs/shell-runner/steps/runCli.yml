@@ -1,0 +1,15 @@
+stepType: action
+name: runCli
+description: "Run the shell command the user asks for and report its result"
+inputTypeNames:
+  - com.embabel.agent.domain.io.UserInput
+outputTypeName: com.embabel.agent.spec.model.BackgroundMessage
+toolGroups:
+  - shell
+prompt: |
+  The user asks you to run a shell command and report what it returned.
+  Use the runCommand tool to execute the command exactly as requested, then report the outcome.
+
+  User request: {{userInput.content}}
+
+  In your reply, state the command's exit code and its output in one or two plain-language sentences.
