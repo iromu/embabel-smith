@@ -1,7 +1,8 @@
 # Spec Sources and Publishing
 
-A **spec source** is where agent specs are read from and written to. One module owns both sides:
-`prod/embabel-smith-specsource` (`com.embabel.smith.specsource`). The format of what it resolves is
+A **spec source** is where agent specs are read from and written to. Reads live in
+`prod/embabel-smith-specsource` (`com.embabel.smith.specsource`); writes live in the builder's
+`publish/` package. The format of what it resolves is
 in [`agent-spec-format.md`](agent-spec-format.md); who consumes it is in
 [`07-runtime.md`](07-runtime.md) and [`08-builder.md`](08-builder.md).
 
@@ -12,8 +13,10 @@ in [`agent-spec-format.md`](agent-spec-format.md); who consumes it is in
 | `folder:<path>` | a directory whose immediate subdirectories are candidate packs |
 | `git:<path-or-url>[@ref]` | a git repository, optionally pinned to a branch, tag or commit |
 
-An unknown scheme is rejected with an actionable error naming the accepted ones. Parsing lives in
-`SpecSource`; failures surface as `SpecSourceException`.
+An unknown scheme is rejected by `SpecSource.parse` with an `IllegalArgumentException` naming the
+offending URI — it does not list the accepted schemes. `SpecSourceException` is reserved for
+materialisation failures (unreachable remote, unknown ref, missing folder); the publish path is the
+one place that names the accepted schemes (`publish/PublishTarget.parse`).
 
 **Discovery is one level deep, deliberately.** A folder source scans immediate subdirectories and
 treats a directory as a pack when it has a `manifest.yml` *and* it validates — discovery reuses
@@ -29,13 +32,17 @@ with its own credential configuration for no gain.
 
 Consequences worth knowing:
 
-- Every invocation is **non-interactive** (`-c core.askpass=false`, explicit `-b` /
-  `checkout <ref>`), so a clone can never hang waiting for a password prompt.
+- Every invocation is **non-interactive** (`-c core.askpass=false`, `GIT_TERMINAL_PROMPT=0`), so a
+  clone can never hang waiting for a password prompt. The read path clones with `clone -- <url>`
+  and discovers the default branch afterwards via `symbolic-ref`; an explicit `-b` appears only on
+  the publishing path.
 - The cache lives at `~/.smith/spec-sources/<uri-hash>` — one subdirectory per source, keyed by a
   SHA-256 of the URI, so two repositories can never collide. Re-resolving is `fetch` + `checkout`;
   a cache directory with no `.git` is treated as corrupt and replaced by a fresh clone.
-- **A pinned ref is immutable.** Once resolved to a commit SHA it stays there. An unpinned source
-  follows the branch tip.
+- **A pinned commit SHA is immutable.** A pinned *branch or tag* is not: each resolve runs
+  `fetch --all --prune`, checks the ref out, and — when `refs/remotes/origin/<ref>` exists — resets
+  hard onto it, so a branch pin follows that branch's tip, exactly like an unpinned source (which
+  follows the default branch). Pin a SHA when you need reproducibility.
 - Local paths are cloned from disk, so the whole path is testable offline. The test suite uses
   `git init --bare` repositories rather than any network remote.
 
@@ -50,16 +57,19 @@ them apart avoids cache and write races when the studio runs both sides of the l
 hash is independent of directory listing order and changes only when content changes. The same value
 is exposed on `ResolvedSpec`.
 
-The hash is deliberately *the same quantity* the lifecycle's drift detection consumes, so the
-improvement loop can compare a running pack against its recorded baseline without recomputing
-anything. See [`10-self-improvement.md`](10-self-improvement.md).
+**This is not the hash the lifecycle's drift detection consumes.** Drift is assessed against the
+builder's `SpecContentHash`, a semantic hash over the parsed model (goal, steps, types). The two
+quantities differ by construction and never match each other; `SourceService` records that using
+`PackContentHasher` on the sidecar would produce permanent false drift. Keep them straight when
+reading [`10-self-improvement.md`](10-self-improvement.md).
 
 ## Publishing
 
-Publishing writes a pack into a source. It is shared by all three build targets — an agent spec, a
-skill folder, an N-pack process — because the publisher was generalized to *"a named directory of
-files"* rather than staying spec-specific. That is why the collision gate and the no-push rule are
-stated once here instead of three times.
+Publishing writes a pack into a source. It is shared by all three kinds of publishable unit — an
+agent spec, a skill folder, an N-pack process — because the publisher was generalized to *"a named
+directory of files"* rather than staying spec-specific. Note that only `agent-spec` and `skill` are
+selectable with `--target`; the process is generated alongside every agent-spec build, not chosen.
+That is why the collision gate and the no-push rule are stated once here instead of three times.
 
 | Behaviour | Rule | Why |
 | --- | --- | --- |
@@ -74,5 +84,6 @@ Implementation: `publish/FolderPublisher`, `publish/GitPublisher`, `publish/Publ
 ## Failure behaviour
 
 Failures are explicit and actionable, never a stack trace from the transport layer: unreachable
-remote, unknown ref, missing folder, and an unknown scheme each get their own message naming what
-was attempted and what would fix it.
+remote, unknown ref and missing folder each get their own `SpecSourceException` naming what was
+attempted and what would fix it. An unknown scheme is the exception to that pattern — it is an
+`IllegalArgumentException` from parsing that names the URI but not the accepted schemes.

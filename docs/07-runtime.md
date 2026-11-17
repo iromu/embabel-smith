@@ -23,8 +23,10 @@ ingests every pack into one platform, selects the goal, and executes a GOAP plan
 
 ## Trust tiers
 
-`core/TrustTier` and `core/TrustTierPolicy` gate which steps may run; a high-trust step needs an
-explicit tier (`--trust-tier`) or the run fails with `TrustTierBlockedException`. This is the product
+`core/TrustTier` and `core/TrustTierPolicy` gate which **packs** may run. The check is per pack, over
+every pack in the source, and runs **once before execution** — so a single disallowed pack aborts the
+whole run with `TrustTierBlockedException`, even if nothing in it was heading for that pack. A
+high-trust pack needs an explicit tier (`--trust-tier`). This is the product
 form of the per-tier tool-group allow-list proven in POC 10: a community-sourced pack must not reach
 privileged tool groups.
 
@@ -34,8 +36,9 @@ privileged tool groups.
 observability extra: the self-improvement loop has no other evidence source, so a run that leaves no
 trace is a run the loop cannot learn from.
 
-`trace/TraceRecorder` writes `trace/TraceRecord` (per-step durations, success, input/output
-excerpts, the trust tier). Design decisions that matter to a reader of the code:
+`trace/TraceRecorder` writes `trace/TraceRecord` (per-step durations, success, the trust tier, an
+excerpt of the goal output). The run's `input` is stored **verbatim** — only outputs are excerpted, at
+`DEFAULT_EXCERPT_LIMIT`. Design decisions that matter to a reader of the code:
 
 - **The writer stays dumb.** It appends with `SYNC` and does no retention. The rolling window is a
   *read*-side concern applied by the loop. A writer that trims would eventually disagree with
@@ -76,9 +79,15 @@ same capability without going through the CLI.
 
 ## The model endpoint
 
-The endpoint is pluggable and env-driven (`OPENAI_CUSTOM_*`), and starting a run without it yields a
-clear configuration error rather than an opaque model failure. The gate itself is
-`smith-common`'s `ModelEndpointConfig`; see [`05-architecture.md`](05-architecture.md) for why no
-model call in `prod/` may bypass Embabel's `Ai` layer.
+The endpoint is pluggable and env-driven (`OPENAI_CUSTOM_*`). **The runtime applies no endpoint
+gate**: `application.yml` feeds every provider an inert but well-formed default
+(`…:sk-smith-no-endpoint`, `…:http://127.0.0.1:9/v1`) so the app boots with nothing set, and an
+unconfigured endpoint surfaces as a *failed run* — a `RunOutcome.failed` — not a named
+configuration error. The `MODEL_NOT_CONFIGURED` gate is a studio-layer concern
+(`smith-common`'s `ModelEndpointConfig`, consulted by its controllers); see
+[`05-architecture.md`](05-architecture.md) for why no model call in `prod/` may bypass Embabel's
+`Ai` layer.
 
-Offline tests cover the core with the endpoint unset; the model-touching cases are endpoint-gated.
+Offline tests cover the core with the endpoint pointed at an inert local target — an in-process
+404 `HttpServer`, or `http://127.0.0.1:9/v1` — rather than leaving it unset, because the config
+always supplies a value. The model-touching cases are endpoint-gated.

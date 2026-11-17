@@ -87,10 +87,44 @@ retrieve/scale/remote controller) and reading the three pane components.
 
 ## Loop
 
-- **The full builder→runtime loop** is the single unchecked task in the whole archived task set
-  (`embabel-agent-builder` 7.1), with the stated reason *needs a live endpoint*. `run-loop.sh`
-  implements it and the results document carries loop evidence, so **verify before treating this as
-  genuinely outstanding** — the box was likely never ticked rather than the work never done.
+- **Closed — the full builder→runtime loop.** This was listed as the single unchecked task in the
+  archived `embabel-agent-builder` set (7.1, *needs a live endpoint*). It is done: `run-loop.sh` runs
+  it and the results document records it **GREEN** — `docs/04-poc-run-results.md` §"Full loop (task
+  7.1)", building a pack, ingesting it, running it and achieving the goal. The unticked box was a
+  bookkeeping artefact of the deleted planning tree. Check: `grep -n 'Full loop (task 7.1)'
+  docs/04-poc-run-results.md`.
+- **Open — the loop publishes with `push = true`, against the product's commit-never-push rule.**
+  `ImprovementLoop` and `LoopService` force pushing so a `git:` source's commit survives its
+  publisher's throwaway clone, which means an unattended loop writes to the shared remote by
+  default. `05-architecture.md` and `06-spec-sources.md` state the opposite as the invariant. Decide
+  either to gate it behind configuration or to amend the stated rule. Check: `grep -n 'push=true'
+  prod/embabel-smith-studio/src/main/java/com/embabel/smith/studio/improve/ImprovementLoop.java`.
+
+## Skill evaluator
+
+- **`embabel-smith-skillevaluator` is built but wired to nothing.** It is a full reactor module
+  (`prod/pom.xml`) — the Tier 1 static validator, `Tier1Runner` plus schema, license, hygiene,
+  version, quality-score, script-lint, Python-syntax, code-risk and security validators — with no
+  model call and no consumer: no other product module depends on it, it is absent from the root POM's
+  `dependencyManagement`, and until now it had no mention anywhere in `docs/`, `README.md` or
+  `.wiki/`. Decide whether to integrate it into the build/publish gate, expose it as a CLI, or mark
+  it deliberately dormant. Check: `grep -rn skillevaluator prod/*/pom.xml pom.xml docs/`.
+- **Its provenance is partly unattributed.** The module is a port of a Python `tier1` validator, and
+  8 of its source files still carry `SPDX-FileCopyrightText: Copyright (c) 2025/2026 NVIDIA
+  CORPORATION & AFFILIATES` (50 carry the project author). `NOTICE` names only "Copyright 2026 Ivan
+  Rodriguez", with no upstream attribution anywhere in `NOTICE`, `LICENSE` or `README.md`. Resolve
+  the attribution before this module ships. Check: `grep -rho 'SPDX-FileCopyrightText:.*'
+  prod/embabel-smith-skillevaluator/src | sort | uniq -c`.
+
+## Test coverage
+
+- **Four `prod/` integration tests are endpoint-gated, so the publish, run and loop paths are never
+  executed in CI.** `LiveBuildIntegrationTest`, `LiveRunIntegrationTest`, `LiveLoopIntegrationTest`
+  and `RestIntegrationTest` are all `@EnabledIfEnvironmentVariable(named = "OPENAI_CUSTOM_BASE_URL")`.
+  Without that variable the offline suite passes and those guarantees are simply untested — including
+  the embabel generation seam that `08-builder.md` leans on for its "known upstream limit". Nothing
+  here records that, so a green CI run reads as full coverage. Check: `grep -rln
+  EnabledIfEnvironmentVariable prod/*/src/test`.
 
 ## Re-creating a planning change
 

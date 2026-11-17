@@ -74,5 +74,8 @@ dimension POC 23 measures: Precision@1, the one-time index-build cost, and per-q
 - **Some hardware findings are host-specific**, not general: the 2080 Ti (Turing) cannot serve
   ModelOpt FP8, which needs Hopper or newer, and CPU-only serving sufficed for a 0.6B model. Label
   such figures as observations about this machine.
-- Large model artifacts are gitignored and acquired by a documented one-time command; container image
-  tags and digests are pinned in the results document.
+- Large model artifacts are gitignored and acquired by a documented one-time command. **Container
+  images are *not* pinned**: POC 19's compose file uses the floating tag
+  `ghcr.io/ggml-org/llama.cpp:server` with no `@sha256:` digest, and the results document records
+  neither a tag nor a digest. Treat the latency figures as observations about this machine at this
+  moment, and pin the digest before re-running them for a comparison.

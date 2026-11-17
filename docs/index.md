@@ -1,8 +1,9 @@
 # Embabel Smith — Documentation
 
 Documents that research, ground, synthesize, and report a GOAP-based agent builder on the Embabel
-platform (v1.5.4). The numbered pages are the design history; the unnumbered pages are the current
-reference, and each claim in them is checkable against the tree.
+platform (v1.5.4). Pages 01–04 are the design history and the POC record; 05–12 and the unnumbered
+pages are the current reference, and each claim in them is checkable against the tree. Where a
+history page and a reference page disagree, the reference page and the code win.
 
 ## Reference — how the system works now
 

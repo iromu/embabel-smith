@@ -6,14 +6,16 @@ proven class from the runtime or builder.
 
 ## Two rules the module is built on
 
-**Thin controllers, cores do the work.** One `@RestController` per pane, roughly 30–60 lines,
+**Thin controllers, cores do the work.** One `@RestController` per pane, most of them 50–105 lines,
 delegating to `AgentSpecRunService`, `BuilderService`, the improvement loop, or the store.
+`StoreController` (227 lines) is the outlier because pack download and import zipping live in it.
 Collaborators arrive as narrow functional interfaces, so a controller is testable offline with fakes
 and no live model.
 
 **Pure logic stays out of the views.** This is the load-bearing frontend decision: the POC's
-single-file vanilla UI was untestable precisely because logic and DOM were fused. So the canvas snap
-rule is a pure module, `src/api/client.ts` is the **single** fetch site (tests mock once), and the
+single-file vanilla UI was untestable precisely because logic and DOM were fused. So the flow-graph
+rules are pure modules — `compose/model.ts` owns connection typing and the derived layout —
+`src/api/client.ts` is the **single** fetch site (tests mock once), and the
 DTO mirror in `src/api/types.ts` means a backend field change is caught by `vue-tsc`. The test
 pyramid is four layers: `vue-tsc --noEmit` as the type gate, Vitest on pure logic,
 Vitest + `@vue/test-utils` on components, and Spring Boot MockMvc per controller.
@@ -27,32 +29,44 @@ documented build step.
 
 ## Surfaces
 
-`/` is the **process workspace**: describe → generate → edit → dry-run → publish. The POC-era panes
-are demoted to a secondary *Operations* group, because a 13-pane sidebar does not express the
-product's primary purpose.
+`/` is the **process workspace**: describe → generate → edit → dry-run → publish. The fourteen nav
+items are spread over six groups — Studio, Run & Build, Inspect, Govern, Operate, Configure — with
+the POC-era panes pushed down the list, because a flat fourteen-item sidebar does not express the
+product's primary purpose. Retrieve sits under *Inspect*; Remote and Scale sit under *Operate*.
 
 | Route | Pane | Backed by |
 | --- | --- | --- |
 | `/`, `/process` | ProcessWorkspace | `GenerateController`, `SimulateController`, `DiscoverController`, `ExtractController` |
-| `/run` | RunPane | `RunController` |
-| `/author` | AuthorPane | `BuildController` |
-| `/compose` | ComposePane | `ComposeController` |
+| `/run` | RunPane | `RunController`, `SourceController` (the goal list) |
+| `/author` | AuthorPane | `BuildController`, `SourceController` (the source list) |
+| `/compose` | ComposePane | `ComposeController`, `SourceController` |
 | `/eval` | EvalPane | `EvalController` |
-| `/lifecycle` | LifecyclePane | pack lifecycle DTOs |
+| `/lifecycle` | LifecyclePane | `SourceController` (pack list) + the sidecar drift it reports |
 | `/security` | SecurityPane | `SecurityController` |
 | `/trust` | TrustPane | `TrustController` |
 | `/traces` | TracesPane | `TraceController` |
 | `/improve` | AutoImprovePane | `ImproveController` |
 | `/storage` | StoragePane | `StorageSettingsController`, `StoreController` |
 | `/retrieve`, `/remote`, `/scale` | RetrievePane, RemotePane, ScalePane | **none — POC-only stubs** |
+| (chrome, all panes) | — | `StatusController`, `ModelsController` |
 
-The last row is deliberate: all three are thin wrappers around `PocOnlyPane.vue`, which renders the
+`SourceController` (`/api/sources`, `/api/packs`, `/api/goals`) backs four of the panes above rather
+than owning one, which is why it appears in several rows.
+
+The POC-only row is deliberate: all three are thin wrappers around `PocOnlyPane.vue`, which renders the
 POC reference and a disabled badge. There is no retrieve, remote or scale controller under
 `prod/embabel-smith-studio`. Retrieval-at-scale and the remote bridges are proven in the POCs and
 **not wired into the product** — tracked in [`12-backlog.md`](12-backlog.md).
 
 ## The process workspace
 
+- **Ingestion is the builder's.** Loading documents, assembling the corpus and extracting a
+  description live in `prod/embabel-smith-builder`'s `blueprint/` package — see
+  [`08-builder.md`](08-builder.md). `DiscoverController`, `ExtractController` and
+  `GenerateController` delegate to those three stages and keep the stepwise interaction the UI
+  depends on: each endpoint calls the one stage it is named for and never runs the next.
+  `generate/FlowValidator` is the one class that stayed, because it is static, makes no model call and
+  mirrors the Compose editor's client-side rule — UI validation, not build core.
 - **One pack, not "skills + tools."** The no-code format has no LLM-tool concept, and *tool* already
   means a trust-tier group here. A second artifact type would be a generative process with no
   consumer.
@@ -86,8 +100,10 @@ requirement: **the endpoint must be rebindable at runtime**.
   were plain JDBC (cheaper, rejected) and restart-to-apply (rejected: the requirement is runtime).
   The consequence is that datasource, JPA and Spring Data auto-configurations are *excluded* so the
   app boots with no datasource at all — which also solves the "nothing configured yet" startup.
-- **Rebind order:** build pool and entity-manager factory → verify connectivity → atomic swap →
-  destroy the previous. A failed verification keeps the old binding and shows the connection error.
+- **Rebind order:** build the pool → run a test query to verify connectivity → build the
+  entity-manager factory → atomic swap → destroy the previous. Verification happens *before* the
+  factory exists, so a bad endpoint closes the half-built pool and throws, and the caller keeps its
+  previous binding.
   `ProcessStore`'s public API never changed, so no controller ever sees a binding.
 - **Settings live in a local document, not the database** — `~/.smith/studio/storage.json`, mode
   `0600`. Chicken-and-egg: the settings configure the database. Resolution order at startup is
@@ -100,8 +116,10 @@ requirement: **the endpoint must be rebindable at runtime**.
 - **Tests need no Postgres.** An in-memory H2 is selected by a test-profile property so the
   full-context tests boot without Docker, and the rebind path is tested directly: bind `mem:one`,
   write, rebind `mem:two`, then assert the new one serves, the old database is untouched, and the
-  old pool reports closed. Portability is enforced by using only column types both engines share
-  (`TEXT`, `BIGINT`, `TIMESTAMP`) with `ddl-auto=update`; the H2 suite is the drift detector.
+  old pool reports closed. Portability is enforced by using only column types both engines share:
+  short `VARCHAR` for name and goal, an `INTEGER` step count, `TIMESTAMP` for the save time, and
+  `LONGVARCHAR` for the pack body — chosen deliberately *over* `@Lob`, because a CLOB does not map
+  cleanly across the two. `ddl-auto=update`; the H2 suite is the drift detector.
 
 Two accepted risks, documented rather than fixed, because this is a local development tool: the
 settings document holds the database password in plaintext, and a request mid-transaction on the old

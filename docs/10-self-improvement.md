@@ -5,9 +5,12 @@ that are failing or drifting, refine them from the failure evidence, gate the ca
 it with a lifecycle transition. The evidence it consumes is described in
 [`07-runtime.md`](07-runtime.md).
 
-The classes are plain objects with injected collaborators (`TraceWindowReader`, `BuilderService`,
-`EvalScorer`, the publishers, a clock) — no Spring and no web layer — so the whole loop is unit
-testable offline with fakes.
+The classes are plain objects with injected collaborators (`TraceWindowReader`, `Detector`,
+`Refiner` over a `PromptRewriter`, `GateChain` over an `InvokerFactory` and the eval tasks, a
+`Publisher`) — no Spring and no web layer — so the whole loop is unit
+testable offline with fakes. Two seams are *not* injectable: the eval scorer is constructed inside
+`GateChain`, and time is not a collaborator — `Instant.now()` is inline in `LifecycleTransitions`
+and `ImprovementLoop`, so sidecar timestamps are not pinned by tests.
 
 ## Detect → refine → gate → publish
 
@@ -32,6 +35,14 @@ traces, no drift. A documented failure-fix fallback covers that ceiling case.
 **Publication** reuses the builder's publishers and moves the lifecycle state through the POC 18
 state machine (`incubating → active → degraded → retired`) via `LifecycleTransitions`. `retired`
 is excluded from automatic refinement: a human revives it with an explicit rebuild.
+
+**Unlike a manual build, the loop publishes with `push = true`.** The documented rule is *commit,
+never push* without an explicit `--push` (see [`05-architecture.md`](05-architecture.md) and
+[`06-spec-sources.md`](06-spec-sources.md)), but an autonomous run has no operator to pass it, and
+for a `git:` source the commit would otherwise die with the publisher's throwaway clone. So
+`ImprovementLoop` and `LoopService` publish with pushing forced on: **an unattended loop writes to
+the git remote by default.** That is a deliberate deviation from the product rule — treat it as a
+policy decision to revisit, not an oversight to silently fix.
 
 **Lifecycle state is advisory in v1 — the runtime does not gate on it.** That is a deliberate
 simplification with the runtime-side gate left as a separate change.

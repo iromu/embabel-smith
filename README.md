@@ -63,8 +63,8 @@ Full index: [`docs/index.md`](docs/index.md).
 | [`docs/10-self-improvement.md`](docs/10-self-improvement.md) | Detect → refine → gate → publish, gate ordering, strict-baseline rationale, what is advisory in v1. |
 | [`docs/11-spec-selection-pocs.md`](docs/11-spec-selection-pocs.md) | Shared benchmark methodology and gating for POCs 17, 19 and 23, plus the caveats that must travel with their numbers. |
 | [`docs/12-backlog.md`](docs/12-backlog.md) | Every known open or deliberately-accepted gap, each with the reason and the check that confirms it is still open. |
-| [`docs/03-embabel-spec-agent-builder-design.md`](docs/03-embabel-spec-agent-builder-design.md) | The spec-first design synthesis the product implements. |
-| [`docs/04-poc-run-results.md`](docs/04-poc-run-results.md) | POC evidence read against the hypothesis; §7 holds the authoritative shared results. |
+| [`docs/03-embabel-spec-agent-builder-design.md`](docs/03-embabel-spec-agent-builder-design.md) | The spec-first design synthesis the product grew from — design history. Where it names files or modules, `agent-spec-format.md` and `05-architecture.md` outrank it. |
+| [`docs/04-poc-run-results.md`](docs/04-poc-run-results.md) | POC evidence read against the hypothesis; §7 holds the shared results for POCs 8–21, 23 and 26. POCs 22, 24 and 25 are covered only in their own READMEs. |
 | [`docs/research/`](docs/research/) | 01 — Embabel research and decisive evidence; 02 — the "skills, not agents" literature survey. |
 
 [`AGENTS.md`](AGENTS.md) records the working conventions; the POC READMEs under `poc/` are frozen
