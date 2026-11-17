@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package com.embabel.smith.studio.generate;
+package com.embabel.smith.builder.blueprint;
 
 import com.embabel.smith.builder.core.SpecPromptCaller;
 import org.junit.jupiter.api.Test;
@@ -35,6 +35,18 @@ class ProcessExtractorTest {
 		extractor.extract("corpus body");
 		assertThat(seen[0]).isEqualTo("DISCOVERY-PROMPT");
 		assertThat(seen[1]).contains("corpus body");
+	}
+
+	@Test
+	void anExtractorWithoutATemplateRunsTheBundledDiscoveryPrompt() {
+		String[] seen = new String[1];
+		ProcessExtractor extractor = new ProcessExtractor((system, user) -> {
+			seen[0] = system;
+			return "description";
+		});
+
+		assertThat(extractor.extract("corpus body")).isEqualTo("description");
+		assertThat(seen[0]).contains("# Extract the Business Process from This Codebase");
 	}
 
 }

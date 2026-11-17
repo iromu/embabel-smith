@@ -77,7 +77,7 @@ class LoopServiceTest {
 
 		assertThat(info.ran()).isFalse();
 		assertThat(info.errorCode()).isEqualTo("MODEL_NOT_CONFIGURED");
-		verify(loop, never()).runOnce();
+		verify(loop, never()).runOnce(any());
 	}
 
 	@Test
@@ -85,7 +85,7 @@ class LoopServiceTest {
 		PendingCandidate candidate = candidate("c1", "extract");
 		ApprovalQueue queue = new ApprovalQueue();
 		queue.enqueue(candidate, false, x -> new PublishResult(Path.of("/tmp/extract"), false)); // held
-		when(loop.runOnce()).thenReturn(List.of(candidate));
+		when(loop.runOnce(null)).thenReturn(List.of(candidate));
 		when(loop.queue()).thenReturn(queue);
 		when(publisher.publish(any(), any(), anyBoolean(), anyBoolean()))
 			.thenReturn(new PublishResult(Path.of("/tmp/extract"), true));
@@ -108,7 +108,7 @@ class LoopServiceTest {
 		PendingCandidate candidate = candidate("c1", "extract");
 		ApprovalQueue queue = new ApprovalQueue();
 		queue.enqueue(candidate, false, x -> new PublishResult(Path.of("/tmp/extract"), false));
-		when(loop.runOnce()).thenReturn(List.of(candidate));
+		when(loop.runOnce(null)).thenReturn(List.of(candidate));
 		when(loop.queue()).thenReturn(queue);
 		when(publisher.publish(any(), any(), anyBoolean(), anyBoolean())).thenThrow(new IOException("boom"));
 		LoopService service = new LoopService(loop, new LoopSchedulerState(true), publisher, configured());
@@ -124,7 +124,7 @@ class LoopServiceTest {
 	@Test
 	void holdModeQueuesWithoutPublishing() throws IOException {
 		PendingCandidate candidate = candidate("c1", "extract");
-		when(loop.runOnce()).thenReturn(List.of(candidate));
+		when(loop.runOnce(null)).thenReturn(List.of(candidate));
 		LoopService service = new LoopService(loop, new LoopSchedulerState(false), publisher, configured());
 
 		IterationInfo info = service.trigger();

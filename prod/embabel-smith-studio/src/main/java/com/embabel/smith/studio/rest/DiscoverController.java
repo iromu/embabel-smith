@@ -5,7 +5,7 @@
 
 package com.embabel.smith.studio.rest;
 
-import com.embabel.smith.studio.discover.BusinessProcessDiscovery;
+import com.embabel.smith.builder.blueprint.BusinessProcessDiscovery;
 import com.embabel.smith.studio.rest.dto.DiscoverRequest;
 import com.embabel.smith.studio.rest.dto.DiscoverResponse;
 import com.embabel.smith.studio.store.ProcessStore;

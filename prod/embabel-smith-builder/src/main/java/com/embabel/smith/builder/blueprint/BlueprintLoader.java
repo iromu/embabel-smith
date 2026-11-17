@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package com.embabel.smith.studio.generate;
+package com.embabel.smith.builder.blueprint;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -23,7 +23,12 @@ import java.util.stream.Stream;
  */
 public class BlueprintLoader {
 
-	/** Hard cap on the concatenated corpus, in characters (~200K). */
+	/**
+	 * Hard cap on the corpus this loader assembles for a generation to run from, in
+	 * characters (~200K). The cap on the corpus discovery presents is a different, larger
+	 * boundary in {@link BusinessProcessDiscovery}; the two are deliberately not the same
+	 * value.
+	 */
 	private static final int MAX_CHARS = 200_000;
 
 	/**

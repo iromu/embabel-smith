@@ -6,8 +6,6 @@
 package com.embabel.smith.studio.config;
 
 import java.io.IOException;
-import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -18,6 +16,9 @@ import com.embabel.agent.core.AgentPlatform;
 import com.embabel.common.ai.model.LlmOptions;
 import com.embabel.smith.builder.BuildOptions;
 import com.embabel.smith.builder.BuilderService;
+import com.embabel.smith.builder.blueprint.BlueprintLoader;
+import com.embabel.smith.builder.blueprint.BusinessProcessDiscovery;
+import com.embabel.smith.builder.blueprint.ProcessExtractor;
 import com.embabel.smith.builder.core.AgentSpecGenerator;
 import com.embabel.smith.builder.core.AgentSpecGenerators;
 import com.embabel.smith.builder.core.AiSpecPromptCaller;
@@ -43,10 +44,7 @@ import com.embabel.smith.runtime.core.TrustTier;
 import com.embabel.smith.runtime.trace.JsonlTraceStore;
 import com.embabel.smith.specsource.GitSpecSource;
 import com.embabel.smith.specsource.SpecSource;
-import com.embabel.smith.studio.discover.BusinessProcessDiscovery;
-import com.embabel.smith.studio.generate.BlueprintLoader;
 import com.embabel.smith.studio.generate.FlowValidator;
-import com.embabel.smith.studio.generate.ProcessExtractor;
 import com.embabel.smith.studio.improve.ImprovementLoop;
 import com.embabel.smith.studio.loop.LoopSchedulerState;
 import com.embabel.smith.studio.rest.BuildController;
@@ -256,14 +254,14 @@ public class StudioConfiguration {
 	}
 
 	/**
-	 * The model-based process extraction: the discovery prompt plus the model caller the
-	 * workspace shares with generation.
+	 * The model-based process extraction: the builder's discovery prompt plus the model
+	 * caller the workspace shares with generation.
 	 * @param specPromptCaller the model caller to run the discovery prompt through.
 	 * @return the model-based process extraction.
 	 */
 	@Bean
 	public ProcessExtractor processExtractor(SpecPromptCaller specPromptCaller) {
-		return new ProcessExtractor(specPromptCaller, loadPrompt("business_process_discovery.jinja"));
+		return new ProcessExtractor(specPromptCaller);
 	}
 
 	/**
@@ -275,23 +273,6 @@ public class StudioConfiguration {
 	@Bean
 	public ExtractController.ExtractFn extractFn(ProcessExtractor extractor) {
 		return extractor::extract;
-	}
-
-	/**
-	 * Reads a prompt template from the classpath {@code prompts/} directory.
-	 * @param name the prompt template name.
-	 * @return the prompt template text.
-	 */
-	private static String loadPrompt(String name) {
-		try (InputStream in = StudioConfiguration.class.getResourceAsStream("/prompts/" + name)) {
-			if (in == null) {
-				throw new IllegalStateException("prompt resource not found: /prompts/" + name);
-			}
-			return new String(in.readAllBytes(), StandardCharsets.UTF_8);
-		}
-		catch (IOException ex) {
-			throw new IllegalStateException("Failed to load prompt " + name + ": " + ex.getMessage(), ex);
-		}
 	}
 
 	/**

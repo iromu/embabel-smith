@@ -3,7 +3,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package com.embabel.smith.studio.generate;
+package com.embabel.smith.builder.blueprint;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 
 import com.embabel.smith.builder.core.SpecPromptCaller;
 
@@ -18,13 +22,37 @@ import com.embabel.smith.builder.core.SpecPromptCaller;
  */
 public class ProcessExtractor {
 
+	/** Classpath location of the bundled discovery prompt. */
+	private static final String PROMPT_RESOURCE = "/prompts/business_process_discovery.jinja";
+
 	private final SpecPromptCaller caller;
 
 	private final String template;
 
+	public ProcessExtractor(SpecPromptCaller caller) {
+		this(caller, bundledPrompt(PROMPT_RESOURCE));
+	}
+
 	public ProcessExtractor(SpecPromptCaller caller, String template) {
 		this.caller = caller;
 		this.template = template;
+	}
+
+	/**
+	 * Reads a bundled prompt from the builder's resources.
+	 * @param resource the classpath location of the prompt.
+	 * @return the prompt template text.
+	 */
+	private static String bundledPrompt(String resource) {
+		try (InputStream in = ProcessExtractor.class.getResourceAsStream(resource)) {
+			if (in == null) {
+				throw new IllegalStateException("prompt resource not found: " + resource);
+			}
+			return new String(in.readAllBytes(), StandardCharsets.UTF_8);
+		}
+		catch (IOException ex) {
+			throw new IllegalStateException("Failed to load prompt " + resource + ": " + ex.getMessage(), ex);
+		}
 	}
 
 	/**

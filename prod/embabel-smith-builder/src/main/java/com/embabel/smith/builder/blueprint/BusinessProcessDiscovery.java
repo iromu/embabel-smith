@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package com.embabel.smith.studio.discover;
+package com.embabel.smith.builder.blueprint;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -28,7 +28,11 @@ import java.util.stream.Stream;
  */
 public class BusinessProcessDiscovery {
 
-	/** Hard cap on the total loaded corpus, in characters (~300K). */
+	/**
+	 * Hard cap on the corpus this loader presents, in characters (~300K). The cap on the
+	 * corpus a generation runs from is a different, smaller boundary in
+	 * {@link BlueprintLoader}; the two are deliberately not the same value.
+	 */
 	private static final int MAX_CHARS = 300_000;
 
 	public DiscoverResult load(String path, String url) {
@@ -89,8 +93,7 @@ public class BusinessProcessDiscovery {
 			throw new IllegalStateException("Failed to create a temp dir for the clone: " + ex.getMessage(), ex);
 		}
 		try {
-			ProcessBuilder pb = new ProcessBuilder("git", "clone", "--depth", "1", url, dir.toString());
-			pb.redirectErrorStream(true);
+			ProcessBuilder pb = cloneProcess(url, dir);
 			Process process = pb.start();
 			String output = new String(process.getInputStream().readAllBytes());
 			boolean finished = process.waitFor(180, TimeUnit.SECONDS);
@@ -110,6 +113,22 @@ public class BusinessProcessDiscovery {
 			Thread.currentThread().interrupt();
 			throw new IllegalStateException("git clone interrupted for " + url, ex);
 		}
+	}
+
+	/**
+	 * The shallow-clone process for a repository, in the same non-interactive posture
+	 * {@code GitPublisher} uses: a private repository has to fail rather than wait for
+	 * credentials nobody is at a terminal to type.
+	 * @param url the repository URL to clone.
+	 * @param dir the directory to clone into.
+	 * @return the process builder, not yet started.
+	 */
+	static ProcessBuilder cloneProcess(String url, Path dir) {
+		ProcessBuilder pb = new ProcessBuilder("git", "-c", "core.askpass=false", "clone", "--depth", "1", url,
+				dir.toString());
+		pb.environment().put("GIT_TERMINAL_PROMPT", "0");
+		pb.redirectErrorStream(true);
+		return pb;
 	}
 
 	private static Path expandHome(String p) {

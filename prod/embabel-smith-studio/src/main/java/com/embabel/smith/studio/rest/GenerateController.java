@@ -5,8 +5,8 @@
 
 package com.embabel.smith.studio.rest;
 
+import com.embabel.smith.builder.blueprint.BlueprintLoader;
 import com.embabel.smith.common.config.ModelEndpointConfig;
-import com.embabel.smith.studio.generate.BlueprintLoader;
 import com.embabel.smith.studio.rest.dto.GenerateRequest;
 import com.embabel.smith.studio.rest.dto.GenerateResponse;
 

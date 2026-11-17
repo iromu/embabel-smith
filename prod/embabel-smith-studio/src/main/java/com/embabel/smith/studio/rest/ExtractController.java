@@ -7,8 +7,8 @@ package com.embabel.smith.studio.rest;
 
 import java.util.Map;
 
+import com.embabel.smith.builder.blueprint.BusinessProcessDiscovery;
 import com.embabel.smith.common.config.ModelEndpointConfig;
-import com.embabel.smith.studio.discover.BusinessProcessDiscovery;
 import com.embabel.smith.studio.rest.dto.ExtractRequest;
 import com.embabel.smith.studio.rest.dto.ExtractResponse;
 
