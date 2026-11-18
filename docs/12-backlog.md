@@ -138,3 +138,10 @@ it: capability *renames* cannot be expressed as deltas — a delta operates on r
 must not move or rename a capability — so the 2026-11-11 vocabulary rename was applied as direct
 edits, with renames ordered before archiving so archiving could not create incomplete capability
 files.
+
+
+## Misc
+
+- a2a operations on runtime module: Send Message, Send Streaming Message, Get Task, List Tasks, Cancel Task, Get Agent Card.
+- Spec https://a2a-protocol.org/latest/specification/#11-key-goals-of-a2a
+- This should reuse embabel and Spring AI libs to handle a2a protocol definition
