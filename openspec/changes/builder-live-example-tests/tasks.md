@@ -1,0 +1,124 @@
+# Tasks
+
+Depends on `builder-docs-ingestion`: the extraction suite drives ingestion through the builder, and
+while ingestion lives in the studio the builder's test sources cannot reach it.
+
+## 1. Opt-in wiring
+
+- [x] 1.1 Add `<excludedGroups>${test.excludedGroups}</excludedGroups>` to the root pom's Surefire
+      `pluginManagement` block with a `test.excludedGroups` property defaulting to `live`, and verify
+      `make test-module MODULE=prod/embabel-smith-builder` runs zero live tests and passes with no
+      endpoint configured.
+- [x] 1.2 Tag the four endpoint-gated tests `@Tag("live")` — builder `LiveBuildIntegrationTest`,
+      runtime `LiveRunIntegrationTest`, studio `improve/RestIntegrationTest`, studio
+      `improve/LiveLoopIntegrationTest` — keeping each `@EnabledIfEnvironmentVariable` in place, and
+      verify a default run reports them not-run while an opted-in run selects them. (The plan named
+      three; the runtime's live test is gated the same way and runs under `make test` too, so
+      leaving it out would have left the first requirement unmet.)
+- [x] 1.3 Add a `test-live` target to the `Makefile` that sources `~/.config/env/llm.env`, exports the
+      endpoint variables and passes `-Dtest.excludedGroups= -Dgroups=live`, add its `make help` line,
+      and verify the target's selected-test list contains the live classes and nothing else.
+- [x] 1.4 Record in the `Makefile` comment and the `README.md` run book that `mvn test -Dgroups=live`
+      alone selects nothing, because the default exclusion still applies, and verify the documented
+      invocation is byte-identical to the one the target runs.
+- [x] 1.5 Document the convention in `docs/05-architecture.md` beside the existing build entry points,
+      and verify the page names the property and the target that actually exist.
+
+## 2. Example harness plumbing
+
+> Superseded 2026-11-17 — built, then removed with the suites that used it. The scripts under
+> `examples/` need no repo-root helper and no cell matrix.
+
+
+- [x] 2.1 Write the repository-root helper that reads `smith.repoRoot` and falls back to walking up
+      from `user.dir` to a directory holding both `pom.xml` and `examples/`, and verify a test resolves
+      it from a module working directory and fails naming both candidates when neither is present.
+- [x] 2.2 Configure the builder module's Surefire to pass `smith.repoRoot=${maven.multiModuleProjectDirectory}`
+      and `<runOrder>alphabetical</runOrder>`, and verify a probe test reports the resolved examples
+      path and the three suites' execution order.
+- [x] 2.3 Define the declared example — `examples/cases/<slug>/case.yml` naming blueprint, targets,
+      techniques and eval tasks — plus its loader and directory scan, and verify loader tests cover a
+      valid case, a case missing a required field which the failure names, and an unrecognised target
+      or technique value.
+- [x] 2.4 Write the per-cell `result.json` writer, documenting its fields on the class that writes it,
+      and verify a round-trip test reads back stage, score, lift, issues and model.
+
+## 3. Extraction suite
+
+> Superseded 2026-11-17 — the prompt it drove is written for a codebase, not for these
+> blueprints. See the Direction change in `proposal.md`.
+
+
+- [ ] 3.1 Implement `BlueprintExtractionLiveTest`: for each declared example, load and assemble its
+      blueprint through the builder and write the extracted description to
+      `examples/cases/<slug>/description.md`, and verify a live run leaves one non-empty description per
+      declared example.
+- [x] 3.2 Verify the skip path: with the live group requested and no endpoint configured, the suite is
+      reported skipped rather than failed.
+
+## 4. Generation suite
+
+> Superseded 2026-11-17 — nine cells at ~200 model calls and 50 minutes of endpoint time
+> published nothing. `examples/generate-spec.sh` and `examples/generate-skill.sh` do one cell each,
+> by hand.
+
+
+- [x] 4.1 Implement `ExampleGenerationLiveTest` parameterized over the cells each example declares,
+      consuming the extracted description and failing any example whose description is absent with a
+      message naming `BlueprintExtractionLiveTest`, and verify a case with no description fails that
+      way without any extraction call being made.
+- [x] 4.2 Wire each cell so the `BuilderAgent` scratch directory is the cell's `candidates/`, the
+      publish target is the cell's `published/`, and `overwrite` is set, and verify a rerun of one cell
+      replaces its artifacts instead of colliding at `publish`.
+- [x] 4.3 Write `report.md` (the build report verbatim) and `result.json` for both outcomes — published
+      and blocked-at-a-gate — and verify a blocked cell still leaves both files naming its stage, and
+      that a blocked cell does not by itself fail the run.
+- [x] 4.4 Keep the `embabel` cell in the matrix as evidence, recording the `DANGLING_TYPE_REF` block the
+      technique is known to produce, and verify the report shows that cell rather than omitting it.
+
+## 5. Reporting suite
+> Superseded 2026-11-17 with the suites whose results it aggregated.
+
+
+- [x] 5.1 Implement `ExampleReportLiveTest` to fail when a declared cell produced no `result.json`, and
+      verify that deleting one result file makes it name that cell.
+- [x] 5.2 Render `examples/generated/REPORT.md` with one row per declared cell — stage reached, eval
+      score, skill lift, model, wall time — reading the values from `result.json` rather than
+      re-deriving them, and verify the row count equals the declared cell count.
+- [x] 5.3 Record quality without gating on it, and verify a cell with a zero score or zero lift is
+      rendered and leaves the suite passing.
+
+## 6. Integration checks
+
+- [x] 6.1 Superseded: the matrix was run once, and its outcome (nine cells, 49.9 min, zero
+      published) is what ended it. See the Direction change in `proposal.md`.
+- [x] 6.2 Verify `make test` and `make lint` are green offline with the live group excluded, so the
+      default reactor is unaffected by everything above.
+
+## Workflow follow-up
+
+- Decided 2026-11-17: generated output is gitignored (`examples/out/`), and both the `cases/` tree
+  and the extracted `description.md` files are gone with the suites that wrote them.
+- The matrix-sizing note turned out to be the whole finding: nine cells was ~200 model calls, and
+  that is why the unit of work is now one blueprint, one target, one deliberate run.
+- Archive after a full live run has been captured, and re-ingest `.wiki/` plus republish once
+  `docs/05-architecture.md` changes.
+
+## 7. Scripts in place of the matrix (2026-11-17)
+
+- [x] 7.1 `examples/smith-cli.sh` — the bootstrap the scripts share: load the endpoint env, resolve
+      the builder's runtime classpath (cached under `/tmp` keyed on the module pom), start the CLI
+      with `java -cp`, because `spring-boot:run` cannot pass picocli argv. Verify a run resolves 206
+      classpath entries offline and reaches `SmithBuilderApplication.main`.
+- [x] 7.2 `examples/generate-spec.sh <blueprint>` — one blueprint to one agent spec through
+      `smith build`, writing `report.md` and `exit.txt` whether or not a gate let it through, with
+      its header stating the per-build call cost. Verify the arg plumbing, blueprint lookup and
+      output folders against a dead endpoint.
+- [x] 7.3 `examples/generate-skill.sh <blueprint>` — the same for the skill target, its header
+      naming the ~15-19 calls and why (four calls per eval scenario). Verify as above.
+- [x] 7.4 `examples/README.md` as the run book, including why no script passes `--extract`, and
+      `examples/out/` gitignored.
+- [ ] 7.5 Run both scripts once against a live endpoint and read the reports — the scripts are
+      verified as plumbing, not yet as a build that published.
+- [ ] 7.6 Deferred: the live test worth adding — a small blueprint with a known expected agent spec
+      and skill, asserted rather than recorded.

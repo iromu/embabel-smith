@@ -1,0 +1,17 @@
+---
+stepType: "action"
+name: "trader_proposal"
+description: "Convert the investment plan into a concrete transaction proposal."
+inputTypeNames:
+- "InvestmentPlan"
+- "TechnicalReport"
+- "UserInput"
+outputTypeName: "TransactionProposal"
+prompt: "You are the Trader. Convert the Investment Plan {{investmentPlan}} into a\
+  \ concrete transaction proposal. Use the Technical Report {{technicalReport}} for\
+  \ price structure and the Operator Request {{userInput}} for holdings context if\
+  \ provided. Specify an action (Buy/Hold/Sell), reasoning, entry price, stop-loss,\
+  \ and position sizing as absolute prices."
+pre: []
+post: []
+toolGroups: []

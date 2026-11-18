@@ -33,7 +33,10 @@ each is callable on its own:
 | --- | --- | --- |
 | load | `blueprint/BusinessProcessDiscovery` | 300K of `.md`/`.markdown`, from a folder or a `git clone --depth 1` bounded to 180 s |
 | assemble | `blueprint/BlueprintLoader` | 200K corpus, every document labelled with its path relative to the root |
-| extract | `blueprint/ProcessExtractor` | the `business_process_discovery` prompt through `SpecPromptCaller`; the answer is plain text, not a spec to parse |
+| extract | `blueprint/ProcessExtractor` | the `business_process_discovery` prompt through `SpecPromptCaller`; the answer is plain text, not a spec to parse. The prompt wants a *codebase*, so this is the repository-to-blueprint step, not a step to run over a blueprint — see the note under the CLI |
+| corpus | `blueprint/CodebaseCorpus` | 200K read from a repository's source *and* documents, the documents capped at half of it so a heavily documented project cannot crowd its own code out |
+| archive | `blueprint/ZipArchive` | a repository archive (a forge's repository download) extracted to a temp directory, with the wrapper directory the forge adds lifted so the labels stay the repository's own; an entry named to write outside the extraction directory is refused |
+| blueprint | `blueprint/BlueprintGenerator` | fetch → corpus → extract → split, writing the seven deliverables and an index that states how much of the repository the model did not see |
 
 **These are pre-stages, not pipeline stages.** Each ends in a `String` and stops there, so
 `BuilderService.build(String, PublishTarget, BuildOptions)` keeps its signature and the gate pipeline
@@ -177,6 +180,9 @@ on the runtime module.
 smith build ("<description>" | --docs <path>) --out <folder:…|git:…>
             [--extract] [--target agent-spec|skill]
             [--technique single-shot|embabel] [--max-refine <n>] [--overwrite] [--push]
+
+smith blueprint (--repo <git-url> | --zip <archive> | --path <dir>) --out <dir>
+                [--subdir <directory-in-the-repo>] [--overwrite]
 ```
 
 Exactly one of `<description>` and `--docs` is required; naming neither, or naming both, is a usage
@@ -184,9 +190,69 @@ error. `--extract` is a modifier on `--docs`: without it the assembled corpus go
 the description, with it the discovery prompt runs first and the build gets the extracted business-
 process description. Extracting costs a model call, which is why it is opt-in.
 
-`cli/SmithBuilderCommand` is the root (`smith`); `cli/BuildCommand` is `build`. As in the runtime,
+`smith blueprint` is the other command, and it ends in **documents** rather than a published
+capability: it reconstructs the business process a repository implements and writes the seven
+discovery deliverables plus an index, which is exactly the input `--docs` reads. It shares nothing
+with the build pipeline — no eval, no refinement, no publish — because an artifact that is read by a
+human has no gate to belong to. Its one check is completeness: an answer that carried four of the
+seven deliverables writes those four, names the three it missed, and exits 1. The stages live in
+`blueprint/BlueprintGenerator` (fetch → corpus → extract → split, where a fetch is a shallow clone or an
+archive extraction), and `cli/BlueprintCommand` holds
+no more logic than `BuildCommand` does.
+
+`cli/SmithBuilderCommand` is the root (`smith`); `cli/BuildCommand` is `build` and
+`cli/BlueprintCommand` is `blueprint`. As in the runtime,
 the CLI wraps `BuilderService` and holds no build logic — what it does hold is the choice of input,
 composing the ingestion pre-stages above into the one description the build takes.
+
+## Verifying it against a real model
+
+Building against a live endpoint is a run you start by hand, not a test phase. The scripts are in
+`examples/` and they drive the product CLI, so a green run is evidence about the path a user takes
+rather than about a test double of it.
+
+| Script | Does | Leaves |
+| --- | --- | --- |
+| `generate-blueprint.sh <codebase>` | `smith blueprint --repo\|--zip\|--path …` | `examples/blueprints/<name>/` and `examples/out/<name>/blueprint/` |
+| `generate-spec.sh <blueprint>` | `smith build --docs … --target agent-spec` | `examples/out/<blueprint>/agent-spec-<technique>/` |
+| `generate-skill.sh <blueprint>` | `smith build --docs … --target skill` | `examples/out/<blueprint>/skill/` |
+| `smith-cli.sh` | the shared "how to start the CLI" bootstrap the three source | — |
+
+**Cost is why this is manual.** A matrix once lived in the builder's test sources as three
+parameterised JUnit suites — nine cells (three blueprints × two techniques × the skill target),
+about two hundred model calls and fifty minutes of endpoint time, every cell ending blocked or
+errored because the gate stops or the endpoint 500s. A test phase that cannot go green for a
+reason in the code, and charges a GPU to find that out, gets skipped until it verifies nothing.
+Each script states its own cost in its header instead — the skill path is ~15–19 calls per
+blueprint because the eval runner spends four calls per scenario — so the decision to pay stays
+with the person running it.
+
+**A blueprint is a directory.** `examples/blueprints/<Name>/` holds the documents, and that is the
+whole registry: a new example is a new directory, and a script takes its slug case- and
+hyphen-insensitively. There is no `case.yml` and no cell matrix. `examples/out/` is gitignored —
+regenerated evidence, not authored content.
+
+**No build script passes `--extract`.** `business_process_discovery.jinja` asks for a *codebase* — "Analyse
+the entire codebase", "Do not describe classes, functions, modules or files" — and returns the seven
+discovery deliverables. A blueprint already *is* that output (`blueprints/TradingAgents/` is a copy
+of hand-written business documentation), so extraction over it re-summarises business prose into
+less detailed business prose and charges a full-context call for it. `--extract` remains a modifier
+on `--docs`, and `--docs` reads `.md`/`.markdown`/`.txt` only — so what belongs behind it is a
+repository's documentation, never a blueprint.
+
+**The script that does run the discovery prompt is `generate-blueprint.sh`, over a repository.**
+That is the job the prompt was written for, and the last gap in the ingestion story is closed:
+`smith blueprint` fetches the codebase — a shallow clone, an archive extraction, or a checkout read
+where it sits — reads its source *and* documents into a bounded corpus, and writes the seven
+deliverables the other two scripts consume. One call, and the largest prompt and longest completion
+the builder sends — which is why it is a hand-started script too, and why the count of files the cap
+left out is part of both its report and the index it writes. The fetch is the part an example does not
+have to pay for twice: a repository download yields the same corpus as the clone (measured identical on
+the example repository), so iterating on an example means pointing the script at an archive.
+
+`make test-live` still runs the four endpoint-gated integration tests that carry `@Tag("live")`; the
+examples are not part of it. The live test worth adding next is the cheap one — a small blueprint
+with a known expected spec and skill, which can be asserted rather than merely recorded.
 
 ## What the builder does *not* do
 

@@ -1,0 +1,18 @@
+---
+stepType: "action"
+name: "bull_researcher"
+description: "Build the strongest evidence-based case FOR investing."
+inputTypeNames:
+- "TechnicalReport"
+- "SentimentReport"
+- "NewsMacroReport"
+- "FundamentalsReport"
+outputTypeName: "BullArgument"
+prompt: "You are the Bull Researcher. Review the following analyst reports: Technical\
+  \ {{technicalReport}}, Sentiment {{sentimentReport}}, News/Macro {{newsMacroReport}},\
+  \ and Fundamentals {{fundamentalsReport}}. Build the strongest evidence-based case\
+  \ FOR investing in this instrument, highlighting growth, competitive advantage,\
+  \ and positive indicators. Directly rebut potential bearish arguments."
+pre: []
+post: []
+toolGroups: []
