@@ -24,6 +24,7 @@ import com.embabel.smith.common.model.AgentSpecManifest;
 import com.embabel.smith.runtime.trace.JsonlTraceStore;
 import com.embabel.smith.specsource.FolderSpecSource;
 import com.embabel.smith.specsource.SpecSource;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.junit.jupiter.api.io.TempDir;
@@ -42,6 +43,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * source. Skipped when the model endpoint is not configured.
  */
 @SpringBootTest
+@Tag("live")
 @EnabledIfEnvironmentVariable(named = "OPENAI_CUSTOM_BASE_URL", matches = ".+")
 class LiveLoopIntegrationTest {
 

@@ -79,6 +79,28 @@ mvn -q verify
 Every module's offline tests are green without a model endpoint. Tests that exercise the model are
 **endpoint-gated** and are not run offline.
 
+### Live tests are opt-in by tag
+
+Every test that needs a real model endpoint carries `@Tag("live")`, and the root `pom.xml` excludes
+that group through the overridable `test.excludedGroups` property (default `live`). So a plain
+`mvn test` runs no live test whether or not an endpoint happens to be configured — and
+`make test` still exports the endpoint env, it just no longer decides whether live tests run.
+
+`make test-live` is the one supported way to opt in: it sources `~/.config/env/llm.env`, exports the
+endpoint variables, and runs the live group. The equivalent by hand is the flag pair below, and the
+pair matters — **`mvn test -Dgroups=live` alone selects nothing**, because Surefire applies the
+selection and the default exclusion together and the exclusion still says "exclude `live`". Clearing
+the exclusion is the other half of opting in:
+
+```bash
+make test-live                                        # the documented entry point
+./mvnw test -Dtest.excludedGroups= -Dgroups=live      # the same thing, by hand
+```
+
+On a machine with no endpoint configured, an opted-in run reports the live tests **skipped** rather
+than failed: each of them keeps `@EnabledIfEnvironmentVariable` alongside the tag. The tag answers
+"should this run by default", the env check answers "can it run here".
+
 The 26 POC modules are **not** in the default reactor — they sit behind the `poc` Maven profile, so
 the commands above cover `smith-common` and `prod/` only. Add `-Ppoc` (or `POC=1` to a `make`
 target) to build or test them too.

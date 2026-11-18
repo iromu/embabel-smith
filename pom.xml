@@ -43,6 +43,12 @@
         <maven-enforcer-plugin.version>3.6.3</maven-enforcer-plugin.version>
         <checkstyle.version>12.3.1</checkstyle.version>
         <io.spring.javaformat.version>0.0.48</io.spring.javaformat.version>
+
+        <!-- JUnit tags excluded from the default test run. Tests that need a live model endpoint
+             carry @Tag("live"), so `mvn test` is green with no endpoint configured. Override with
+             -Dtest.excludedGroups= to opt in; `make test-live` is the supported form, because
+             -Dgroups=live alone selects nothing (the exclusion still applies). -->
+        <test.excludedGroups>live</test.excludedGroups>
     </properties>
 
     <modules>
@@ -275,6 +281,11 @@
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-surefire-plugin</artifactId>
                     <version>${maven-surefire-plugin.version}</version>
+                    <!-- Declared here rather than per module so a new module cannot forget the
+                         policy: the live group is off unless a run asks for it. -->
+                    <configuration>
+                        <excludedGroups>${test.excludedGroups}</excludedGroups>
+                    </configuration>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>

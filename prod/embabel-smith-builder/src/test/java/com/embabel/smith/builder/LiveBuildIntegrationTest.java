@@ -16,6 +16,7 @@ import com.embabel.smith.builder.eval.AgentSpecInvokerFactory;
 import com.embabel.smith.builder.eval.AiPromptRewriter;
 import com.embabel.smith.builder.eval.EvalTask;
 import com.embabel.smith.builder.publish.PublishTarget;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.junit.jupiter.api.io.TempDir;
@@ -41,6 +42,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * requirement claims.
  */
 @SpringBootTest
+@Tag("live")
 @EnabledIfEnvironmentVariable(named = "OPENAI_CUSTOM_BASE_URL", matches = ".+")
 class LiveBuildIntegrationTest {
 

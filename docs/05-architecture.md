@@ -141,12 +141,11 @@ the product's source of model names.
 Use the root `Makefile` rather than inventing Maven invocations (`make help` lists them).
 
 - `make build` — compile the reactor, tests skipped.
-- `make test` / `make test-module MODULE=prod/embabel-smith-studio` — the target sources
-  `~/.config/env/llm.env` **when that file exists** and exports the endpoint vars, so `Live*` tests
-  actually run instead of silently skipping. Consequence, on a machine that has the file: `make test`
-  never exercises the offline path. To run the
-  deterministic suite, unset the endpoint:
-  `env -u OPENAI_CUSTOM_BASE_URL -u OPENAI_CUSTOM_API_KEY -u OPENAI_CUSTOM_MODELS -u EMBABEL_MODELS_DEFAULT_LLM ./mvnw test`.
+- `make test` / `make test-module MODULE=prod/embabel-smith-studio` — the offline suite. The target
+  still sources `~/.config/env/llm.env` **when that file exists** and exports the endpoint vars, but
+  since 2026-11-17 that no longer decides whether live tests run (see the next bullet); the export is
+  there so a module's own endpoint-aware *wiring* configures the same way it does in production.
+- `make test-live` — the **only** supported opt-in to the live group. See below.
 - `make lint` / `make checkstyle-module MODULE=…` — the project's SpringChecks.
 - **`POC=1` on any target** adds `-Ppoc`, bringing the 26 POC modules into the reactor
   (`make test POC=1`, `make lint POC=1`). A `MODULE` under `poc/` implies it. To run a POC module's
@@ -154,6 +153,31 @@ Use the root `Makefile` rather than inventing Maven invocations (`make help` lis
   `-DskipTests`, so `make module … GOAL=test` compiles without running anything. `make lint` without
   it no longer checks POC sources — the pre-commit hook is product-only now, and the POCs are frozen
   anyway.
+
+### The live group is opt-in (`test.excludedGroups`)
+
+Every test that needs a real model endpoint carries `@Tag("live")`. The root `pom.xml`'s Surefire
+`pluginManagement` block — inherited by every module, so a new module cannot forget the policy —
+excludes the group through the property `test.excludedGroups`, which defaults to `live`. A plain
+`mvn test` therefore runs no live test whether or not an endpoint is configured, which is what makes
+the default reactor green on a machine that has no model.
+
+`make test-live` sources the endpoint env and runs the group. By hand it is
+`./mvnw test -Dtest.excludedGroups= -Dgroups=live`, and **both flags are required**:
+`mvn test -Dgroups=live` alone selects *nothing*, because Surefire applies the group selection and
+the exclusion together and the exclusion still says "exclude `live`". Forgetting to clear the
+exclusion is silent — the run goes green having executed zero live tests.
+
+Each live test keeps `@EnabledIfEnvironmentVariable(named = "OPENAI_CUSTOM_BASE_URL")` *beside* the
+tag, so the two gates answer different questions: the tag says "should this run by default", the env
+condition says "can it run here". An opted-in run on a laptop with no endpoint is a wall of skips,
+not a wall of failures. Removing the env condition is what turns that into failures; removing the tag
+is what makes `make test` depend on a model agreeing.
+
+The four tests this covers today are the builder's `LiveBuildIntegrationTest`, the runtime's
+`LiveRunIntegrationTest` and the studio's `improve/RestIntegrationTest` and
+`improve/LiveLoopIntegrationTest`, plus the builder's example suites (see
+[`08-builder.md`](08-builder.md)).
 
 **Checkstyle runs in Maven's `validate` phase**, so a style violation fails `make build` and
 `make test` too, not just `make lint`. Because the reactor stops at the first failing module, one
