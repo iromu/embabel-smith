@@ -70,7 +70,7 @@ public class SingleShotProcessSpecGenerator implements ProcessSpecGenerator {
 	@Override
 	public ProcessDraft generateProcess(String description, String model) {
 		String user = "Below is a business-process description. Produce the multi-agent process JSON for "
-				+ "the core end-to-end process.\n\n" + description;
+				+ "the core end-to-end process.\n\n" + PromptData.block("document", description);
 		String raw = this.caller.call(this.template, user, model);
 		MultiProcessResponse response = parse(raw);
 

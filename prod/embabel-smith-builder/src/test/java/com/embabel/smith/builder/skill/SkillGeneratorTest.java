@@ -76,6 +76,19 @@ class SkillGeneratorTest {
 	}
 
 	@Test
+	void theDescriptionArrivesInsideDocumentTags() {
+		List<String> users = new ArrayList<>();
+		SpecPromptCaller caller = (system, user) -> {
+			users.add(user);
+			return "{\"description\": \"d\", \"body\": \"b\"}";
+		};
+
+		new SkillGenerator(caller, "sys").generate("cold-store-goods-receipt", DESCRIPTION);
+
+		assertThat(users.get(0)).contains("<document>\n" + DESCRIPTION + "\n</document>");
+	}
+
+	@Test
 	void theNameIsFixedByTheDescriptionAndTheModelSeesBoth() {
 		List<String> users = new ArrayList<>();
 		// The model tries to name the skill itself; the caller-supplied name wins,

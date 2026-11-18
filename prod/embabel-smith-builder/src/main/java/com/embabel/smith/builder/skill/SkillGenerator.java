@@ -5,6 +5,7 @@
 
 package com.embabel.smith.builder.skill;
 
+import com.embabel.smith.builder.core.PromptData;
 import com.embabel.smith.builder.core.SpecPromptCaller;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -44,7 +45,7 @@ public class SkillGenerator {
 	 */
 	public Skill generate(String skillName, String description) {
 		String user = "Below is a business-process description. Generate the skill for the skill named '" + skillName
-				+ "'.\n\n" + description;
+				+ "'.\n\n" + PromptData.block("document", description);
 		JsonNode node = LlmJson.callAndParse(this.caller, this.prompt, user, 3, "the generated skill",
 				(raw) -> this.json.readTree(raw));
 		String skillDescription = node.path("description").asText("");

@@ -97,7 +97,7 @@ class SkillBuilderServiceTest {
 	}
 
 	private static int countExpectations(String gradingRequest) {
-		String tail = gradingRequest.substring(gradingRequest.indexOf("EXPECTATIONS:"));
+		String tail = gradingRequest.substring(gradingRequest.indexOf("<expectations>"));
 		return (int) tail.lines().filter((line) -> line.matches("^\\d+\\. .*")).count();
 	}
 
