@@ -34,8 +34,11 @@ Remaining: OpenSpec "capture" of the design, and optional model-based discovery
 7. [x] Build SPA, run app, Playwright the pipeline, verify the flow (programmatically — see Blockers), iterate
 8. [x] DB (docker) — NOT needed for v1; specs/docs are ephemeral per run (see note below)
 9. [x] OpenSpec: capture the design — change `07-smith-studio-process-workspace`
-10. [ ] Optional: model-based discovery — run `business_process_discovery.jinja` against a raw
-    codebase/docs dir to extract the process (currently `/api/discover` only loads existing docs)
+10. [x] Optional: model-based discovery — run `business_process_discovery.jinja` against a raw
+    codebase/docs dir to extract the process. Built 2026-11-17 as `smith blueprint`
+    (`blueprint/CodebaseCorpus` + `BlueprintGenerator`), driven by hand from
+    `examples/generate-blueprint.sh`, over a clone, an archive or a checkout. `/api/discover`
+    still only loads existing docs.
 
 ## Blockers (things I could not resolve on my own)
 - **DB not needed for v1** — generated specs and loaded docs are per-run and ephemeral

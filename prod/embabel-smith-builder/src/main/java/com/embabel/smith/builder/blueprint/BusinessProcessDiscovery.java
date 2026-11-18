@@ -44,8 +44,13 @@ public class BusinessProcessDiscovery {
 			return new DiscoverResult("folder", dir.toString(), readDocs(dir));
 		}
 		if (url != null && !url.isBlank()) {
-			Path dir = clone(url.trim());
-			return new DiscoverResult("git", url.trim(), readDocs(dir));
+			Path dir = cloneRepo(url.trim());
+			try {
+				return new DiscoverResult("git", url.trim(), readDocs(dir));
+			}
+			finally {
+				deleteQuietly(dir);
+			}
 		}
 		throw new IllegalArgumentException("Provide a docs path or a repository URL.");
 	}
@@ -84,7 +89,13 @@ public class BusinessProcessDiscovery {
 		return docs;
 	}
 
-	private Path clone(String url) {
+	/**
+	 * Shallow-clones a repository into a fresh temp directory and returns it. The caller
+	 * owns the directory and is expected to {@link #deleteQuietly delete} it when done.
+	 * @param url the repository URL to clone
+	 * @return the temp directory holding the clone
+	 */
+	static Path cloneRepo(String url) {
 		Path dir;
 		try {
 			dir = Files.createTempDirectory("smith-discover-");
@@ -92,6 +103,20 @@ public class BusinessProcessDiscovery {
 		catch (IOException ex) {
 			throw new IllegalStateException("Failed to create a temp dir for the clone: " + ex.getMessage(), ex);
 		}
+		try {
+			runClone(url, dir);
+		}
+		catch (IllegalStateException ex) {
+			// The caller never received the directory, so no cleanup downstream of this
+			// call can reach it — and a failed clone is a timeout or an unreadable URL,
+			// which is exactly the run that repeats.
+			deleteQuietly(dir);
+			throw ex;
+		}
+		return dir;
+	}
+
+	private static void runClone(String url, Path dir) {
 		try {
 			ProcessBuilder pb = cloneProcess(url, dir);
 			Process process = pb.start();
@@ -104,7 +129,6 @@ public class BusinessProcessDiscovery {
 			if (process.exitValue() != 0) {
 				throw new IllegalStateException("git clone failed for " + url + ": " + output.trim());
 			}
-			return dir;
 		}
 		catch (IOException ex) {
 			throw new IllegalStateException("git clone failed for " + url + ": " + ex.getMessage(), ex);
@@ -112,6 +136,31 @@ public class BusinessProcessDiscovery {
 		catch (InterruptedException ex) {
 			Thread.currentThread().interrupt();
 			throw new IllegalStateException("git clone interrupted for " + url, ex);
+		}
+	}
+
+	/**
+	 * Removes a directory tree, ignoring every failure. Used for the temp clone a
+	 * generation no longer needs, where a leftover directory in the system temp is a
+	 * worse outcome than an aborted cleanup.
+	 * @param dir the directory to remove, or null to do nothing
+	 */
+	static void deleteQuietly(Path dir) {
+		if (dir == null || !Files.exists(dir)) {
+			return;
+		}
+		try (Stream<Path> walk = Files.walk(dir)) {
+			walk.sorted(Comparator.reverseOrder()).forEach((path) -> {
+				try {
+					Files.delete(path);
+				}
+				catch (IOException ignored) {
+					// best-effort cleanup of a temp directory
+				}
+			});
+		}
+		catch (IOException ignored) {
+			// best-effort cleanup of a temp directory
 		}
 	}
 
@@ -131,7 +180,7 @@ public class BusinessProcessDiscovery {
 		return pb;
 	}
 
-	private static Path expandHome(String p) {
+	static Path expandHome(String p) {
 		if (p.equals("~")) {
 			return Path.of(System.getProperty("user.home"));
 		}

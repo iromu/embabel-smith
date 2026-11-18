@@ -37,7 +37,11 @@ smith build ("<description>" | --docs <path>) --out <source-uri>
   model's context.
 - `--extract` — run the `business_process_discovery` prompt over `--docs` first and build the
   business-process description it extracts, rather than the documents as written. Requires `--docs`
-  (usage error, exit **2**, without it). Opt-in because it costs a model call.
+  (usage error, exit **2**, without it). Opt-in because it costs a model call. Note what the prompt
+  asks for: a **codebase** ("Analyse the entire codebase", "Do not describe classes, functions,
+  modules or files"), so it earns its keep in front of source code, not in front of documents that
+  are already a business-process description — over those it re-summarises and loses detail. Nothing
+  in `prod/` feeds it source yet: `--docs` reads `.md`, `.markdown` and `.txt` only.
 - `--out` (required) — source URI to publish to: `folder:<path>` or `git:<url>[@ref]`.
 - `--target` — the artifact to produce: `agent-spec` (default, an executable pack) or `skill`
   (a `SKILL.md` validated by the with/without-skill lift; see

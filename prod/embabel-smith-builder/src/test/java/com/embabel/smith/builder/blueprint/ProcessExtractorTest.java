@@ -38,6 +38,21 @@ class ProcessExtractorTest {
 	}
 
 	@Test
+	void handsEachCorpusShapeItsOwnTag() {
+		String[] seen = new String[1];
+		ProcessExtractor extractor = new ProcessExtractor((system, user) -> {
+			seen[0] = user;
+			return "description";
+		}, "DISCOVERY-PROMPT");
+
+		extractor.extract("a docs corpus");
+		assertThat(seen[0]).contains("<documents>\na docs corpus\n</documents>");
+
+		extractor.extractCodebase("a code corpus");
+		assertThat(seen[0]).contains("<codebase>\na code corpus\n</codebase>");
+	}
+
+	@Test
 	void anExtractorWithoutATemplateRunsTheBundledDiscoveryPrompt() {
 		String[] seen = new String[1];
 		ProcessExtractor extractor = new ProcessExtractor((system, user) -> {
