@@ -1,0 +1,5 @@
+stepType: goal
+name: briefDone
+description: "The topic brief has been extracted"
+outputTypeName: TopicBrief
+export: true

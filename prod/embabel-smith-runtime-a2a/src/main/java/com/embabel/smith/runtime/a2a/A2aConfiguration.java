@@ -99,16 +99,22 @@ public class A2aConfiguration {
 	/**
 	 * The card handler registered at {@code /a2a}: the library's goals-derived card,
 	 * serving through {@link RunBackedA2ARequestHandler} instead of the Autonomy one. The
-	 * goal filter admits every deployed goal; filtering by the configured tier is the
-	 * card's own task.
+	 * goal filter is {@link TrustTierGoalFilter}, so the card advertises only the goals
+	 * the endpoint's configured tier can actually run — the same tier every run uses.
 	 * @param platform the booted agent platform whose goals the card advertises
 	 * @param requestHandler the handler that runs the goals
+	 * @param sourceUri the spec source whose packs decide the goal filter
+	 * @param trustTier the tier that decides it, and that every run executes under
 	 * @return the card handler
 	 */
 	@Bean
-	public AgentCardHandler runBackedAgentCardHandler(AgentPlatform platform,
-			RunBackedA2ARequestHandler requestHandler) {
-		return new EmbabelServerGoalsAgentCardHandler(ENDPOINT_PATH, platform, requestHandler, (goal) -> true);
+	public AgentCardHandler runBackedAgentCardHandler(AgentPlatform platform, RunBackedA2ARequestHandler requestHandler,
+			@Value("${smith.a2a.source:}") String sourceUri,
+			@Value("${smith.a2a.trust-tier:STANDARD}") String trustTier) {
+		TrustTierGoalFilter goalFilter = new TrustTierGoalFilter(sourceUri,
+				TrustTier.valueOf(trustTier.toUpperCase(Locale.ROOT)));
+		return new EmbabelServerGoalsAgentCardHandler(ENDPOINT_PATH, platform, requestHandler,
+				(goal) -> goalFilter.allows(goal));
 	}
 
 	private static Path traceFile(String traceDir) {

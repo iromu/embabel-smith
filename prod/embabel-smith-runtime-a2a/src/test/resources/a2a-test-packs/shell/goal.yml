@@ -1,0 +1,5 @@
+stepType: goal
+name: cliDone
+description: "A shell command has been run and its result reported"
+outputTypeName: com.embabel.agent.spec.model.BackgroundMessage
+export: true

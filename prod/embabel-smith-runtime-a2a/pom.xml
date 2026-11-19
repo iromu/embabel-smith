@@ -24,6 +24,16 @@
             <groupId>org.iromu.embabel.smith</groupId>
             <artifactId>embabel-smith-runtime</artifactId>
         </dependency>
+        <!-- Declared rather than inherited from the runtime: the card's goal filter reads the
+             spec source and its packs directly, so this module uses these two itself. -->
+        <dependency>
+            <groupId>org.iromu.embabel.smith</groupId>
+            <artifactId>smith-common</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.iromu.embabel.smith</groupId>
+            <artifactId>embabel-smith-specsource</artifactId>
+        </dependency>
         <!-- The only prod module that declares the A2A starter, and therefore the only one
              that gains spring-boot-starter-web and a servlet engine from it. -->
         <dependency>

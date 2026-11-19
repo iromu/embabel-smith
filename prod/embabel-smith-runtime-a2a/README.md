@@ -26,20 +26,25 @@ appended to the same JSONL file.
 Five, and only five: `message/send`, `message/stream`, `tasks/get`, `tasks/cancel`, plus
 the card document.
 
-- **`tasks/list` is not served.** The library's JSON-RPC facade rejects it before any
-  request handler runs — there is no 0.3 method for it to route — so no handler behind
-  that facade can offer it. Listing would require a route outside the library's dispatch,
-  which is the protocol surface the reuse ruling exists to avoid.
-- **`historyLength` is required on `tasks/get`.** `TaskQueryParams.historyLength` is a
-  primitive `int` and Jackson 3 ships `FAIL_ON_NULL_FOR_PRIMITIVES=true`, so omitting the
-  field fails inside the facade with HTTP 500 (`Cannot map null into type int`) before
-  this module's code runs. The field is documented as required rather than worked around,
-  because relaxing the mapper would mean re-tuning a default inside a library this module
-  does not own.
-- **`tasks/cancel` never claims to stop anything.** A run is synchronous, and the trace
-  record is written after it returns, so every task the store knows about has already
-  reached a terminal state. Cancelling one returns the task in the state it is actually in
-  with a status message saying it was not cancelled and why.
+## Deviations from the specification
+
+Everything this endpoint does that the A2A specification does not describe, in one place.
+Each line was measured through the library's facade — the test named in the last column
+posts the request and asserts the answer it actually got. "Non-goal" means the change
+decided not to implement it, for the reason given.
+
+| Deviation                                                                                                                                   | Cause                                                                                                                                                                                                                                          | Pinned by                                                                   |
+| ------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| **`tasks/list` is not served: five operations, not six.** A client that calls it gets HTTP 500 with `Method tasks/list is not supported`.     | Protocol 0.3 has no `tasks/list` method, so the facade rejects it before any request handler runs. Offering it would mean a route outside the library's dispatch — the protocol surface the reuse ruling exists to avoid.                          | `A2aEndpointOverHttpTest.aMethodTheFacadeDoesNotDispatchIsAFiftyHundred…`   |
+| **`historyLength` is required on `tasks/get`.** Omitting it answers HTTP 500 (`Cannot map null into type int`) before this module's code runs. | `TaskQueryParams.historyLength` is a primitive `int` and Jackson 3 ships `FAIL_ON_NULL_FOR_PRIMITIVES=true`. Documented as required rather than worked around: the mapper belongs to the library's facade, not to this module.                   | `A2aEndpointOverHttpTest.omittingThePrimitiveBackedHistoryLength…`          |
+| **A method the facade does not route answers HTTP 500, not one of the section 9.5 error codes.**                                             | Upstream behaviour: its dispatch throws `UnsupportedOperationException` and the facade maps that to a 500 with a JSON-RPC error body. Accepted for v1 rather than routed around.                                                                 | `A2aDeviationRecordTest.aMethodTheFacadeDoesNotRouteAnswersHttp500…`        |
+| **Discovery is served at `/{path}/.well-known/agent.json`, not at the current specification's `/.well-known/agent-card.json` (§8.2).**        | The library registers the 0.3 location and the card reports `protocolVersion: 0.3.0`. A client expecting the 1.0 specification will not find this endpoint, which is the point of the field. Non-goal: protocol 1.0.                            | `A2aAgentCardTest.discoveryIsServedAtTheLibrarysWellKnownAgentJsonPath…`    |
+| **No push notification configuration (§3.1.7–§3.1.10).**                                                                                    | Non-goal. The card says so: `capabilities.pushNotifications` is `false`, so a client does not try. Runs are synchronous and the caller waits for the task.                                                                                       | `A2aAgentCardTest.theCardDocumentCarriesTheProtocolVersionAndDefaults…`     |
+| **No `SubscribeToTask` (§3.1.6, `tasks/resubscribe`).**                                                                                      | Non-goal. There is nothing to resubscribe to: the run is synchronous and its record is written when it finishes, so a stream is over the moment it is opened.                                                                                   | `A2aDeviationRecordTest.taskResubscriptionIsNotServed`                      |
+| **No extended agent card (§3.1.11, §9.4.6).**                                                                                               | Non-goal. There is no authenticated caller to issue it to. The card declares `supportsAuthenticatedExtendedCard: false` and the method answers 500.                                                                                              | `A2aDeviationRecordTest.theExtendedAgentCardMethodIsNotServed`              |
+| **No card signing (§8.4).**                                                                                                                 | Non-goal, with the same reason as the absence of authentication: this is a local development surface. The served card carries no `securitySchemes` and no `security`.                                                                         | `A2aDeviationRecordTest.theCardDeclaresNoSecuritySchemes`                   |
+| **`tasks/cancel` never stops a run.** It returns the task in the state it is actually in, with a status message saying it was not cancelled.   | The trace record is written after the run returns, so every task the store knows about is already terminal. Claiming a stop would be a fiction; a real in-flight cancel needs the run made durable first, which is a different change.           | `A2aEndpointOverHttpTest.cancellingAFinishedTaskRefusesOverTheWire`         |
+
 
 ## Run parameters
 
@@ -53,6 +58,23 @@ the endpoint once. The goal and the planner are per-request, in the message-send
 | `SMITH_A2A_SOURCE`      | `smith.a2a.source`          | Spec source every run executes against           |
 | `SMITH_A2A_TRUST_TIER`  | `smith.a2a.trust-tier`      | `STANDARD` (default) or `HIGH`                   |
 | `SMITH_A2A_TRACE_DIR`   | `smith.a2a.trace-dir`       | Trace directory (default `~/.smith/traces`)      |
+
+## The agent card and the trust tier
+
+`GET /a2a/.well-known/agent.json` advertises one skill per goal of the deployed source,
+minus the goals whose pack the configured tier cannot run — tool groups are declared on
+steps, so a goal's tier requirement comes from the pack that exports it. The card and the
+run gate make the same per-pack check, so they cannot disagree about which packs are the
+problem.
+
+The source is read for this once, on the first card request, not at boot: resolving a
+`git:` source during startup would let a source that is temporarily unreachable fail a
+boot. A source that cannot be read at all advertises every deployed goal — the run still
+goes through the runtime's tier gate, so nothing disallowed executes, and the card being
+optimistic about an unreadable source is visible in the log.
+
+A goal reaches the card only once its source has been ingested, and the endpoint ingests a
+source when a run asks it to. Until the first run, the card advertises no skills.
 
 ## Running it
 
