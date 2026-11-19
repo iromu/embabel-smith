@@ -12,11 +12,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.embabel.agent.core.AgentPlatform;
-import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.MethodOrderer;
+import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestMethodOrder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
@@ -28,29 +29,32 @@ import tools.jackson.databind.JsonNode;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * The agent card over real HTTP, from a real deployed source. Both packs staged here are
- * allowed by the configured tier, so the card advertises one skill per exported goal, and
- * the document a client reads is checked field by field against what section 1 measured
- * about the library.
+ * The agent card over real HTTP. Both packs staged here are allowed by the configured
+ * tier, so the card advertises one skill per exported goal, and the document a client
+ * reads is checked field by field against what section 1 measured about the library.
  *
  * <p>
- * The library gets onto the card by being ingested into the platform once for this
- * context — ingestion is the only thing that puts goals on the platform, and the endpoint
- * itself ingests only when a run asks it to. Nothing here runs a goal, so no model
- * endpoint is involved and the tests are offline.
+ * Nothing here ingests or runs a goal before reading the card: the skills come from the
+ * configured source, so a freshly started endpoint can already describe itself, and no
+ * model endpoint is involved. The one test that does send requests sends them for a goal
+ * the source does not export, so the run is refused at goal selection — after the ingest
+ * that used to be the card's problem, and before anything could reach a model.
+ *
+ * <p>
+ * The order matters: the first test's claim is that the card is complete with nothing run
+ * yet, so it has to observe the context before the last one sends anything.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
 		properties = { "spring.main.web-application-type=SERVLET", "OPENAI_CUSTOM_BASE_URL=http://127.0.0.1:9/v1",
 				"OPENAI_CUSTOM_API_KEY=sk-a2a-test", "OPENAI_CUSTOM_MODELS=a2a-test-model",
 				"embabel.models.default-llm=a2a-test-model", "smith.a2a.trust-tier=STANDARD", })
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class A2aAgentCardTest {
 
 	private static final Path TRACE_DIR = createTempDir("smith-a2a-card-trace-");
 
 	private static final Path LIBRARY = A2aTestPacks.library(createTempDir("smith-a2a-card-lib-"), A2aTestPacks.EXTRACT,
 			A2aTestPacks.EXPLAIN);
-
-	private static final AtomicBoolean DEPLOYED = new AtomicBoolean();
 
 	@LocalServerPort
 	private int port;
@@ -64,21 +68,31 @@ class A2aAgentCardTest {
 		registry.add("smith.a2a.source", () -> "folder:" + LIBRARY);
 	}
 
-	@BeforeEach
-	void deployTheSourceOnce() {
-		if (DEPLOYED.compareAndSet(false, true)) {
-			A2aTestPacks.deploy(this.platform, LIBRARY);
-		}
-	}
-
+	/**
+	 * The assertion the previous mechanism could not make: the source is configured,
+	 * nothing has been ingested or run, and the card already lists both goals. Derived
+	 * from {@code AgentPlatform.getGoals()} instead, this card would be empty here — that
+	 * set only gains a goal when something is deployed.
+	 */
 	@Test
-	void theCardCarriesOneSkillPerGoalOfTheDeployedSource() {
+	@Order(1)
+	void theCardListsEveryGoalOfTheConfiguredSourceBeforeAnythingHasRun() {
 		JsonNode card = card();
 
 		assertThat(card.path("skills")).hasSize(2);
-		List<String> advertised = new ArrayList<>();
-		card.path("skills").forEach((skill) -> advertised.add(skill.path("name").asText()));
-		assertThat(advertised).containsExactlyInAnyOrder("briefDone", "explainDone");
+		assertThat(advertisedNames(card)).containsExactlyInAnyOrder("briefDone", "explainDone");
+	}
+
+	@Test
+	void theCardSkillCarriesTheGoalItAdvertises() {
+		JsonNode skill = card().path("skills").get(0);
+
+		// A no-code goal has no tags and no examples — those belong to @Agent on a Java
+		// class — so both are present and empty rather than invented.
+		assertThat(skill.path("id").asText()).isEqualTo(skill.path("name").asText());
+		assertThat(skill.path("description").asText()).isNotBlank();
+		assertThat(skill.path("tags")).isEmpty();
+		assertThat(skill.path("examples")).isEmpty();
 	}
 
 	@Test
@@ -95,8 +109,8 @@ class A2aAgentCardTest {
 
 	/**
 	 * The claims a client reads before it decides how to talk to this endpoint. Each
-	 * value is the one section 1 recorded from {@code embabel-agent-a2a:1.5.4}; none of
-	 * them is set by this module.
+	 * value is the one section 1 recorded from {@code embabel-agent-a2a:1.5.4}; only
+	 * {@code skills} is assembled by this module, and it is asserted elsewhere.
 	 */
 	@Test
 	void theCardDocumentCarriesTheProtocolVersionAndDefaultsTheLibraryIsKnownFor() {
@@ -139,6 +153,41 @@ class A2aAgentCardTest {
 			.isEqualTo(404);
 		assertThat(client.get("/.well-known/agent-card.json").statusCode()).as("section 8.2's path at the server root")
 			.isEqualTo(404);
+	}
+
+	/**
+	 * The second half of the defect this change fixes. Every run ends in
+	 * {@code platform.deploy(agent)} under a fresh scope name, so a card built from the
+	 * platform's goals grew a duplicate skill per run. Two requests are sent here — for a
+	 * goal the source does not export, so each one deploys the source and then fails at
+	 * goal selection without reaching a model — and the card still lists each goal once.
+	 */
+	@Test
+	@Order(2)
+	void twoRunsOfTheSameSourceLeaveOneSkillPerGoalOnTheCard() {
+		for (int run = 1; run <= 2; run++) {
+			HttpResponse<String> response = new A2aClient(this.port)
+				.rpc("""
+						{"jsonrpc":"2.0","id":%d,"method":"message/send","params":{"message":{"role":"user","kind":"message",\
+						"messageId":"m-%d","parts":[{"kind":"text","text":"go"}]},"metadata":{"goal":"noSuchGoal"}}}
+						"""
+					.formatted(run, run));
+			assertThat(response.statusCode()).isEqualTo(200);
+			assertThat(A2aClient.json(response.body()).path("result").path("status").path("state").asText())
+				.as("the run deploys the source, then fails at goal selection")
+				.isEqualTo("failed");
+		}
+
+		JsonNode card = card();
+
+		assertThat(advertisedNames(card)).containsExactlyInAnyOrder("briefDone", "explainDone");
+		assertThat(card.path("skills")).as("no duplicate skill per run").hasSize(2);
+	}
+
+	private List<String> advertisedNames(JsonNode card) {
+		List<String> advertised = new ArrayList<>();
+		card.path("skills").forEach((skill) -> advertised.add(skill.path("name").asText()));
+		return advertised;
 	}
 
 	private JsonNode card() {

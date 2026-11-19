@@ -12,12 +12,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicBoolean;
 
-import com.embabel.agent.core.AgentPlatform;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -31,6 +27,11 @@ import static org.assertj.core.api.Assertions.assertThat;
  * The configured trust tier decides both what the card advertises and what a run may do,
  * for a source that contains a pack the standard tier disallows: {@code shell}, whose
  * step declares the {@code shell} tool group.
+ *
+ * <p>
+ * The card is read from the configured source, so nothing here ingests anything first —
+ * and the card's size is a claim, because the source is a fixed list rather than whatever
+ * the platform happens to have accumulated.
  *
  * <p>
  * The blocked run is a real run of the real service against the real platform — it is
@@ -48,13 +49,8 @@ class A2aTrustTierTest {
 	private static final Path LIBRARY = A2aTestPacks.library(createTempDir("smith-a2a-tier-lib-"), A2aTestPacks.EXPLAIN,
 			A2aTestPacks.SHELL);
 
-	private static final AtomicBoolean DEPLOYED = new AtomicBoolean();
-
 	@LocalServerPort
 	private int port;
-
-	@Autowired
-	private AgentPlatform platform;
 
 	@DynamicPropertySource
 	static void endpoint(DynamicPropertyRegistry registry) {
@@ -62,22 +58,12 @@ class A2aTrustTierTest {
 		registry.add("smith.a2a.source", () -> "folder:" + LIBRARY);
 	}
 
-	@BeforeEach
-	void deployTheSourceOnce() {
-		if (DEPLOYED.compareAndSet(false, true)) {
-			A2aTestPacks.deploy(this.platform, LIBRARY);
-		}
-	}
-
 	@Test
 	void theCardAdvertisesTheAllowedGoalAndOmitsTheGoalOfTheDisallowedPack() {
-		// Membership, not size: a run of this source deploys the packs again, and the
-		// card
-		// is read from the live platform, so the count is not this test's claim.
 		List<String> advertised = advertisedGoals();
 
-		assertThat(advertised).contains("explainDone");
-		assertThat(advertised).as("the shell pack's goal is not something this tier can run").doesNotContain("cliDone");
+		assertThat(advertised).as("the shell pack declares a group this tier cannot run")
+			.containsExactly("explainDone");
 	}
 
 	@Test

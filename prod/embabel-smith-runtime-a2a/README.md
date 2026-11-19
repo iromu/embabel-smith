@@ -52,29 +52,38 @@ The protocol request carries no spec source and no trust tier, so both are confi
 the endpoint once. The goal and the planner are per-request, in the message-send
 `metadata` under `goal` and `planner`.
 
-| Environment variable    | Property                    | Meaning                                          |
-| ----------------------- | --------------------------- | ------------------------------------------------ |
-| `SERVER_PORT`           | `server.port`               | Port to serve (default 18090)                    |
-| `SMITH_A2A_SOURCE`      | `smith.a2a.source`          | Spec source every run executes against           |
-| `SMITH_A2A_TRUST_TIER`  | `smith.a2a.trust-tier`      | `STANDARD` (default) or `HIGH`                   |
-| `SMITH_A2A_TRACE_DIR`   | `smith.a2a.trace-dir`       | Trace directory (default `~/.smith/traces`)      |
+| Environment variable    | Property                    | Meaning                                                                                       |
+| ----------------------- | --------------------------- | --------------------------------------------------------------------------------------------- |
+| `SERVER_PORT`           | `server.port`               | Port to serve (default 18090)                                                                 |
+| `SMITH_A2A_SOURCE`      | `smith.a2a.source`          | Spec source every run executes against, and the only thing the card's skills come from — unset, the card answers 500 |
+| `SMITH_A2A_TRUST_TIER`  | `smith.a2a.trust-tier`      | `STANDARD` (default) or `HIGH`                                                                |
+| `SMITH_A2A_TRACE_DIR`   | `smith.a2a.trace-dir`       | Trace directory (default `~/.smith/traces`)                                                   |
 
 ## The agent card and the trust tier
 
-`GET /a2a/.well-known/agent.json` advertises one skill per goal of the deployed source,
-minus the goals whose pack the configured tier cannot run — tool groups are declared on
-steps, so a goal's tier requirement comes from the pack that exports it. The card and the
-run gate make the same per-pack check, so they cannot disagree about which packs are the
-problem.
+`GET /a2a/.well-known/agent.json` advertises one skill per goal of the **configured
+source** (`smith.a2a.source`), minus the goals whose pack the configured tier cannot run —
+tool groups are declared on steps, so a goal's tier requirement comes from the pack that
+exports it. The card and the run gate make the same per-pack check, so they cannot disagree
+about which packs are the problem.
 
-The source is read for this once, on the first card request, not at boot: resolving a
-`git:` source during startup would let a source that is temporarily unreachable fail a
-boot. A source that cannot be read at all advertises every deployed goal — the run still
-goes through the runtime's tier gate, so nothing disallowed executes, and the card being
-optimistic about an unreadable source is visible in the log.
+The card is derived from the source rather than from `AgentPlatform.getGoals()` because
+that set is a deployment history, not a description of the endpoint: every run ends in
+`platform.deploy(agent)`, so it is empty until something has been ingested. Only the skill
+list changed source — every other card field is still the one
+`EmbabelServerGoalsAgentCardHandler` sets, asserted through HTTP by `A2aAgentCardTest`.
+`tags` and `examples` are empty because a `goal.yml` declares neither; those two lists
+belong to `@Agent` on a Java class, and nothing is invented to fill them.
 
-A goal reaches the card only once its source has been ingested, and the endpoint ingests a
-source when a run asks it to. Until the first run, the card advertises no skills.
+The source is read once, on the first card request, not at boot: resolving a `git:` source
+during startup would let a source that is temporarily unreachable fail a boot, and
+`SpecSource.resolve()` re-clones one on every call, so a per-request read would hit the
+network on every card fetch. **A source that cannot be read fails the card request** with a
+message naming it, which the library's facade turns into a 500. There is nothing to fall
+back to now that the source is the only source of skills, and an empty skill list would
+tell a client the agent can do nothing — false in the direction that hides a
+misconfiguration. The failure is not cached, so the next request succeeds once the source
+is readable again.
 
 ## Running it
 

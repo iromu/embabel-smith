@@ -12,15 +12,11 @@ import java.nio.file.Path;
 import java.util.Objects;
 import java.util.stream.Stream;
 
-import com.embabel.agent.core.AgentPlatform;
-import com.embabel.smith.runtime.core.RuntimeCore;
-import com.embabel.smith.specsource.SpecSource;
-
 /**
  * Access to the agent specs under {@code src/test/resources/a2a-test-packs}: builds a
- * temporary {@code folder:} library from named packs, and deploys one so its goals reach
- * the platform the agent card is built from. Ingesting deploys but never runs, so it
- * needs no model endpoint.
+ * temporary {@code folder:} library from named packs. Staging is all the endpoint needs —
+ * both the card and the run read the source itself, so nothing has to be deployed first,
+ * and no model endpoint is involved.
  */
 final class A2aTestPacks {
 
@@ -33,6 +29,13 @@ final class A2aTestPacks {
 	private A2aTestPacks() {
 	}
 
+	/**
+	 * Copies the named packs into {@code target} as a {@code folder:} library.
+	 * @param target the directory to stage into; created if missing, and reusable, so a
+	 * second call adds packs to a library already staged there
+	 * @param packNames the pack directories to copy
+	 * @return {@code target}, for chaining
+	 */
 	static Path library(Path target, String... packNames) {
 		try {
 			Files.createDirectories(target);
@@ -44,16 +47,6 @@ final class A2aTestPacks {
 		catch (IOException ex) {
 			throw new IllegalStateException("Cannot stage the A2A test library at " + target, ex);
 		}
-	}
-
-	/**
-	 * Deploys a library's packs into the platform, which is what puts their goals on the
-	 * agent card.
-	 * @param platform the platform the card handler reads goals from
-	 * @param library the directory {@link #library(Path, String...)} staged
-	 */
-	static void deploy(AgentPlatform platform, Path library) {
-		new RuntimeCore(platform).ingest(SpecSource.parse("folder:" + library).resolve());
 	}
 
 	private static Path root() {

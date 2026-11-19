@@ -5,11 +5,17 @@
 
 package com.embabel.smith.runtime.a2a;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.net.http.HttpResponse;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 
 import tools.jackson.databind.JsonNode;
 
@@ -27,15 +33,27 @@ import static org.assertj.core.api.Assertions.assertThat;
  * JSON-RPC error body, so a client gets a 500 where section 9.5 of the specification
  * defines a structured error code. That is upstream behaviour this module chose not to
  * route around.
+ *
+ * <p>
+ * The source staged here exists and is readable, because one of the deviations below is
+ * read off the served card and a card request now fails when its source cannot be read.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
 		properties = { "spring.main.web-application-type=SERVLET", "OPENAI_CUSTOM_BASE_URL=http://127.0.0.1:9/v1",
 				"OPENAI_CUSTOM_API_KEY=sk-a2a-test", "OPENAI_CUSTOM_MODELS=a2a-test-model",
-				"embabel.models.default-llm=a2a-test-model", "smith.a2a.source=folder:/tmp/a2a-library", })
+				"embabel.models.default-llm=a2a-test-model", })
 class A2aDeviationRecordTest {
+
+	private static final Path LIBRARY = A2aTestPacks.library(createTempDir("smith-a2a-deviation-lib-"),
+			A2aTestPacks.EXTRACT);
 
 	@LocalServerPort
 	private int port;
+
+	@DynamicPropertySource
+	static void endpoint(DynamicPropertyRegistry registry) {
+		registry.add("smith.a2a.source", () -> "folder:" + LIBRARY);
+	}
 
 	/**
 	 * Section 9.5 defines error codes for a method the server cannot execute. This
@@ -90,12 +108,23 @@ class A2aDeviationRecordTest {
 		HttpResponse<String> response = new A2aClient(this.port).get("/a2a/.well-known/agent.json");
 
 		JsonNode card = A2aClient.json(response.body());
-		// The positive control on the two assertions below: this is the card, so an empty
-		// securitySchemes means the card omits them rather than the request never landed.
+		// The positive control on the two assertions below: this is the card with its
+		// skills on it, so an empty securitySchemes means the card omits them rather than
+		// the request never landed.
 		assertThat(response.statusCode()).isEqualTo(200);
 		assertThat(card.path("protocolVersion").asText()).isEqualTo("0.3.0");
+		assertThat(card.path("skills")).isNotEmpty();
 		assertThat(card.path("securitySchemes")).isEmpty();
 		assertThat(card.path("security")).isEmpty();
+	}
+
+	private static Path createTempDir(String prefix) {
+		try {
+			return Files.createTempDirectory(prefix);
+		}
+		catch (IOException ex) {
+			throw new UncheckedIOException(ex);
+		}
 	}
 
 }

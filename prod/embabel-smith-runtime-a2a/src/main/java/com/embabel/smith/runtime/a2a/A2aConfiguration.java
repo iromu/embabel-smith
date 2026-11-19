@@ -10,7 +10,6 @@ import java.util.Locale;
 
 import com.embabel.agent.a2a.server.AgentCardHandler;
 import com.embabel.agent.a2a.server.config.A2AConfiguration;
-import com.embabel.agent.a2a.server.support.EmbabelServerGoalsAgentCardHandler;
 import com.embabel.agent.core.AgentPlatform;
 import com.embabel.smith.runtime.AgentSpecRunService;
 import com.embabel.smith.runtime.core.TrustTier;
@@ -32,8 +31,9 @@ import org.springframework.context.annotation.FilterType;
  * {@code A2AConfiguration}, because that one delegates to
  * {@code AutonomyA2ARequestHandler}, which runs goals through Embabel Autonomy — skipping
  * the trust-tier gate, the planner selection and the trace record that make a run a Smith
- * run. The card itself is still built by the library from {@code agentPlatform.goals},
- * which are the goals of the deployed source.
+ * run. Its card is replaced too: it derives the skill list from
+ * {@code agentPlatform.getGoals()}, which is a deployment history rather than a
+ * description of this endpoint, so the skills come from {@code smith.a2a.source} instead.
  *
  * <p>
  * <b>Why this class repeats the library's component scan.</b> The library's card handler
@@ -92,29 +92,33 @@ public class A2aConfiguration {
 	public RunBackedA2ARequestHandler runBackedA2ARequestHandler(AgentSpecRunService runService, TraceStore traceStore,
 			@Value("${smith.a2a.source:}") String sourceUri,
 			@Value("${smith.a2a.trust-tier:STANDARD}") String trustTier) {
-		return new RunBackedA2ARequestHandler(runService, traceStore, sourceUri,
-				TrustTier.valueOf(trustTier.toUpperCase(Locale.ROOT)));
+		return new RunBackedA2ARequestHandler(runService, traceStore, sourceUri, tierOf(trustTier));
 	}
 
 	/**
-	 * The card handler registered at {@code /a2a}: the library's goals-derived card,
-	 * serving through {@link RunBackedA2ARequestHandler} instead of the Autonomy one. The
-	 * goal filter is {@link TrustTierGoalFilter}, so the card advertises only the goals
-	 * the endpoint's configured tier can actually run — the same tier every run uses.
-	 * @param platform the booted agent platform whose goals the card advertises
+	 * The card handler registered at {@code /a2a}: the library's card document with the
+	 * skill list read from {@code smith.a2a.source}, serving requests through
+	 * {@link RunBackedA2ARequestHandler} instead of the Autonomy one. The skills are the
+	 * goals of the packs the endpoint's configured tier can actually run — the same tier
+	 * every run uses, and the same per-pack check the run-time gate makes, so the card
+	 * and the gate cannot disagree.
+	 * @param platform the platform whose identity the card carries
 	 * @param requestHandler the handler that runs the goals
-	 * @param sourceUri the spec source whose packs decide the goal filter
-	 * @param trustTier the tier that decides it, and that every run executes under
+	 * @param sourceUri the spec source the skills are derived from
+	 * @param trustTier the tier that decides which packs are advertised, and that every
+	 * run executes under
 	 * @return the card handler
 	 */
 	@Bean
-	public AgentCardHandler runBackedAgentCardHandler(AgentPlatform platform, RunBackedA2ARequestHandler requestHandler,
-			@Value("${smith.a2a.source:}") String sourceUri,
+	public AgentCardHandler sourceDerivedAgentCardHandler(AgentPlatform platform,
+			RunBackedA2ARequestHandler requestHandler, @Value("${smith.a2a.source:}") String sourceUri,
 			@Value("${smith.a2a.trust-tier:STANDARD}") String trustTier) {
-		TrustTierGoalFilter goalFilter = new TrustTierGoalFilter(sourceUri,
-				TrustTier.valueOf(trustTier.toUpperCase(Locale.ROOT)));
-		return new EmbabelServerGoalsAgentCardHandler(ENDPOINT_PATH, platform, requestHandler,
-				(goal) -> goalFilter.allows(goal));
+		return new SourceDerivedAgentCardHandler(ENDPOINT_PATH, platform, requestHandler,
+				new SpecSourceSkills(sourceUri, tierOf(trustTier)));
+	}
+
+	private static TrustTier tierOf(String trustTier) {
+		return TrustTier.valueOf(trustTier.toUpperCase(Locale.ROOT));
 	}
 
 	private static Path traceFile(String traceDir) {
