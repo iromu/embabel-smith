@@ -14,24 +14,31 @@
 # The JVM logs to stdout along with its report, so the split is made by pattern afterwards.
 #
 # The pipeline behind that one command (SkillBuilderService): generate the SKILL.md, validate
-# its frontmatter, have the model draft an evals.json suite, run every scenario twice — once
-# with the skill in the prompt, once without — grade both, gate on the lift between the two
-# pass rates, then run the static security scan, stamp the lifecycle and publish.
+# its frontmatter, inspect it against the skill writing guidelines (redrawing the draft while
+# the gate still refuses it), have the model draft an evals.json suite, run every scenario
+# twice — once with the skill in the prompt, once without — grade both, gate on the lift
+# between the two pass rates, then run the static security scan, stamp the lifecycle and
+# publish.
 #
 # ---------------------------------------------------------------------------
-# THIS IS THE EXPENSIVE ONE. ~15-19 model calls per blueprint:
+# THIS IS THE EXPENSIVE ONE. ~15-21 model calls per blueprint:
 #
-#   skill generator        1 call, retried up to 3 times if the answer will not parse
+#   skill generator        1 call, plus up to 2 redrafts when the inspection gate refuses a
+#                          draft (--max-inspect); each call retried up to 3 times if the
+#                          answer will not parse
+#   inspection gate        free (the evaluator runs in-JVM; the checks that need an external
+#                          scanner are not requested unless --full-inspection is passed)
 #   evals.json drafter     1 call, retried up to 3 times, and it is asked to write
 #                          3-4 scenarios, so a fussy endpoint pays 3 calls just to get a suite
 #   eval runner            4 calls PER SCENARIO — run with the skill, grade it, run the
 #                          baseline without it, grade that. With 4 scenarios this is 16
 #   security scan          free (static, offline)
 #
-# There is no refinement loop on this path, so the cost is bounded, but the eval runner is
-# the bulk of it and it scales with the number of scenarios the model chose to write. On a
-# contended local endpoint, run ONE blueprint at a time, sequentially, and not alongside
-# anything else that talks to the same GPU.
+# The inspection redraft loop is the only iteration on this path, and it is bounded at
+# --max-inspect (default 2) — so at most two extra generation calls, and only for a draft the
+# gate refused. The eval runner is still the bulk of the cost and it scales with the number
+# of scenarios the model chose to write. On a contended local endpoint, run ONE blueprint at a
+# time, sequentially, and not alongside anything else that talks to the same GPU.
 # ---------------------------------------------------------------------------
 #
 # It deliberately does NOT pass --extract. See generate-spec.sh: the discovery prompt wants a

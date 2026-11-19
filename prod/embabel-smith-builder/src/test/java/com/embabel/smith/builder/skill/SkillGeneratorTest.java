@@ -134,4 +134,46 @@ class SkillGeneratorTest {
 			.hasMessageContaining("Failed to obtain the generated skill");
 	}
 
+	@Test
+	void aFirstDraftIsAskedTheQuestionThatPredatedTheInspectionGate() {
+		List<String> users = new ArrayList<>();
+		SpecPromptCaller caller = (system, user) -> {
+			users.add(user);
+			return "{\"description\": \"d\", \"body\": \"b\"}";
+		};
+
+		new SkillGenerator(caller, "sys").generate("cold-store-goods-receipt", DESCRIPTION, List.of());
+
+		// The redraft entry point is additive: with no findings to fix, the request is
+		// the
+		// one the two-argument generate has always sent.
+		assertThat(users.get(0)).doesNotContain("<findings>").contains("<document>\n" + DESCRIPTION + "\n</document>");
+	}
+
+	@Test
+	void theRedraftRequestCarriesAtMostTheCapOfFindingsAndSaysSo() {
+		List<String> users = new ArrayList<>();
+		SpecPromptCaller caller = (system, user) -> {
+			users.add(user);
+			return "{\"description\": \"d\", \"body\": \"b\"}";
+		};
+		List<String> findings = new ArrayList<>();
+		for (int i = 0; i < SkillGenerator.MAX_FINDINGS_IN_PROMPT + 7; i++) {
+			findings.add("[SCHEMA-HIGH] finding " + i + " in SKILL.md:1");
+		}
+
+		new SkillGenerator(caller, "sys").generate("cold-store-goods-receipt", DESCRIPTION, findings);
+
+		// A pathological draft can report findings without limit; the prompt bound is
+		// what
+		// stops that from becoming an unbounded request. The count is quoted so the model
+		// is not told the quoted list was the whole verdict.
+		String block = users.get(0);
+		block = block.substring(block.indexOf("<findings>"), block.indexOf("</findings>"));
+		assertThat(block.lines().filter((line) -> line.startsWith("[SCHEMA-HIGH]")).count())
+			.isEqualTo(SkillGenerator.MAX_FINDINGS_IN_PROMPT);
+		assertThat(block).doesNotContain("finding " + SkillGenerator.MAX_FINDINGS_IN_PROMPT)
+			.contains("and 7 more findings");
+	}
+
 }

@@ -69,6 +69,14 @@ public class BuildCommand implements Callable<Integer> {
 			+ "(default ${DEFAULT-VALUE}); accepted on an agent-spec build and unused there")
 	double minLift = BuildOptions.DEFAULT_MIN_LIFT;
 
+	@Option(names = "--max-inspect", description = "Skill inspection redrafts the gate is allowed to ask for "
+			+ "(default ${DEFAULT-VALUE}); accepted on an agent-spec build and unused there")
+	int maxInspect = BuildOptions.DEFAULT_MAX_INSPECT;
+
+	@Option(names = "--full-inspection", description = "Also run the skill checks that need an external scanner "
+			+ "(skillspector, gitleaks, bandit, semgrep); only useful where those tools are installed")
+	boolean fullInspection;
+
 	@Option(names = "--overwrite", description = "Overwrite an existing pack or skill of the same name")
 	boolean overwrite;
 
@@ -175,7 +183,7 @@ public class BuildCommand implements Callable<Integer> {
 		try {
 			PublishTarget target = PublishTarget.parse(this.out);
 			BuildOptions options = new BuildOptions(this.maxRefine, BuildOptions.DEFAULT_SCORE_GATE, this.overwrite,
-					this.push, this.technique, this.target, this.minLift);
+					this.push, this.technique, this.target, this.minLift, null, this.maxInspect, this.fullInspection);
 			String description = resolveDescription();
 			return (options.target() == BuildTarget.SKILL) ? buildSkill(description, target, options)
 					: buildAgentSpec(description, target, options);

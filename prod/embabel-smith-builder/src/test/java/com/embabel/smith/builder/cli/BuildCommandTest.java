@@ -165,6 +165,79 @@ class BuildCommandTest {
 	}
 
 	@Test
+	void usageAdvertisesTheInspectionFlags() {
+		CommandLine smith = new CommandLine(new RecordingBuildCommand(new AtomicReference<>()));
+
+		assertThat(smith.getUsageMessage()).contains("--max-inspect").contains("--full-inspection");
+	}
+
+	@Test
+	void theInspectionKnobsDefaultToTwoRedraftsWithNoFullInspection(@TempDir Path out) {
+		AtomicReference<BuildOptions> skillSeen = new AtomicReference<>();
+
+		int exit = new CommandLine(new RecordingBuildCommand(new AtomicReference<>(), skillSeen))
+			.execute("a description", "--out", "folder:" + out, "--target", "skill");
+
+		assertThat(exit).isZero();
+		assertThat(skillSeen.get().maxInspect()).isEqualTo(BuildOptions.DEFAULT_MAX_INSPECT).isEqualTo(2);
+		assertThat(skillSeen.get().fullInspection()).isFalse();
+	}
+
+	@Test
+	void theInspectionFlagsReachTheSkillBuildOptions(@TempDir Path out) {
+		AtomicReference<BuildOptions> skillSeen = new AtomicReference<>();
+
+		int exit = new CommandLine(new RecordingBuildCommand(new AtomicReference<>(), skillSeen)).execute(
+				"a description", "--out", "folder:" + out, "--target", "skill", "--max-inspect", "5",
+				"--full-inspection");
+
+		assertThat(exit).isZero();
+		assertThat(skillSeen.get().maxInspect()).isEqualTo(5);
+		assertThat(skillSeen.get().fullInspection()).isTrue();
+	}
+
+	@Test
+	void theInspectionKnobsLeaveTheAgentSpecBuildAlone(@TempDir Path out) {
+		AtomicReference<BuildOptions> specSeen = new AtomicReference<>();
+		AtomicReference<BuildOptions> skillSeen = new AtomicReference<>();
+
+		// --max-refine keeps its own meaning and its own default of 3 on a spec build
+		// that
+		// also happens to be given the new knobs: the two bounds are unrelated, and the
+		// new
+		// field changed neither.
+		int exit = new CommandLine(new RecordingBuildCommand(specSeen, skillSeen)).execute("a description", "--out",
+				"folder:" + out, "--max-inspect", "5", "--full-inspection");
+
+		assertThat(exit).isZero();
+		assertThat(specSeen.get()).isNotNull();
+		assertThat(specSeen.get().maxRefine()).isEqualTo(BuildOptions.DEFAULT_MAX_REFINE).isEqualTo(3);
+		assertThat(specSeen.get().scoreGate()).isEqualTo(BuildOptions.DEFAULT_SCORE_GATE);
+		assertThat(skillSeen.get()).isNull();
+	}
+
+	@Test
+	void theDefaultMaxRefineStillMeansThreeRounds(@TempDir Path out) {
+		AtomicReference<BuildOptions> seen = new AtomicReference<>();
+
+		int exit = new CommandLine(new RecordingBuildCommand(seen)).execute("a description", "--out", "folder:" + out);
+
+		assertThat(exit).isZero();
+		assertThat(seen.get().maxRefine()).isEqualTo(3);
+	}
+
+	@Test
+	void anUnparseableMaxInspectIsAUsageError(@TempDir Path out) {
+		AtomicReference<BuildOptions> seen = new AtomicReference<>();
+
+		int exit = new CommandLine(new RecordingBuildCommand(seen)).execute("a description", "--out", "folder:" + out,
+				"--max-inspect", "two");
+
+		assertThat(exit).isEqualTo(2);
+		assertThat(seen.get()).isNull();
+	}
+
+	@Test
 	void anUnknownTargetIsAUsageError(@TempDir Path out) {
 		AtomicReference<BuildOptions> specSeen = new AtomicReference<>();
 		AtomicReference<BuildOptions> skillSeen = new AtomicReference<>();
@@ -325,7 +398,7 @@ class BuildCommandTest {
 					RecordingBuildCommand.this.skillSeen.set(options);
 					return SkillBuildResult.built("sample-skill", new Benchmark.Summary(1.0, 0.0, 1.0, List.of()), null,
 							new LifecycleStamper().stamp("0123456789abcdef0123456789abcdef", 1.0),
-							new PublishResult("sample-skill", false));
+							new PublishResult("sample-skill", false), null);
 				}
 			};
 		}

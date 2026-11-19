@@ -92,9 +92,20 @@ class SkillBuilderServiceTest {
 				+ body + "\"}";
 	}
 
+	/**
+	 * A draft written the way the skill writing guidelines ask — title, sections,
+	 * examples — so the inspection gate lets it through and the build reaches the eval
+	 * arms. It is the body {@code SkillInspectorTest} proves is not blocked.
+	 */
 	private static String benignBody() {
-		return "## Workflow\\n1. Read the carrier temperature record.\\n2. Reject a breach and escalate to quality.\\n"
-				+ "\\n## Gotchas\\n- A delivery is not closed until the recipient confirms.\\n";
+		return "# Cold store goods receipt\\n\\nReceive chilled and frozen goods against the carrier's temperature "
+				+ "record.\\n\\n## Instructions\\n1. Read the temperature record the carrier hands over.\\n"
+				+ "2. Compare every reading with the stored range for the product.\\n"
+				+ "3. Reject the delivery and escalate to the duty manager when a reading is outside the range.\\n"
+				+ "4. Ask the recipient to confirm before closing the receipt.\\n\\n## Examples\\n"
+				+ "- Chilled dairy at 6 C against a 0-4 C range: reject and escalate.\\n"
+				+ "- Frozen goods at -18 C: accept and file the record.\\n\\n## Troubleshooting\\n"
+				+ "- A missing temperature record is treated as a breach until the carrier supplies one.\\n";
 	}
 
 	private static int countExpectations(String gradingRequest) {
@@ -144,6 +155,17 @@ class SkillBuilderServiceTest {
 		assertThat(report).contains("security:    SAFE");
 		assertThat(report).contains("lifecycle:   INCUBATING").contains("baseline 1.000");
 		assertThat(report).contains("published:   " + library.resolve(PackName.slug(DESCRIPTION)));
+		// The inspection section is on the built report too: the score it gave, the
+		// drafts
+		// it took, and — always, not only when something came back incomplete — the
+		// checks
+		// a default build did not run. A reader must not infer that the absence of a
+		// complaint means a secret scan happened.
+		assertThat(report).contains("inspect:     7 checks run, quality ").contains("1 draft");
+		assertThat(report).contains("not scanned: security, secrets, code-integrity")
+			.contains("pass --full-inspection to request them");
+		assertThat(result.inspection().qualityScore()).isNotNull();
+		assertThat(result.inspection().drafts()).isEqualTo(1);
 	}
 
 	@Test

@@ -57,6 +57,15 @@ public final class SkillInspector {
 	/** The one check whose findings never block a build, whatever their severity. */
 	private static final String ADVISORY_CHECK = "pii";
 
+	/** The check whose 0-100 score the build report quotes. */
+	private static final String QUALITY_CHECK = "quality";
+
+	/** Metadata key under which the quality validator records its per-skill scores. */
+	private static final String QUALITY_SCORES_KEY = "quality_scores";
+
+	/** Key within those scores holding the composite score. */
+	private static final String OVERALL_SCORE_KEY = "overall_score";
+
 	/**
 	 * The evaluator's report names, mapped back to the check that produced them: a result
 	 * carries its validator's display name, not the check name, and the quality and lint
@@ -118,8 +127,12 @@ public final class SkillInspector {
 		List<String> blocking = new ArrayList<>();
 		List<String> advisory = new ArrayList<>();
 		List<String> incomplete = new ArrayList<>();
+		Double qualityScore = null;
 		for (ValidationResult result : results) {
 			String check = CHECK_BY_REPORT_NAME.getOrDefault(result.getValidatorName(), result.getValidatorName());
+			if (check.equals(QUALITY_CHECK)) {
+				qualityScore = qualityScoreOf(result);
+			}
 			if ("incomplete".equals(result.getStatus())) {
 				// Neither a pass nor a block: only the scanner name is reported. Its
 				// findings and its "not installed" warning, which names a third-party
@@ -150,7 +163,22 @@ public final class SkillInspector {
 				result.getWarnings().forEach((warning) -> advisory.add(check + ": " + warning));
 			}
 		}
-		return new Inspection(List.copyOf(blocking), List.copyOf(advisory), List.copyOf(incomplete), checksNotRun);
+		return new Inspection(List.copyOf(blocking), List.copyOf(advisory), List.copyOf(incomplete), checksNotRun,
+				qualityScore);
+	}
+
+	/**
+	 * The quality validator's composite score, which it records in its result metadata
+	 * rather than as a finding, so a passing run would otherwise report no number at all.
+	 * @param result the {@code quality} result
+	 * @return the 0-100 score, or {@code null} when the result carries none
+	 */
+	private static Double qualityScoreOf(ValidationResult result) {
+		if (result.getMetadata().get(QUALITY_SCORES_KEY) instanceof Map<?, ?> scores
+				&& scores.get(OVERALL_SCORE_KEY) instanceof Number score) {
+			return score.doubleValue();
+		}
+		return null;
 	}
 
 	/**
@@ -194,10 +222,12 @@ public final class SkillInspector {
 	 * neither a pass nor a block
 	 * @param checksNotRun checks the lineup did not request, so nothing was scanned for
 	 * them
+	 * @param qualityScore the quality check's composite 0-100 score, or {@code null} when
+	 * it reported none
 	 * @author Ivan Rodriguez
 	 */
 	public record Inspection(List<String> blockingFindings, List<String> advisoryFindings, List<String> incompleteScans,
-			List<String> checksNotRun) {
+			List<String> checksNotRun, Double qualityScore) {
 
 		/**
 		 * Whether the skill may proceed past the inspection gate.
