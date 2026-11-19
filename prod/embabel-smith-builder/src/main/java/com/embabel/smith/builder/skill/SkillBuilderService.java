@@ -8,6 +8,7 @@ package com.embabel.smith.builder.skill;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import com.embabel.smith.builder.BuildOptions;
 import com.embabel.smith.builder.BuilderService;
@@ -43,7 +44,8 @@ import com.embabel.smith.builder.security.ScanVerdict;
  *   3. EvalSource       — the model drafts the evals.json suite
  *   4. EvalRunner       — every scenario run with the skill and without it
  *   5. Benchmark        — the two pass rates and the lift between them (the gate)
- *   6. security scan    — the static prompt-injection scan over the SKILL.md
+ *   6. security scan    — the static prompt-injection scan over both documents the build
+ *                         publishes from model output: SKILL.md and evals.json
  *   7. LifecycleStamper — content hash + with-skill pass rate as baseline + incubating
  *   8. Publisher        — FolderPublisher | GitPublisher (collision gate; no push by default)
  * </pre>
@@ -121,13 +123,31 @@ public class SkillBuilderService {
 			return SkillBuildResult.blocked("eval", skillName,
 					List.of("the model drafted no eval scenarios, so the skill cannot be validated"), null, null);
 		}
+		// A scenario with no expectations contributes 0/0 to both arms, so it cannot
+		// move the lift: a suite of them blocks with "+0.000" indistinguishable from a
+		// genuinely useless skill, and a mixed suite silently gates on the scenarios
+		// that do measure something. Refused here, before either arm is paid for.
+		List<Integer> unmeasurable = evals.evals()
+			.stream()
+			.filter((eval) -> eval.expectations().isEmpty())
+			.map(EvalSuite.Eval::id)
+			.toList();
+		if (!unmeasurable.isEmpty()) {
+			return SkillBuildResult.blocked("eval", skillName,
+					List.of("the model drafted eval scenarios with no expectations (scenario "
+							+ unmeasurable.stream().map(String::valueOf).collect(Collectors.joining(", "))
+							+ "), so they measure nothing; every scenario must state at least one expectation"),
+					null, null);
+		}
 		Benchmark.Summary summary = Benchmark.aggregate(this.runner.run(skill, evals));
 		if (summary.lift() <= options.minLift()) {
 			return SkillBuildResult.blocked("eval", skillName, liftIssues(summary, options.minLift()), summary, null);
 		}
 
-		// 6. Security gate (static, offline) over the SKILL.md the skill publishes as.
-		ScanReport scan = this.scanner.scanText(skillName, skill.toSkillMd());
+		// 6. Security gate (static, offline) over every document the skill publishes from
+		// model output. The lifecycle sidecar is excluded: the builder wrote it, not the
+		// model.
+		ScanReport scan = this.scanner.scanText(skillName, List.of(skill.toSkillMd(), evals.toJson()));
 		if (scan.verdict() == ScanVerdict.BLOCK) {
 			List<String> findings = scan.findings()
 				.stream()

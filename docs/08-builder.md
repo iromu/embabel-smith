@@ -150,9 +150,32 @@ Generates a portable Agent Skill (`SKILL.md` plus `evals.json`), validated by a 
 no-skill eval lift** rather than an absolute score. `SkillMdValidator` enforces the frontmatter
 constraints (name 1–64 lowercase alphanumeric-or-hyphen, description ≤ 1024).
 
-**The lift gate is strictly greater than zero.** With a configurable minimum of 0, an *inclusive*
-comparison would publish a skill that changed nothing. The default minimum lift is
-`BuildOptions.DEFAULT_MIN_LIFT = 0.0`, and the comparison stays strict.
+**The lift gate is strictly greater than the required minimum.** `--min-lift <n>` sets that minimum on
+the command line. It defaults to `BuildOptions.DEFAULT_MIN_LIFT = 0.0` — so the shipped behaviour is
+"any lift that beats the baseline" — and the comparison stays strict, because an *inclusive* one at
+that default would publish a skill that changed nothing. The flag is accepted on an agent-spec build
+and has no effect there, exactly as `--max-refine` already is.
+
+It is a **CLI knob only**. The studio's `/api/build` pins `rest/BuildController` to
+`BuildTarget.AGENT_SPEC`, and the lift gate belongs to skill builds alone, so no studio request can
+reach it; that is why `BuildRequest` has no lift field and the controller passes the constant
+literally. The day that pane can build a skill, this sentence stops being true and the knob becomes
+worth adding.
+
+**The scan covers both documents the skill publishes from model output.** The static security scan
+vetted by §Security scan below runs over the `SKILL.md` *and* the `evals.json`: both are model-authored
+text and both are written into the published folder, so an injection marker sitting in an eval
+expectation blocks the build at the `security` stage exactly as one in the body does, and nothing is
+written. The `lifecycle.yml` sidecar is not scanned — the builder generated it from a content hash and
+a pass rate, so scanning it would add noise, not coverage.
+
+**Every drafted scenario must carry an expectation.** A scenario with an empty expectation list
+contributes 0/0 to both arms and cannot move the lift: a suite of them blocks with "skill lift +0.000"
+indistinguishable from a genuinely useless skill, and a mixed suite gates silently on the scenarios
+that do measure something. Such a suite is refused at the `eval` stage, naming the offending scenario
+ids, *before* either arm runs — two model calls (draft the skill, draft the suite) instead of four
+more per empty scenario. They are refused rather than dropped: dropping is precisely what makes a
+build gate on a subset nobody chose.
 
 This is a deliberate, documented departure from the spec path's deterministic gate: a relative lift
 judged by an LLM is a softer instrument, so the per-scenario report is published alongside the
@@ -179,7 +202,7 @@ on the runtime module.
 ```
 smith build ("<description>" | --docs <path>) --out <folder:…|git:…>
             [--extract] [--target agent-spec|skill]
-            [--technique single-shot|embabel] [--max-refine <n>] [--overwrite] [--push]
+            [--technique single-shot|embabel] [--max-refine <n>] [--min-lift <n>] [--overwrite] [--push]
 
 smith blueprint (--repo <git-url> | --zip <archive> | --path <dir>) --out <dir>
                 [--subdir <directory-in-the-repo>] [--overwrite]

@@ -117,6 +117,54 @@ class BuildCommandTest {
 	}
 
 	@Test
+	void usageAdvertisesTheMinimumLiftFlag() {
+		CommandLine smith = new CommandLine(new RecordingBuildCommand(new AtomicReference<>()));
+
+		assertThat(smith.getUsageMessage()).contains("--min-lift");
+	}
+
+	@Test
+	void theMinimumLiftFlagReachesTheSkillGate(@TempDir Path out) {
+		AtomicReference<BuildOptions> specSeen = new AtomicReference<>();
+		AtomicReference<BuildOptions> skillSeen = new AtomicReference<>();
+
+		int exit = new CommandLine(new RecordingBuildCommand(specSeen, skillSeen)).execute("a description", "--out",
+				"folder:" + out, "--target", "skill", "--min-lift", "0.6");
+
+		assertThat(exit).isZero();
+		assertThat(skillSeen.get()).isNotNull();
+		assertThat(skillSeen.get().minLift()).isEqualTo(0.6);
+	}
+
+	@Test
+	void theMinimumLiftFlagIsAcceptedOnAnAgentSpecBuildWithoutDecidingIt(@TempDir Path out) {
+		AtomicReference<BuildOptions> specSeen = new AtomicReference<>();
+		AtomicReference<BuildOptions> skillSeen = new AtomicReference<>();
+
+		// Like --max-refine, the option is not target-scoped: a spec build takes it and
+		// its outcome stays the score gate's to decide.
+		int exit = new CommandLine(new RecordingBuildCommand(specSeen, skillSeen)).execute("a description", "--out",
+				"folder:" + out, "--min-lift", "0.6");
+
+		assertThat(exit).isZero();
+		assertThat(specSeen.get()).isNotNull();
+		assertThat(specSeen.get().target()).isEqualTo(BuildTarget.AGENT_SPEC);
+		assertThat(specSeen.get().minLift()).isEqualTo(0.6);
+		assertThat(skillSeen.get()).isNull();
+	}
+
+	@Test
+	void anUnparseableMinimumLiftIsAUsageError(@TempDir Path out) {
+		AtomicReference<BuildOptions> seen = new AtomicReference<>();
+
+		int exit = new CommandLine(new RecordingBuildCommand(seen)).execute("a description", "--out", "folder:" + out,
+				"--min-lift", "generous");
+
+		assertThat(exit).isEqualTo(2);
+		assertThat(seen.get()).isNull();
+	}
+
+	@Test
 	void anUnknownTargetIsAUsageError(@TempDir Path out) {
 		AtomicReference<BuildOptions> specSeen = new AtomicReference<>();
 		AtomicReference<BuildOptions> skillSeen = new AtomicReference<>();

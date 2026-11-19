@@ -65,6 +65,10 @@ public class BuildCommand implements Callable<Integer> {
 	@Option(names = "--max-refine", description = "Maximum refinement rounds (default ${DEFAULT-VALUE})")
 	int maxRefine = BuildOptions.DEFAULT_MAX_REFINE;
 
+	@Option(names = "--min-lift", description = "Skill lift the with/without-skill gate requires "
+			+ "(default ${DEFAULT-VALUE}); accepted on an agent-spec build and unused there")
+	double minLift = BuildOptions.DEFAULT_MIN_LIFT;
+
 	@Option(names = "--overwrite", description = "Overwrite an existing pack or skill of the same name")
 	boolean overwrite;
 
@@ -171,7 +175,7 @@ public class BuildCommand implements Callable<Integer> {
 		try {
 			PublishTarget target = PublishTarget.parse(this.out);
 			BuildOptions options = new BuildOptions(this.maxRefine, BuildOptions.DEFAULT_SCORE_GATE, this.overwrite,
-					this.push, this.technique, this.target, BuildOptions.DEFAULT_MIN_LIFT);
+					this.push, this.technique, this.target, this.minLift);
 			String description = resolveDescription();
 			return (options.target() == BuildTarget.SKILL) ? buildSkill(description, target, options)
 					: buildAgentSpec(description, target, options);
