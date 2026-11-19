@@ -12,7 +12,7 @@ The root POM (`pom.xml`) aggregates two trees by default, and a third behind the
 | --- | --- |
 | `smith-common` | The agent-spec format: data model (`common.model`), YAML I/O (`common.io`), validation (`common.validation`), the endpoint gate (`common.config`), and the sample packs (`common.samples`). Framework-free and fully offline-testable. |
 | `poc/` | 26 numbered proof-of-concept modules. **Frozen evidence** — see below. Not in the default reactor: they build only with `-Ppoc` (`make … POC=1`). |
-| `prod/` | The product: `embabel-smith-specsource`, `embabel-smith-runtime`, `embabel-smith-builder`, `embabel-smith-skillevaluator`, `embabel-smith-studio`. |
+| `prod/` | The product: `embabel-smith-specsource`, `embabel-smith-runtime`, `embabel-smith-runtime-a2a`, `embabel-smith-builder`, `embabel-smith-skillevaluator`, `embabel-smith-studio`. |
 
 `embabel-smith-skillevaluator` is the **Tier 1 skill validator**: a static pipeline
 (`Tier1Runner`) over a skill or a folder of skills, with one `ValidationResult` per validator —
@@ -30,6 +30,16 @@ default build of the product should not pay for either. The consequence is that 
 `specsource` is the only piece shared by more than one product module: the runtime reads it, the
 builder publishes into it, and the studio browses sources and drives the improvement loop from it.
 It holds no Embabel agent code, so it stays offline-testable.
+
+`embabel-smith-runtime-a2a` is the only `prod/` module that gains a network surface **from a
+dependency rather than by asking for one**: it is the only module that declares
+`embabel-agent-starter-a2a`, and that starter is what brings `spring-boot-starter-web` and the servlet
+engine — the studio is the only other `prod/` listener and declares its own web starter, because it is
+the UI. Its launcher sets `spring.main.web-application-type` to `SERVLET` as a system property, as the
+studio's launcher does, because a transitive jar ships a classpath `application.yml` saying `none`. It
+still **holds no model call** — every request delegates to the runtime's `AgentSpecRunService` — so it
+adds a transport, not a second route to the model. What it serves, and what it deliberately does not,
+is in [`07-runtime.md`](07-runtime.md).
 
 ## Extract, do not depend
 
@@ -91,9 +101,9 @@ happens to be first in the list.
 
 The guard is two offline tests that walk the source tree and fail on a forbidden import
 (`import java.net.http.`): `builder/NoDirectModelRequestTest` and `studio/NoDirectModelRequestTest`.
-They cover the two modules that talk to a model; `runtime`, `specsource` and `skillevaluator` carry
-no guard because they hold no model call — the runtime reaches the model only by executing actions
-on the platform.
+They cover the two modules that talk to a model; `runtime`, `runtime-a2a`, `specsource` and
+`skillevaluator` carry no guard because they hold no model call — the runtime reaches the model only
+by executing actions on the platform, and `runtime-a2a` reaches the runtime.
 Because checkstyle and tests run in the normal build, a violation fails `make test` with no endpoint
 needed.
 
@@ -221,5 +231,7 @@ The pre-commit hook installed by `make setup` runs `make lint`; a clone without 
 ## Ports
 
 Port 8080 is held by an unrelated local service, so the POCs and the studio take explicit ports:
-18080 for POC 13's MCP server, 18081 for POC 19's llama.cpp container, and `SERVER_PORT` for
-anything else.
+18080 for POC 13's MCP server, 18081 for POC 19's llama.cpp container, 18090 for the A2A endpoint
+(`make run-a2a`, overridden with `SERVER_PORT`), and `SERVER_PORT` for anything else. POC 16's
+sidecar also defaults to 18090, so running that launcher and the A2A endpoint at the same time needs
+one of the two moved.

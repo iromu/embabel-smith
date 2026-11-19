@@ -357,7 +357,7 @@ $ embabel-builder test --spec research-web --input "Acme Corp competitors"
 | **1. Specs Layer** | Spec Registry + Composer + Runtime Adapter | + `embabel-agent-remote` (for CLI bridging) | `SpecRegistry`, `SpecComposer`, `RemoteActionBridge`, `ShellToolGroupConfig` |
 | **2. Trust & Governance** | T1–T4 tiers, guardrail library, drift detection | + global guardrails config | `TrustTierPolicy`, `GuardrailLibrary`, `DriftWatcher` (scheduled eval) |
 | **3. Scale & Intelligence** | Semantic spec selection (build-time, POCs 8/12/17/19/20/23), SkillGrad-style self-improvement, SE-GoS graph evolution | (custom) | Vector index, `SpecOptimizer` (LLM rewrites prompts from eval failures), `SpecGraph` |
-| **4. Ecosystem** | Remote spec marketplace, MCP spec server, A2A spec mesh | + `embabel-agent-starter-mcpserver`, A2A | Spec pack registry (git/HTTP), MCP server mode, A2A spec discovery |
+| **4. Ecosystem** | Remote spec marketplace, MCP spec server, A2A spec mesh | + `embabel-agent-starter-mcpserver`, A2A | Spec pack registry (git/HTTP), MCP server mode, A2A spec discovery (still open, and this row is spec *discovery*: the runtime's own A2A endpoint already exists as `prod/embabel-smith-runtime-a2a` and serves runs, not spec discovery — [`07-runtime.md`](07-runtime.md)) |
 
 **MVP (Phase 0 + 1)** is **buildable today** with Embabel 1.5.4. The "specs, not agents" paradigm is not a research project — it's *how Embabel already works*; the builder just needs to surface it.
 

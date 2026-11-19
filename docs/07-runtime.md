@@ -163,6 +163,63 @@ smith run --source <folder:…|git:…[@ref]> [--goal <name>] [--input <text>]
 service class** (`AgentSpecRunService`) rather than holding logic itself, so the studio can embed the
 same capability without going through the CLI.
 
+## A2A endpoint
+
+`prod/embabel-smith-runtime-a2a` is a **local development surface on an explicit non-default port
+(18090) with no authentication and no TLS**, so **anyone who can reach the port can start a real run
+and pay for its model calls**; it speaks **A2A protocol 0.3**, so a client expecting the current 1.0
+specification will not find it. Both halves are rulings rather than gaps: the posture is the studio's,
+widened to a port anyone on the network can open, and 0.3 is what
+`embabel-agent-starter-a2a:1.5.4` implements. The module's own README
+(`prod/embabel-smith-runtime-a2a/README.md`) holds the deviation table; what a reader of the runtime
+needs is here.
+
+The surface is `GET /a2a/.well-known/agent.json` plus `POST /a2a`, started with `make run-a2a`. It is
+the only `prod/` module that declares the starter, and therefore the only one that gains a servlet
+engine from it; `SmithA2aApplication` forces `spring.main.web-application-type` to `SERVLET` as a
+system property, and `SmithRuntimeApplication` is untouched — `smith run` still boots non-web and
+opens no socket.
+
+**Five operations, never six:** `message/send`, `message/stream`, `tasks/get`, `tasks/cancel`, plus the
+card document. **Listing tasks is not among them**, and a client that asks gets HTTP 500 with
+`Method tasks/list is not supported` — protocol 0.3 has no such method, so the library's facade
+rejects it before any handler runs. Serving it would mean a route outside the dispatch of the library
+this surface reuses, which is the second protocol surface the reuse ruling exists to avoid; so it is a
+decision, recorded in [`12-backlog.md`](12-backlog.md), and not work owed. A client does not need it:
+`message/send` returns the task and `tasks/get` reads it back by id, and a caller that lost an id can
+read the trace file directly, because that is what both operations are built on.
+
+**One run is one task, and the task id is the `runId` of the `TraceRecord` that run appends** — the
+same record a CLI run writes, so an A2A run is evidence for the loop without a second registry of any
+kind. A success is a `COMPLETED` task carrying the goal output as an artifact; a failure is a `FAILED`
+task carrying the run's error in its status message, because a missing goal, a trust-tier block and an
+unresolvable source are runs the service already reports, not HTTP errors.
+
+**The tier is configured once for the endpoint** (`smith.a2a.trust-tier`, default `STANDARD`) because
+the protocol request carries no caller identity to select one from; `smith.a2a.source` configures the
+spec source the same way, since the request carries no source either. The goal and the planner *are*
+per-request, in the message-send `metadata` under `goal` and `planner`. The card's skill list is
+filtered by the same per-pack tool-group check the run gate makes, so the two cannot disagree about
+which packs are the problem.
+
+**The card's skills come from that configured source**, one per exported goal, read once on the first
+card request and never at boot. Its `tags` and `examples` are empty because a `goal.yml` declares
+neither — those two lists belong to `@Agent` on a Java class, and nothing is invented to fill them. A
+source that cannot be read fails the card request rather than serving an empty skill list, because an
+empty list tells a client the agent can do nothing. **A readable source that simply contains no packs
+still yields `skills: []`**, and it should: a `folder:` source reads the *immediate subdirectories* of
+the path it names, so pointing it at one pack (`folder:…/agent-specs/explainer`) rather than at a
+directory of packs is a correct read of nothing, not a failure.
+
+**Nothing here stops a run.** The trace record is written after the run returns, so every task the
+store holds is already terminal: `tasks/get` never reports a `WORKING` task, and `tasks/cancel` refuses
+with a status message saying the run is synchronous and was not cancelled. `message/stream` emits the
+task, then its artifact, then a terminal status update, and closes — no invented progress events.
+
+The module holds **no model call** of its own: every request goes through `AgentSpecRunService`, so an
+A2A run is the same run `smith run` makes, and the `Ai`-layer rule in
+[`05-architecture.md`](05-architecture.md) is untouched.
+
 ## The model endpoint
 
 The endpoint is pluggable and env-driven (`OPENAI_CUSTOM_*`). **The runtime applies no endpoint

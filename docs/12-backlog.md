@@ -243,6 +243,34 @@ files.
 
 ## Misc
 
-- a2a operations on runtime module: Send Message, Send Streaming Message, Get Task, List Tasks, Cancel Task, Get Agent Card.
-- Spec https://a2a-protocol.org/latest/specification/#11-key-goals-of-a2a
-- This should reuse embabel and Spring AI libs to handle a2a protocol definition
+Closed — **a2a operations on the runtime module** (was: Send Message, Send Streaming Message, Get
+Task, List Tasks, Cancel Task, Get Agent Card, on the spec
+https://a2a-protocol.org/latest/specification/#11-key-goals-of-a2a). They are served by
+`prod/embabel-smith-runtime-a2a` — `make run-a2a`, `POST /a2a`, card at
+`GET /a2a/.well-known/agent.json` — over protocol 0.3, as **five** operations: `message/send`,
+`message/stream`, `tasks/get`, `tasks/cancel`, plus the card document. **Listing tasks is not among
+them and is not owed.** Protocol 0.3 has no `tasks/list`, so the reused facade rejects the method
+before any handler runs and a client that asks gets HTTP 500; serving it would have meant a route
+outside that library's dispatch, which is the second protocol surface the reuse ruling exists to
+avoid. Each deviation, with the test that pins it, is in the module's own README; the surface is
+documented in [`07-runtime.md`](07-runtime.md).
+
+The note's *"reuse embabel and Spring AI libs"* cannot be honoured as written: **there is no Spring AI
+A2A artifact on Maven Central** — five probes of the plausible names (`spring-ai-a2a`,
+`spring-ai-starter-a2a`, `spring-ai-starter-a2a-server`, `spring-ai-autoconfigure-a2a-server`,
+`spring-ai-a2a-server`) all returned 404 and the local `spring-ai-bom` carries no `a2a` entry. What
+does resolve, and is what the module declares, is `com.embabel.agent:embabel-agent-a2a:1.5.4` —
+reached as `embabel-agent-starter-a2a:1.5.4` through `embabel-agent-a2a-autoconfigure:1.5.4` — plus
+`io.github.a2asdk:a2a-java-sdk-spec`, which resolves at **0.3.2.Final** here through
+`embabel-agent-api:1.5.4`. The 0.3.3.Final that `embabel-build-dependencies:2.0.3` pins never enters
+this tree, and the two are distinct binaries, so a root pin to 0.3.3 would be an untested upgrade, not
+a no-op.
+
+- **Open — A2A protocol 1.0.** The reused library speaks 0.3: the served card reports
+  `protocolVersion: 0.3.0`, the dispatch keys off the 0.3 method names, and discovery is at
+  `/a2a/.well-known/agent.json` rather than the current specification's
+  `/.well-known/agent-card.json` — so a client expecting 1.0 will not find this endpoint. Getting to
+  1.0 means waiting for `io.github.a2asdk` 1.0.0 to leave Alpha or hand-writing the binding, which is
+  the option the reuse ruling rejected. Check:
+  `grep -rn 'embabel-agent-starter-a2a' prod/*/pom.xml` returns the one module, and
+  `grep -n 'Non-goal: protocol 1.0' prod/embabel-smith-runtime-a2a/README.md` finds the open half.

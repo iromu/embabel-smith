@@ -1,7 +1,7 @@
 # The A2A surface is a LOCAL DEVELOPMENT endpoint: an explicit non-default port, no
 # authentication, and no localhost bind. Anyone who can reach this port can start a real GOAP
 # run, which spends real billable model calls. The posture is disclosed, not mitigated — the
-# module README records it (and docs/07-runtime.md will, in the change's documentation wave).
+# module README and docs/07-runtime.md both record it.
 server:
   # Never 8080: that port belongs to an unrelated long-running service on this machine, and a
   # default here would make the surface start somewhere by accident.

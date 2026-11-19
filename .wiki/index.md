@@ -4,8 +4,16 @@ type: "index"
 status: "active"
 language: "default"
 last_commit: "7805939705cee28e1bae131f740ad2bd2f463862"
-updated_at: "2026-11-15"
+updated_at: "2026-11-19"
 ---
+
+<!-- Scoped ingest 2026-11-19: only the A2A surface was ingested ([[a2a-endpoint]], [[smith-runtime]],
+[[build-tooling]], [[model-calls-go-through-ai]]). `last_commit` is deliberately NOT advanced — 1083
+tracked files changed since it, so a full ingest is still owed and the rest of these pages are
+unrefreshed since 2026-11-15. Lint ran clean (0 broken links, 0 orphans, 0 stale). GitHub Pages
+re-publish is OWED: `wiki-pages.yml` fires on pushes to `main` touching `.wiki/**`, and these edits
+are on `poc/iteration-2`, so until they merge the site at https://iromu.github.io/embabel-smith/
+still shows the pre-A2A wiki (manual `gh workflow run` is the alternative). -->
 
 # Embabel Smith
 
@@ -147,7 +155,10 @@ Three entry points matter:
   [[skill-output-target]]), and the `studio` (the self-improvement loop that rewrites failing steps
   from traces and republishes on proven improvement, exposed as a web product: REST surface + Vue UI
   + loop scheduling + the process workspace). All model calls in `prod/` go through Embabel's `Ai`,
-  not the endpoint directly. See
+  not the endpoint directly. `runtime-a2a` is the one prod module that gains a servlet engine
+  from a dependency rather than declaring one — an unauthenticated local development endpoint
+  for another process to ask for a run ([[a2a-endpoint]]). The studio also listens, on its own
+  starter, because it is the UI. See
   [[spec-sources]], [[smith-runtime]], [[smith-builder]], [[smith-studio]], [[smith-studio-web]],
   [[studio-process-workspace]], [[studio-compose-editor]] and [[model-calls-go-through-ai]].
 - Root tooling — the `Makefile` (stable Maven entry points), `setup.sh` (developer setup), the
@@ -204,6 +215,7 @@ Three entry points matter:
 | How do the POCs become the product? | [[product-phase]] · `prod/` |
 | How are spec sources (folder/git) resolved? | [[spec-sources]] |
 | How does the `smith run` runtime work (CLI + trace)? | [[smith-runtime]] |
+| How does another process ask this product to run a goal (A2A)? | [[a2a-endpoint]] · `prod/embabel-smith-runtime-a2a/` |
 | How does the `smith build` builder work (pipeline + publish)? | [[smith-builder]] |
 | How does the build choose between a single agent and a multi-agent process? | [[two-candidate-build]] · `builder/core/CandidateRecommender.java` |
 | How do I build a `SKILL.md` instead of a pack? | [[skill-output-target]] · `builder/skill/` |
@@ -230,7 +242,7 @@ Three entry points matter:
 **Features** — [[nl-compile]] · [[spec-format-on-demand]] · [[runtime-adapter]] ·
 [[retrieval-shadowing]] · [[shadowing-remedies]] · [[spec-lifecycle]] · [[trust-tiers]] ·
 [[spec-security-scanning]] · [[progressive-disclosure]] · [[spec-composer]] · [[spec-sources]] ·
-[[smith-runtime]] · [[smith-builder]] · [[smith-studio]] · [[smith-studio-web]] ·
+[[smith-runtime]] · [[a2a-endpoint]] · [[smith-builder]] · [[smith-studio]] · [[smith-studio-web]] ·
 [[smith-studio-storage]] · [[studio-process-workspace]] · [[studio-compose-editor]] ·
 [[generation-approaches]] · [[skill-generation]] · [[skill-scripts-graaljs]] ·
 [[two-candidate-build]] · [[skill-output-target]]

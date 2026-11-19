@@ -11,8 +11,9 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 /**
- * Launcher of the runtime's A2A surface — the only prod module with a network surface,
- * and the only place the Embabel A2A starter appears.
+ * Launcher of the runtime's A2A surface — the only prod module that gains a servlet
+ * engine from a dependency rather than declaring one, and the only place the Embabel A2A
+ * starter appears. The studio also listens, on its own starter, because it is the UI.
  *
  * <p>
  * <b>What this endpoint is.</b> A local development surface: an explicit non-default port

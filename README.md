@@ -14,7 +14,7 @@ for the design.
 
 ## Modules
 
-`smith-common` and the five `prod/` modules below are the **default reactor** — the shipped product.
+`smith-common` and the six `prod/` modules below are the **default reactor** — the shipped product.
 The `poc-*` rows after them are **frozen evidence**: built only with `-Ppoc`, never depended on by the
 product. See [`docs/05-architecture.md`](docs/05-architecture.md) for the module map and why.
 
@@ -23,6 +23,7 @@ product. See [`docs/05-architecture.md`](docs/05-architecture.md) for the module
 | `smith-common` | The shared agent-spec format: data model, YAML I/O, validation, sample specs. Framework-free, fully offline-testable. |
 | `embabel-smith-specsource` | Spec sources: the `folder:` / `git:` grammar, pack discovery, the git cache and ref pinning, content hashes, and the publish rules. The one piece shared by more than one product module — the runtime reads it, the builder publishes into it, the studio browses it — and it holds no Embabel agent code, so it stays offline-testable. |
 | `embabel-smith-runtime` | Ingests packs with **zero compilation** and runs a GOAP plan over an exported goal: multi-pack chaining through shared types, trust tiers, the lifecycle gate on retired packs, the trace record every run emits, and the remote-action bridge client. `smith run`. |
+| `embabel-smith-runtime-a2a` | The runtime's A2A surface: `message/send`, `message/stream`, `tasks/get`, `tasks/cancel` and the agent card over protocol 0.3 — **five** operations, listing tasks not among them. An A2A run is the same run `smith run` makes: same trust-tier gate, same planner selection, same trace record, and no model call of the module's own. The only prod module that gains a servlet engine **from a dependency** rather than declaring one, so it is a deliberate network surface — an explicit non-default port, no authentication and no TLS, i.e. a local development endpoint. `make run-a2a`. |
 | `embabel-smith-builder` | The builder: generation techniques (single-shot by default), validate-before-write, eval and refinement bounds, the skill and process targets, retrieval ranking with lifecycle curation, and the security gate on what is allowed to publish. `smith build`. |
 | `embabel-smith-skillevaluator` | Tier 1 static skill validator (`Tier1Runner`): schema, license, hygiene, version, quality score, script lint, Python syntax, code risk, and the security family (secrets, PII, Unicode smuggling). A port of a Python `tier1` validator, so it runs with no model call. **Built but not yet wired to a consumer** — see [`docs/12-backlog.md`](docs/12-backlog.md). Carries an upstream attribution; see [`NOTICE`](NOTICE). |
 | `embabel-smith-studio` | The browser UI over a thin REST layer: the process workspace, retrieval and remote panes, the self-improvement loop with its approval queue, and hot-swappable Postgres storage. |
@@ -92,6 +93,12 @@ Those guarantees are enforced without anyone remembering to run them:
 `.github/workflows/offline-verification.yml` runs `make build`, `make test` and `make lint` on every
 pull request and every push to the default branch, with no model endpoint and no secrets, on the
 default reactor only.
+
+The `make` entry points are `build`, `test`, `test-live`, `lint` and one launcher — `make run-a2a`,
+which starts the runtime's A2A development endpoint (`SERVER_PORT=`, `SMITH_A2A_SOURCE=`,
+`SMITH_A2A_TRUST_TIER=`, port 18090 by default). It is the only target that opens a port, and the
+endpoint it starts has **no authentication and no TLS**, so read
+[`docs/07-runtime.md`](docs/07-runtime.md) before running it anywhere but your own machine.
 
 ### Live tests are opt-in by tag
 
