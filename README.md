@@ -106,6 +106,12 @@ On a machine with no endpoint configured, an opted-in run reports the live tests
 than failed: each of them keeps `@EnabledIfEnvironmentVariable` alongside the tag. The tag answers
 "should this run by default", the env check answers "can it run here".
 
+The other side of that: because the group is excluded by default, a green `make test` proves nothing
+about the four things those tests alone exercise — a build publishing a pack the model really
+produced, a run that achieves its goal, the REST surfaces with the model-backed cores wired, and one
+loop iteration end to end. [`docs/05-architecture.md`](docs/05-architecture.md) says what rests on
+them.
+
 The 26 POC modules are **not** in the default reactor — they sit behind the `poc` Maven profile, so
 the commands above cover `smith-common` and `prod/` only. Add `-Ppoc` (or `POC=1` to a `make`
 target) to build or test them too.

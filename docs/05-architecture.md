@@ -186,8 +186,32 @@ is what makes `make test` depend on a model agreeing.
 
 The four tests this covers today are the builder's `LiveBuildIntegrationTest`, the runtime's
 `LiveRunIntegrationTest` and the studio's `improve/RestIntegrationTest` and
-`improve/LiveLoopIntegrationTest`, plus the builder's example suites (see
+`improve/LiveLoopIntegrationTest` — and that is the whole list. Check it against the tree rather than
+against this page: `grep -rn '@Tag("live")' prod/*/src/test` prints exactly those four files. The
+builder's example suites are *not* in it; they were removed on 2026-11-17, and building against a live
+model is now a set of hand-started scripts under `examples/` that `make test-live` does not run (see
 [`08-builder.md`](08-builder.md)).
+
+**What the default run therefore does not prove.** A green `make test` is not full coverage, and these
+four are the only execution of the four things below — everywhere else they are exercised against a
+substituted generator, caller, platform or publisher:
+
+- the builder's pipeline running on real model output all the way to a **published** pack. The offline
+  build tests substitute the generator, so they cover validation, scoring, recommendation, the
+  security gate and the publish mechanics — never a pack the model actually produced. This is also
+  where the `embabel` technique's known upstream limit is evidenced, at its generation seam, which is
+  the claim [`08-builder.md`](08-builder.md) makes about it;
+- the runtime's **successful** run — source resolved, packs ingested, a goal planned and achieved, its
+  trace record written. The
+  offline runtime tests say so in their own javadoc: they cover the failure paths, and "the success
+  path is covered by the endpoint-gated integration test";
+- the studio's three production REST surfaces (run a goal, build a pack, one loop iteration) driven
+  with the **real model-backed cores wired**. Offline, the controller tests substitute those cores;
+- the improvement loop's full iteration — real refine, real re-eval, publishing an improved pack —
+  rather than the queue and gate mechanics the offline `ImprovementLoopTest` drives with fakes.
+
+The affordable response is the cheap live test [`08-builder.md`](08-builder.md) already names: a small
+blueprint with a known expected spec and skill, which can be asserted rather than merely recorded.
 
 **Checkstyle runs in Maven's `validate` phase**, so a style violation fails `make build` and
 `make test` too, not just `make lint`. Because the reactor stops at the first failing module, one
