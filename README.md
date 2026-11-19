@@ -2,7 +2,7 @@
 
 A **GOAP-based Embabel agent builder** — a general-purpose builder agent that emits deployable,
 no-code *agent specs* (declarative YAML step definitions), plus the fixed no-code runtime that
-ingests them. Greenfield POC multi-module project on **Embabel 1.5.4 / Java 21**.
+ingests them. Product code and POC evidence in one repository, on **Embabel 1.5.4 / Java 21**.
 
 The core idea: a builder *agent* turns a natural-language description into an **agent spec** (a
 pure-data YAML directory of Embabel step definitions — goals and actions), validates it before
