@@ -18,9 +18,19 @@ The root POM (`pom.xml`) aggregates two trees by default, and a third behind the
 (`Tier1Runner`) over a skill or a folder of skills, with one `ValidationResult` per validator —
 schema, license, hygiene, version, quality score, script lint, Python syntax, code risk, and the
 security family (secrets, PII, Unicode smuggling). It is a port of a Python `tier1` validator, so
-it runs with no model call and depends only on SnakeYAML and Jackson. **It is not yet wired to a
-consumer**: no other product module depends on it, and it is absent from the root POM's
-`dependencyManagement`. Treat it as built-but-unintegrated; see [`12-backlog.md`](12-backlog.md).
+it runs with no model call and depends only on SnakeYAML and Jackson.
+
+**Its consumer is the builder's `skill` target.** `skill/SkillInspector` is the `inspect` gate of
+[`08-builder.md`](08-builder.md) §"`skill`", and it is the only production class outside the module
+that imports `org.iromu.embabel.smith.skillevaluator`; the root POM's `dependencyManagement` names it
+and the builder depends on it. The gate asks for the seven checks the
+evaluator runs in-JVM: `schema`, `version`, `quality`, `unicode`, `lint` and `license` block the
+build, while `pii` runs and is reported as an advisory whatever it finds — advisory by check name,
+not by severity, so a stricter PII heuristic cannot silently acquire blocking authority. It does
+**not** request `security`, `secrets` or `code-integrity`, because those shell out to SkillSpector,
+Gitleaks, Bandit or Semgrep: **a default skill build invokes none of them**, and the build report
+carries a line saying so. `--full-inspection` is the only route that requests them. This is a
+writing-quality gate; the builder's security gate remains `security/AgentSpecSecurityScanner`.
 
 The POCs sit behind the profile because they are evidence, not shipped code: they are slow to build
 (the POC 17 ONNX bundle, the POC 20 encoder) and their interesting tests are endpoint-gated, so a

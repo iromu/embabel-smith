@@ -150,6 +150,40 @@ Generates a portable Agent Skill (`SKILL.md` plus `evals.json`), validated by a 
 no-skill eval lift** rather than an absolute score. `SkillMdValidator` enforces the frontmatter
 constraints (name 1–64 lowercase alphanumeric-or-hyphen, description ≤ 1024).
 
+**The `inspect` gate runs the skill writing guidelines before any eval call is paid for.** After the
+frontmatter check and *before* the model drafts the `evals.json` suite, `skill/SkillInspector` writes
+the draft to `SKILL.md` in a temp folder named after the skill and runs
+`embabel-smith-skillevaluator`'s `Tier1Runner` over it. Six checks block the build — `schema`,
+`version`, `quality`, `unicode`, `lint` and `license` — and `pii` runs but never blocks: it is
+advisory by check name, not by severity, so a stricter PII heuristic cannot quietly gain blocking
+authority. Blocking findings go back to the model as a redraft request, at most `--max-inspect` times
+(default `BuildOptions.DEFAULT_MAX_INSPECT = 2`, so at most three drafts); a draft that still fails is
+refused at stage `inspect` and nothing is published. The placement is the point: inspection makes no
+model call, so a draft scoring under the quality floor — 70 by default,
+`Constants.QUALITY_DEFAULT_MIN_SCORE`, failed through the validator's gate rather than through a finding
+— is refused before the benchmark spends four calls per scenario measuring it. Going over the 500-line
+body ceiling is **not** one of the refusals: `line_count` reports MEDIUM, which the gate treats as
+advisory, so a long draft is commented on and still published. Advisory findings are reported, never fed
+back — they are MEDIUM and LOW nudges, and a redraft per nudge would buy padding and nothing else. Both
+knobs are read only by the skill gate: `--max-inspect` is accepted on an
+agent-spec build and unused there, exactly as `--min-lift` and `--max-refine` already are.
+
+**A default skill build does no secret scanning, no SkillSpector security scan and no script risk
+analysis.** The three checks that would do those things — `security`, `secrets` and `code-integrity` —
+are not requested, because each shells out to a third-party binary (`skillspector`, `gitleaks`,
+`bandit`, `semgrep`) whose absence the evaluator records as an incomplete scan. Every build that
+reaches the gate therefore prints the limit as its own report line —
+`not scanned: security, secrets, code-integrity (no secret, security or code-risk scanning; pass
+--full-inspection to request them)` — beside `inspect: <n> checks run, quality <score>/100, <n>
+draft(s)`. A build refused earlier, at `generate` or `validate`, prints neither line, because no
+inspection ran. `--full-inspection` is the only way to request those checks, and it is an explicit
+human action: it is the one route on which the evaluator's install hints can reach a terminal, and
+those hints name third-party release URLs (`spi/SkillspectorSecurityScanner.java:96` pins a
+SkillSpector wheel). The only security gate remains `security/AgentSpecSecurityScanner`, the static
+prompt-injection scan in §Security scan and lifecycle, widened to `evals.json` by
+`builder-skill-gate-integrity`. The inspection gate is a writing-quality gate; nothing in it looks for
+injection markers, secrets or risky code on the default path.
+
 **The lift gate is strictly greater than the required minimum.** `--min-lift <n>` sets that minimum on
 the command line. It defaults to `BuildOptions.DEFAULT_MIN_LIFT = 0.0` — so the shipped behaviour is
 "any lift that beats the baseline" — and the comparison stays strict, because an *inclusive* one at
@@ -202,7 +236,8 @@ on the runtime module.
 ```
 smith build ("<description>" | --docs <path>) --out <folder:…|git:…>
             [--extract] [--target agent-spec|skill]
-            [--technique single-shot|embabel] [--max-refine <n>] [--min-lift <n>] [--overwrite] [--push]
+            [--technique single-shot|embabel] [--max-refine <n>] [--min-lift <n>]
+            [--max-inspect <n>] [--full-inspection] [--overwrite] [--push]
 
 smith blueprint (--repo <git-url> | --zip <archive> | --path <dir>) --out <dir>
                 [--subdir <directory-in-the-repo>] [--overwrite]

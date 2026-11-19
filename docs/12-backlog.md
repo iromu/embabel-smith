@@ -185,13 +185,31 @@ no longer wraps `PocOnlyPane.vue`.
 
 ## Skill evaluator
 
-- **`embabel-smith-skillevaluator` is built but wired to nothing.** It is a full reactor module
+- **Closed — it is wired to the builder's `skill` target.** It is a full reactor module
   (`prod/pom.xml`) — the Tier 1 static validator, `Tier1Runner` plus schema, license, hygiene,
   version, quality-score, script-lint, Python-syntax, code-risk and security validators — with no
-  model call and no consumer: no other product module depends on it and it is absent from the root
-  POM's `dependencyManagement`. It is named in `README.md` and in `docs/05-architecture.md`; it has no
-  `.wiki/` page yet. Decide whether to integrate it into the build/publish gate, expose it as a CLI, or
-  mark it deliberately dormant. Check: `grep -rn skillevaluator prod/*/pom.xml pom.xml docs/`.
+  model call. `builder-skill-inspection-gate` gave it its consumer: `skill/SkillInspector` in the
+  builder is the `inspect` gate described in [`08-builder.md`](08-builder.md), the builder declares the
+  dependency, and the root POM's `dependencyManagement` names it. The gate requests the seven checks
+  the evaluator runs in-JVM — six block the build, `pii` reports as an advisory — and does not request
+  the three that need an external scanner. It is integrated into the skill build gate rather than
+  exposed as a CLI or left unused: the deliberate-dormancy ruling `skillevaluator-dormant` recorded was
+  reversed by the human and that change is superseded, and a CLI entry point remains unimplemented. It
+  is named in `README.md` and in `docs/05-architecture.md`; it has no `.wiki/` page of its own yet.
+  Check: `grep -rn skillevaluator prod/*/pom.xml pom.xml docs/`.
+- **Open — an enabled scanner can print an install hint naming a third-party release URL.**
+  `spi/SkillspectorSecurityScanner.java:96` holds `Install with: uv tool install
+  https://github.com/NVIDIA/SkillSpector/releases/download/…whl`; the other binary-backed scanners
+  carry their own (`SecretsGitleaksCli.java:75` a `go install`, `CodeRiskValidator.java:881,885` the
+  Bandit and Semgrep routes). On the default skill-build path every one of those strings is inert: the
+  builder's lineup (`skill/SkillInspector.java:46`) never requests `security`, `secrets` or
+  `code-integrity`, so the validator that would print a hint is never constructed. `--full-inspection`
+  is the single route that can surface one, and it is an explicit human action. Whether the product
+  should ever tell a user to fetch and run a third-party binary is a supply-chain decision for the
+  human, not for a change. Check: `grep -n 'uv tool install'
+  prod/embabel-smith-skillevaluator/src/main/java/org/iromu/embabel/smith/skillevaluator/spi/SkillspectorSecurityScanner.java`
+  and `grep -n 'BINARY_FREE_CHECKS = '
+  prod/embabel-smith-builder/src/main/java/com/embabel/smith/builder/skill/SkillInspector.java`.
 - **Closed — its provenance is now attributed.** The module is a port of a Python `tier1` validator and
   8 of its source files carry `SPDX-FileCopyrightText: Copyright (c) 2025/2026 NVIDIA CORPORATION &
   AFFILIATES` (50 carry the project author). The root `NOTICE` now names NVIDIA SkillEvaluator as the
