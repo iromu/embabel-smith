@@ -14,9 +14,18 @@ for the design.
 
 ## Modules
 
+`smith-common` and the five `prod/` modules below are the **default reactor** — the shipped product.
+The `poc-*` rows after them are **frozen evidence**: built only with `-Ppoc`, never depended on by the
+product. See [`docs/05-architecture.md`](docs/05-architecture.md) for the module map and why.
+
 | Module | Purpose |
 | --- | --- |
 | `smith-common` | The shared agent-spec format: data model, YAML I/O, validation, sample specs. Framework-free, fully offline-testable. |
+| `embabel-smith-specsource` | Spec sources: the `folder:` / `git:` grammar, pack discovery, the git cache and ref pinning, content hashes, and the publish rules. The one piece shared by more than one product module — the runtime reads it, the builder publishes into it, the studio browses it — and it holds no Embabel agent code, so it stays offline-testable. |
+| `embabel-smith-runtime` | Ingests packs with **zero compilation** and runs a GOAP plan over an exported goal: multi-pack chaining through shared types, trust tiers, the lifecycle gate on retired packs, the trace record every run emits, and the remote-action bridge client. `smith run`. |
+| `embabel-smith-builder` | The builder: generation techniques (single-shot by default), validate-before-write, eval and refinement bounds, the skill and process targets, retrieval ranking with lifecycle curation, and the security gate on what is allowed to publish. `smith build`. |
+| `embabel-smith-skillevaluator` | Tier 1 static skill validator (`Tier1Runner`): schema, license, hygiene, version, quality score, script lint, Python syntax, code risk, and the security family (secrets, PII, Unicode smuggling). A port of a Python `tier1` validator, so it runs with no model call. **Built but not yet wired to a consumer** — see [`docs/12-backlog.md`](docs/12-backlog.md). Carries an upstream attribution; see [`NOTICE`](NOTICE). |
+| `embabel-smith-studio` | The browser UI over a thin REST layer: the process workspace, retrieval and remote panes, the self-improvement loop with its approval queue, and hot-swappable Postgres storage. |
 | `poc-1-no-code-runtime` | **POC 1 (keystone).** Fixed launcher that ingests an agent spec via `YmlStepSpecRepository` + `StepSpecAgentScopeBuilder.deploy()` and runs a GOAP plan over the exported goal. |
 | `poc-2-nl-compile` | **POC 2.** Natural-language → draft via `NaturalLanguageCompiler.compileAgent`; reports the draft's goal-shape quality (the `DraftQuality` classifier — doc 02 caveat #2). |
 | `poc-3-builder-agent` | **POC 3.** The builder as a code-backed `@Agent` (GOAP): `compileFromDescription → validateDraft → writeAgentSpec`; logs the draft quality before and after `normalizeGoalOutput`. |
