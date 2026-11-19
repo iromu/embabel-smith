@@ -30,6 +30,33 @@ high-trust pack needs an explicit tier (`--trust-tier`). This is the product
 form of the per-tier tool-group allow-list proven in POC 10: a community-sourced pack must not reach
 privileged tool groups.
 
+## Lifecycle state
+
+`core/LifecycleSidecar` reads the `state` key out of the pack's own `lifecycle.yml` sidecar — the file
+[`08-builder.md`](08-builder.md)'s stamper writes — and `RuntimeCore.ingest` **excludes a pack whose
+state is `retired`**. It is not deployed at all, so neither its goal nor its actions are plannable,
+which is what "out of the library" has to mean once the planner can chain through a pack. Retirement is
+also kept out of the duplicate-goal check: a retired twin of a live pack is an exclusion, not a
+collision.
+
+- **Only `retired` blocks.** `INCUBATING` and `DEGRADED` stay runnable — `DEGRADED`'s own definition is
+  "the spec still functions", and gating the others would be a policy nobody has written down.
+- **No sidecar means no recorded state, and no recorded state runs.** The same fallback the loop's
+  reader applies, so packs published before stamping existed and the frozen POC sources keep working.
+  A sidecar that cannot be parsed is read the same way; refusing to run on unreadable data would turn
+  a corrupt file into an outage.
+- **The exclusion is reported by name.** `IngestedSource.excluded` carries it, and the empty-source
+  error appends what it left out — a library that quietly lost a pack produces a plan nobody can
+  explain.
+- **Asking for a retired pack's goal is a named block, not a missing goal.** `LifecycleBlockedException`
+  — message beginning `Run blocked by lifecycle state`, naming the pack — is thrown in place of
+  `GoalNotFoundException`, because the loop filters failures by message prefix and must not read a
+  retirement as a spec defect. A live pack that exports the same goal still wins.
+- **A blocked run emits a trace record** like any other failure: no steps, no pack, the reason in
+  `error`.
+- **There is no override.** The documented revival is an explicit rebuild, which republishes the pack
+  and leaves `retired`; a bypass flag would be a second, weaker revival path.
+
 ## Traces
 
 **Every run emits a trace record — including failed runs.** This is a product requirement, not an
@@ -48,6 +75,9 @@ excerpt of the goal output). The run's `input` is stored **verbatim** — only o
 - **The trust tier is recorded in the trace** so the loop can distinguish "failed because the tier
   blocked it" from "failed because the spec is wrong". A refinement must never try to fix a policy
   outcome.
+- **A run that never executed still has a record**, with `steps` empty and the reason in `error`: a
+  trust-tier block, a lifecycle block, a goal no pack exports, or no plan reachable. The loop matches
+  the first two by message prefix and drops them from the failures it refines from.
 - **v1 is single-process per host**, with no locking beyond append-and-sync. Concurrent writers are
   a known limitation, not an oversight.
 

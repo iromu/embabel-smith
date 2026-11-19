@@ -22,8 +22,8 @@ import com.embabel.smith.runtime.trace.TraceRecord;
  * Three triggers (spec "Detection triggers"):
  * <ul>
  * <li><b>failed runs</b> — recent traces that failed in a way that is <em>not</em> a
- * trust-tier block (a tier block is a policy outcome, not a spec defect refinement can
- * fix);</li>
+ * policy block: neither a trust-tier block nor a lifecycle block (both are policy
+ * outcomes, not a spec defect refinement can fix);</li>
  * <li><b>content drift</b> — the current pack's content hash differs from the sidecar's
  * recorded hash (the pack changed since its baseline was recorded);</li>
  * <li><b>below baseline</b> — an injected live re-evaluation scores below the sidecar's
@@ -39,6 +39,13 @@ public final class Detector {
 	 * {@code TrustTierBlockedException}).
 	 */
 	public static final String TIER_BLOCK_PREFIX = "Run blocked by trust tier";
+
+	/**
+	 * The prefix the runtime records for a lifecycle block (see
+	 * {@code LifecycleBlockedException}): the goal's pack was retired out of the library.
+	 * A policy outcome, so it is matched the same way as the tier prefix.
+	 */
+	public static final String LIFECYCLE_BLOCK_PREFIX = "Run blocked by lifecycle state";
 
 	/**
 	 * Detects without a live re-eval (the below-baseline trigger is disabled).
@@ -66,7 +73,7 @@ public final class Detector {
 	public Result detect(String spec, AgentSpec current, LifecycleMetadata sidecar, List<TraceRecord> window,
 			ReevalHook hook) {
 		List<String> reasons = new ArrayList<>();
-		List<TraceRecord> failures = failedNonTierBlock(window);
+		List<TraceRecord> failures = failedNonPolicyBlock(window);
 		boolean regressed = false;
 		if (!failures.isEmpty()) {
 			reasons.add("failed runs");
@@ -82,20 +89,20 @@ public final class Detector {
 	}
 
 	/**
-	 * The failed runs in the window that are <em>not</em> trust-tier blocks. A tier block
-	 * is a policy outcome (the granted tier does not allow the pack's tool groups) and
-	 * cannot be fixed by refining prompts, so it is excluded from the refinement
-	 * evidence.
+	 * The failed runs in the window that are <em>not</em> policy blocks. A trust-tier
+	 * block (the granted tier does not allow the pack's tool groups) and a lifecycle
+	 * block (the goal's pack was retired) are both policy outcomes that refining prompts
+	 * cannot fix, so neither is refinement evidence.
 	 * @param window the spec's trace window
-	 * @return the failed runs that are not trust-tier blocks.
+	 * @return the failed runs that are neither a tier block nor a lifecycle block.
 	 */
-	public static List<TraceRecord> failedNonTierBlock(List<TraceRecord> window) {
+	public static List<TraceRecord> failedNonPolicyBlock(List<TraceRecord> window) {
 		List<TraceRecord> out = new ArrayList<>();
 		for (TraceRecord record : window) {
 			if (record.success()) {
 				continue;
 			}
-			if (isTierBlock(record)) {
+			if (isTierBlock(record) || isLifecycleBlock(record)) {
 				continue;
 			}
 			out.add(record);
@@ -110,6 +117,16 @@ public final class Detector {
 	 */
 	public static boolean isTierBlock(TraceRecord record) {
 		return !record.success() && record.error() != null && record.error().startsWith(TIER_BLOCK_PREFIX);
+	}
+
+	/**
+	 * A failed run caused by the lifecycle gate — the goal's pack was retired out of the
+	 * library (a policy block, not a spec defect).
+	 * @param record the trace record to test
+	 * @return {@code true} when the record is a lifecycle block.
+	 */
+	public static boolean isLifecycleBlock(TraceRecord record) {
+		return !record.success() && record.error() != null && record.error().startsWith(LIFECYCLE_BLOCK_PREFIX);
 	}
 
 	/**

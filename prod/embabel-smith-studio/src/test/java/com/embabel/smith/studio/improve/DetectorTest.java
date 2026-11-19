@@ -8,6 +8,7 @@ package com.embabel.smith.studio.improve;
 import com.embabel.smith.builder.lifecycle.LifecycleMetadata;
 import com.embabel.smith.builder.lifecycle.LifecycleState;
 import com.embabel.smith.common.model.AgentSpec;
+import com.embabel.smith.runtime.core.LifecycleBlockedException;
 import com.embabel.smith.runtime.trace.TraceRecord;
 import org.junit.jupiter.api.Test;
 
@@ -44,6 +45,30 @@ class DetectorTest {
 		assertThat(result.queued()).isFalse();
 		assertThat(result.reasons()).isEmpty();
 		assertThat(result.failureTraces()).isEmpty();
+	}
+
+	@Test
+	void lifecycleBlockDoesNotQueue() {
+		AgentSpec pack = TestFixtures.pack("extract", "s1", "s2");
+		LifecycleMetadata sidecar = TestFixtures.sidecar(pack, 1.0, LifecycleState.ACTIVE);
+		List<TraceRecord> window = List.of(TestFixtures.lifecycleBlockTrace("r1", "extract", "input"));
+
+		Detector.Result result = detector.detect("extract", pack, sidecar, window);
+
+		assertThat(result.queued()).isFalse();
+		assertThat(result.reasons()).isEmpty();
+		assertThat(result.failureTraces()).isEmpty();
+	}
+
+	@Test
+	void theLifecyclePrefixMatchesWhatTheRuntimeThrows() {
+		// The two modules match a message prefix rather than share a type, so the string
+		// is
+		// a contract: this fails the day either side renames it.
+		String message = new LifecycleBlockedException("extract", "briefDone").getMessage();
+
+		assertThat(message).startsWith(Detector.LIFECYCLE_BLOCK_PREFIX);
+		assertThat(Detector.isLifecycleBlock(TestFixtures.lifecycleBlockTrace("r1", "extract", "input"))).isTrue();
 	}
 
 	@Test
