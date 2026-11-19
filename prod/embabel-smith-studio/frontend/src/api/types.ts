@@ -362,6 +362,29 @@ export interface TrustResponse {
   declaredToolGroups: string[]
 }
 
+// ---- Retrieve (offline) ----------------------------------------------------
+export interface RetrieveRequest {
+  source: string
+  query: string
+  /** How many hits to return; omitted means the backend's default. */
+  k?: number | null
+}
+export interface RetrieveResult {
+  name: string
+  description: string
+  /** The curated score — below the scorer's own when the pack is degraded. */
+  score: number
+  outputType: string | null
+  /** The pack's recorded lifecycle state, or "UNKNOWN" when it has no lifecycle sidecar. */
+  lifecycleState: string
+}
+export interface RetrieveResponse {
+  error: string | null
+  /** The active scorer's name, so the pane can show which one ranked the hits. */
+  scorer: string | null
+  results: RetrieveResult[]
+}
+
 /**
  * True when a response is the structured "no model endpoint configured" error — the endpoint-gated
  * panes (Run, Build, Eval) render a dedicated banner for it rather than a generic failure.

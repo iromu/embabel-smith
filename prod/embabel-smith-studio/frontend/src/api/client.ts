@@ -37,6 +37,8 @@ import type {
   ModelCatalog,
   PackInfo,
   RejectResponse,
+  RetrieveRequest,
+  RetrieveResponse,
   RunRequest,
   RunResponse,
   SavePackRequest,
@@ -233,6 +235,11 @@ export const scan = (req: SecurityRequest): Promise<SecurityResponse> =>
   post<SecurityResponse>('/api/security', req)
 export const checkTrust = (req: TrustRequest): Promise<TrustResponse> =>
   post<TrustResponse>('/api/trust', req)
+
+// ---- Retrieve (offline) ----------------------------------------------------
+/** Rank a source's packs against a task. No model call, so no timer wrapper. */
+export const retrieve = (req: RetrieveRequest): Promise<RetrieveResponse> =>
+  post<RetrieveResponse>('/api/retrieve', req)
 
 // ---- Traces (offline) -------------------------------------------------------
 export const traces = (spec: string, limit = 100): Promise<TraceInfo[]> =>

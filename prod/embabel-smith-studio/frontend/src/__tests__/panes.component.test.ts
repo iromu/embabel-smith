@@ -7,6 +7,7 @@ import type { Component } from 'vue'
 
 import AutoImprovePane from '../panes/AutoImprovePane.vue'
 import ComposePane from '../panes/ComposePane.vue'
+import RetrievePane from '../panes/RetrievePane.vue'
 import RunPane from '../panes/RunPane.vue'
 import SecurityPane from '../panes/SecurityPane.vue'
 import StoragePane from '../panes/StoragePane.vue'
@@ -33,6 +34,7 @@ vi.mock('../api/client', async (importOriginal) => {
     listModels: vi.fn(),
     run: vi.fn(),
     scan: vi.fn(),
+    retrieve: vi.fn(),
     compose: vi.fn(),
     loopStatus: vi.fn(),
     listCandidates: vi.fn(),
@@ -49,6 +51,7 @@ const listGoals = api.listGoals as Mock
 const listModels = api.listModels as Mock
 const run = api.run as Mock
 const scan = api.scan as Mock
+const retrieve = api.retrieve as Mock
 const compose = api.compose as Mock
 const loopStatus = api.loopStatus as Mock
 const listCandidates = api.listCandidates as Mock
@@ -203,6 +206,130 @@ describe('SecurityPane', () => {
 
     expect(scan).toHaveBeenCalledWith({ source: 'folder:/s', spec: 'alpha' })
     expect(wrapper.find('[data-test="security-result"]').text()).toContain('SAFE')
+  })
+})
+
+describe('RetrievePane', () => {
+  it('ranks the curated hits, naming the scorer and each pack lifecycle state', async () => {
+    seedSources()
+    retrieve.mockResolvedValue({
+      error: null,
+      scorer: 'lexical',
+      results: [
+        {
+          name: 'alpha',
+          description: 'reconcile invoices',
+          score: 0.6,
+          outputType: 'Report',
+          lifecycleState: 'ACTIVE',
+        },
+        {
+          name: 'bravo',
+          description: 'reconcile invoices',
+          score: 0.3,
+          outputType: 'Report',
+          lifecycleState: 'DEGRADED',
+        },
+      ],
+    })
+    const wrapper = mountPane(RetrievePane)
+    await flushPromises()
+
+    await wrapper.find('[data-test="retrieve-query"]').setValue('reconcile invoices')
+    await wrapper.find('[data-test="retrieve-btn"]').trigger('click')
+    await flushPromises()
+
+    expect(retrieve).toHaveBeenCalledWith({ source: 'folder:/s', query: 'reconcile invoices' })
+    const table = wrapper.find('[data-test="retrieve-table"]')
+    expect(table.text()).toContain('alpha')
+    expect(table.text()).toContain('bravo')
+    // The de-ranked pack is shown with the state that halved it, so the user can see why
+    // it sank rather than guessing.
+    expect(table.text()).toContain('DEGRADED')
+    expect(wrapper.find('[data-test="retrieve-scorer"]').text()).toContain('lexical')
+  })
+
+  it('does not surface a retired pack the endpoint dropped', async () => {
+    // The source itself lists a retired pack, so if the pane ever rendered the pack list
+    // rather than the retrieval hits, the retired one would appear.
+    listSources.mockResolvedValue([{ uri: 'folder:/s', kind: 'folder' }])
+    listPacks.mockResolvedValue([
+      {
+        name: 'keeper',
+        contentHash: 'h',
+        lifecycleState: 'ACTIVE',
+        baselinePassRate: 0.9,
+        drift: false,
+        updatedAt: '2026-01-01T00:00:00Z',
+      },
+      {
+        name: 'retired-pack',
+        contentHash: 'h2',
+        lifecycleState: 'RETIRED',
+        baselinePassRate: 0.1,
+        drift: true,
+        updatedAt: '2026-01-01T00:00:00Z',
+      },
+    ])
+    // The endpoint applies the curation rules; the retired pack is not in what it returns.
+    retrieve.mockResolvedValue({
+      error: null,
+      scorer: 'lexical',
+      results: [
+        {
+          name: 'keeper',
+          description: 'summarise a thread',
+          score: 0.5,
+          outputType: 'Summary',
+          lifecycleState: 'ACTIVE',
+        },
+      ],
+    })
+    const wrapper = mountPane(RetrievePane)
+    await flushPromises()
+
+    await wrapper.find('[data-test="retrieve-query"]').setValue('summarise')
+    await wrapper.find('[data-test="retrieve-btn"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).not.toContain('retired-pack')
+    expect(wrapper.find('[data-test="retrieve-table"]').text()).toContain('keeper')
+    expect(wrapper.find('[data-test="retrieve-scorer"]').text()).toContain('1 match')
+  })
+
+  it('shows the no-match state when the source has nothing to rank', async () => {
+    seedSources()
+    retrieve.mockResolvedValue({ error: null, scorer: 'lexical', results: [] })
+    const wrapper = mountPane(RetrievePane)
+    await flushPromises()
+
+    await wrapper.find('[data-test="retrieve-query"]').setValue('teleport the moon')
+    await wrapper.find('[data-test="retrieve-btn"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="retrieve-none"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="retrieve-table"]').exists()).toBe(false)
+    // A search that came back empty must not leave a spinner running.
+    expect(wrapper.find('.q-spinner').exists()).toBe(false)
+    expect(wrapper.find('[data-test="retrieve-scorer"]').text()).toContain('0 match')
+  })
+
+  it('shows a source-resolution failure as a banner rather than a table', async () => {
+    seedSources()
+    retrieve.mockResolvedValue({
+      error: 'Retrieve failed: unsupported source scheme: nonsense',
+      scorer: null,
+      results: [],
+    })
+    const wrapper = mountPane(RetrievePane)
+    await flushPromises()
+
+    await wrapper.find('[data-test="retrieve-query"]').setValue('anything')
+    await wrapper.find('[data-test="retrieve-btn"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="retrieve-error"]').text()).toContain('unsupported source scheme')
+    expect(wrapper.find('[data-test="retrieve-results"]').exists()).toBe(false)
   })
 })
 
