@@ -60,7 +60,11 @@ smith_classpath() {
     cat "$SMITH_CP"
     return
   fi
-  (cd "$SMITH_ROOT" && ./mvnw -o -q -DskipTests compile -pl "$BUILDER_MODULE" -am)
+  # `install`, not `compile`: the builder depends on its sibling embabel-smith-skillevaluator,
+  # and dependency:build-classpath below resolves siblings from the local repository, not from
+  # the reactor. Compiling alone leaves that artifact uninstalled, so the resolution step fails
+  # offline with "Cannot access embabel-snapshots ... has not been downloaded from it before".
+  (cd "$SMITH_ROOT" && ./mvnw -o -q -DskipTests install -pl "$BUILDER_MODULE" -am)
   if [ ! -s "$cache" ] || [ "$SMITH_ROOT/$BUILDER_MODULE/pom.xml" -nt "$cache" ]; then
     (cd "$SMITH_ROOT" && ./mvnw -o -q dependency:build-classpath -pl "$BUILDER_MODULE" \
       -Dmdep.outputFile="$cache" -Dmdep.includeScope=runtime)
