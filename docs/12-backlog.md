@@ -188,15 +188,20 @@ no longer wraps `PocOnlyPane.vue`.
 - **`embabel-smith-skillevaluator` is built but wired to nothing.** It is a full reactor module
   (`prod/pom.xml`) — the Tier 1 static validator, `Tier1Runner` plus schema, license, hygiene,
   version, quality-score, script-lint, Python-syntax, code-risk and security validators — with no
-  model call and no consumer: no other product module depends on it, it is absent from the root POM's
-  `dependencyManagement`, and until now it had no mention anywhere in `docs/`, `README.md` or
-  `.wiki/`. Decide whether to integrate it into the build/publish gate, expose it as a CLI, or mark
-  it deliberately dormant. Check: `grep -rn skillevaluator prod/*/pom.xml pom.xml docs/`.
-- **Its provenance is partly unattributed.** The module is a port of a Python `tier1` validator, and
-  8 of its source files still carry `SPDX-FileCopyrightText: Copyright (c) 2025/2026 NVIDIA
-  CORPORATION & AFFILIATES` (50 carry the project author). `NOTICE` names only "Copyright 2026 Ivan
-  Rodriguez", with no upstream attribution anywhere in `NOTICE`, `LICENSE` or `README.md`. Resolve
-  the attribution before this module ships. Check: `grep -rho 'SPDX-FileCopyrightText:.*'
+  model call and no consumer: no other product module depends on it and it is absent from the root
+  POM's `dependencyManagement`. It is named in `README.md` and in `docs/05-architecture.md`; it has no
+  `.wiki/` page yet. Decide whether to integrate it into the build/publish gate, expose it as a CLI, or
+  mark it deliberately dormant. Check: `grep -rn skillevaluator prod/*/pom.xml pom.xml docs/`.
+- **Closed — its provenance is now attributed.** The module is a port of a Python `tier1` validator and
+  8 of its source files carry `SPDX-FileCopyrightText: Copyright (c) 2025/2026 NVIDIA CORPORATION &
+  AFFILIATES` (50 carry the project author). The root `NOTICE` now names NVIDIA SkillEvaluator as the
+  upstream, states Apache-2.0, and lists those eight files by path and by the year each header actually
+  carries — six configuration YAMLs at 2026, two Python test fixtures at 2025. No Java file carries an
+  NVIDIA header; the ten Java files that mention NVIDIA do so incidentally — an example author name, a
+  reference in a doc comment — and carry the project author's header. `README.md` names the module and
+  links the notice, and the module's own `NOTICE` carries the same statement. What was open here was the
+  attribution, not the copy: the eight SPDX lines stay exactly as
+  upstream wrote them, as Apache-2.0 §4 requires. Check: `grep -rho 'SPDX-FileCopyrightText:.*'
   prod/embabel-smith-skillevaluator/src | sort | uniq -c`.
 
 ## Test coverage
