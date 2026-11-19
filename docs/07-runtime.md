@@ -57,6 +57,62 @@ collision.
 - **There is no override.** The documented revival is an explicit rebuild, which republishes the pack
   and leaves `retired`; a bypass flag would be a second, weaker revival path.
 
+## Remote action bridges
+
+`remote/` is the one part of the runtime that talks to another process. It is a *client* of a
+remote-action sidecar — the contract POC 16 proved — and the studio's `/remote` pane is its only
+consumer. It lives here rather than in the studio for a reason a test enforces: the studio's
+`NoDirectModelRequestTest` fails the build if any studio production source imports
+`java.net.http.`, so the HTTP has to live somewhere else, and this is the module that already owns
+"run an action".
+
+The client is `RemoteActionBridge`, with `RemoteBridge` (a name and a base URL), `AdvertisedAction`,
+`BridgeState` and `ExecuteResult` as its shapes and `RemoteBridges.parse` for the `name@url`
+configuration grammar. The contract has three endpoints and this client calls two of them:
+
+| Endpoint | Used by the product client? |
+| --- | --- |
+| `GET /api/v1/actions` | yes — the action catalog, and the reachability decision below |
+| `POST /api/v1/actions/execute` | yes — run one action; body `{action_name, parameters: {userInput: {content}}}`, and the reply's `content` field is the output |
+| `GET /api/v1/types` | **no** |
+
+The type catalog is the endpoint the product does not call, and that is a choice rather than an
+oversight: the pane has one text box that maps to `UserInput`, so it can run an action whose declared
+inputs are exactly that one type and nothing else, and lists anything else with its declared input
+types marked not runnable. Fetching a type catalog would let the client *describe* shapes it still
+cannot construct, so it is omitted rather than half-wired.
+
+- **Reachability is decided from the response, not from the absence of an exception.** A 2xx whose
+  body parses as a JSON array is reachable; a non-2xx, a body that is not an array, and a socket that
+  was never accepted are each unreachable, with their own reason kept. A service that answers
+  `200 OK` with something that is not a catalog is not a sidecar, and calling it reachable because
+  the call threw nothing would be a badge that lies.
+- **Timeouts are fixed at 3 seconds to connect and 10 seconds for the request.** The bridge list is
+  rendered when a pane opens, so the cost of a configurable timeout is a knob nobody asked for and a
+  UI that can hang on a host that accepts the socket and never answers.
+- **The reason is the exception's own name when it carries no message.** On this JVM
+  `java.net.ConnectException` arrives with a null message all the way down the cause chain, so
+  `ex.getMessage()` — what the POC displayed — renders as a bare `toString()`. Keeping
+  `ConnectException` is what lets a reader tell "refused the socket" apart from "answered with
+  something that was not a catalog".
+- **A decline is passed through, never rewritten.** When the sidecar answers non-success, its status
+  and its untouched body travel back together; inventing a result for an action that did not run is
+  the failure mode this avoids.
+- **The runtime never starts a sidecar.** A process that speaks the contract is started by hand; the
+  reasoning is in [`09-studio.md`](09-studio.md) and the decision record in
+  [`12-backlog.md`](12-backlog.md).
+
+**Planning over a remote action is not a product capability.** The bridge can report that a sidecar
+offers `remoteDigest`, and it can run that action because a person named it. It cannot put a remote
+action into a GOAP plan. Three things stand between the two, and none of them is in this module
+today: the pack format has no step kind that can name a remote action, so there is nothing for a
+planner to select — POC 16 chained the two by hand in Java, which is not a format;
+`embabel-agent-remote`, which supplies `RestAction`, is not a dependency of any `prod/` module and
+must not become one before that format decision is made; and remote actions would have to be
+registered into the platform the planner searches (`RestServer(…).agentScope(platform)`), which the
+current ingest path never does. POC 16 is the evidence that the wiring works; the format decision is
+what would make it a product feature rather than a demo.
+
 ## Traces
 
 **Every run emits a trace record — including failed runs.** This is a product requirement, not an

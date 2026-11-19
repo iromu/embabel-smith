@@ -385,6 +385,54 @@ export interface RetrieveResponse {
   results: RetrieveResult[]
 }
 
+// ---- Remote bridges --------------------------------------------------------
+/** One action a sidecar advertised, named as the sidecar named it. */
+export interface ActionInfo {
+  name: string
+  description: string
+  /** What the action declares it consumes, so an unrunnable one explains what it wants. */
+  inputTypeNames: string[]
+  /** False when the action needs anything other than one `UserInput` — this pane has one text box. */
+  runnable: boolean
+}
+export interface BridgeInfo {
+  name: string
+  baseUrl: string
+  /** The catalog URL that was actually contacted. */
+  urlProbed: string
+  reachable: boolean
+  /** The failure, only when unreachable. */
+  reason: string | null
+  actions: ActionInfo[]
+}
+export interface BridgesResponse {
+  bridges: BridgeInfo[]
+  /** Configured entries that were not `name@url`; reported rather than guessed. */
+  malformedBridges: string[]
+  /** Reported only — the product is not an MCP client, so it never probes or invokes this. */
+  mcpEndpoint: string | null
+}
+export interface RemoteExecuteRequest {
+  bridge: string
+  action: string
+  input: string
+}
+export interface RemoteExecuteResponse {
+  /** Why the product refused to try; `urlProbed` is null beside it, proving nothing was contacted. */
+  error: string | null
+  bridge: string | null
+  action: string | null
+  urlProbed: string | null
+  /** The content the sidecar returned, null unless it ran the action. */
+  output: string | null
+  /** Why no process answered, null when one did. */
+  reason: string | null
+  /** The sidecar's own status when it declined. */
+  status: number | null
+  /** The sidecar's untouched body when it declined. */
+  sidecarBody: string | null
+}
+
 /**
  * True when a response is the structured "no model endpoint configured" error — the endpoint-gated
  * panes (Run, Build, Eval) render a dedicated banner for it rather than a generic failure.

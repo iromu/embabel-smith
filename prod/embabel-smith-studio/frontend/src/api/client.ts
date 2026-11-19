@@ -15,6 +15,7 @@ import type { Ref } from 'vue'
 import type {
   ApproveResponse,
   AutoPublishRequest,
+  BridgesResponse,
   BuildRequest,
   BuildResponse,
   CandidateInfo,
@@ -37,6 +38,8 @@ import type {
   ModelCatalog,
   PackInfo,
   RejectResponse,
+  RemoteExecuteRequest,
+  RemoteExecuteResponse,
   RetrieveRequest,
   RetrieveResponse,
   RunRequest,
@@ -240,6 +243,16 @@ export const checkTrust = (req: TrustRequest): Promise<TrustResponse> =>
 /** Rank a source's packs against a task. No model call, so no timer wrapper. */
 export const retrieve = (req: RetrieveRequest): Promise<RetrieveResponse> =>
   post<RetrieveResponse>('/api/retrieve', req)
+
+// ---- Remote bridges --------------------------------------------------------
+/**
+ * Probe every configured bridge. A sidecar that is not running comes back as an unreachable entry
+ * in a successful response, so the pane renders it as a state rather than a failed request.
+ */
+export const listBridges = (): Promise<BridgesResponse> => get<BridgesResponse>('/api/remote/bridges')
+/** Run one advertised action on one configured bridge; the output is the sidecar's own text. */
+export const executeRemote = (req: RemoteExecuteRequest): Promise<RemoteExecuteResponse> =>
+  post<RemoteExecuteResponse>('/api/remote/execute', req)
 
 // ---- Traces (offline) -------------------------------------------------------
 export const traces = (spec: string, limit = 100): Promise<TraceInfo[]> =>
