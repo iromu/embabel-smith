@@ -79,6 +79,11 @@ mvn -q verify
 Every module's offline tests are green without a model endpoint. Tests that exercise the model are
 **endpoint-gated** and are not run offline.
 
+Those guarantees are enforced without anyone remembering to run them:
+`.github/workflows/offline-verification.yml` runs `make build`, `make test` and `make lint` on every
+pull request and every push to the default branch, with no model endpoint and no secrets, on the
+default reactor only.
+
 ### Live tests are opt-in by tag
 
 Every test that needs a real model endpoint carries `@Tag("live")`, and the root `pom.xml` excludes

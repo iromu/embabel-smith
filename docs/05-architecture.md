@@ -154,6 +154,16 @@ Use the root `Makefile` rather than inventing Maven invocations (`make help` lis
   it no longer checks POC sources — the pre-commit hook is product-only now, and the POCs are frozen
   anyway.
 
+**`.github/workflows/offline-verification.yml` runs `make build`, `make test` and `make lint`** on every
+pull request and every push to the default branch — the same three commands, the same wrapper, no
+endpoint and no secrets, so a failure there reproduces with the command above. Two things follow. The
+first is that these guarantees no longer depend on someone's local hooks: a style violation or a broken
+test-compile in any module of the default reactor fails a check on the change itself. The second is
+that its scope is this page's scope and no wider — the default reactor, so not `poc/`, and the live
+group excluded, so the four paths below stay unproven by CI exactly as they are by a local run. The
+exclusion is the pom's `test.excludedGroups`, not the workflow: `make test` sources the endpoint env
+when that file exists, and a CI runner simply has no such file.
+
 ### The live group is opt-in (`test.excludedGroups`)
 
 Every test that needs a real model endpoint carries `@Tag("live")`. The root `pom.xml`'s Surefire
