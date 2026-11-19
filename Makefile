@@ -11,10 +11,10 @@ GOAL ?= compile
 # Set POC=1 to include it (`make test POC=1`); a poc/ MODULE implies it.
 POC_FLAG := $(if $(filter poc/%,$(MODULE)),-Ppoc,$(if $(POC),-Ppoc,))
 
-.PHONY: help build test test-live test-module checkstyle checkstyle-module module clean install setup
+.PHONY: help build test test-live test-module checkstyle checkstyle-module module run-a2a clean install setup
 
 help: ## List targets
-	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-18s %s\n", $$1, $$2}'
+	@grep -E '^[a-zA-Z0-9_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-18s %s\n", $$1, $$2}'
 
 build: ## Compile the default reactor (POCs: POC=1), skip tests
 	$(MVN) $(POC_FLAG) -q compile -DskipTests
@@ -51,6 +51,9 @@ checkstyle-module: ## Project SpringChecks on one module (MODULE=poc/poc-1-no-co
 
 module: ## Run a goal on one module + upstream deps (MODULE=... GOAL=compile|test|install)
 	$(MVN) $(POC_FLAG) $(GOAL) -pl $(MODULE) -am -DskipTests
+
+run-a2a: ## Launch the A2A development server (SERVER_PORT=, SMITH_A2A_SOURCE=, SMITH_A2A_TRUST_TIER=)
+	$(MVN) -q -pl prod/embabel-smith-runtime-a2a spring-boot:run
 
 clean: ## Remove build output
 	$(MVN) $(POC_FLAG) clean
