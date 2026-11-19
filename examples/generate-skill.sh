@@ -46,14 +46,17 @@
 #
 # Usage:
 #   ./generate-skill.sh <blueprint>
-#   ./generate-skill.sh <blueprint> -- --max-refine 0    # everything after -- goes straight to
-#                                                        # `smith build`; see `smith build --help`
-#                                                        # for the flags it actually takes
+#   ./generate-skill.sh <blueprint> -- --max-inspect 0  # everything after -- goes straight to
+#                                                       # `smith build`; see `smith build --help`
+#                                                       # for the flags it actually takes.
+#                                                       # --max-inspect bounds the inspection
+#                                                       # redrafts; --max-refine is accepted here
+#                                                       # and read only by the agent-spec target
 #
-# The lift gate is not a CLI flag — it is BuildOptions.DEFAULT_MIN_LIFT, 0.0, meaning the
-# with-skill pass rate must merely beat the no-skill baseline. A blocked build is a normal,
-# readable outcome — the report carries the per-scenario grading so you can see which
-# scenarios did not move.
+# The lift gate defaults to BuildOptions.DEFAULT_MIN_LIFT, 0.0, meaning the with-skill pass
+# rate must merely beat the no-skill baseline; --min-lift <n> raises it per run. A blocked
+# build is a normal, readable outcome — the report carries the per-scenario grading so you can
+# see which scenarios did not move.
 #
 # A different model: the CLI has no --model flag; export EMBABEL_MODELS_DEFAULT_LLM, or point
 # SMITH_LLM_ENV at an env file that names it.
