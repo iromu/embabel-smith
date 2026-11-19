@@ -32,7 +32,7 @@ source_paths:
   - "prod/embabel-smith-builder/src/test/java/com/embabel/smith/builder/skill/SkillInspectorTest.java"
   - "prod/embabel-smith-builder/src/test/java/com/embabel/smith/builder/skill/SkillInspectionGateTest.java"
   - "prod/embabel-smith-builder/README.md"
-  - "openspec/specs/agent-skill-builder/spec.md"
+  - "docs/08-builder.md"
 updated_at: "2026-11-19"
 ---
 
