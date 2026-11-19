@@ -45,11 +45,11 @@ class SkillPublishableTest {
 
 		PublishResult result = publisher.publish(this.publishable, false, false);
 
-		assertThat(result.location()).isEqualTo(library.resolve(NAME));
+		assertThat(result.location()).isEqualTo(library.resolve(NAME).toString());
 		assertThat(result.pushed()).isFalse();
-		assertThat(result.location().resolve("SKILL.md")).isRegularFile();
-		assertThat(result.location().resolve("evals.json")).isRegularFile();
-		assertThat(result.location().resolve("lifecycle.yml")).isRegularFile();
+		assertThat(Path.of(result.location()).resolve("SKILL.md")).isRegularFile();
+		assertThat(Path.of(result.location()).resolve("evals.json")).isRegularFile();
+		assertThat(Path.of(result.location()).resolve("lifecycle.yml")).isRegularFile();
 	}
 
 	@Test
@@ -74,7 +74,7 @@ class SkillPublishableTest {
 			.hasMessageContaining("--overwrite");
 
 		PublishResult replaced = publisher.publish(this.publishable, true, false);
-		assertThat(replaced.location().resolve("SKILL.md")).isRegularFile();
+		assertThat(Path.of(replaced.location()).resolve("SKILL.md")).isRegularFile();
 	}
 
 	@Test

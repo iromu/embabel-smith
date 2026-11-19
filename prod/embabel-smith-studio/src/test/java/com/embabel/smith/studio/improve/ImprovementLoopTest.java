@@ -50,13 +50,39 @@ class ImprovementLoopTest {
 		return new JsonlTraceStore(tmp.resolve("traces.jsonl"));
 	}
 
+	/** The policy for a folder improve source — the loop's common case. */
+	private LoopPublishPolicy folderPolicy(boolean push) {
+		return new LoopPublishPolicy(push, "folder:" + this.tmp.resolve("source"));
+	}
+
+	/** The policy for a git improve source, whose commit needs a push to survive. */
+	private LoopPublishPolicy gitPolicy(boolean push) {
+		return new LoopPublishPolicy(push, "git:https://example.com/iromu/published-packs.git");
+	}
+
 	private ImprovementLoop loop(SpecSource source, JsonlTraceStore store, List<Publishable> published,
 			boolean autoPublish) {
+		return loop(source, store, published, autoPublish, folderPolicy(false));
+	}
+
+	private ImprovementLoop loop(SpecSource source, JsonlTraceStore store, List<Publishable> published,
+			boolean autoPublish, LoopPublishPolicy publishPolicy) {
 		return new ImprovementLoop(source, store, (current, feedback) -> current + " [revised]", passingInvoker, tasks,
 				(p, overwrite, push) -> {
 					published.add(p);
-					return new PublishResult(Path.of("/tmp/" + p.name()), false);
-				}, autoPublish);
+					return new PublishResult("/tmp/" + p.name(), push);
+				}, publishPolicy, autoPublish);
+	}
+
+	/** A loop whose publisher records the push flag it was called with. */
+	private ImprovementLoop pushRecordingLoop(SpecSource source, JsonlTraceStore store, boolean[] push,
+			LoopPublishPolicy publishPolicy) {
+		return new ImprovementLoop(source, store, (current, feedback) -> current + " [revised]", passingInvoker, tasks,
+				(p, overwrite, pushFlag) -> {
+					push[0] = pushFlag;
+					return new PublishResult("/tmp/" + p.name(), pushFlag);
+				}, publishPolicy, true); // auto-publish, so the publish happens in the
+											// pass
 	}
 
 	@Test
@@ -131,22 +157,86 @@ class ImprovementLoopTest {
 	}
 
 	@Test
-	void publishPersistsToTheSourceWithPush() throws IOException {
+	void publishDoesNotPushByDefault() throws IOException {
 		AgentSpec pack = TestFixtures.pack("extract", "s1", "s2");
 		JsonlTraceStore store = store();
 		store.append(TestFixtures.failedTrace("r1", "extract", "input", TestFixtures.step("s2", "failed", "bad")));
 
 		boolean[] push = { false };
-		ImprovementLoop loop = new ImprovementLoop(source(pack), store, (current, feedback) -> current + " [revised]",
-				passingInvoker, tasks, (p, overwrite, pushFlag) -> {
-					push[0] = pushFlag;
-					return new PublishResult(Path.of("/tmp/" + p.name()), pushFlag);
-				}, true); // auto-publish
+		// smith.studio.loop.push unset (the shipped default) -> the publisher is told not
+		// to push.
+		ImprovementLoop loop = pushRecordingLoop(source(pack), store, push, folderPolicy(false));
 
 		loop.runOnce();
 
-		assertThat(push[0]).isTrue(); // the loop pushes improvements into the source
-										// (git)
+		assertThat(push[0]).isFalse();
+	}
+
+	@Test
+	void publishPushesOnlyWhenPushingIsEnabled() throws IOException {
+		AgentSpec pack = TestFixtures.pack("extract", "s1", "s2");
+		JsonlTraceStore store = store();
+		store.append(TestFixtures.failedTrace("r1", "extract", "input", TestFixtures.step("s2", "failed", "bad")));
+
+		boolean[] push = { false };
+		ImprovementLoop loop = pushRecordingLoop(source(pack), store, push, folderPolicy(true));
+
+		loop.runOnce();
+
+		assertThat(push[0]).isTrue();
+	}
+
+	@Test
+	void aGitSourceWithPushingEnabledIsPublishedWithPush() throws IOException {
+		AgentSpec pack = TestFixtures.pack("extract", "s1", "s2");
+		JsonlTraceStore store = store();
+		store.append(TestFixtures.failedTrace("r1", "extract", "input", TestFixtures.step("s2", "failed", "bad")));
+
+		boolean[] push = { false };
+		List<Publishable> published = new ArrayList<>();
+		ImprovementLoop loop = new ImprovementLoop(source(pack), store, (current, feedback) -> current + " [revised]",
+				passingInvoker, tasks, (p, overwrite, pushFlag) -> {
+					push[0] = pushFlag;
+					published.add(p);
+					return new PublishResult("/tmp/" + p.name(), pushFlag);
+				}, gitPolicy(true), true); // auto-publish
+
+		loop.runOnce();
+
+		assertThat(published).hasSize(1);
+		assertThat(push[0]).isTrue(); // an operator who opted in gets the push
+	}
+
+	@Test
+	void aGitSourceWithPushingOffIsNotPublishedAndTheCandidateStaysPending() throws IOException {
+		AgentSpec pack = TestFixtures.pack("extract", "s1", "s2");
+		JsonlTraceStore store = store();
+		store.append(TestFixtures.failedTrace("r1", "extract", "input", TestFixtures.step("s2", "failed", "bad")));
+
+		List<Publishable> published = new ArrayList<>();
+		ImprovementLoop loop = loop(source(pack), store, published, true, gitPolicy(false));
+
+		List<PendingCandidate> produced = loop.runOnce();
+
+		assertThat(published).isEmpty(); // the doomed publish is never attempted
+		assertThat(produced).extracting(PendingCandidate::spec).containsExactly("extract");
+		assertThat(loop.queue().pending()).extracting(PendingCandidate::spec).containsExactly("extract");
+	}
+
+	@Test
+	void aFolderSourcePublishesWithPushingOff() throws IOException {
+		AgentSpec pack = TestFixtures.pack("extract", "s1", "s2");
+		JsonlTraceStore store = store();
+		store.append(TestFixtures.failedTrace("r1", "extract", "input", TestFixtures.step("s2", "failed", "bad")));
+
+		List<Publishable> published = new ArrayList<>();
+		ImprovementLoop loop = loop(source(pack), store, published, true, folderPolicy(false));
+
+		List<PendingCandidate> produced = loop.runOnce();
+
+		assertThat(published).hasSize(1); // a local write is already durable
+		assertThat(produced).isEmpty();
+		assertThat(loop.queue().size()).isZero();
 	}
 
 	@Test
@@ -167,8 +257,8 @@ class ImprovementLoopTest {
 			return input -> "pass";
 		}, tasks, (p, overwrite, push) -> {
 			published.add(p);
-			return new PublishResult(Path.of("/tmp/" + p.name()), false);
-		}, true);
+			return new PublishResult("/tmp/" + p.name(), false);
+		}, folderPolicy(false), true);
 		loop.inFlight().begin("extract"); // simulate a concurrent iteration already
 											// improving it
 
@@ -193,8 +283,8 @@ class ImprovementLoopTest {
 		ImprovementLoop loop = new ImprovementLoop(source(pack), store, (current, feedback) -> current + " [revised]",
 				p -> input -> "fail", tasks, (p, overwrite, push) -> {
 					published.add(p);
-					return new PublishResult(Path.of("/tmp/" + p.name()), false);
-				}, true);
+					return new PublishResult("/tmp/" + p.name(), false);
+				}, folderPolicy(false), true);
 
 		loop.runOnce();
 
@@ -225,8 +315,8 @@ class ImprovementLoopTest {
 			return input -> "pass";
 		}, tasks, (p, overwrite, push) -> {
 			published.add(p);
-			return new PublishResult(Path.of("/tmp/" + p.name()), false);
-		}, true);
+			return new PublishResult("/tmp/" + p.name(), false);
+		}, folderPolicy(false), true);
 
 		loop.runOnce();
 
@@ -250,8 +340,8 @@ class ImprovementLoopTest {
 				p -> input -> "fail", // scores 0.0, below the 0.9 baseline
 				tasks, (p, overwrite, push) -> {
 					published.add(p);
-					return new PublishResult(Path.of("/tmp/" + p.name()), false);
-				}, true);
+					return new PublishResult("/tmp/" + p.name(), false);
+				}, folderPolicy(false), true);
 
 		loop.runOnce();
 
@@ -310,8 +400,8 @@ class ImprovementLoopTest {
 			return current + " [revised]";
 		}, p -> input -> "fail", tasks, (p, overwrite, push) -> {
 			published.add(p);
-			return new PublishResult(Path.of("/tmp/" + p.name()), false);
-		}, true);
+			return new PublishResult("/tmp/" + p.name(), false);
+		}, folderPolicy(false), true);
 
 		loop.runOnce();
 

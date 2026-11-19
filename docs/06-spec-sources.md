@@ -77,6 +77,12 @@ That is why the collision gate and the no-push rule are stated once here instead
 | Name collision | refused unless `--overwrite` is passed | a silent overwrite of someone else's pack is the worst possible default |
 | Git publish | **commit, never push** by default; `--push` is opt-in | pushing is a shared-state action needing credentials and intent |
 | Commit message | `smith: publish <unit> (baseline <score>)` | the baseline the improvement loop later compares against is in history |
+| Reported location | `folder:` → the directory it wrote; `git:` → `git:<repo>#<unit>` | a location has to still be true when it is read. The git publisher clones into a temporary working tree and `close()` deletes it, so a path inside that tree names nothing; the repository and the unit's path within it is where the artifact actually lives |
+
+The location is one value, stated in the source's own terms, and every surface that reports it
+prints it unchanged: `BuildResult.report()` and `skill/SkillBuildResult.report()` print it, and the
+studio's `PublishInfo` and the loop's approve response carry the same string. To read the files of a
+git-published artifact, read them from the source — that is what a git source is.
 
 Implementation: `publish/FolderPublisher`, `publish/GitPublisher`, `publish/PublishTarget`, with
 `publish/CollisionException` for the gate.

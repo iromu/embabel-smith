@@ -86,7 +86,7 @@ class DualCandidateBuildTest {
 		assertThat(result.isBuilt()).as(() -> result.report()).isTrue();
 		assertThat(result.packName()).isEqualTo("trading");
 		assertThat(result.recommendation().shape()).isEqualTo(CandidateShape.MULTI_AGENT);
-		Path published = result.published().location();
+		Path published = Path.of(result.published().location());
 		assertThat(Files.isRegularFile(published.resolve("process.yml"))).isTrue();
 		assertThat(Files.isRegularFile(published.resolve("research/manifest.yml"))).isTrue();
 		assertThat(Files.isRegularFile(published.resolve("research/steps/analyze_market.yml"))).isTrue();
@@ -101,7 +101,7 @@ class DualCandidateBuildTest {
 
 		assertThat(result.isBuilt()).as(() -> result.report()).isTrue();
 		assertThat(result.recommendation().shape()).isEqualTo(CandidateShape.SINGLE_AGENT);
-		Path published = result.published().location();
+		Path published = Path.of(result.published().location());
 		assertThat(published.getFileName().toString()).isEqualTo("trading-pack");
 		assertThat(Files.isRegularFile(published.resolve("manifest.yml"))).isTrue();
 		assertThat(Files.isRegularFile(published.resolve("goal.yml"))).isTrue();
@@ -128,7 +128,8 @@ class DualCandidateBuildTest {
 		assertThat(result.isBuilt()).as(() -> result.report()).isTrue();
 		assertThat(result.recommendation().shape()).isEqualTo(CandidateShape.MULTI_AGENT);
 		// The repair put each producer before the agent it feeds.
-		assertThat(Files.isRegularFile(result.published().location().resolve("research/manifest.yml"))).isTrue();
+		assertThat(Files.isRegularFile(Path.of(result.published().location()).resolve("research/manifest.yml")))
+			.isTrue();
 		assertThat(scratch.resolve("trading/process.yml")).isRegularFile();
 	}
 
@@ -142,7 +143,7 @@ class DualCandidateBuildTest {
 		assertThat(result.isBuilt()).as(() -> result.report()).isTrue();
 		assertThat(result.recommendation().shape()).isEqualTo(CandidateShape.SINGLE_AGENT);
 		assertThat(result.recommendation().reason()).contains("did not validate");
-		assertThat(result.published().location().resolve("manifest.yml")).isRegularFile();
+		assertThat(Path.of(result.published().location()).resolve("manifest.yml")).isRegularFile();
 		// The unsound process never reaches the store: a stored process is one someone
 		// could ingest.
 		assertThat(Files.exists(scratch.resolve("trading"))).isFalse();
@@ -169,7 +170,7 @@ class DualCandidateBuildTest {
 
 		assertThat(result.isBuilt()).as(() -> result.report()).isTrue();
 		assertThat(result.recommendation().single().score()).isZero();
-		assertThat(result.published().location().resolve("process.yml")).isRegularFile();
+		assertThat(Path.of(result.published().location()).resolve("process.yml")).isRegularFile();
 	}
 
 	@Test

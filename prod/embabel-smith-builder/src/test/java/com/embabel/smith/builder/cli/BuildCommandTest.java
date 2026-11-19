@@ -277,7 +277,7 @@ class BuildCommandTest {
 					RecordingBuildCommand.this.skillSeen.set(options);
 					return SkillBuildResult.built("sample-skill", new Benchmark.Summary(1.0, 0.0, 1.0, List.of()), null,
 							new LifecycleStamper().stamp("0123456789abcdef0123456789abcdef", 1.0),
-							new PublishResult(Path.of("sample-skill"), false));
+							new PublishResult("sample-skill", false));
 				}
 			};
 		}

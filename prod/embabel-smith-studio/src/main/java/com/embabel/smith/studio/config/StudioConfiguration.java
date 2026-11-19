@@ -46,6 +46,7 @@ import com.embabel.smith.specsource.GitSpecSource;
 import com.embabel.smith.specsource.SpecSource;
 import com.embabel.smith.studio.generate.FlowValidator;
 import com.embabel.smith.studio.improve.ImprovementLoop;
+import com.embabel.smith.studio.improve.LoopPublishPolicy;
 import com.embabel.smith.studio.loop.LoopSchedulerState;
 import com.embabel.smith.studio.rest.BuildController;
 import com.embabel.smith.studio.rest.EvalController;
@@ -356,10 +357,7 @@ public class StudioConfiguration {
 			@Value("${smith.studio.improve-source:}") String improveSourceUri,
 			@Value("${smith.studio.sources:}") String sources,
 			@Value("${smith.studio.source-cache-dir:}") String cacheDir) {
-		String uri = improveSourceUri;
-		if (uri == null || uri.isBlank()) {
-			uri = firstSource(sources);
-		}
+		String uri = improveSourceUri(improveSourceUri, sources);
 		if (uri == null || uri.isBlank()) {
 			return new FolderPublisher(PublishTarget.parse("folder:" + Path.of(System.getProperty("java.io.tmpdir"))));
 		}
@@ -369,13 +367,31 @@ public class StudioConfiguration {
 	@Bean
 	public ImprovementLoop improvementLoop(SpecSource improveSource, StorageContext storageContext,
 			PromptRewriter promptRewriter, AgentPlatform platform, Publisher loopPublisher,
+			LoopPublishPolicy loopPublishPolicy,
 			@Value("${smith.studio.loop.auto-publish:false}") boolean autoPublish) {
 		InvokerFactory invokerFactory = new AgentSpecInvokerFactory(platform);
 		// Always hold: auto-publish is applied at the LoopService layer so the toggle is
 		// live. The
 		// loop reads traces through the selected backend (JSONL file or database).
 		return new ImprovementLoop(improveSource, storageContext.traceStore(), promptRewriter, invokerFactory,
-				defaultEvalTasks(), loopPublisher, false);
+				defaultEvalTasks(), loopPublisher, loopPublishPolicy, false);
+	}
+
+	/**
+	 * The loop's publish policy: whether an approved candidate is pushed to the improve
+	 * source's remote, and whether a publish may be attempted at all. Not runtime-
+	 * toggleable — pushing is the credential-and-intent decision.
+	 * @param push the configured value of {@code smith.studio.loop.push}.
+	 * @param improveSourceUri the configured improve source URI, or empty for the
+	 * default.
+	 * @param sources the comma-separated configured sources.
+	 * @return the loop's publish policy.
+	 */
+	@Bean
+	public LoopPublishPolicy loopPublishPolicy(@Value("${smith.studio.loop.push:false}") boolean push,
+			@Value("${smith.studio.improve-source:}") String improveSourceUri,
+			@Value("${smith.studio.sources:}") String sources) {
+		return new LoopPublishPolicy(push, improveSourceUri(improveSourceUri, sources));
 	}
 
 	@Bean
@@ -394,6 +410,17 @@ public class StudioConfiguration {
 
 	private static List<EvalTask> defaultEvalTasks() {
 		return EvalTask.smokeDefault();
+	}
+
+	/**
+	 * The URI the loop publishes to: the explicit improve source, else the first
+	 * configured source — the same resolution the {@code loopPublisher} bean uses.
+	 * @param improveSourceUri the configured improve source URI, or empty.
+	 * @param sources the comma-separated configured sources.
+	 * @return the improve-source URI, possibly null or blank when none is configured.
+	 */
+	private static String improveSourceUri(String improveSourceUri, String sources) {
+		return (improveSourceUri != null && !improveSourceUri.isBlank()) ? improveSourceUri : firstSource(sources);
 	}
 
 	private static String firstSource(String sources) {

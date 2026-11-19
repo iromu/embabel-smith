@@ -60,7 +60,7 @@ class BuildCoreTest {
 				PublishTarget.parse("folder:" + library), BuildOptions.defaults());
 
 		assertThat(result.isBuilt()).isTrue();
-		Path packDir = result.published().location();
+		Path packDir = Path.of(result.published().location());
 		assertThat(packDir.resolve("manifest.yml")).isRegularFile();
 		assertThat(packDir.resolve("goal.yml")).isRegularFile();
 		assertThat(packDir.resolve("lifecycle.yml")).isRegularFile();

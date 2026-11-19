@@ -5,8 +5,11 @@
 
 package com.embabel.smith.builder.publish;
 
+import com.embabel.smith.builder.BuildResult;
 import com.embabel.smith.builder.lifecycle.LifecycleMetadata;
 import com.embabel.smith.builder.lifecycle.LifecycleStamper;
+import com.embabel.smith.builder.skill.EvalSuite;
+import com.embabel.smith.builder.skill.Skill;
 import com.embabel.smith.common.model.AgentSpec;
 import com.embabel.smith.common.samples.SampleAgentSpecs;
 import org.junit.jupiter.api.Test;
@@ -23,15 +26,27 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Offline tests of publishing (task 4.3): a folder publish writes the pack plus its
- * sidecar; a git publish commits into a local bare repository's working tree and (with
- * push) lands the pack in the remote; a same-named pack collides unless
- * {@code --overwrite} replaces it.
+ * sidecar; a git publish commits into a local bare repository and (with push) lands the
+ * pack in the remote; a same-named artifact collides unless {@code --overwrite} replaces
+ * it. Both publishable shapes are exercised against both targets — the skill cases cover
+ * the {@code Publishable} generalization over {@code git:}, which no test reached before.
+ *
+ * <p>
+ * A publish's location is asserted in the source's own terms, and for git it is read
+ * after {@code close()} has deleted the working tree, because that is when a reader sees
+ * it.
  */
 class PublisherTest {
+
+	private static final String SKILL_NAME = "cold-store-goods-receipt";
 
 	private final AgentSpec pack = SampleAgentSpecs.explainer();
 
 	private final LifecycleMetadata lifecycle = new LifecycleStamper().stamp(pack, 1.0);
+
+	private final SkillPublishable skill = skillPublishable(
+			"Handle chilled goods receipts and reject a temperature" + " breach.",
+			"Read the carrier temperature record.");
 
 	@Test
 	void folderPublishWritesThePackAndSidecar(@TempDir Path library) throws Exception {
@@ -39,9 +54,9 @@ class PublisherTest {
 
 		PublishResult result = publisher.publish(pack, lifecycle, false, false);
 
-		assertThat(result.location()).isEqualTo(library.resolve("explainer"));
-		assertThat(result.location().resolve("manifest.yml")).isRegularFile();
-		assertThat(result.location().resolve("lifecycle.yml")).isRegularFile();
+		assertThat(result.location()).isEqualTo(library.resolve("explainer").toString());
+		assertThat(Path.of(result.location()).resolve("manifest.yml")).isRegularFile();
+		assertThat(Path.of(result.location()).resolve("lifecycle.yml")).isRegularFile();
 		assertThat(result.pushed()).isFalse();
 	}
 
@@ -55,7 +70,7 @@ class PublisherTest {
 			.hasMessageContaining("explainer");
 
 		PublishResult replaced = publisher.publish(pack, lifecycle, true, false);
-		assertThat(replaced.location().resolve("manifest.yml")).isRegularFile();
+		assertThat(Path.of(replaced.location()).resolve("manifest.yml")).isRegularFile();
 	}
 
 	@Test
@@ -65,10 +80,8 @@ class PublisherTest {
 
 		GitPublisher publisher = new GitPublisher(PublishTarget.parse("git:" + bare));
 		try {
-			// Local commit only (no push): the working tree has the pack, the remote does
-			// not.
+			// Local commit only (no push): the commit exists, the remote does not.
 			PublishResult local = publisher.publish(pack, lifecycle, false, false);
-			assertThat(local.location().resolve("manifest.yml")).isRegularFile();
 			assertThat(local.pushed()).isFalse();
 
 			// A same-named pack now exists in the working tree → collision without
@@ -88,10 +101,92 @@ class PublisherTest {
 			// The commit message names the pack and its baseline score (design D3).
 			assertThat(runGit("-C", verify.toString(), "log", "-1", "--pretty=%s"))
 				.isEqualTo("smith: publish " + pack.name() + " (baseline 1.000)");
+
+			// The reported location names the source, not the deleted working tree.
+			assertThat(pushed.location()).isEqualTo("git:" + bare + "#explainer");
+
+			// And that is what a reader is shown: the build report prints the location it
+			// was given, so a git build's `published:` line names the git source.
+			assertThat(BuildResult.built(pack.name(), 1.0, null, this.lifecycle, pushed).report())
+				.contains("published:   git:" + bare + "#explainer (pushed)");
 		}
 		finally {
 			publisher.close();
 		}
+	}
+
+	@Test
+	void aSkillPublishedToGitLandsInACommitThatOutlivesThePublisher(@TempDir Path tmp) throws Exception {
+		Path bare = tmp.resolve("skill-repo.git");
+		runGit("init", "--bare", bare.toString());
+
+		GitPublisher publisher = new GitPublisher(PublishTarget.parse("git:" + bare));
+		PublishResult result;
+		try {
+			// Push so the commit reaches the bare repository — a default publish commits
+			// only in the working tree, which close() then deletes.
+			result = publisher.publish(this.skill, false, true);
+			assertThat(result.pushed()).isTrue();
+		}
+		finally {
+			publisher.close();
+		}
+
+		// Read back from a fresh clone: the commit, not the publisher's copy of it.
+		Path verify = tmp.resolve("verify");
+		runGit("clone", "--quiet", bare.toString(), verify.toString());
+		assertThat(verify.resolve(SKILL_NAME).resolve("SKILL.md")).isRegularFile();
+		assertThat(verify.resolve(SKILL_NAME).resolve("evals.json")).isRegularFile();
+		assertThat(verify.resolve(SKILL_NAME).resolve("lifecycle.yml")).isRegularFile();
+		assertThat(runGit("-C", verify.toString(), "log", "-1", "--pretty=%s"))
+			.isEqualTo("smith: publish " + SKILL_NAME + " (baseline 0.750)");
+
+		// Asserted after close(): the report is read once the tree it used to point into
+		// is gone. The local bare repository is itself under a temp dir, so the check is
+		// that the location names the source rather than the working tree, and that the
+		// string resolves to nothing on disk.
+		assertThat(result.location()).isEqualTo("git:" + bare + "#" + SKILL_NAME);
+		assertThat(result.location()).doesNotContain("smith-git-publish-");
+		assertThat(Path.of(result.location())).doesNotExist();
+	}
+
+	@Test
+	void aSkillCollidesInAGitSourceAndOverwriteReplacesTheDirectory(@TempDir Path tmp) throws Exception {
+		Path bare = tmp.resolve("skill-repo.git");
+		runGit("init", "--bare", bare.toString());
+
+		GitPublisher publisher = new GitPublisher(PublishTarget.parse("git:" + bare));
+		try {
+			publisher.publish(this.skill, false, false);
+
+			assertThatThrownBy(() -> publisher.publish(this.skill, false, false)).isInstanceOf(CollisionException.class)
+				.hasMessageContaining(SKILL_NAME)
+				.hasMessageContaining("--overwrite");
+
+			publisher.publish(skillPublishable("A revised description of the same skill.", "Only the new step."), true,
+					true);
+
+			Path verify = tmp.resolve("verify");
+			runGit("clone", "--quiet", bare.toString(), verify.toString());
+			String skillMd = Files.readString(verify.resolve(SKILL_NAME).resolve("SKILL.md"));
+			assertThat(skillMd).contains("A revised description of the same skill.")
+				.doesNotContain("Read the carrier temperature record");
+		}
+		finally {
+			publisher.close();
+		}
+	}
+
+	/**
+	 * A skill with its drafted suite and a 0.75 baseline, for the git cases. The baseline
+	 * is in the commit message, so the value is asserted rather than incidental.
+	 */
+	private static SkillPublishable skillPublishable(String description, String workflowStep) {
+		Skill skill = new Skill(SKILL_NAME, description, "## Workflow\n1. " + workflowStep + "\n");
+		EvalSuite evals = new EvalSuite(SKILL_NAME, List.of(new EvalSuite.Eval(1, "receive a chilled pallet",
+				"accepted after a check", List.of(), List.of("must apply FEFO"))));
+		return new SkillPublishable(skill, evals,
+				new LifecycleStamper().stamp("cafebabe000000000000000000000000000000000000000000000000000000", 0.75));
 	}
 
 	private static String runGit(String... args) {

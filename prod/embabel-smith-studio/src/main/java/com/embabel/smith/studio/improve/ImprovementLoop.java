@@ -78,6 +78,8 @@ public final class ImprovementLoop {
 
 	private final Publisher publisher;
 
+	private final LoopPublishPolicy publishPolicy;
+
 	private final boolean autoPublish;
 
 	private final ApprovalQueue queue = new ApprovalQueue();
@@ -103,22 +105,26 @@ public final class ImprovementLoop {
 	 * @param invokerFactory the invoker factory used to deploy and run packs
 	 * @param evalTasks the eval tasks used for re-evaluation
 	 * @param publisher the publisher that writes approved candidates back to the source
+	 * @param publishPolicy whether a published candidate is pushed, and whether the
+	 * publish may be attempted at all
 	 * @param autoPublish whether gated candidates are published immediately
 	 */
 	public ImprovementLoop(SpecSource source, TraceStore traceStore, PromptRewriter rewriter,
-			InvokerFactory invokerFactory, List<EvalTask> evalTasks, Publisher publisher, boolean autoPublish) {
+			InvokerFactory invokerFactory, List<EvalTask> evalTasks, Publisher publisher,
+			LoopPublishPolicy publishPolicy, boolean autoPublish) {
 		this(source, new TraceWindowReader(traceStore), new Detector(), new Refiner(rewriter),
-				new GateChain(invokerFactory, evalTasks), publisher, autoPublish);
+				new GateChain(invokerFactory, evalTasks), publisher, publishPolicy, autoPublish);
 	}
 
 	public ImprovementLoop(SpecSource source, TraceWindowReader traceReader, Detector detector, Refiner refiner,
-			GateChain gateChain, Publisher publisher, boolean autoPublish) {
+			GateChain gateChain, Publisher publisher, LoopPublishPolicy publishPolicy, boolean autoPublish) {
 		this.source = source;
 		this.traceReader = traceReader;
 		this.detector = detector;
 		this.refiner = refiner;
 		this.gateChain = gateChain;
 		this.publisher = publisher;
+		this.publishPolicy = publishPolicy;
 		this.autoPublish = autoPublish;
 	}
 
@@ -208,7 +214,13 @@ public final class ImprovementLoop {
 							failedInputs(detection.failureTraces()), model);
 					if (gate.gated()) {
 						PendingCandidate candidate = toCandidate(spec, refinement, gate, sidecar, detection);
-						boolean held = this.queue.enqueue(candidate, this.autoPublish, this::publishCandidate);
+						// A publish that could not persist (a git source with pushing
+						// off) is
+						// not attempted: the candidate is held so the improvement
+						// survives for a
+						// decision once the operator enables smith.studio.loop.push.
+						boolean publishNow = this.autoPublish && this.publishPolicy.canPublish();
+						boolean held = this.queue.enqueue(candidate, publishNow, this::publishCandidate);
 						if (held) {
 							produced.add(candidate);
 						}
@@ -283,12 +295,9 @@ public final class ImprovementLoop {
 
 	private PublishResult publishCandidate(PendingCandidate candidate) {
 		try {
-			// push=true: the loop writes the improvement back into the spec source, so a
-			// git
-			// source must be pushed or the commit dies with the publisher's throwaway
-			// clone. The
-			// folder publisher ignores the flag (a local write is already persistent).
-			return this.publisher.publish(candidate.candidate(), candidate.proposedLifecycle(), true, true);
+			// push comes from smith.studio.loop.push (default off); a git source that
+			// cannot be pushed is refused rather than committed into the deleted clone.
+			return this.publishPolicy.publish(this.publisher, candidate);
 		}
 		catch (IOException ex) {
 			throw new UncheckedIOException("cannot publish candidate for " + candidate.spec(), ex);

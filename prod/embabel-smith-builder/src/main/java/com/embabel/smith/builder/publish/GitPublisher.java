@@ -73,7 +73,9 @@ public class GitPublisher implements Publisher {
 			git(this.workDir, "push", "origin", "HEAD");
 			pushed = true;
 		}
-		return new PublishResult(unitDir, pushed);
+		// Not unitDir: that sits inside this.workDir, which close() deletes. The
+		// artifact lives as a commit in the source, so report it in the source's terms.
+		return new PublishResult("git:" + this.target.location() + "#" + unit.name(), pushed);
 	}
 
 	@Override

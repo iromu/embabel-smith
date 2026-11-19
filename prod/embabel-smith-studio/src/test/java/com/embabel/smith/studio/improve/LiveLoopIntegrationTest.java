@@ -73,7 +73,7 @@ class LiveLoopIntegrationTest {
 		FolderPublisher publisher = new FolderPublisher(PublishTarget.parse("folder:" + sourceRoot));
 
 		ImprovementLoop loop = new ImprovementLoop(source, store, rewriter, new AgentSpecInvokerFactory(platform),
-				tasks, publisher, true); // auto-publish
+				tasks, publisher, new LoopPublishPolicy(false, "folder:" + sourceRoot), true); // auto-publish
 
 		List<PendingCandidate> held = loop.runOnce();
 

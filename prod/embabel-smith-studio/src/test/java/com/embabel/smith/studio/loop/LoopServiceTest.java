@@ -16,6 +16,7 @@ import com.embabel.smith.common.model.AgentSpec;
 import com.embabel.smith.common.model.AgentSpecManifest;
 import com.embabel.smith.studio.improve.ApprovalQueue;
 import com.embabel.smith.studio.improve.ImprovementLoop;
+import com.embabel.smith.studio.improve.LoopPublishPolicy;
 import com.embabel.smith.studio.improve.PendingCandidate;
 import com.embabel.smith.studio.rest.dto.ApproveResponse;
 import com.embabel.smith.studio.rest.dto.IterationInfo;
@@ -26,7 +27,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.io.IOException;
-import java.nio.file.Path;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -41,7 +41,9 @@ import static org.mockito.Mockito.when;
  * Offline tests for the loop control surface (the only production auto-publish path): a
  * missing model endpoint is reported without running; auto-publish approves and publishes
  * each produced candidate; a publish failure leaves the candidate pending; hold mode
- * queues without publishing; and approve/reject on an unknown id surface the error.
+ * queues without publishing; a publish that the loop's push policy refuses is reported
+ * and leaves the candidate pending; and approve/reject on an unknown id surface the
+ * error.
  */
 @ExtendWith(MockitoExtension.class)
 class LoopServiceTest {
@@ -60,6 +62,16 @@ class LoopServiceTest {
 		return new ModelEndpointConfig("", "", "", "");
 	}
 
+	/** The shipped default: pushing off, over a folder improve source. */
+	private static LoopPublishPolicy folderPolicy() {
+		return new LoopPublishPolicy(false, "folder:/tmp/packs");
+	}
+
+	/** A git improve source with pushing off — a publish there could not persist. */
+	private static LoopPublishPolicy gitPolicyWithoutPush() {
+		return new LoopPublishPolicy(false, "git:https://example.com/iromu/published-packs.git");
+	}
+
 	private static PendingCandidate candidate(String id, String spec) {
 		AgentSpec pack = new AgentSpec(new AgentSpecManifest(spec, "1.0.0"),
 				GoalStepSpec.exportedGoal(spec, "goal " + spec, "BackgroundMessage"),
@@ -71,7 +83,7 @@ class LoopServiceTest {
 
 	@Test
 	void triggerWithoutEndpointReportsModelNotConfigured() {
-		LoopService service = new LoopService(loop, new LoopSchedulerState(true), publisher, missing());
+		LoopService service = new LoopService(loop, new LoopSchedulerState(true), publisher, folderPolicy(), missing());
 
 		IterationInfo info = service.trigger();
 
@@ -84,12 +96,13 @@ class LoopServiceTest {
 	void autoPublishApprovesAndPublishesProducedCandidates() throws IOException {
 		PendingCandidate candidate = candidate("c1", "extract");
 		ApprovalQueue queue = new ApprovalQueue();
-		queue.enqueue(candidate, false, x -> new PublishResult(Path.of("/tmp/extract"), false)); // held
+		queue.enqueue(candidate, false, x -> new PublishResult("/tmp/extract", false)); // held
 		when(loop.runOnce(null)).thenReturn(List.of(candidate));
 		when(loop.queue()).thenReturn(queue);
 		when(publisher.publish(any(), any(), anyBoolean(), anyBoolean()))
-			.thenReturn(new PublishResult(Path.of("/tmp/extract"), true));
-		LoopService service = new LoopService(loop, new LoopSchedulerState(true), publisher, configured());
+			.thenReturn(new PublishResult("/tmp/extract", false));
+		LoopService service = new LoopService(loop, new LoopSchedulerState(true), publisher, folderPolicy(),
+				configured());
 
 		IterationInfo info = service.trigger();
 
@@ -97,21 +110,22 @@ class LoopServiceTest {
 		assertThat(info.candidates()).isEqualTo(1);
 		assertThat(info.publishedSpecs()).containsExactly("extract");
 		assertThat(info.queuedSpecs()).isEmpty();
-		// The loop pushes improvements into the source (a git source's commit must
-		// survive the
-		// publisher's throwaway clone); the folder publisher ignores the flag.
-		verify(publisher).publish(any(), any(), anyBoolean(), eq(true));
+		// Pushing is off by default (smith.studio.loop.push); the folder publisher
+		// ignores the
+		// flag, so the local publish still happens.
+		verify(publisher).publish(any(), any(), anyBoolean(), eq(false));
 	}
 
 	@Test
 	void aPublishFailureLeavesTheCandidatePending() throws IOException {
 		PendingCandidate candidate = candidate("c1", "extract");
 		ApprovalQueue queue = new ApprovalQueue();
-		queue.enqueue(candidate, false, x -> new PublishResult(Path.of("/tmp/extract"), false));
+		queue.enqueue(candidate, false, x -> new PublishResult("/tmp/extract", false));
 		when(loop.runOnce(null)).thenReturn(List.of(candidate));
 		when(loop.queue()).thenReturn(queue);
 		when(publisher.publish(any(), any(), anyBoolean(), anyBoolean())).thenThrow(new IOException("boom"));
-		LoopService service = new LoopService(loop, new LoopSchedulerState(true), publisher, configured());
+		LoopService service = new LoopService(loop, new LoopSchedulerState(true), publisher, folderPolicy(),
+				configured());
 
 		IterationInfo info = service.trigger();
 
@@ -125,7 +139,8 @@ class LoopServiceTest {
 	void holdModeQueuesWithoutPublishing() throws IOException {
 		PendingCandidate candidate = candidate("c1", "extract");
 		when(loop.runOnce(null)).thenReturn(List.of(candidate));
-		LoopService service = new LoopService(loop, new LoopSchedulerState(false), publisher, configured());
+		LoopService service = new LoopService(loop, new LoopSchedulerState(false), publisher, folderPolicy(),
+				configured());
 
 		IterationInfo info = service.trigger();
 
@@ -135,9 +150,48 @@ class LoopServiceTest {
 	}
 
 	@Test
+	void approvingAGitCandidateWithoutPushingIsRefusedAndStaysPending() throws IOException {
+		PendingCandidate candidate = candidate("c1", "extract");
+		ApprovalQueue queue = new ApprovalQueue();
+		queue.enqueue(candidate, false, x -> new PublishResult("/tmp/extract", false)); // held
+		when(loop.queue()).thenReturn(queue);
+		LoopService service = new LoopService(loop, new LoopSchedulerState(false), publisher, gitPolicyWithoutPush(),
+				configured());
+
+		ApproveResponse response = service.approve("c1");
+
+		assertThat(response.ok()).isFalse();
+		assertThat(response.error()).contains("smith.studio.loop.push").contains("was not published");
+		assertThat(response.location()).isNull();
+		assertThat(service.candidates()).extracting(PendingCandidate::id).containsExactly("c1");
+		verify(publisher, never()).publish(any(), any(), anyBoolean(), anyBoolean());
+	}
+
+	@Test
+	void anAutoPublishIterationReportsThePushRefusalInsteadOfAPublish() throws IOException {
+		PendingCandidate candidate = candidate("c1", "extract");
+		ApprovalQueue queue = new ApprovalQueue();
+		queue.enqueue(candidate, false, x -> new PublishResult("/tmp/extract", false)); // held
+		when(loop.runOnce(null)).thenReturn(List.of(candidate));
+		when(loop.queue()).thenReturn(queue);
+		LoopService service = new LoopService(loop, new LoopSchedulerState(true), publisher, gitPolicyWithoutPush(),
+				configured());
+
+		IterationInfo info = service.trigger();
+
+		assertThat(info.ran()).isTrue();
+		assertThat(info.publishedSpecs()).isEmpty(); // nothing was written
+		assertThat(info.queuedSpecs()).containsExactly("extract");
+		assertThat(info.errorCode()).isEqualTo("PUSH_DISABLED");
+		assertThat(info.error()).contains("smith.studio.loop.push");
+		verify(publisher, never()).publish(any(), any(), anyBoolean(), anyBoolean());
+	}
+
+	@Test
 	void approvingAnUnknownIdReportsTheError() {
 		when(loop.queue()).thenReturn(new ApprovalQueue());
-		LoopService service = new LoopService(loop, new LoopSchedulerState(false), publisher, configured());
+		LoopService service = new LoopService(loop, new LoopSchedulerState(false), publisher, folderPolicy(),
+				configured());
 
 		ApproveResponse response = service.approve("missing");
 
@@ -148,7 +202,8 @@ class LoopServiceTest {
 	@Test
 	void rejectingAnUnknownIdReportsTheError() {
 		when(loop.queue()).thenReturn(new ApprovalQueue());
-		LoopService service = new LoopService(loop, new LoopSchedulerState(false), publisher, configured());
+		LoopService service = new LoopService(loop, new LoopSchedulerState(false), publisher, folderPolicy(),
+				configured());
 
 		RejectResponse response = service.reject("missing");
 

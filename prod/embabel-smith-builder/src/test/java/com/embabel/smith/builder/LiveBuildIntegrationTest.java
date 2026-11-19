@@ -63,7 +63,7 @@ class LiveBuildIntegrationTest {
 		assertThat(result.isBuilt()).as(() -> result.report()).isTrue();
 		assertThat(result.recommendation()).as("the build weighed both candidates").isNotNull();
 		assertThat(result.recommendation().single().score()).as("the pack was scored").isNotNull();
-		Path published = result.published().location();
+		Path published = Path.of(result.published().location());
 		// Whatever the build recommended is what landed: a pack, or a process of packs.
 		assertThat(Files.isRegularFile(published.resolve("manifest.yml"))
 				|| Files.isRegularFile(published.resolve("process.yml")))

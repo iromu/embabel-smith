@@ -38,7 +38,8 @@ public class FolderPublisher implements Publisher {
 		}
 		Files.createDirectories(unitDir);
 		unit.writeTo(unitDir);
-		return new PublishResult(unitDir, false);
+		// The written directory is a real, lasting location: report it as it stands.
+		return new PublishResult(unitDir.toString(), false);
 	}
 
 	private static void checkCollision(Path unitDir, String name, boolean overwrite) {

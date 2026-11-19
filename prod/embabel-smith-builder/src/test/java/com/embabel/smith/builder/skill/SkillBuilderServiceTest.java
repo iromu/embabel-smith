@@ -127,7 +127,7 @@ class SkillBuilderServiceTest {
 		assertThat(result.lift()).isEqualTo(1.0);
 
 		Path skillDir = library.resolve(PackName.slug(DESCRIPTION));
-		assertThat(result.published().location()).isEqualTo(skillDir);
+		assertThat(result.published().location()).isEqualTo(skillDir.toString());
 		assertThat(skillDir.resolve("SKILL.md")).isRegularFile();
 		assertThat(skillDir.resolve("evals.json")).isRegularFile();
 		assertThat(skillDir.resolve("lifecycle.yml")).isRegularFile();
