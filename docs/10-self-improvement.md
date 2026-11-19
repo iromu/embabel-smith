@@ -36,16 +36,27 @@ traces, no drift. A documented failure-fix fallback covers that ceiling case.
 state machine (`incubating → active → degraded → retired`) via `LifecycleTransitions`. `retired`
 is excluded from automatic refinement: a human revives it with an explicit rebuild.
 
-**Unlike a manual build, the loop publishes with `push = true`.** The documented rule is *commit,
-never push* without an explicit `--push` (see [`05-architecture.md`](05-architecture.md) and
-[`06-spec-sources.md`](06-spec-sources.md)), but an autonomous run has no operator to pass it, and
-for a `git:` source the commit would otherwise die with the publisher's throwaway clone. So
-`ImprovementLoop` and `LoopService` publish with pushing forced on: **an unattended loop writes to
-the git remote by default.** That is a deliberate deviation from the product rule — treat it as a
-policy decision to revisit, not an oversight to silently fix.
+**The loop obeys the commit-never-push rule; pushing is configuration.** The documented invariant is
+*commit, never push* without an explicit `--push` (see [`05-architecture.md`](05-architecture.md) and
+[`06-spec-sources.md`](06-spec-sources.md)), and the loop now matches it: `smith.studio.loop.push`
+decides whether a published candidate is pushed and **defaults to off**, so an unattended loop cannot
+write to a shared remote. Unlike auto-publish, it is *not* runtime-toggleable — pushing is the
+credential-and-intent decision, so it can only be set when the studio is configured and started.
 
-**Lifecycle state is advisory in v1 — the runtime does not gate on it.** That is a deliberate
-simplification with the runtime-side gate left as a separate change.
+A `git:` improve source with pushing off is **refused rather than published**. `GitPublisher` commits
+inside a temporary clone that `close()` deletes, so a commit made there would vanish silently; the
+publish is therefore not attempted. The refusal names `smith.studio.loop.push`, the candidate stays in
+the `ApprovalQueue`, and an auto-publishing iteration records that it published nothing
+(`IterationInfo.errorCode` = `PUSH_DISABLED`). A `folder:` source is unaffected — a local write is
+already durable and the folder publisher ignores the flag. Both write paths
+(`ImprovementLoop.publishCandidate`, `LoopService.publish`) share the one `LoopPublishPolicy`. The
+loop's forced `overwrite` is a separate decision, still open in [`12-backlog.md`](12-backlog.md).
+
+**Retirement is enforced; the other states are advisory.** The runtime refuses to ingest a pack
+whose sidecar says `retired`, and a run asking for that pack's goal is a named lifecycle block the
+detector filters out exactly as it filters a tier block. `INCUBATING` and `DEGRADED` remain advisory
+by choice — gating them would be a policy nobody has written down. See
+[`07-runtime.md`](07-runtime.md) §Lifecycle state.
 
 ## Human control
 

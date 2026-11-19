@@ -47,16 +47,50 @@ product's primary purpose. Retrieve sits under *Inspect*; Remote and Scale sit u
 | `/traces` | TracesPane | `TraceController` |
 | `/improve` | AutoImprovePane | `ImproveController` |
 | `/storage` | StoragePane | `StorageSettingsController`, `StoreController` |
-| `/retrieve`, `/remote`, `/scale` | RetrievePane, RemotePane, ScalePane | **none — POC-only stubs** |
+| `/retrieve` | RetrievePane | `RetrieveController`, `SourceController` (the source list) |
+| `/remote` | RemotePane | `RemoteController` (the bridge client is the runtime's `RemoteActionBridge`) |
+| `/scale` | ScalePane | **none — POC-only stub** |
 | (chrome, all panes) | — | `StatusController`, `ModelsController` |
 
-`SourceController` (`/api/sources`, `/api/packs`, `/api/goals`) backs four of the panes above rather
+`SourceController` (`/api/sources`, `/api/packs`, `/api/goals`) backs five of the panes above rather
 than owning one, which is why it appears in several rows.
 
-The POC-only row is deliberate: all three are thin wrappers around `PocOnlyPane.vue`, which renders the
-POC reference and a disabled badge. There is no retrieve, remote or scale controller under
-`prod/embabel-smith-studio`. Retrieval-at-scale and the remote bridges are proven in the POCs and
-**not wired into the product** — tracked in [`12-backlog.md`](12-backlog.md).
+The POC-only row is deliberate: the scale pane is a thin wrapper around `PocOnlyPane.vue`, which
+renders the POC reference and a disabled badge, and there is no scale controller under
+`prod/embabel-smith-studio`.
+
+### Remote bridges are reported, never started
+
+`/remote` lists the sidecars this installation configured, says whether each answers, shows the
+actions each one advertises, and returns the output of running one of them. Three decisions shape it:
+
+- **Sidecars are started by hand; the studio never spawns a process.** This was an open backlog
+  question and is now closed as a decision. A browser-reachable, port-bound development tool that
+  launches processes is a remote-code-execution surface, and spawning would make Docker a product
+  dependency. So an absent sidecar is *reported*, with the URL that was probed, rather than launched,
+  and the pane carries no "start" affordance to tempt a reader into thinking it could.
+- **A request names a bridge; it never supplies an address.** `POST /api/remote/execute` carries the
+  configured *name*, and a name `smith.studio.remote-bridges` does not define is refused before
+  anything is contacted. Without that rule the pane is an open proxy: any client that can reach it
+  could make this host send arbitrary requests to arbitrary URLs.
+- **The controller holds no HTTP.** `RemoteController` reads configuration, selects a bridge and
+  shapes DTOs; the three-endpoint contract, the timeouts and how a reply decides reachability all
+  live in the runtime's `remote/` package — see
+  [`07-runtime.md`](07-runtime.md). That split is enforced rather than stylistic:
+  `NoDirectModelRequestTest` fails the build if any studio production source imports
+  `java.net.http.` ([`05-architecture.md`](05-architecture.md) §the model layer).
+
+An unreachable bridge is a *state* inside a `2xx` response, never a failed request: the pane reports
+on the world, and one sidecar being down is not a fault in this application. The configured MCP
+endpoint is displayed as configured and **not invoked** — this product is not an MCP client, so
+showing it as reachable would be a badge that lies.
+
+The scale pane stays POC-only by decision, and it is not the retrieval capability it is grouped with:
+what it shows is a benchmark over a large synthetic library, whose measured P@1 lives in
+[`04-poc-run-results.md`](04-poc-run-results.md) §7.1 — a harness result rather than something a pane
+can offer a user. The retrieval capability that measurement recommended *is* now wired: `/retrieve`
+ranks a source's packs through `RetrieveController`, and the ranking is curated by each pack's
+recorded lifecycle state.
 
 ## The process workspace
 
@@ -90,6 +124,19 @@ POC reference and a disabled badge. There is no retrieve, remote or scale contro
 
 With no `OPENAI_CUSTOM_*` set, the application boots and every disk-backed pane works. Model-backed
 actions return a structured `MODEL_NOT_CONFIGURED` that the UI renders as a banner — not a 500.
+
+## Loop settings
+
+The two `smith.studio.loop.*` properties are bound in `StudioConfiguration` and decide what the
+Auto-improve pane is allowed to do on its own:
+
+- `smith.studio.loop.auto-publish` (default `false`) — whether an iteration publishes the candidates
+  it gates instead of holding them for approval. Toggleable at runtime from the pane.
+- `smith.studio.loop.push` (default `false`) — whether a published candidate is pushed to the improve
+  source's git remote. Deliberately **not** toggleable at runtime: pushing is the credential-and-intent
+  decision the commit-never-push rule exists to protect. A `git:` improve source with pushing off is
+  refused rather than committed into a clone the publisher deletes, and the candidate stays pending.
+  The reasoning is in [`10-self-improvement.md`](10-self-improvement.md).
 
 ## Storage
 
@@ -137,6 +184,7 @@ ten panes over a thin REST layer, and established the patterns the studio kept v
 controllers, the offline / endpoint-gated split, graceful "endpoint not configured" states, the
 single API client. Only the delegates changed.
 
-What the product dropped is the retrieve, remote and scale panes (above). The type-checked canvas
-snap and the curation-aware retrieval survive only in the POC; the product's equivalent is the
-Compose pane's editable flow.
+What the product dropped is the scale pane (above); remote and retrieve are wired. The type-checked
+canvas snap survives only in the POC — the product's equivalent is the Compose pane's editable flow —
+and so does the *scale benchmark*, while the curation-aware retrieval it proved now runs in the product
+as the builder's `retrieval/` package behind `RetrieveController`.
