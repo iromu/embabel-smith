@@ -57,11 +57,17 @@ schema the rest sits on.
 
 ## 2. The versioned store
 
-- [ ] 2.1 Give `PackEntity` a key that is not the bare name — `(name, version)` per decision 2 — keeping
+- [x] 2.1 Give `PackEntity` a key that is not the bare name — `(name, version)` per decision 2 — keeping
       `goal`, `steps`, `saved_at` and `content` as the version's payload. Verify a test saves two versions
       of one name and reads both back, and that the assertion would fail against the current
       name-as-primary-key mapping.
-- [ ] 2.2 Decide who moves an existing `packs` table, because **nothing will do it for you**: the studio
+      Done 2026-11-19. `@IdClass(PackEntityId.class)` with `version` as a second `@Id`; `PackRepository`
+      becomes `JpaRepository<PackEntity, PackEntityId>` and still declares **no** finders. A POJO IdClass,
+      not a record, because Hibernate materialises the key itself and needs the no-arg constructor.
+      `twoVersionsOfOneNameAreStoredAsTwoRows` stores `1.0.0` and `1.1.0` and asserts both; under the old
+      mapping the second `save` is a merge onto the one row, so it fails twice over — one row, and no
+      `version` column to select.
+- [x] 2.2 Decide who moves an existing `packs` table, because **nothing will do it for you**: the studio
       sets `hibernate.hbm2ddl.auto = "update"` in `storage/StorageBinding`, and there is no Flyway, no
       Liquibase and no `.sql` file in the repo. `update` adds columns; it does not re-key a primary key, so
       an already-deployed studio would keep a name-keyed table underneath an entity expecting
@@ -69,9 +75,25 @@ schema the rest sits on.
       start-up check that detects the old key and rebuilds the table, or a declared re-create that accepts
       losing dev rows. Verify by running the studio's persistence against a database holding the OLD shape
       and asserting table and entity agree afterwards — not by asserting the new mapping alone.
-- [ ] 2.3 Make a republish of the same name and same version an update of that version, and a republish at
+      Done 2026-11-19: **the detector, not the re-create** — `storage/PacksKeyMigration` reads the key
+      through JDBC metadata and, when it is not `(name, version)`, adds the column, backfills each row from
+      the version its own stored `content` declares (default `1.0.0`), sets it `NOT NULL`, drops the old
+      constraint by the name metadata reports and adds the composite key. Rows are never deleted. It is
+      called from `StorageBinding.create` **before** the `EntityManagerFactory` is built, which is the whole
+      point: `update` would otherwise add the missing key column as `NOT NULL` to a populated table.
+      `PacksKeyMigrationTest` hand-creates the old shape (name-only primary key, no `version` column, two
+      seeded rows, one declaring no version), binds the real `StorageContext`, then asserts through metadata
+      that the key is `(name, version)`, that both rows survived with the versions their content declared,
+      and that a new version writes onto the migrated table. A second test binds twice to prove idempotence;
+      the run logged exactly two rebuilds for three binds, so the second bind left the new key alone.
+      **Residual, unverified:** the DDL is exercised on H2 only. The Postgres forms —
+      `DROP CONSTRAINT packs_pkey` and `ALTER COLUMN … SET NOT NULL` — are reasoned-about, not executed, and
+      Postgres is the deployment with a real old-shaped table in the persistent `studio-pgdata` volume.
+- [x] 2.3 Make a republish of the same name and same version an update of that version, and a republish at
       a new version an added row. Verify both in one test, and verify the same-version case does not
       duplicate.
+      Done 2026-11-19 by `republishOfTheSameVersionUpdatesThatRow`: one row at `1.0.0` after two saves of it,
+      the goal updated in place, then a save at `1.1.0` adds a second row.
 - [ ] 2.4 **Decided by `design.md` decision 7: the studio's existing store path writes the versioned row;
       the builder gains no persistence.** The search for 1.3 found that the publish path never touches
       `packs` — `LoopPublishPolicy.publish` ends at a `Publisher` writing to a folder or a git clone — so
@@ -82,18 +104,35 @@ schema the rest sits on.
       check that no JPA, `spring-data` or JDBC dependency was added; a test that a loop publish leaves a row
       whose version is the candidate's, readable afterwards; and that the folder destination's content is
       unchanged by the new write (the save is additive, not a replacement of publishing).
-- [ ] 2.5 Decide what `listPacks` means once a name has several rows — `store/ProcessStore.java:74` returns
+- [x] 2.5 Decide what `listPacks` means once a name has several rows — `store/ProcessStore.java:74` returns
       `findAll()`, which will list every version. Either collapse to the highest version per name (decision
       3's rule, applied in one place) or show versions as separate rows; pick one and say which the studio
       UI is showing, because the listing is what a human uses to tell whether an improvement landed.
+      Done 2026-11-19: **collapsed to the highest version per name**, through the same `highestPerName` the
+      loader uses, so the listing and `loadPack` cannot disagree about what a bare name means — a listing
+      showing three rows of which only one is what clicking that name returns would be the worst possible
+      thing for a human checking whether an improvement landed. `version` was deliberately **not** added to
+      `PackRecord`/`StoredPackInfo` or the frontend: the DTO has no version column today, so "versions as
+      separate rows" would render three visually identical entries, and showing a version is a UI change
+      outside this change.
 
 ## 3. The loop keeps its versions — in the store, not in the folder name
 
-- [ ] 3.1 Update the one name-keyed reader found in 1.3 — `store/ProcessStore.java:89`,
+- [x] 3.1 Update the one name-keyed reader found in 1.3 — `store/ProcessStore.java:89`,
       `packs().findById(name)` — to resolve a version explicitly using the answer from 1.2, and deal with
       `listPacks` at line 74 (task 2.5). Verify it compiles against the new key and that no reader is left
       relying on the name being unique. There is no second reader: the repository declares no finders, and
       no other module queries the table.
+      Done 2026-11-19. `findById(name)` cannot compile against a composite key, so `loadPack` fetches and
+      narrows in Java through `highestPerName` — the same helper the listing uses, so decision 3's rule lives
+      in exactly one place. **The rule was mutation-checked, not argued:** replacing the numeric
+      `compareVersions` with `String.compareTo` and re-running the module failed exactly one of 153 tests,
+      `highestVersionComparesNumericallyNotLexically`, with `expected: "1.10.0" but was: "1.9.0"`. That test
+      saves the higher version first, so it also fails against "most recently saved wins". The single
+      failure is itself the evidence that no other reader silently depends on the ordering.
+      Note for whoever writes the next reader here: a derived finder is unavailable in this module — the
+      ANTLR query parser is shadowed by an older copy bundled in a transitive Kotlin compiler jar, as
+      `TraceRepository` and `DiscoveryRepository` both record.
 - [ ] 3.2 **Withdrawn by `design.md` decision 7 — do not remove the flag.** The warning below is why, and
       the search found a second reason: the loop's overwrite happens in `FolderPublisher`, which deletes
       `<destination>/<name>`, and `FolderPublisher.publish` resolves the directory from
