@@ -127,8 +127,8 @@ actions return a structured `MODEL_NOT_CONFIGURED` that the UI renders as a bann
 
 ## Loop settings
 
-The two `smith.studio.loop.*` properties are bound in `StudioConfiguration` and decide what the
-Auto-improve pane is allowed to do on its own:
+The `smith.studio.loop.*` properties, together with the source they publish to, are bound in
+`StudioConfiguration` and decide what the Auto-improve pane is allowed to do on its own:
 
 - `smith.studio.loop.auto-publish` (default `false`) — whether an iteration publishes the candidates
   it gates instead of holding them for approval. Toggleable at runtime from the pane.
@@ -137,6 +137,12 @@ Auto-improve pane is allowed to do on its own:
   decision the commit-never-push rule exists to protect. A `git:` improve source with pushing off is
   refused rather than committed into a clone the publisher deletes, and the candidate stays pending.
   The reasoning is in [`10-self-improvement.md`](10-self-improvement.md).
+- `smith.studio.improve-source` (default empty) — where an approved candidate is written: a `folder:`
+  or `git:` destination, falling back to the first configured `smith.studio.sources` entry. Empty with
+  no sources configured, the loop **refuses to publish** and names this setting rather than defaulting
+  the destination to the system temporary directory — a folder there is overwritten by the next
+  iteration and may be discarded by the operating system, so a default would be a destination that
+  cannot be relied on to still hold the improvement. The candidate stays pending.
 
 ## Storage
 

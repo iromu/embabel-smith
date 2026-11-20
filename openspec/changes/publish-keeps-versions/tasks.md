@@ -208,15 +208,25 @@ schema the rest sits on.
       the third is the one that matters, because it shows a lost bump reaches the stored row rather than being
       caught only by a unit test on the bump itself. Both mutations reverted; the module is green at 159 tests.
       The pre-existing fact this task opened remains true: no test pins `overwrite`, by design.
-- [ ] 3.4 Keep `CollisionException`'s message reachable for a human at the CLI: `smith build` without
+- [x] 3.4 Keep `CollisionException`'s message reachable for a human at the CLI: `smith build` without
       `--overwrite` still refuses a same-named folder, and `BuildController`/`ComposeController` still
       surface the refusal. Verify the existing CLI and controller tests pass untouched — that behaviour is
       explicitly not changing — and note that `BuildController` reports a publish collision under stage
       `build` rather than `publish`, which is pre-existing and out of scope unless the human wants it.
+      Done 2026-11-20 by reading and by the untouched suite, which is what this task asked for. The refusal
+      still reaches every surface: `BuilderService.publish` catches `CollisionException` and returns
+      `BuildResult.blocked("publish", name, List.of(ex.getMessage()), …)`, which is what the CLI prints;
+      `ComposeController` catches it explicitly and returns `ComposeResponse.failed(ex.getMessage())`;
+      `BuildController` catches `Exception` broadly, so a publish collision arrives under stage **`build`** —
+      the named pre-existing quirk, left alone. `PublisherTest.aFolderCollisionBlocksUnlessOverwrite` and
+      `SkillBuilderServiceTest`'s `stage()).isEqualTo("publish")` both pass unchanged.
+      **One honest limit on the wording above:** no test drives `smith build` end-to-end into a collision and
+      asserts a human sees the message — `BuildCommandTest` covers flag parsing, not a refused publish. The
+      message's reach is pinned one layer down, at `BuilderService` and the controllers.
 
 ## 4. A durable destination instead of a temporary one
 
-- [ ] 4.1 Drop `StudioConfiguration.loopPublisher`'s `folder:` + system-temp-dir fallback: with no improve
+- [x] 4.1 Drop `StudioConfiguration.loopPublisher`'s `folder:` + system-temp-dir fallback: with no improve
       source configured, the loop refuses to publish and names the setting to change, in the voice of the
       existing `LoopPushDisabledException`. Verify a test asserts the refusal and that nothing was written
       under the temp dir.
