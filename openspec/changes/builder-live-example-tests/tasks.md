@@ -123,7 +123,42 @@ while ingestion lives in the studio the builder's test sources cannot reach it.
       naming the ~15-19 calls and why (four calls per eval scenario). Verify as above.
 - [x] 7.4 `examples/README.md` as the run book, including why no script passes `--extract`, and
       `examples/out/` gitignored.
-- [ ] 7.5 Run both scripts once against a live endpoint and read the reports — the scripts are
+- [x] 7.5 Run both scripts once against a live endpoint and read the reports — the scripts are
       verified as plumbing, not yet as a build that published.
+      **Run 2026-11-20 against `http://spark.local:4000/v1` with `Qwen-instruct`, blueprint
+      `Sentinel` (one 31.7 KB document), both with `-- --max-refine 0`. They are now also evidence of
+      a build that published, and of a gate that refused one.**
+      - `generate-spec.sh` — **exit 0, `BUILD OK: sentinel_security_ops`**, in 12 minutes over 18
+        endpoint timeouts. Published `goal.yml`, `manifest.yml`, `lifecycle.yml`, 8 `steps/`, 9
+        `types/`; eval 1.000, security SAFE at T1_COMMUNITY, lifecycle INCUBATING. The two-candidate
+        mechanism ran for real and did its job: the multi-agent process
+        `sentinel_security_operations` failed validation (goal output unreachable from the entry, four
+        agents with no producer, one cycle, `DANGLING_TYPE_REF` across six packs), so the single-agent
+        candidate was chosen and scored. The `DANGLING_TYPE_REF` cluster the `embabel` technique is
+        known for, reproduced here by a generated process rather than by that technique.
+      - `generate-skill.sh` — **exit 1, `SKILL BUILD BLOCKED at security`**, and the block is the more
+        interesting half. The lift gate **passed**: `+0.438` (with 0.875 against a 0.438 baseline) over
+        four model-drafted scenarios, so the skill measurably improved the agent. The security scanner
+        then refused it on `CRITICAL SECRET_EXFIL — Spec prompt references a secret or credential`.
+        Inspection had already run: 7 checks, quality 84.2/100, one draft, 16 advisory findings, none
+        blocking. Worth a reader's attention rather than my verdict: the blueprint *is* a
+        security-operations process, so its subject matter is credentials and exfiltration, and a
+        domain-accurate skill can trip an exfil heuristic on what it is about. Not investigated here;
+        recorded, not assumed to be a false positive.
+      - **Three defects this run found — all in the harness, not the product, all fixed.**
+        `generate-skill.sh` documented `[-- <extra args>]` and never stripped the separator, so picocli
+        read it as end-of-options and rejected flags it does declare; the run died at startup
+        (`c352df6`). A run that prints no verdict left a **zero-byte `report.md`**, the file the run
+        book tells you to read; it now keeps the CLI's last words. And the report cut demanded a colon
+        after the verdict word, which only the `OK` forms print — **so every blocked build had been
+        cutting an empty report**, including this one, whose 2.9 KB report named the refusing gate and
+        the measured lift and had been thrown away (`894a185`). That third one means 7.2's promise that
+        `report.md` is written "whether or not a gate let it through" was false from the day it was
+        ticked; its verification checked the plumbing against a dead endpoint, which only ever produces
+        the no-verdict case. All three fixed and verified against real logs, not against a model of
+        them.
+      - **What this does not settle:** one blueprint, one technique, one model, `--max-refine 0`.
+        Nothing was pushed through `--technique embabel` (its block is already recorded from the
+        matrix), and the security refusal above is unexplained.
 - [ ] 7.6 Deferred: the live test worth adding — a small blueprint with a known expected agent spec
       and skill, asserted rather than recorded.
