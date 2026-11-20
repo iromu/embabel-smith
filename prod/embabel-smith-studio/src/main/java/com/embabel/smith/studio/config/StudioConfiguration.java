@@ -47,6 +47,7 @@ import com.embabel.smith.specsource.SpecSource;
 import com.embabel.smith.studio.generate.FlowValidator;
 import com.embabel.smith.studio.improve.ImprovementLoop;
 import com.embabel.smith.studio.improve.LoopPublishPolicy;
+import com.embabel.smith.studio.improve.LoopPushDisabledException;
 import com.embabel.smith.studio.loop.LoopSchedulerState;
 import com.embabel.smith.studio.rest.BuildController;
 import com.embabel.smith.studio.rest.EvalController;
@@ -78,6 +79,13 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @Configuration
 @EnableScheduling
 public class StudioConfiguration {
+
+	/**
+	 * The studio setting that names the improve source the loop publishes to. It is
+	 * refused rather than defaulted when empty, so an unconfigured loop never writes
+	 * improvements to a directory the operating system is free to discard.
+	 */
+	private static final String IMPROVE_SOURCE_SETTING = "smith.studio.improve-source";
 
 	/**
 	 * The endpoint the studio reports and gates model-backed actions on: whichever of the
@@ -352,6 +360,19 @@ public class StudioConfiguration {
 		return Sources.parse(uri, cacheRoot(cacheDir));
 	}
 
+	/**
+	 * The publisher the improvement loop writes an approved candidate to: the configured
+	 * improve source. With no source configured there is no durable destination, so the
+	 * publisher refuses the publish and names the setting to change — the same way
+	 * {@link LoopPublishPolicy} refuses a git source with pushing off — and the candidate
+	 * stays pending.
+	 * @param improveSource the improve source the loop watches; not consulted here, the
+	 * URI decides the destination.
+	 * @param improveSourceUri the configured improve source URI, or empty.
+	 * @param sources the comma-separated configured sources.
+	 * @param cacheDir the configured source cache directory.
+	 * @return the loop's publisher.
+	 */
 	@Bean
 	public Publisher loopPublisher(SpecSource improveSource,
 			@Value("${smith.studio.improve-source:}") String improveSourceUri,
@@ -359,7 +380,14 @@ public class StudioConfiguration {
 			@Value("${smith.studio.source-cache-dir:}") String cacheDir) {
 		String uri = improveSourceUri(improveSourceUri, sources);
 		if (uri == null || uri.isBlank()) {
-			return new FolderPublisher(PublishTarget.parse("folder:" + Path.of(System.getProperty("java.io.tmpdir"))));
+			// Nothing is published, and nothing is written: the destination is a
+			// decision, not a default.
+			return (unit, overwrite, push) -> {
+				throw new LoopPushDisabledException("Candidate for '" + unit.name()
+						+ "' was not published: no improve source is configured, so the loop has no durable "
+						+ "destination to write it to. Set " + IMPROVE_SOURCE_SETTING
+						+ " to a folder: or git: destination. The candidate stays pending.");
+			};
 		}
 		return publisherFor(uri, cacheRoot(cacheDir));
 	}

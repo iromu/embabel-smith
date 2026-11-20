@@ -178,6 +178,42 @@ class PublisherTest {
 	}
 
 	/**
+	 * Decision 5 of change publish-keeps-versions: the git destination needs no
+	 * versioning machinery of its own. Two publishes of one name are two commits in the
+	 * target repository, and the {@code overwrite} that replaces the working copy in the
+	 * clone does not lose the first publish — it stays readable out of history.
+	 */
+	@Test
+	void aGitSourceKeepsEveryPublishOfOneNameAsACommit(@TempDir Path tmp) throws Exception {
+		Path bare = tmp.resolve("versions.git");
+		runGit("init", "--bare", bare.toString());
+
+		GitPublisher publisher = new GitPublisher(PublishTarget.parse("git:" + bare));
+		try {
+			publisher.publish(this.skill, false, true);
+			publisher.publish(skillPublishable("A revised description of the same skill.", "Only the new step."), true,
+					true);
+		}
+		finally {
+			publisher.close();
+		}
+
+		Path verify = tmp.resolve("verify");
+		runGit("clone", "--quiet", bare.toString(), verify.toString());
+		assertThat(runGit("-C", verify.toString(), "rev-list", "--count", "HEAD")).isEqualTo("2");
+
+		// The working copy holds the second publish.
+		assertThat(Files.readString(verify.resolve(SKILL_NAME).resolve("SKILL.md")))
+			.contains("A revised description of the same skill.");
+
+		// The first publish is read out of the repository's history, not a working tree.
+		assertThat(runGit("-C", verify.toString(), "show", "HEAD~1:" + SKILL_NAME + "/SKILL.md"))
+			.contains("Handle chilled goods receipts")
+			.contains("Read the carrier temperature record")
+			.doesNotContain("A revised description of the same skill.");
+	}
+
+	/**
 	 * A skill with its drafted suite and a 0.75 baseline, for the git cases. The baseline
 	 * is in the commit message, so the value is asserted rather than incidental.
 	 */

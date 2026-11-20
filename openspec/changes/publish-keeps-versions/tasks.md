@@ -86,9 +86,19 @@ schema the rest sits on.
       that the key is `(name, version)`, that both rows survived with the versions their content declared,
       and that a new version writes onto the migrated table. A second test binds twice to prove idempotence;
       the run logged exactly two rebuilds for three binds, so the second bind left the new key alone.
-      **Residual, unverified:** the DDL is exercised on H2 only. The Postgres forms —
-      `DROP CONSTRAINT packs_pkey` and `ALTER COLUMN … SET NOT NULL` — are reasoned-about, not executed, and
-      Postgres is the deployment with a real old-shaped table in the persistent `studio-pgdata` volume.
+      **Residual, narrowed 2026-11-20 — and narrowing it found a real bug.** The DDL now runs a second time,
+      against H2 in PostgreSQL mode with lower-cased identifiers (`PacksKeyMigrationTest
+      .aNameKeyedTableIsRebuiltWhenIdentifiersAreStoredLowerCase`), which is the identifier casing the deployed
+      database uses. That test failed first, and the failure was the migration's, not the test's: it reads the
+      primary-key constraint name out of JDBC metadata and re-issued it **unquoted**, and a case-folding
+      connection folds the statement's identifier and misses the constraint the name came from — H2 stores a
+      generated key name upper case (`CONSTRAINT_6`) even when it stores table names lower case. Probed directly
+      against the H2 jar: the same rebuild fails unquoted and succeeds quoted, in both dialects. The drop is now
+      quoted with the name metadata reports, which is the name the database stores, and the class javadoc says
+      which identifiers are quoted and why. **What is still unverified:** the Postgres-only forms —
+      `DROP CONSTRAINT packs_pkey`, `ALTER COLUMN … SET NOT NULL` — have never been executed against a real
+      Postgres, and Postgres is the deployment with a real name-keyed table in the persistent `studio-pgdata`
+      volume. H2's PostgreSQL mode is a casing check, not a Postgres.
 - [x] 2.3 Make a republish of the same name and same version an update of that version, and a republish at
       a new version an added row. Verify both in one test, and verify the same-version case does not
       duplicate.
@@ -210,12 +220,39 @@ schema the rest sits on.
       source configured, the loop refuses to publish and names the setting to change, in the voice of the
       existing `LoopPushDisabledException`. Verify a test asserts the refusal and that nothing was written
       under the temp dir.
-- [ ] 4.2 Confirm the git path needs no versioning machinery of its own (decision 5): two publishes of one
+      Done 2026-11-20. The fallback is gone; the bean now hands back a publisher that refuses, throwing the
+      existing `LoopPushDisabledException` with a message naming `smith.studio.improve-source` (held as
+      `IMPROVE_SOURCE_SETTING`, per the `PUSH_SETTING` precedent) and saying the candidate stays pending. It is
+      a lambda over `Publisher`'s one abstract method, so no class was added, and it surfaces through the two
+      catches that already exist — `LoopService.trigger` and `LoopService.approve` — with no new catch.
+      `StudioConfigurationLoopPublisherTest` has both directions: the refusal, and a configured source still
+      getting a publisher that writes, so a publisher that refused unconditionally could not pass. **Mutation-
+      checked:** restoring the temp-directory line fails the refusal test and nothing else.
+      The test is worth a note on how it verifies "nothing was written". Its first version asserted that
+      `<java.io.tmpdir>/<pack name>` did not exist — a global path, which made the suite order-dependent on
+      history: after the mutation had run, the real `/tmp` held the pack the mutation published, and the green
+      code failed. It now redirects `java.io.tmpdir` to a `@TempDir` and asserts that directory is still empty,
+      which is both hermetic and still catches the mutation, because the fallback resolved the same property.
+- [x] 4.2 Confirm the git path needs no versioning machinery of its own (decision 5): two publishes of one
       name are two commits in the target repository. Verify with a test against a local bare repository
       that the first publish's content is still readable from history after the second one overwrites the
       working copy in the clone.
-- [ ] 4.3 Leave `canPublish()` and its message alone (decision 6). Verify its test still passes, and that
+      Done 2026-11-20 by `PublisherTest.aGitSourceKeepsEveryPublishOfOneNameAsACommit`: two publishes of one
+      name into a `git init --bare` repository leave `rev-list --count HEAD` at **2**, the working copy holds
+      the second publish, and `git show HEAD~1:<name>/SKILL.md` still returns the first publish's content and
+      not the second's. Both publishes push, because a `GitPublisher` commit without a push lives only in the
+      clone the test is about to close. The two publishes carry **different** content on purpose: the publisher
+      skips a commit when the staged diff is empty, so identical content would make one commit and the test
+      would pass against a publisher that kept nothing. Offline — bare repo, clone and working tree all under
+      the temp dir. No production change: decision 5 was that the git path needs nothing added, and nothing
+      was added.
+- [x] 4.3 Leave `canPublish()` and its message alone (decision 6). Verify its test still passes, and that
       making the durable path the default did not quietly widen when publishing is allowed.
+      Done 2026-11-20. `LoopPublishPolicy` is not in the change set at all — `git diff` for that file is empty,
+      so `canPublish()` (`!gitSource || push`), its message and `PUSH_SETTING` are byte-for-byte what they were.
+      Its tests pass unchanged. Nothing widened: the new refusal fires on a *narrower* condition than
+      `canPublish()` (no improve source configured at all), it does not consult `canPublish()`, and a source
+      that was publishable before is publishable now.
 
 ## 5. Documentation
 
