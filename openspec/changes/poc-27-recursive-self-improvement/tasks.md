@@ -192,7 +192,22 @@ service.
 
 ## 9. Evidence and documentation
 
-- [ ] 9.1 Verify every cited paper's arXiv identifier against arXiv and correct the list, since `poc/` is frozen afterwards and a wrong identifier is permanent
+- [x] 9.1 Verify every cited paper's arXiv identifier against arXiv and correct the list, since `poc/` is frozen afterwards and a wrong identifier is permanent
+      **Done, and the task's premise turned out to be wrong.** There was no list to correct: the only
+      paper list for POC 27 is the Literature bullet in `proposal.md`, and it named twelve papers with
+      **no identifiers at all** while stating that they would be "verified against arXiv before the README
+      is frozen". So 9.1 became resolve-and-attach rather than audit. Twelve identifiers attached there,
+      each one re-fetched independently from `export.arxiv.org` and confirmed on title, first authors and
+      publication date — none wrong, none unsupported, because the list attached no per-paper claim to get
+      wrong. Two things the verification produced that the README must carry:
+      **(a)** arXiv's stored spellings are not consistent — `2505.22954` is filed unaccented as "Darwin
+      Godel Machine" while `2410.04444` keeps its accent as "Gödel Agent", and `cs/0309048` is titled
+      "…Making **Provably Optimal** Self-Improvements", not the "…Provable…" wording usually quoted —
+      and **(b)** `design.md` D6's "greedy selection from one best variant converges early" is this POC's
+      own reasoning set against DGM's open-ended archive, **not a finding reported by `2505.22954`**, so
+      9.2 must phrase it as an analogy rather than a cited result. "The reward-overoptimization result"
+      was ambiguous and now names `2210.10760` (Gao–Schulman–Hilton) explicitly, distinguishing it from
+      the 2024 direct-alignment follow-up `2406.02900`.
 - [ ] 9.2 Write `poc/poc-27-recursive-self-improvement/README.md` with the hypothesis, the mermaid diagram, the paper list and the measured results, and verify it ends with the Conclusion and shared-results sections the POC convention requires
 - [ ] 9.3 Add the POC 27 row and run results to `docs/04-poc-run-results.md` and the module table in `README.md`, and verify the documented commands run as written
 - [ ] 9.4 State the honest outcome either way in the README, and verify a flat derivative is reported as a finding rather than softened

@@ -80,7 +80,15 @@ result, per the conventions in `docs/04` and `AGENTS.md`.
 - **Conventions that bind it**: every source file carries the author and SPDX header; the POC README
   ends with a Conclusion and shared-results section and carries a mermaid diagram; `poc/` is frozen
   after the fact; commit, never push (`docs/05-architecture.md`).
-- **Literature**: the README cites the self-improvement line — Gödel machines, STOP, the Darwin Gödel
-  Machine, Gödel Agent, ADAS, Voyager, LLMs-as-Tool-Makers, Agent Workflow Memory, Reflexion,
-  Self-Refine, STaR, and the reward-overoptimization result — with arXiv identifiers **verified
-  against arXiv before the README is frozen**, since `poc/` is not edited afterwards.
+- **Literature**: the README cites the self-improvement line — Gödel machines (arXiv:cs/0309048,
+  arXiv spells the title "Goedel Machines: Self-Referential Universal Problem Solvers Making
+  Provably Optimal Self-Improvements"), STOP (arXiv:2310.02304), the Darwin Gödel Machine
+  (arXiv:2505.22954, arXiv's own title is unaccented: "Darwin Godel Machine: Open-Ended Evolution of
+  Self-Improving Agents"), Gödel Agent (arXiv:2410.04444), ADAS (arXiv:2408.08435, titled
+  "Automated Design of Agentic Systems"), Voyager (arXiv:2305.16291), LLMs-as-Tool-Makers
+  (arXiv:2305.17126, titled "Large Language Models as Tool Makers"), Agent Workflow Memory
+  (arXiv:2409.07429), Reflexion (arXiv:2303.11366), Self-Refine (arXiv:2303.17651), STaR
+  (arXiv:2203.14465), and the reward-overoptimization result (arXiv:2210.10760, "Scaling Laws for
+  Reward Model Overoptimization", Gao–Schulman–Hilton — the phrase names this one, not the 2024
+  direct-alignment follow-up arXiv:2406.02900) — each identifier **resolved against arXiv on
+  2026-11-20**, since `poc/` is not edited afterwards.
