@@ -134,10 +134,13 @@ smith_progress() {
 # The builder's report goes to System.out and so does every log line — Spring Boot 4.1's
 # console appender has no stderr target — so the two cannot be separated by file descriptor.
 # They are separated by shape instead: the report starts at a verdict line and runs to the
-# indented summary under it, and log lines resume with a timestamp.
+# indented summary under it, and log lines resume with a timestamp. The verdict line is cut by
+# prefix, not by a colon, because only the OK forms have one: a blocked build says
+# "BUILD BLOCKED at <stage> (<name>)", so a pattern that demands a colon silently drops every
+# blocked report — the one outcome the reader most needs the report for.
 smith_write_report() {
   local log="$1" file="$2"
-  sed -n '/^\(BUILD OK\|BUILD BLOCKED\|SKILL BUILD OK\|SKILL BUILD BLOCKED\):/,$p' "$log" 2>/dev/null |
+  sed -n '/^\(SKILL \)\?BUILD \(OK\|BLOCKED\)/,$p' "$log" 2>/dev/null |
     awk '(/^[0-9][0-9]:[0-9][0-9]:[0-9][0-9]\./ || /^JvmType - /) && NR > 1 { exit } { print }' >"$file"
   # A run that never reached a verdict — a rejected argument, a failure during startup — has no
   # report to cut, and a zero-byte report.md reads as "nothing happened" rather than "nothing
