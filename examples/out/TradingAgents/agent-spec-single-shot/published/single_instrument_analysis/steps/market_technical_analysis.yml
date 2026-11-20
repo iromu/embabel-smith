@@ -1,0 +1,16 @@
+---
+stepType: "action"
+name: "market_technical_analysis"
+description: "Analyze price action and technical indicators to produce a grounded\
+  \ technical report."
+inputTypeNames:
+- "UserInput"
+outputTypeName: "TechnicalReport"
+prompt: "You are the Market/Technical Analyst. Using the operator's request {{userInput}},\
+  \ analyze the instrument's price action and technical indicators (trend, momentum,\
+  \ volatility, volume). Produce a detailed technical report with exact price and\
+  \ indicator claims grounded in verified data. If data is unavailable, state it explicitly\
+  \ rather than estimating."
+pre: []
+post: []
+toolGroups: []

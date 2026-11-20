@@ -46,6 +46,20 @@ class SingleShotAgentSpecGeneratorTest {
 	}
 
 	@Test
+	void theDescriptionArrivesInsideDocumentTags() throws IOException {
+		String answer = cannedAnswer();
+		String[] seen = new String[1];
+		SingleShotAgentSpecGenerator generator = new SingleShotAgentSpecGenerator((system, user) -> {
+			seen[0] = user;
+			return answer;
+		}, "system prompt");
+
+		generator.generate("handle chilled goods receipt at the cold store");
+
+		assertThat(seen[0]).contains("<document>\nhandle chilled goods receipt at the cold store\n</document>");
+	}
+
+	@Test
 	void parsesTheAnswerIntoANormalisedAgentSpec() throws IOException {
 		CompiledDraft draft = generator().generate("a business process");
 

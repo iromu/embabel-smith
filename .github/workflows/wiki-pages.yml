@@ -8,7 +8,10 @@ name: Deploy static site to Pages
 # default branch that touch the wiki or this workflow, and on manual dispatch.
 on:
   push:
-    branches: [poc/builder]
+    # The repository's default branch, as `gh repo view` reports it. This named
+    # `poc/builder`, a branch that no longer exists on the remote, so the push
+    # trigger could not fire and the site only updated on manual dispatch.
+    branches: [main]
     paths:
       - '.wiki/**'
       - '.github/workflows/wiki-pages.yml'

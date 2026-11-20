@@ -1,0 +1,9 @@
+{
+  "id": "b27-t03",
+  "stage": "evaluate / refine",
+  "prompt": "A pack's evaluation failed and the failure evidence names a step in the middle of the pipeline. What does the builder's refinement loop rewrite, and what happens to that mid-pipeline step?",
+  "require": ["terminal"],
+  "anyOf": ["not rewritten", "untouched", "never touched", "left alone"],
+  "forbid": [],
+  "check": "Deterministic, no model call: PASS when the answer names the terminal action's prompt as what the loop rewrites AND states that the implicated mid-pipeline step is left as it is. The loop rewrites the prompt of the one step producing the goal output, one prompt per round, so a pack can reach the round bound without the failing step ever being touched. An answer that says the failing step's prompt is rewritten fails."
+}

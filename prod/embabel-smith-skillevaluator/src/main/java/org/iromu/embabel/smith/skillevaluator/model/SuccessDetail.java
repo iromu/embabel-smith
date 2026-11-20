@@ -9,7 +9,11 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/** Structured success information for a passed check. */
+/**
+ * Structured success information for a passed check.
+ *
+ * @author Ivan Rodriguez
+ */
 public final class SuccessDetail {
 
 	private final String checkName;
@@ -21,7 +25,7 @@ public final class SuccessDetail {
 	public SuccessDetail(String checkName, String message, Map<String, Object> metadata) {
 		this.checkName = checkName;
 		this.message = message;
-		this.metadata = metadata == null ? new LinkedHashMap<>() : new LinkedHashMap<>(metadata);
+		this.metadata = (metadata != null) ? new LinkedHashMap<>(metadata) : new LinkedHashMap<>();
 	}
 
 	public SuccessDetail(String checkName, String message) {
@@ -29,26 +33,26 @@ public final class SuccessDetail {
 	}
 
 	public String getCheckName() {
-		return checkName;
+		return this.checkName;
 	}
 
 	public String getMessage() {
-		return message;
+		return this.message;
 	}
 
 	public Map<String, Object> getMetadata() {
-		return Collections.unmodifiableMap(metadata);
+		return Collections.unmodifiableMap(this.metadata);
 	}
 
 	public SuccessDetail withCheckName(String newCheckName) {
-		return new SuccessDetail(newCheckName, message, metadata);
+		return new SuccessDetail(newCheckName, this.message, this.metadata);
 	}
 
 	public Map<String, Object> toMap() {
 		Map<String, Object> map = new LinkedHashMap<>();
-		map.put("check", checkName);
-		map.put("message", message);
-		map.put("metadata", metadata.isEmpty() ? null : metadata);
+		map.put("check", this.checkName);
+		map.put("message", this.message);
+		map.put("metadata", this.metadata.isEmpty() ? null : this.metadata);
 		return map;
 	}
 

@@ -1,0 +1,21 @@
+---
+stepType: "action"
+name: "conservative_risk_analyst"
+description: "Challenge the proposal from a conservative, capital-protection stance."
+inputTypeNames:
+- "TransactionProposal"
+- "TechnicalReport"
+- "SentimentReport"
+- "NewsMacroReport"
+- "FundamentalsReport"
+- "UserInput"
+- "AggressiveRiskView"
+outputTypeName: "ConservativeRiskView"
+prompt: "You are the Conservative Risk Analyst. Review the Transaction Proposal {{transactionProposal}}\
+  \ and supporting reports: Technical {{technicalReport}}, Sentiment {{sentimentReport}},\
+  \ News/Macro {{newsMacroReport}}, Fundamentals {{fundamentalsReport}}, and Holdings\
+  \ {{userInput}}. Also review the Aggressive view {{aggressiveRiskView}}. Protect\
+  \ capital and minimize volatility, pointing out where the plan is too risky."
+pre: []
+post: []
+toolGroups: []

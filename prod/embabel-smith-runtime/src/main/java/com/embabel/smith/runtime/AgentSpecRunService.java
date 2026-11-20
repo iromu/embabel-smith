@@ -10,6 +10,7 @@ import java.nio.file.Path;
 import com.embabel.agent.core.AgentPlatform;
 import com.embabel.smith.runtime.core.GoalNotFoundException;
 import com.embabel.smith.runtime.core.IngestedSource;
+import com.embabel.smith.runtime.core.LifecycleBlockedException;
 import com.embabel.smith.runtime.core.RunOutcome;
 import com.embabel.smith.runtime.core.RuntimeCore;
 import com.embabel.smith.runtime.core.TrustTier;
@@ -111,7 +112,7 @@ public class AgentSpecRunService {
 			try {
 				outcome = this.core.run(ingested, effectiveGoal, effectiveInput, plannerOverride, tier);
 			}
-			catch (GoalNotFoundException | TrustTierBlockedException ex) {
+			catch (GoalNotFoundException | LifecycleBlockedException | TrustTierBlockedException ex) {
 				outcome = RunOutcome.failed(ex.getMessage());
 			}
 		}

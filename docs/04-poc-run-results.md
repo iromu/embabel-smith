@@ -1,14 +1,18 @@
 # Embabel Smith POC — Conclusions vs. the Theory
-*Run 2026-11-02, full re-runs 2026-11-03 ×2 + 2026-11-04 (Java 25 / GraalVM CE, target Java 21 · Spring Boot 4.1.1 · Embabel 1.5.4) · POC 1–21*
+*Run 2026-11-02, full re-runs 2026-11-03 ×2 + 2026-11-04 (Java 25 / GraalVM CE, target Java 21 · Spring Boot 4.1.1 · Embabel 1.5.4) · POC 1–21, plus POC 23 (§7.1) and POC 26 (§7.4)*
 
 This page concludes the POC run **against the hypothesis laid out in docs 01–03**: what the POCs
-actually proved, what they did not, and which POCs are still missing. The run now covers **all
-twenty-one POCs** — the feasibility core (POC 1–5), spec composition (POC 6), and the spec-first
+actually proved, what they did not, and which POCs are still missing. The run it narrates covers the
+**twenty-one POCs built by 2026-11-04** — the feasibility core (POC 1–5), spec composition (POC 6),
+and the spec-first
 extensions POC 7–21 (runtime adapter, retrieval, eval-guided refinement, trust tiers, progressive
 disclosure, **semantic retrieval at scale**, **remote / MCP invocation**, the **spec Composer**, the
 **visual spec-chain editor**, the **remote-action bridge**, **GLiNER2 transformer spec
 classification**, **spec lifecycle / drift detection**, **small-LLM spec selection**, the
 **real semantic `EmbeddingService`**, and **install-time spec security / vulnerability scanning**).
+The suite has since grown to **26 modules**: POC 23 and POC 26 contribute results here through
+§7.1 and §7.4, while POC 22, POC 24 and POC 25 are **not covered on this page** — their measured
+results live in their own `README.md` files.
 The raw run evidence (the green loop, the offline baseline, the defects fixed) is kept in §5 as
 support. The full suite was **re-run twice on 2026-11-03 and again on 2026-11-04** (this page's
 latest evidence, the 2026-11-04 re-run) and every POC remains green with consistent numbers: the
@@ -127,7 +131,7 @@ The POCs were scoped to test the **feasibility core** of this, not the full spec
 | C7 | **Any OpenAI-compatible endpoint** works | doc01 §2.5 | all endpoint-gated | ✅ **Proven** |
 | C8 | **Specs compose** — GOAP chains multiple exported goals into a workflow | doc03 §2.2, doc02 §0 idea 2 | POC 6 (live) | ✅ **Proven** (two-spec GOAP chain) |
 | C9 | **LLM-authored specs are good** (or eval-guided refinement makes them good) | doc02 §5 caveat 2 | POC run (degenerate drafts) + **POC 9** | ⚠️ **Negative at source; proven fix** — raw drafts are weak, but eval-guided refinement lifts 0% → 100% |
-| C10 | **Spec selection at scale** — retrieval/routing as the library grows (spec shadowing) | doc03 §2.1, doc02 §5 caveat 1 | **POC 8** (lexical) + **POC 12** (200+ scale) + **POC 17** (GLiNER2 transformer) + **POC 19** (0.6B small LLM) + **POC 20** (real `EmbeddingService`) + **POC 23** (remote `EmbeddingService` + scaling) | ✅ **Proven at scale — and the shadowing tie is now broken** — clean (P@1 100%) at 191 distinct specs; POC 12 shows near-duplicate shadowing collapses P@1 for *both* lexical and dense retrievers; POC 17 shows a GLiNER2 transformer that *understands* meaning recovers it (strict **100%**, matching **83%**) where text-similarity cannot (lexical 33%/17%, dense 0%); POC 19 shows a 0.6B decision-tuned LLM (served in Docker, dev-services managed) also beats text similarity (strict **67%** free-form / **50%** its own decision format, matching **50%**/**0%**) but trails the transformer; **POC 20 shows a real semantic `EmbeddingService` (ONNX MiniLM, not a stand-in) retrieves cleanly at the distinct scale (100%) and, under shadowing, beats lexical (17%) and dense (0%) at 33% — but shares the near-duplicate ambiguity, so curation (POC 18) remains the real fix**; **POC 23 shows a *remote* `EmbeddingService` (nomic-embed-text-v2 over the OpenAI-compatible endpoint, not a bundled model) retrieves cleanly to 1000 specs (P@1 100%) with sub-millisecond-to-~1 ms per-query cost and zero per-query model calls — the selection mechanism of choice as the library scales** |
+| C10 | **Spec selection at scale** — retrieval/routing as the library grows (spec shadowing) | doc03 §2.1, doc02 §5 caveat 1 | **POC 8** (lexical) + **POC 12** (200+ scale) + **POC 17** (GLiNER2 transformer) + **POC 19** (0.6B small LLM) + **POC 20** (real `EmbeddingService`) + **POC 23** (remote `EmbeddingService` + scaling) | ✅ **Proven at scale — and the shadowing tie is now broken** — clean (P@1 100%) at 191 distinct specs; POC 12 shows near-duplicate shadowing collapses P@1 for *both* lexical and dense retrievers; POC 17 shows a GLiNER2 transformer that *understands* meaning recovers it (strict **100%**, matching **83%**) where text-similarity cannot (lexical 33%/17%, dense 0%); POC 19 shows a 0.6B decision-tuned LLM (served in Docker, dev-services managed) also beats text similarity (strict **67%** free-form / **50%** its own decision format, matching **50%**/**0%**) but trails the transformer; **POC 20 shows a real semantic `EmbeddingService` (ONNX MiniLM, not a stand-in) retrieves cleanly at the distinct scale (100%) and, under shadowing, beats lexical (17%) and dense (0%) at 33% — but shares the near-duplicate ambiguity, so curation (POC 18) remains the real fix**; **POC 23 shows a *remote* `EmbeddingService` (nomic-embed-text-v2 over the OpenAI-compatible endpoint, not a bundled model) retrieves cleanly to 1000 specs (P@1 100%) with sub-millisecond-to-~1.3 ms per-query cost and zero per-query model calls — the selection mechanism of choice as the library scales** |
 | C11 | **Specs invoke CLIs/scripts** — the "normal agent harness" (`toolGroups`/`remote`/MCP) | doc03 §2.3, §4.2 | **POC 7** (local CLI) + **POC 13** (remote/MCP) + **POC 26** (an Agent Skill's own `scripts/*.js`, in-JVM) | ✅ **Proven (all three halves)** — POC 7: a `shell` tool group ran a real command; POC 13: an exported goal published as an MCP tool and invoked over Streamable HTTP; POC 26: Embabel's script SPI was already there but had no in-JVM JavaScript runner (default logs *"script execution is not yet supported"*, the shipped one spawns `node`) — embedding GraalJS on a plain JDK closes it, the script becomes a callable tool, and its ECMAScript 2026 surface measures 14/14 |
 | C12 | **Security / trust tiers** (T1–T4, guardrails, allowlists) | doc02 §5 caveat 3, doc03 §2.1 | **POC 10** (live) | ✅ **Proven** — per-tier allowlist refused `shell` under T1; a global guardrail blocked a prompt-injection |
 | C13 | **Progressive disclosure** — load only what's needed; unbounded on-disk knowledge | doc02 §2, doc03 §1 | **POC 11** (stress) | ✅ **Proven** — plan context constant while a reference grows 3 KB → 313 KB (×100) |
@@ -442,10 +446,13 @@ is now built (POC 20)** — what remains is wiring it (and the other POCs) into 
 
 ## 5. Run evidence (support)
 
-- **Offline baseline:** `mvn test` green across all modules — **211 tests, 0 failures, 0 errors**
+- **Offline baseline, as of this run:** `mvn test` green across all modules — **211 tests, 0 failures,
+  0 errors**
   (re-run ×2 on 2026-11-03 + 2026-11-04, all green; +11 from POC 21's security scanner, +10 from
   POC 20, +3 from the POC 15 retrieval pane, +2 from the POC 15 author pane, +3 from the POC 15
-  eval/refinement pane, +12 from the POC 15 library curation).
+  eval/refinement pane, +12 from the POC 15 library curation). The count stops at POC 21; POCs 22–26
+  add more (POC 26 alone contributes 31 offline tests), so re-count it rather than reusing this
+  number.
   Coverage: format round-trip, validation,
   **draft-quality classifier (POC 2/3 caveat #2)**, builder normalization, writer idempotency,
   composition wiring, shell tool, lexical retrieval, **200+ scale retrieval (POC 12)**,
@@ -784,8 +791,9 @@ is now built (POC 20)** — what remains is wiring it (and the other POCs) into 
 
 ## 6. What other POCs to create
 
-All twenty-one POCs are now built. POC 1–5 (feasibility core), POC 6 (composition), and POC 7–21
-(the spec-first extensions) are complete and their run evidence is in §5:
+All twenty-one POCs of this run are built. POC 1–5 (feasibility core), POC 6 (composition), and POC 7–21
+(the spec-first extensions) are complete and their run evidence is in §5. Five more POCs (22–26) have
+been built since this run closed; see the note at the top of the page:
 
 1. **POC 6 — Spec composition.** ✅ **Built & proven:** `compose-extract` + `compose-explain`
    chained by GOAP through their shared `TopicBrief`; see §5.
@@ -886,7 +894,9 @@ drift (POC 18), the real semantic `EmbeddingService` (POC 20), and **install-tim
 Some hypothesis areas are tested by **multiple POCs with different techniques** on the same
 scenario. Their results are shared: each POC's `README.md` carries the same consolidated
 "Measured results (shared — …)" section, and this page is the consolidated read. Each POC's
-verdict against the hypothesis is in its `README.md` **"Conclusion"** section.
+verdict against the hypothesis is in its `README.md` **"Conclusion"** section. (§7.4's POC 26 is the
+exception: it carries its numbers under a plain "Results" heading rather than the shared section, and
+its Conclusion is worded accordingly.)
 
 ### 7.1 Spec selection at scale (C10) — POC 8 / 12 / 17 / 19 / 20 / 23
 
@@ -946,7 +956,7 @@ the best: strict 100%), a fine-tuned 0.6B LLM, and a real embedding index — be
 but the near-duplicates are near-identical in *meaning* too, so none fully cures the collapse on its
 own (the remote nomic embedding ties lexical at 17% under shadowing — the specific embedding model
 matters). And the scaling result is unambiguous: a remote `EmbeddingService` retrieves cleanly to
-1000 specs with sub-millisecond-to-~1 ms per-query cost and **zero per-query model calls** — the
+1000 specs with sub-millisecond-to-~1.3 ms per-query cost and **zero per-query model calls** — the
 reason it is the selection mechanism of choice as the library outgrows per-candidate selectors. The
 real fix for shadowing is library **curation** (dedup / lifecycle — POC 18, applied in the POC 15
 retrieval pane). Raw run evidence: §5 (the POC 8 / 12 / 17 / 19 / 20 / 23 entries). Shared
@@ -1038,8 +1048,12 @@ guest — untrusted scripts belong in the Docker/Podman engines), and 31 offline
 
 ## 8. How to re-run
 
+**Every `mvn -pl poc/…` command below needs `-Ppoc`.** The POC reactor is off by default — it sits
+behind the `poc` profile in the root POM (see [`05-architecture.md`](05-architecture.md)) — and Maven
+can only select a module that is in the reactor.
+
 ```bash
-mvn install -DskipTests
+mvn -Ppoc install -DskipTests
 
 export OPENAI_CUSTOM_BASE_URL=<base-url>
 export OPENAI_CUSTOM_API_KEY=<key>

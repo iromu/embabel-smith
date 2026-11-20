@@ -8,7 +8,6 @@ package com.embabel.smith.studio.improve;
 import com.embabel.smith.builder.publish.PublishResult;
 import org.junit.jupiter.api.Test;
 
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -40,11 +39,11 @@ class ApprovalQueueTest {
 		List<PendingCandidate> published = new ArrayList<>();
 		PublishResult result = queue.approve("c1", c -> {
 			published.add(c);
-			return new PublishResult(Path.of("/tmp/extract"), false);
+			return new PublishResult("/tmp/extract", false);
 		});
 
 		assertThat(published).containsExactly(candidate);
-		assertThat(result.location()).isEqualTo(Path.of("/tmp/extract"));
+		assertThat(result.location()).isEqualTo("/tmp/extract");
 		assertThat(queue.size()).isZero();
 	}
 
@@ -67,7 +66,7 @@ class ApprovalQueueTest {
 
 		boolean held = queue.enqueue(candidate, true, c -> {
 			published.add(c);
-			return new PublishResult(Path.of("/tmp/extract"), false);
+			return new PublishResult("/tmp/extract", false);
 		});
 
 		assertThat(held).isFalse();

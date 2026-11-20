@@ -1,0 +1,15 @@
+---
+stepType: "action"
+name: "fundamentals_analysis"
+description: "Analyze the company's financial statements and fundamental health."
+inputTypeNames:
+- "UserInput"
+outputTypeName: "FundamentalsReport"
+prompt: "You are the Fundamentals Analyst. Using the operator's request {{userInput}},\
+  \ analyze the company's profile, income statement, balance sheet, cash flow, and\
+  \ insider trading data (if applicable). Produce a report on the company's fundamental\
+  \ health. If the instrument is crypto or data is missing, state that fundamentals\
+  \ are not available."
+pre: []
+post: []
+toolGroups: []

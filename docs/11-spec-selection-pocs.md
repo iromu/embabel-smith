@@ -5,8 +5,13 @@ agent pick?** Measured results live in [`04-poc-run-results.md`](04-poc-run-resu
 page records the contracts, the shared methodology, and the design reasoning, so the numbers are not
 restated (and cannot drift) in two places.
 
-These are **POC-only**. Nothing here is wired into `prod/`; the studio's `/retrieve` and `/scale`
-routes are explicit POC-only stubs. See [`12-backlog.md`](12-backlog.md).
+These are **POC-only**: no module here is a dependency of `prod/`, and the studio's `/scale` route is
+still an explicit POC-only stub. One exception is worth naming, because it is this page's own finding
+being acted on rather than a second POC: the *mechanism* these POCs were measured against — POC 8's
+index-entry shape and POC 12's lexical scorer, plus POC 18's lifecycle curation rule — was **copied**
+into the builder's `retrieval/` package and is wired behind the studio's `/retrieve` pane. Copied, not
+depended on: `poc/` is frozen evidence. The selector mechanisms below (POC 17, 19, 23) remain
+unwired. See [`12-backlog.md`](12-backlog.md).
 
 ## The scenario, and why it is hard
 
@@ -74,5 +79,8 @@ dimension POC 23 measures: Precision@1, the one-time index-build cost, and per-q
 - **Some hardware findings are host-specific**, not general: the 2080 Ti (Turing) cannot serve
   ModelOpt FP8, which needs Hopper or newer, and CPU-only serving sufficed for a 0.6B model. Label
   such figures as observations about this machine.
-- Large model artifacts are gitignored and acquired by a documented one-time command; container image
-  tags and digests are pinned in the results document.
+- Large model artifacts are gitignored and acquired by a documented one-time command. **Container
+  images are *not* pinned**: POC 19's compose file uses the floating tag
+  `ghcr.io/ggml-org/llama.cpp:server` with no `@sha256:` digest, and the results document records
+  neither a tag nor a digest. Treat the latency figures as observations about this machine at this
+  moment, and pin the digest before re-running them for a comparison.

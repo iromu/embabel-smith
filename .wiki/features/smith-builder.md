@@ -39,7 +39,8 @@ never depends on a `poc-*` artifact ([[product-phase]]).
 
 ```
 smith build "<description>" --out <source-uri> [--target agent-spec|skill]
-                            [--technique <name>] [--max-refine <n>] [--overwrite] [--push]
+                            [--technique <name>] [--max-refine <n>] [--min-lift <n>]
+                            [--max-inspect <n>] [--full-inspection] [--overwrite] [--push]
 ```
 
 - `<description>` (required) — the natural-language description of the artifact.
@@ -50,8 +51,18 @@ smith build "<description>" --out <source-uri> [--target agent-spec|skill]
   below. The skill target is a separate service; see [[skill-output-target]].
 - `--technique` — `single-shot` (default) or `embabel`; see the seam below.
 - `--max-refine` — max refinement rounds (default **3**).
+- `--min-lift` — skill lift the with/without-skill gate requires (default **0.0**).
+- `--max-inspect` — redrafts the skill inspection gate is allowed to ask for (default **2**, so at most
+  three drafts).
+- `--full-inspection` — also request the skill checks that need an external scanner. Off by default, so
+  **a default skill build does no secret, security or code-risk scanning** and says so in its report;
+  see the gate in [[skill-output-target]].
 - `--overwrite` — replace an existing same-named artifact instead of colliding.
 - `--push` — push the git commit to the remote (default: **local commit only**).
+
+The three skill knobs (`--min-lift`, `--max-inspect`, `--full-inspection`) are accepted on an
+`agent-spec` build and unused there, exactly as `--max-refine` is accepted on a skill build and unused
+there — one command surface, two gates.
 
 There is **no `--score-gate` flag**: the gate is a `BuildOptions` field (default **1.0**) that only
 programmatic callers of `BuilderService` — the studio — can set. Exit codes: **0** when published

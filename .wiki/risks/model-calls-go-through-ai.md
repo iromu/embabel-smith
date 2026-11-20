@@ -40,8 +40,10 @@ offenders = files.filter(p -> p.toString().endsWith(".java"))
 ```
 
 So a violation is caught by `make test`, in the same place as everything else, with no endpoint
-needed. Only these two modules import `Ai`; `runtime` and `specsource` carry no guard because they
-hold no model call — the runtime reaches the model only by executing actions on the platform.
+needed. Only these two modules import `Ai`; `runtime`, `runtime-a2a`, `specsource` and
+`skillevaluator` carry no guard because they hold no model call — the runtime reaches the model only
+by executing actions on the platform, and `runtime-a2a` reaches the runtime. **Do not add a guard to
+`runtime-a2a`**: it is a transport, and a guard there would imply it has a model call to route.
 
 The call sites that migrated:
 

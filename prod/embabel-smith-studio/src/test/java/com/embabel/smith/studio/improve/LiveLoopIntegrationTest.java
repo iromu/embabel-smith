@@ -24,6 +24,8 @@ import com.embabel.smith.common.model.AgentSpecManifest;
 import com.embabel.smith.runtime.trace.JsonlTraceStore;
 import com.embabel.smith.specsource.FolderSpecSource;
 import com.embabel.smith.specsource.SpecSource;
+import com.embabel.smith.studio.store.ProcessStore;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.junit.jupiter.api.io.TempDir;
@@ -35,6 +37,7 @@ import java.nio.file.Path;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
 /**
  * Endpoint-gated loop integration test (task 3.2): one full loop iteration on a live
@@ -42,6 +45,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * source. Skipped when the model endpoint is not configured.
  */
 @SpringBootTest
+@Tag("live")
 @EnabledIfEnvironmentVariable(named = "OPENAI_CUSTOM_BASE_URL", matches = ".+")
 class LiveLoopIntegrationTest {
 
@@ -71,7 +75,11 @@ class LiveLoopIntegrationTest {
 		FolderPublisher publisher = new FolderPublisher(PublishTarget.parse("folder:" + sourceRoot));
 
 		ImprovementLoop loop = new ImprovementLoop(source, store, rewriter, new AgentSpecInvokerFactory(platform),
-				tasks, publisher, true); // auto-publish
+				tasks, publisher,
+				// The store row a publish leaves is covered offline; this test asserts
+				// the
+				// folder write, so nothing here needs a bound database.
+				new LoopPublishPolicy(false, "folder:" + sourceRoot, mock(ProcessStore.class)), true); // auto-publish
 
 		List<PendingCandidate> held = loop.runOnce();
 

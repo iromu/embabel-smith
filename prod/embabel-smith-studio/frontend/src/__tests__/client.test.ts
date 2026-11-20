@@ -347,6 +347,65 @@ describe('api/client — the single fetch site', () => {
     await expect(api.run({ source: 's', goal: 'g', input: 'i' })).rejects.toThrow(/status 500/)
   })
 
+  it('listBridges GETs /api/remote/bridges and parses reachability plus the advertised actions', async () => {
+    const { calls } = stubFetch({
+      bridges: [
+        {
+          name: 'digest',
+          baseUrl: 'http://127.0.0.1:18090',
+          urlProbed: 'http://127.0.0.1:18090/api/v1/actions',
+          reachable: false,
+          reason: 'ConnectException',
+          actions: [],
+        },
+      ],
+      malformedBridges: ['http://localhost:18090'],
+      mcpEndpoint: 'http://127.0.0.1:8081/mcp',
+    })
+    const res = await api.listBridges()
+    expect(calls[0].url).toBe('/api/remote/bridges')
+    expect(calls[0].init?.method).toBeUndefined()
+    expect(res.bridges[0].reachable).toBe(false)
+    expect(res.bridges[0].reason).toBe('ConnectException')
+    expect(res.malformedBridges).toEqual(['http://localhost:18090'])
+    expect(res.mcpEndpoint).toBe('http://127.0.0.1:8081/mcp')
+  })
+
+  it('executeRemote POSTs the bridge, action and input and parses the sidecar output', async () => {
+    const { calls } = stubFetch({
+      error: null,
+      bridge: 'digest',
+      action: 'remoteDigest',
+      urlProbed: 'http://127.0.0.1:18090/api/v1/actions/execute',
+      output: 'Digested on the sidecar: 2 words',
+      reason: null,
+      status: null,
+      sidecarBody: null,
+    })
+    const res = await api.executeRemote({ bridge: 'digest', action: 'remoteDigest', input: 'two words' })
+    expect(calls[0].url).toBe('/api/remote/execute')
+    expect(calls[0].init?.method).toBe('POST')
+    expect(bodyOf(calls[0])).toEqual({ bridge: 'digest', action: 'remoteDigest', input: 'two words' })
+    expect(res.output).toBe('Digested on the sidecar: 2 words')
+  })
+
+  it('executeRemote carries a decline as the sidecar status and body, not an output', async () => {
+    stubFetch({
+      error: null,
+      bridge: 'digest',
+      action: 'nope',
+      urlProbed: 'http://x/api/v1/actions/execute',
+      output: null,
+      reason: null,
+      status: 400,
+      sidecarBody: '{"error":"unknown action: nope"}',
+    })
+    const res = await api.executeRemote({ bridge: 'digest', action: 'nope', input: 'x' })
+    expect(res.output).toBeNull()
+    expect(res.status).toBe(400)
+    expect(res.sidecarBody).toContain('unknown action')
+  })
+
   it('listModels GETs /api/models and shapes the catalog', async () => {
     const { calls } = stubFetch({ models: ['gpt-4.1', 'claude-sonnet-4-6'], defaultModel: 'gpt-4.1' })
     const catalog = await api.listModels()

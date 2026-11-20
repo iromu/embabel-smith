@@ -87,7 +87,7 @@ public class SingleShotAgentSpecGenerator implements AgentSpecGenerator {
 	@Override
 	public CompiledDraft generate(String description, String model) {
 		String user = "Below is a business-process description. Produce the agent spec JSON for the "
-				+ "core end-to-end process.\n\n" + description;
+				+ "core end-to-end process.\n\n" + PromptData.block("document", description);
 		String raw = this.caller.call(this.template, user, model);
 		AgentSpec pack = parse(raw);
 		return new CompiledDraft(pack.name(), pack, List.of());

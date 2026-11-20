@@ -46,5 +46,84 @@
         <module>poc-24-generation-approaches</module>
         <module>poc-25-skill-generation</module>
         <module>poc-26-graaljs-skill-scripts</module>
+        <module>poc-27-recursive-self-improvement</module>
     </modules>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.iromu.embabel.smith</groupId>
+                <artifactId>poc-1-no-code-runtime</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.iromu.embabel.smith</groupId>
+                <artifactId>poc-2-nl-compile</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.iromu.embabel.smith</groupId>
+                <artifactId>poc-8-retrieval</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.iromu.embabel.smith</groupId>
+                <artifactId>poc-9-quality-refinement</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.iromu.embabel.smith</groupId>
+                <artifactId>poc-12-semantic-retrieval</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.iromu.embabel.smith</groupId>
+                <artifactId>poc-14-composer</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.iromu.embabel.smith</groupId>
+                <artifactId>poc-17-gliner-retrieval</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.iromu.embabel.smith</groupId>
+                <artifactId>poc-18-agent-spec-lifecycle</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.iromu.embabel.smith</groupId>
+                <artifactId>poc-20-semantic-embedding</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <!-- POC 21 reuses POC 10's trust tiers for its recommended-load-tier computation. -->
+            <dependency>
+                <groupId>org.iromu.embabel.smith</groupId>
+                <artifactId>poc-10-trust-tiers</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.iromu.embabel.smith</groupId>
+                <artifactId>poc-21-agent-spec-security</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <!-- Remote transports (POC 22 Remote pane): the RestAction sidecar and the MCP server. -->
+            <dependency>
+                <groupId>org.iromu.embabel.smith</groupId>
+                <artifactId>poc-13-remote-mcp</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.iromu.embabel.smith</groupId>
+                <artifactId>poc-16-remote-action</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <!-- POC 27 runs its generated improvement policies through POC 26's in-JVM script engine. -->
+            <dependency>
+                <groupId>org.iromu.embabel.smith</groupId>
+                <artifactId>poc-26-graaljs-skill-scripts</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 </project>

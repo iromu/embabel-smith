@@ -29,10 +29,12 @@ with the same Maven version.
 | --- | --- |
 | `build` | `mvn -q compile -DskipTests` |
 | `test` | `mvn test`, **after sourcing the model-endpoint env** |
+| `test-live` | `mvn test -Dtest.excludedGroups= -Dgroups=live` — the only opt-in to the `@Tag("live")` group; both flags are needed |
 | `test-module` | `mvn test -pl $(MODULE) -am` |
 | `lint` / `checkstyle` | `mvn checkstyle:check` (both are aliases) |
 | `checkstyle-module` | `mvn checkstyle:check -pl $(MODULE)` |
 | `module` | `mvn $(GOAL) -pl $(MODULE) -am -DskipTests` |
+| `run-a2a` | `mvn -q -pl prod/embabel-smith-runtime-a2a spring-boot:run` — **the only target that opens a port** (18090, unauthenticated; see [[a2a-endpoint]]) |
 | `install` / `clean` | `mvn install -DskipTests` / `mvn clean` |
 | `setup` | `./setup.sh` |
 

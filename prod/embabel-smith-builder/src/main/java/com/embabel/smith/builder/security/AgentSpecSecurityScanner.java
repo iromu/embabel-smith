@@ -115,7 +115,21 @@ public class AgentSpecSecurityScanner {
 	 * @return the scan report with findings, verdict, and recommended tier.
 	 */
 	public ScanReport scanText(String name, String text) {
-		List<Finding> findings = textFindings(List.of(text));
+		return scanText(name, List.of(text));
+	}
+
+	/**
+	 * The same text checks over the several documents that make up one artifact, all
+	 * reported against one name. The skill target publishes two model-authored documents
+	 * (its {@code SKILL.md} and the {@code evals.json} it was validated against), and an
+	 * artifact is not vetted until every document it publishes has been, so the scan
+	 * takes the set rather than assuming a single text.
+	 * @param name the artifact name to report the findings against.
+	 * @param texts the documents to scan.
+	 * @return the scan report with findings, verdict, and recommended tier.
+	 */
+	public ScanReport scanText(String name, List<String> texts) {
+		List<Finding> findings = textFindings(texts);
 		return new ScanReport(name, findings, verdict(findings), TrustTier.T1_COMMUNITY);
 	}
 

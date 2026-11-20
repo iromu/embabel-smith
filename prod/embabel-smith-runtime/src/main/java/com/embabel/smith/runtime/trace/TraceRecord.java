@@ -16,7 +16,8 @@ import java.util.List;
  * or unpinned git sources); {@code source.resolvedAt} is the commit SHA the git source
  * materialized at ({@code null} for folder sources). {@code pack} names the pack that
  * exports the run's goal ({@code null} when the goal was not found). {@code steps} is
- * empty when the run never executed (tier block, goal not found, or no plan reachable).
+ * empty when the run never executed (tier block, lifecycle block, goal not found, or no
+ * plan reachable).
  *
  * @param runId the unique run identifier
  * @param timestamp when the run was recorded

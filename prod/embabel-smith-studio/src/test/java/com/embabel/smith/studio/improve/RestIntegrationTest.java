@@ -20,6 +20,7 @@ import com.embabel.smith.studio.rest.dto.CandidateInfo;
 import com.embabel.smith.studio.rest.dto.IterationInfo;
 import com.embabel.smith.studio.rest.dto.RunRequest;
 import com.embabel.smith.studio.rest.dto.RunResponse;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -42,6 +43,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * model endpoint is not configured.
  */
 @SpringBootTest
+@Tag("live")
 @EnabledIfEnvironmentVariable(named = "OPENAI_CUSTOM_BASE_URL", matches = ".+")
 class RestIntegrationTest {
 

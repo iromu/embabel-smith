@@ -1,0 +1,15 @@
+---
+stepType: "action"
+name: "sentiment_analysis"
+description: "Analyze retail and community sentiment from news headlines and social\
+  \ chatter."
+inputTypeNames:
+- "UserInput"
+outputTypeName: "SentimentReport"
+prompt: "You are the Sentiment Analyst. Using the operator's request {{userInput}},\
+  \ analyze retail and community mood based on available news headlines and social\
+  \ chatter. Produce a structured sentiment read including a six-level band (Bullish\
+  \ to Bearish), a 0-10 score, a confidence level, and a narrative explanation."
+pre: []
+post: []
+toolGroups: []

@@ -6,16 +6,50 @@ from [`index.md`](index.md).
 
 ## Module map
 
-The root POM (`pom.xml`) aggregates three trees:
+The root POM (`pom.xml`) aggregates two trees by default, and a third behind the `poc` profile:
 
 | Tree | Contents |
 | --- | --- |
-| `smith-common` | The agent-spec format: data model (`common.model`), YAML I/O (`common.io`), validation (`common.validation`). Framework-free and fully offline-testable. |
-| `poc/` | 26 numbered proof-of-concept modules. **Frozen evidence** — see below. |
-| `prod/` | The product: `embabel-smith-specsource`, `embabel-smith-runtime`, `embabel-smith-builder`, `embabel-smith-studio`. |
+| `smith-common` | The agent-spec format: data model (`common.model`), YAML I/O (`common.io`), validation (`common.validation`), the endpoint gate (`common.config`), and the sample packs (`common.samples`). Framework-free and fully offline-testable. |
+| `poc/` | 26 numbered proof-of-concept modules. **Frozen evidence** — see below. Not in the default reactor: they build only with `-Ppoc` (`make … POC=1`). |
+| `prod/` | The product: `embabel-smith-specsource`, `embabel-smith-runtime`, `embabel-smith-runtime-a2a`, `embabel-smith-builder`, `embabel-smith-skillevaluator`, `embabel-smith-studio`. |
 
-`specsource` is the only piece shared by two product modules (the runtime reads it, the builder
-publishes into it). It holds no Embabel agent code, so it stays offline-testable.
+`embabel-smith-skillevaluator` is the **Tier 1 skill validator**: a static pipeline
+(`Tier1Runner`) over a skill or a folder of skills, with one `ValidationResult` per validator —
+schema, license, hygiene, version, quality score, script lint, Python syntax, code risk, and the
+security family (secrets, PII, Unicode smuggling). It is a port of a Python `tier1` validator, so
+it runs with no model call and depends only on SnakeYAML and Jackson.
+
+**Its consumer is the builder's `skill` target.** `skill/SkillInspector` is the `inspect` gate of
+[`08-builder.md`](08-builder.md) §"`skill`", and it is the only production class outside the module
+that imports `org.iromu.embabel.smith.skillevaluator`; the root POM's `dependencyManagement` names it
+and the builder depends on it. The gate asks for the seven checks the
+evaluator runs in-JVM: `schema`, `version`, `quality`, `unicode`, `lint` and `license` block the
+build, while `pii` runs and is reported as an advisory whatever it finds — advisory by check name,
+not by severity, so a stricter PII heuristic cannot silently acquire blocking authority. It does
+**not** request `security`, `secrets` or `code-integrity`, because those shell out to SkillSpector,
+Gitleaks, Bandit or Semgrep: **a default skill build invokes none of them**, and the build report
+carries a line saying so. `--full-inspection` is the only route that requests them. This is a
+writing-quality gate; the builder's security gate remains `security/AgentSpecSecurityScanner`.
+
+The POCs sit behind the profile because they are evidence, not shipped code: they are slow to build
+(the POC 17 ONNX bundle, the POC 20 encoder) and their interesting tests are endpoint-gated, so a
+default build of the product should not pay for either. The consequence is that `-pl poc/…` needs
+`-Ppoc` — Maven can only select a module that is in the reactor.
+
+`specsource` is the only piece shared by more than one product module: the runtime reads it, the
+builder publishes into it, and the studio browses sources and drives the improvement loop from it.
+It holds no Embabel agent code, so it stays offline-testable.
+
+`embabel-smith-runtime-a2a` is the only `prod/` module that gains a network surface **from a
+dependency rather than by asking for one**: it is the only module that declares
+`embabel-agent-starter-a2a`, and that starter is what brings `spring-boot-starter-web` and the servlet
+engine — the studio is the only other `prod/` listener and declares its own web starter, because it is
+the UI. Its launcher sets `spring.main.web-application-type` to `SERVLET` as a system property, as the
+studio's launcher does, because a transitive jar ships a classpath `application.yml` saying `none`. It
+still **holds no model call** — every request delegates to the runtime's `AgentSpecRunService` — so it
+adds a transport, not a second route to the model. What it serves, and what it deliberately does not,
+is in [`07-runtime.md`](07-runtime.md).
 
 ## Extract, do not depend
 
@@ -25,8 +59,15 @@ configuration would leak into the product — and POCs are frozen evidence whose
 entangle the product.
 
 The rule is machine-enforced, not conventional: `maven-enforcer-plugin` runs a `bannedDependencies`
-rule on `prod/pom.xml` (execution `ban-poc-dependencies`, banning `com.embabel.smith:poc-*`). The
-pattern is by group, so it survived the later module renames untouched.
+rule on `prod/pom.xml` (execution `ban-poc-dependencies`, banning `org.iromu.embabel.smith:poc-*`).
+The pattern is by group, which is exactly why it needs watching: `bannedDependencies` matches the
+group literally, so a `groupId` rename voids the ban silently and the build stays green. It went
+unnoticed for a whole rename cycle that way — the rule is only visible when a violation exists, so
+re-check the exclude against `pom.xml`'s `<groupId>` after any rename, and prove it with a temporary
+POC dependency.
+
+Because the POCs are no longer in the default reactor, this ban is the only thing between a product
+module and a stale `poc-*` jar resolved from the local repo.
 
 **POC modules are frozen.** Product work never edits anything under `poc/`. A POC's job was to
 de-risk exactly one claim, in its own module; folding new behavior into one changes its identity and
@@ -70,8 +111,9 @@ happens to be first in the list.
 
 The guard is two offline tests that walk the source tree and fail on a forbidden import
 (`import java.net.http.`): `builder/NoDirectModelRequestTest` and `studio/NoDirectModelRequestTest`.
-They cover the two modules that talk to a model; `runtime` and `specsource` carry no guard because
-they hold no model call — the runtime reaches the model only by executing actions on the platform.
+They cover the two modules that talk to a model; `runtime`, `runtime-a2a`, `specsource` and
+`skillevaluator` carry no guard because they hold no model call — the runtime reaches the model only
+by executing actions on the platform, and `runtime-a2a` reaches the runtime.
 Because checkstyle and tests run in the normal build, a violation fails `make test` with no endpoint
 needed.
 
@@ -93,9 +135,13 @@ the product's source of model names.
 
 ## Cross-cutting invariants
 
-- **Validate before write.** A generated spec is never written unless it validates on a throwaway
-  platform. This is the guardrail that makes "generate with no code" safe.
-- **The static security scan gates publication.** A high-severity finding blocks the publish.
+- **Validate before write.** A generated spec is never written unless the deterministic
+  `AgentSpecValidator` passes it. The throwaway-platform deploy comes *later*, as the eval — the
+  write gate is static, so an invalid spec is blocked before anything lands on disk. This is the
+  guardrail that makes "generate with no code" safe.
+- **The static security scan gates publication.** A `CRITICAL` finding blocks the publish; `WARN`
+  findings force review but do not block. There is no `HIGH` severity in the scale
+  (`INFO` / `WARN` / `CRITICAL`).
 - **Trust tiers are recorded in the trace**, so a policy block is never mistaken for a bad spec —
   see [`07-runtime.md`](07-runtime.md).
 - **Publishing commits; it never pushes.** Pushing is a shared-state action needing credentials and
@@ -114,13 +160,89 @@ the product's source of model names.
 
 Use the root `Makefile` rather than inventing Maven invocations (`make help` lists them).
 
-- `make build` — compile the full reactor, tests skipped.
-- `make test` / `make test-module MODULE=prod/embabel-smith-studio` — the target sources
-  `~/.config/env/llm.env` and exports the endpoint vars first, so `Live*` tests actually run instead
-  of silently skipping. Consequence: `make test` never exercises the offline path. To run the
-  deterministic suite, unset the endpoint:
-  `env -u OPENAI_CUSTOM_BASE_URL -u OPENAI_CUSTOM_API_KEY -u OPENAI_CUSTOM_MODELS -u EMBABEL_MODELS_DEFAULT_LLM ./mvnw test`.
+- `make build` — compile the reactor, tests skipped.
+- `make test` / `make test-module MODULE=prod/embabel-smith-studio` — the offline suite. The target
+  still sources `~/.config/env/llm.env` **when that file exists** and exports the endpoint vars, but
+  since 2026-11-17 that no longer decides whether live tests run (see the next bullet); the export is
+  there so a module's own endpoint-aware *wiring* configures the same way it does in production.
+- `make test-live` — the **only** supported opt-in to the live group. See below.
 - `make lint` / `make checkstyle-module MODULE=…` — the project's SpringChecks.
+- **`POC=1` on any target** adds `-Ppoc`, bringing the 26 POC modules into the reactor
+  (`make test POC=1`, `make lint POC=1`). A `MODULE` under `poc/` implies it. To run a POC module's
+  tests, use `make test-module MODULE=poc/poc-1-no-code-runtime` — `make module` appends
+  `-DskipTests`, so `make module … GOAL=test` compiles without running anything. `make lint` without
+  it no longer checks POC sources — the pre-commit hook is product-only now, and the POCs are frozen
+  anyway.
+
+**`.github/workflows/offline-verification.yml` runs `make build`, `make test` and `make lint`** on every
+pull request and every push to the default branch — the same three commands, the same wrapper, no
+endpoint and no secrets, so a failure there reproduces with the command above. Two things follow. The
+first is that these guarantees no longer depend on someone's local hooks: a style violation or a broken
+test-compile in any module of the default reactor fails a check on the change itself. The second is
+that its scope is this page's scope and no wider — the default reactor, so not `poc/`, and the live
+group excluded, so the paths below stay unproven by CI exactly as they are by a local run. The
+exclusion is the pom's `test.excludedGroups`, not the workflow: `make test` sources the endpoint env
+when that file exists, and a CI runner simply has no such file.
+
+### The live group is opt-in (`test.excludedGroups`)
+
+Every test that needs a real model endpoint carries `@Tag("live")`. The root `pom.xml`'s Surefire
+`pluginManagement` block — inherited by every module, so a new module cannot forget the policy —
+excludes the group through the property `test.excludedGroups`, which defaults to `live`. A plain
+`mvn test` therefore runs no live test whether or not an endpoint is configured, which is what makes
+the default reactor green on a machine that has no model.
+
+`make test-live` sources the endpoint env and runs the group. By hand it is
+`./mvnw test -Dtest.excludedGroups= -Dgroups=live`, and **both flags are required**:
+`mvn test -Dgroups=live` alone selects *nothing*, because Surefire applies the group selection and
+the exclusion together and the exclusion still says "exclude `live`". Forgetting to clear the
+exclusion is silent — the run goes green having executed zero live tests.
+
+Each live test keeps `@EnabledIfEnvironmentVariable(named = "OPENAI_CUSTOM_BASE_URL")` *beside* the
+tag, so the two gates answer different questions: the tag says "should this run by default", the env
+condition says "can it run here". An opted-in run on a laptop with no endpoint is a wall of skips,
+not a wall of failures. Removing the env condition is what turns that into failures; removing the tag
+is what makes `make test` depend on a model agreeing.
+
+The live tests are the builder's `LiveBuildIntegrationTest` and `LiveExampleBuildTest`, the runtime's
+`LiveRunIntegrationTest`, the a2a launcher's `SmithA2aLiveTest`, and the studio's
+`improve/RestIntegrationTest` and `improve/LiveLoopIntegrationTest` — and that is the whole list.
+**It is deliberately stated without a
+count**: a fifth joined it when the a2a launcher landed, and a page that says "exactly these four"
+silently becomes false the moment someone adds a test, which is what happened here. Check the list
+against the tree rather than against this page:
+`grep -rln '@Tag("live")' prod/*/src/test` prints the files named above, and when the two disagree the
+grep is right. The builder's example suites are *not* in it; they were removed on 2026-11-17, and
+building against a live model is now a set of hand-started scripts under `examples/` that
+`make test-live` does not run (see [`08-builder.md`](08-builder.md)).
+
+**What the default run therefore does not prove.** A green `make test` is not full coverage, and the
+tests above are the only execution of the things below — everywhere else they are exercised against a
+substituted generator, caller, platform or publisher:
+
+- the builder's pipeline running on real model output all the way to a **published** pack. The offline
+  build tests substitute the generator, so they cover validation, scoring, recommendation, the
+  security gate and the publish mechanics — never a pack the model actually produced. This is also
+  where the `embabel` technique's known upstream limit is evidenced, at its generation seam, which is
+  the claim [`08-builder.md`](08-builder.md) makes about it;
+- the runtime's **successful** run — source resolved, packs ingested, a goal planned and achieved, its
+  trace record written. The
+  offline runtime tests say so in their own javadoc: they cover the failure paths, and "the success
+  path is covered by the endpoint-gated integration test";
+- the studio's three production REST surfaces (run a goal, build a pack, one loop iteration) driven
+  with the **real model-backed cores wired**. Offline, the controller tests substitute those cores;
+- the improvement loop's full iteration — real refine, real re-eval, publishing an improved pack —
+  rather than the queue and gate mechanics the offline `ImprovementLoopTest` drives with fakes;
+- the a2a endpoint answering a real task: a `message/send` that runs the goal and returns a completed
+  task carrying the output as an artifact, and the streaming form closing with a terminal
+  `completed` status update. Offline, `RunBackedA2ARequestHandlerTest` stubs the run service, so it
+  proves the handler drives the runner correctly — never that a goal actually runs behind it.
+
+The affordable response the earlier version of this page pointed at now exists:
+`LiveExampleBuildTest`, described in [`08-builder.md`](08-builder.md), builds one hand-written 1.5 KB
+blueprint through both targets and asserts the shape the document dictates — the goal's output type is
+the deliverable it names, the stages are there, the skill carries a gradeable suite. It is asserted,
+not recorded, which is what the `examples/` scripts cannot be.
 
 **Checkstyle runs in Maven's `validate` phase**, so a style violation fails `make build` and
 `make test` too, not just `make lint`. Because the reactor stops at the first failing module, one
@@ -130,5 +252,7 @@ The pre-commit hook installed by `make setup` runs `make lint`; a clone without 
 ## Ports
 
 Port 8080 is held by an unrelated local service, so the POCs and the studio take explicit ports:
-18080 for POC 13's MCP server, 18081 for POC 19's llama.cpp container, and `SERVER_PORT` for
-anything else.
+18080 for POC 13's MCP server, 18081 for POC 19's llama.cpp container, 18090 for the A2A endpoint
+(`make run-a2a`, overridden with `SERVER_PORT`), and `SERVER_PORT` for anything else. POC 16's
+sidecar also defaults to 18090, so running that launcher and the A2A endpoint at the same time needs
+one of the two moved.

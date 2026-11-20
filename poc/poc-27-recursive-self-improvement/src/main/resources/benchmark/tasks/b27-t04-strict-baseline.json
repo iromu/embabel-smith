@@ -1,0 +1,9 @@
+{
+  "id": "b27-t04",
+  "stage": "gate",
+  "prompt": "A candidate pack's re-evaluated pass-rate is exactly equal to the baseline recorded on its sidecar. Does the improvement gate accept that as an improvement?",
+  "require": ["no"],
+  "anyOf": ["strict", "greater than", "equal is not"],
+  "forbid": ["yes"],
+  "check": "Deterministic, no model call: PASS when the answer says no and gives the reason — the baseline comparison is strict, so equal scores are not progress and accepting equal would let noise churn the source. A yes fails. The consequence this task is here to surface: a pack already at the gate maximum can only improve by fixing behaviour the eval does not cover."
+}

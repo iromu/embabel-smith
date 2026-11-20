@@ -12,26 +12,21 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
+
 import org.iromu.embabel.smith.skillevaluator.util.Constants;
 
 /**
  * Manual equivalent of the pydantic {@code SkillFrontmatter} model (plus its nested
  * {@code SkillMetadata}) for the skill frontmatter, ported from {@code models/skill.py}.
- *
  * <p>
  * {@link #validate} collects every field error the way pydantic does — one error per
  * failing field, in model field order — and returns the parsed value only when none were
  * produced. Error texts mirror pydantic's own wording so the {@code frontmatter_field}
  * findings read the same as upstream.
+ *
+ * @author Ivan Rodriguez
  */
 final class SchemaFrontmatter {
-
-	/**
-	 * One rejected field: its dotted path, the pydantic-style message, and its error
-	 * type.
-	 */
-	record FieldError(String field, String message, String errorType) {
-	}
 
 	private static final String FIELD_REQUIRED = "Field required";
 
@@ -83,35 +78,45 @@ final class SchemaFrontmatter {
 	}
 
 	String getName() {
-		return name;
+		return this.name;
 	}
 
 	String getDescription() {
-		return description;
+		return this.description;
 	}
 
 	/**
 	 * The raw {@code metadata} mapping, or {@code null} when absent (pydantic's nested
 	 * model).
+	 * @return the metadata mapping as parsed, or {@code null} when the field was absent
 	 */
 	Map<String, Object> getMetadata() {
-		return metadata;
+		return this.metadata;
 	}
 
-	/** Normalized {@code metadata.domain} values (deduplicated, whitespace-stripped). */
+	/**
+	 * Normalized {@code metadata.domain} values (deduplicated, whitespace-stripped).
+	 * @return the domain values, empty when the field was absent or rejected
+	 */
 	List<String> getDomain() {
-		return domain;
+		return this.domain;
 	}
 
-	/** Top-level keys outside the model's fields (pydantic's {@code model_extra}). */
+	/**
+	 * Top-level keys outside the model's fields (pydantic's {@code model_extra}).
+	 * @return the unrecognized extra key names, in document order
+	 */
 	Set<String> getExtras() {
-		return extras;
+		return this.extras;
 	}
 
 	/**
 	 * Validate the parsed frontmatter mapping, appending every field error to
 	 * {@code errors}. Returns the parsed frontmatter, or {@code null} when anything
 	 * failed.
+	 * @param data the parsed frontmatter mapping to check
+	 * @param errors the list every rejected field's {@link FieldError} is appended to
+	 * @return the parsed frontmatter, or {@code null} when any field failed
 	 */
 	static SchemaFrontmatter validate(Map<String, Object> data, List<FieldError> errors) {
 		List<String> forbidden = new ArrayList<>();
@@ -246,6 +251,9 @@ final class SchemaFrontmatter {
 	/**
 	 * Normalizes and validates the nested {@code metadata} mapping; returns the domain
 	 * list.
+	 * @param metadata the nested mapping to check
+	 * @param errors the list rejected-field {@link FieldError}s are appended to
+	 * @return the normalized domain values, empty when absent or rejected
 	 */
 	private static List<String> checkMetadata(Map<?, ?> metadata, List<FieldError> errors) {
 		Object author = metadata.get("author");
@@ -283,6 +291,9 @@ final class SchemaFrontmatter {
 	/**
 	 * Port of {@code SkillMetadata.normalize_domain}; returns the rejection reason, or
 	 * {@code null}.
+	 * @param raw the {@code domain} value: a string, a list of strings, or {@code null}
+	 * @param out collects the normalized values in order, deduplicated
+	 * @return the reason the domain was rejected, or {@code null} when it is valid
 	 */
 	private static String normalizeDomain(Object raw, List<String> out) {
 		List<?> values;
@@ -328,7 +339,11 @@ final class SchemaFrontmatter {
 	// Constraint helpers
 	// ------------------------------------------------------------------
 
-	/** Port of {@code SkillFrontmatter.validate_name_format}. */
+	/**
+	 * Port of {@code SkillFrontmatter.validate_name_format}.
+	 * @param value the already-stripped, length-valid skill name
+	 * @return the format problem, or {@code null} when the name is acceptable
+	 */
 	private static String nameFormatProblem(String value) {
 		if (!Constants.KEBAB_CASE.matcher(value).lookingAt()) {
 			return "Skill name '" + value + "' must be in kebab-case format "
@@ -355,6 +370,7 @@ final class SchemaFrontmatter {
 	 * Python renders the {@code RESERVED_SKILL_NAMES} set with its literal braces.
 	 * Deviation: a Python set's iteration order is hash-based and not stable across runs;
 	 * this renders one fixed order.
+	 * @return the reserved names rendered as a Python-style brace-delimited set
 	 */
 	private static String reservedWordsLiteral() {
 		List<String> names = new ArrayList<>(Constants.RESERVED_SKILL_NAMES);
@@ -369,7 +385,13 @@ final class SchemaFrontmatter {
 		return sb.append('}').toString();
 	}
 
-	/** pydantic's min/max length message, or {@code null} when the value fits. */
+	/**
+	 * pydantic's min/max length message, or {@code null} when the value fits.
+	 * @param value the string whose code-point length is checked
+	 * @param minLength the least number of code points accepted
+	 * @param maxLength the most accepted, or {@code 0} for no upper bound
+	 * @return the pydantic wording of the violation, or {@code null} when it fits
+	 */
 	private static String lengthProblem(String value, int minLength, int maxLength) {
 		int length = codePoints(value);
 		if (length < minLength) {
@@ -385,7 +407,11 @@ final class SchemaFrontmatter {
 		return codePoints(value) < minLength;
 	}
 
-	/** Python's {@code len(str)}: code points, not UTF-16 units. */
+	/**
+	 * Python's {@code len(str)}: code points, not UTF-16 units.
+	 * @param value the string to measure
+	 * @return the number of Unicode code points in {@code value}
+	 */
 	private static int codePoints(String value) {
 		return value.codePointCount(0, value.length());
 	}
@@ -396,6 +422,18 @@ final class SchemaFrontmatter {
 			out.put(SchemaYaml.renderKey(entry.getKey()), entry.getValue());
 		}
 		return out;
+	}
+
+	/**
+	 * One rejected field: its dotted path, the pydantic-style message, and its error
+	 * type.
+	 *
+	 * @param field the dotted path of the rejected field
+	 * @param message the pydantic-worded reason
+	 * @param errorType the pydantic error type discriminator
+	 * @author Ivan Rodriguez
+	 */
+	record FieldError(String field, String message, String errorType) {
 	}
 
 }

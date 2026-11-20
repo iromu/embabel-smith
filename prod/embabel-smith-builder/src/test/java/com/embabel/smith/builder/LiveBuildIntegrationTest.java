@@ -16,6 +16,7 @@ import com.embabel.smith.builder.eval.AgentSpecInvokerFactory;
 import com.embabel.smith.builder.eval.AiPromptRewriter;
 import com.embabel.smith.builder.eval.EvalTask;
 import com.embabel.smith.builder.publish.PublishTarget;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.junit.jupiter.api.io.TempDir;
@@ -41,6 +42,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * requirement claims.
  */
 @SpringBootTest
+@Tag("live")
 @EnabledIfEnvironmentVariable(named = "OPENAI_CUSTOM_BASE_URL", matches = ".+")
 class LiveBuildIntegrationTest {
 
@@ -61,7 +63,7 @@ class LiveBuildIntegrationTest {
 		assertThat(result.isBuilt()).as(() -> result.report()).isTrue();
 		assertThat(result.recommendation()).as("the build weighed both candidates").isNotNull();
 		assertThat(result.recommendation().single().score()).as("the pack was scored").isNotNull();
-		Path published = result.published().location();
+		Path published = Path.of(result.published().location());
 		// Whatever the build recommended is what landed: a pack, or a process of packs.
 		assertThat(Files.isRegularFile(published.resolve("manifest.yml"))
 				|| Files.isRegularFile(published.resolve("process.yml")))

@@ -1,0 +1,8 @@
+---
+stepType: "goal"
+name: "final_investment_decision"
+description: "The final investment rating (Buy/Overweight/Hold/Underweight/Sell),\
+  \ executive summary, and investment thesis for the instrument on the analysis date."
+outputTypeName: "FinalDecision"
+export: true
+exported: true

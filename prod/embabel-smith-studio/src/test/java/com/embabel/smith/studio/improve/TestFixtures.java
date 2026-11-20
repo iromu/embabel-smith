@@ -75,6 +75,13 @@ final class TestFixtures {
 		return trace(runId, spec, input, false, "Run blocked by trust tier: untrusted", new TraceRecord.StepRecord[0]);
 	}
 
+	/** A lifecycle block trace — the pack was retired (failed, no executed steps). */
+	static TraceRecord lifecycleBlockTrace(String runId, String spec, String input) {
+		return trace(runId, spec, input, false,
+				"Run blocked by lifecycle state: goal 'x' is exported only by the retired pack '" + spec + "'",
+				new TraceRecord.StepRecord[0]);
+	}
+
 	private static TraceRecord trace(String runId, String spec, String input, boolean success, String error,
 			TraceRecord.StepRecord... steps) {
 		return new TraceRecord(runId, Instant.now(), new TraceRecord.SourceRef("folder:/tmp", null, null),

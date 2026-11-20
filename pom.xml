@@ -43,13 +43,30 @@
         <maven-enforcer-plugin.version>3.6.3</maven-enforcer-plugin.version>
         <checkstyle.version>12.3.1</checkstyle.version>
         <io.spring.javaformat.version>0.0.48</io.spring.javaformat.version>
+
+        <!-- JUnit tags excluded from the default test run. Tests that need a live model endpoint
+             carry @Tag("live"), so `mvn test` is green with no endpoint configured. Override with
+             -Dtest.excludedGroups= to opt in; `make test-live` is the supported form, because
+             -Dgroups=live alone selects nothing (the exclusion still applies). -->
+        <test.excludedGroups>live</test.excludedGroups>
     </properties>
 
     <modules>
         <module>smith-common</module>
-        <module>poc</module>
         <module>prod</module>
     </modules>
+
+    <profiles>
+        <!-- The POCs are frozen evidence, not shipped code: they are slow to build (large model
+             downloads) and their interesting tests are endpoint-gated. Keep them out of the
+             default reactor — build them with -Ppoc. -->
+        <profile>
+            <id>poc</id>
+            <modules>
+                <module>poc</module>
+            </modules>
+        </profile>
+    </profiles>
 
     <repositories>
         <!-- Embabel release binaries (also mirrored on Maven Central). -->
@@ -121,6 +138,14 @@
                 <artifactId>embabel-agent-starter-mcpserver</artifactId>
                 <version>${embabel-agent.version}</version>
             </dependency>
+            <!-- A2A server (protocol 0.3): the Embabel A2A starter, declared only by
+                 embabel-smith-runtime-a2a. It brings spring-boot-starter-web, so a module
+                 that declares it gains a servlet engine. -->
+            <dependency>
+                <groupId>com.embabel.agent</groupId>
+                <artifactId>embabel-agent-starter-a2a</artifactId>
+                <version>${embabel-agent.version}</version>
+            </dependency>
             <!-- Agent Skills (Agent Skills spec + the SkillScriptExecutionEngine SPI, POC 26). -->
             <dependency>
                 <groupId>com.embabel.agent</groupId>
@@ -183,7 +208,17 @@
             </dependency>
             <dependency>
                 <groupId>org.iromu.embabel.smith</groupId>
+                <artifactId>embabel-smith-skillevaluator</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.iromu.embabel.smith</groupId>
                 <artifactId>embabel-smith-runtime</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.iromu.embabel.smith</groupId>
+                <artifactId>embabel-smith-runtime-a2a</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
@@ -194,73 +229,6 @@
             <dependency>
                 <groupId>org.iromu.embabel.smith</groupId>
                 <artifactId>embabel-smith-studio</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.iromu.embabel.smith</groupId>
-                <artifactId>poc-1-no-code-runtime</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.iromu.embabel.smith</groupId>
-                <artifactId>poc-2-nl-compile</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.iromu.embabel.smith</groupId>
-                <artifactId>poc-8-retrieval</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.iromu.embabel.smith</groupId>
-                <artifactId>poc-9-quality-refinement</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.iromu.embabel.smith</groupId>
-                <artifactId>poc-12-semantic-retrieval</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.iromu.embabel.smith</groupId>
-                <artifactId>poc-14-composer</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.iromu.embabel.smith</groupId>
-                <artifactId>poc-17-gliner-retrieval</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.iromu.embabel.smith</groupId>
-                <artifactId>poc-18-agent-spec-lifecycle</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.iromu.embabel.smith</groupId>
-                <artifactId>poc-20-semantic-embedding</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <!-- POC 21 reuses POC 10's trust tiers for its recommended-load-tier computation. -->
-            <dependency>
-                <groupId>org.iromu.embabel.smith</groupId>
-                <artifactId>poc-10-trust-tiers</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.iromu.embabel.smith</groupId>
-                <artifactId>poc-21-agent-spec-security</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <!-- Remote transports (POC 22 Remote pane): the RestAction sidecar and the MCP server. -->
-            <dependency>
-                <groupId>org.iromu.embabel.smith</groupId>
-                <artifactId>poc-13-remote-mcp</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.iromu.embabel.smith</groupId>
-                <artifactId>poc-16-remote-action</artifactId>
                 <version>${project.version}</version>
             </dependency>
 
@@ -331,6 +299,11 @@
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-surefire-plugin</artifactId>
                     <version>${maven-surefire-plugin.version}</version>
+                    <!-- Declared here rather than per module so a new module cannot forget the
+                         policy: the live group is off unless a run asks for it. -->
+                    <configuration>
+                        <excludedGroups>${test.excludedGroups}</excludedGroups>
+                    </configuration>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>

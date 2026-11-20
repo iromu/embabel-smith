@@ -1,0 +1,38 @@
+# This module's own configuration, and it exists because of the referee's dependency.
+#
+# embabel-smith-studio ships an application.yml at the root of its jar. Spring reads
+# classpath:/application.yml as a single resource — the first match on the classpath — so the
+# moment this module depends on the studio, the studio's file would silently become this POC's
+# configuration unless this module has one of its own. That file sets
+# spring.main.web-application-type: SERVLET, spring.profiles.default: local, a placeholder model
+# and placeholder provider keys; the first of those would turn this POC's command-line launcher
+# into a servlet application trying to bind port 8080, and the rest would replace the POC's own
+# "no endpoint configured" behaviour with the studio's inert placeholders.
+#
+# So: this file shadows it. Two things are then stated here, and for opposite reasons.
+#
+# The web-application-type is the line the studio actually forces, and it is stated to cancel it.
+#
+# The provider keys below are the ones the studio's placeholders used to supply, and shadowing the
+# studio also shadows them — which leaves nothing, because a launcher that boots Embabel's platform
+# instantiates every provider config on the classpath and none of them boots on a blank key. The
+# environment is not enough: the local endpoint is OpenAI-compatible, so the operator sets
+# OPENAI_CUSTOM_* and no ANTHROPIC_API_KEY at all, and AnthropicModelsConfig then throws on
+# construction. Same convention as the prod modules: every provider the environment does not
+# configure is fed an inert but well-formed key, so the app boots whatever is set and only the
+# endpoint the operator configured is reachable. The model endpoint itself stays env-driven.
+embabel:
+  agent:
+    platform:
+      models:
+        openai:
+          api-key: ${OPENAI_API_KEY:sk-smith-no-endpoint}
+          custom:
+            api-key: ${OPENAI_CUSTOM_API_KEY:sk-smith-no-endpoint}
+            base-url: ${OPENAI_CUSTOM_BASE_URL:http://127.0.0.1:9/v1}
+            models: ${OPENAI_CUSTOM_MODELS:smith-no-endpoint}
+        anthropic:
+          api-key: ${ANTHROPIC_API_KEY:sk-smith-no-endpoint}
+spring:
+  main:
+    web-application-type: none

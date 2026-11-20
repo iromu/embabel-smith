@@ -11,15 +11,20 @@ import com.embabel.smith.builder.lifecycle.LifecycleMetadata;
 import com.embabel.smith.builder.lifecycle.LifecycleStamper;
 import com.embabel.smith.builder.lifecycle.LifecycleState;
 import com.embabel.smith.builder.publish.PublishResult;
+import com.embabel.smith.builder.publish.PublishTarget;
 import com.embabel.smith.builder.publish.Publishable;
+import com.embabel.smith.builder.publish.FolderPublisher;
+import com.embabel.smith.common.io.AgentSpecReader;
 import com.embabel.smith.common.io.AgentSpecWriter;
 import com.embabel.smith.common.io.Yaml;
 import com.embabel.smith.common.model.AgentSpec;
 import com.embabel.smith.runtime.trace.JsonlTraceStore;
 import com.embabel.smith.specsource.FolderSpecSource;
 import com.embabel.smith.specsource.SpecSource;
+import com.embabel.smith.studio.store.ProcessStore;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.ArgumentCaptor;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -28,6 +33,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 class ImprovementLoopTest {
 
@@ -50,13 +57,48 @@ class ImprovementLoopTest {
 		return new JsonlTraceStore(tmp.resolve("traces.jsonl"));
 	}
 
+	/** A store that records nothing — these tests are about the publish, not the row. */
+	private ProcessStore unusedStore() {
+		return mock(ProcessStore.class);
+	}
+
+	/** The policy for a folder improve source — the loop's common case. */
+	private LoopPublishPolicy folderPolicy(boolean push) {
+		return folderPolicy(push, unusedStore());
+	}
+
+	private LoopPublishPolicy folderPolicy(boolean push, ProcessStore packStore) {
+		return new LoopPublishPolicy(push, "folder:" + this.tmp.resolve("source"), packStore);
+	}
+
+	/** The policy for a git improve source, whose commit needs a push to survive. */
+	private LoopPublishPolicy gitPolicy(boolean push) {
+		return new LoopPublishPolicy(push, "git:https://example.com/iromu/published-packs.git", unusedStore());
+	}
+
 	private ImprovementLoop loop(SpecSource source, JsonlTraceStore store, List<Publishable> published,
 			boolean autoPublish) {
+		return loop(source, store, published, autoPublish, folderPolicy(false));
+	}
+
+	private ImprovementLoop loop(SpecSource source, JsonlTraceStore store, List<Publishable> published,
+			boolean autoPublish, LoopPublishPolicy publishPolicy) {
 		return new ImprovementLoop(source, store, (current, feedback) -> current + " [revised]", passingInvoker, tasks,
 				(p, overwrite, push) -> {
 					published.add(p);
-					return new PublishResult(Path.of("/tmp/" + p.name()), false);
-				}, autoPublish);
+					return new PublishResult("/tmp/" + p.name(), push);
+				}, publishPolicy, autoPublish);
+	}
+
+	/** A loop whose publisher records the push flag it was called with. */
+	private ImprovementLoop pushRecordingLoop(SpecSource source, JsonlTraceStore store, boolean[] push,
+			LoopPublishPolicy publishPolicy) {
+		return new ImprovementLoop(source, store, (current, feedback) -> current + " [revised]", passingInvoker, tasks,
+				(p, overwrite, pushFlag) -> {
+					push[0] = pushFlag;
+					return new PublishResult("/tmp/" + p.name(), pushFlag);
+				}, publishPolicy, true); // auto-publish, so the publish happens in the
+											// pass
 	}
 
 	@Test
@@ -131,22 +173,86 @@ class ImprovementLoopTest {
 	}
 
 	@Test
-	void publishPersistsToTheSourceWithPush() throws IOException {
+	void publishDoesNotPushByDefault() throws IOException {
 		AgentSpec pack = TestFixtures.pack("extract", "s1", "s2");
 		JsonlTraceStore store = store();
 		store.append(TestFixtures.failedTrace("r1", "extract", "input", TestFixtures.step("s2", "failed", "bad")));
 
 		boolean[] push = { false };
-		ImprovementLoop loop = new ImprovementLoop(source(pack), store, (current, feedback) -> current + " [revised]",
-				passingInvoker, tasks, (p, overwrite, pushFlag) -> {
-					push[0] = pushFlag;
-					return new PublishResult(Path.of("/tmp/" + p.name()), pushFlag);
-				}, true); // auto-publish
+		// smith.studio.loop.push unset (the shipped default) -> the publisher is told not
+		// to push.
+		ImprovementLoop loop = pushRecordingLoop(source(pack), store, push, folderPolicy(false));
 
 		loop.runOnce();
 
-		assertThat(push[0]).isTrue(); // the loop pushes improvements into the source
-										// (git)
+		assertThat(push[0]).isFalse();
+	}
+
+	@Test
+	void publishPushesOnlyWhenPushingIsEnabled() throws IOException {
+		AgentSpec pack = TestFixtures.pack("extract", "s1", "s2");
+		JsonlTraceStore store = store();
+		store.append(TestFixtures.failedTrace("r1", "extract", "input", TestFixtures.step("s2", "failed", "bad")));
+
+		boolean[] push = { false };
+		ImprovementLoop loop = pushRecordingLoop(source(pack), store, push, folderPolicy(true));
+
+		loop.runOnce();
+
+		assertThat(push[0]).isTrue();
+	}
+
+	@Test
+	void aGitSourceWithPushingEnabledIsPublishedWithPush() throws IOException {
+		AgentSpec pack = TestFixtures.pack("extract", "s1", "s2");
+		JsonlTraceStore store = store();
+		store.append(TestFixtures.failedTrace("r1", "extract", "input", TestFixtures.step("s2", "failed", "bad")));
+
+		boolean[] push = { false };
+		List<Publishable> published = new ArrayList<>();
+		ImprovementLoop loop = new ImprovementLoop(source(pack), store, (current, feedback) -> current + " [revised]",
+				passingInvoker, tasks, (p, overwrite, pushFlag) -> {
+					push[0] = pushFlag;
+					published.add(p);
+					return new PublishResult("/tmp/" + p.name(), pushFlag);
+				}, gitPolicy(true), true); // auto-publish
+
+		loop.runOnce();
+
+		assertThat(published).hasSize(1);
+		assertThat(push[0]).isTrue(); // an operator who opted in gets the push
+	}
+
+	@Test
+	void aGitSourceWithPushingOffIsNotPublishedAndTheCandidateStaysPending() throws IOException {
+		AgentSpec pack = TestFixtures.pack("extract", "s1", "s2");
+		JsonlTraceStore store = store();
+		store.append(TestFixtures.failedTrace("r1", "extract", "input", TestFixtures.step("s2", "failed", "bad")));
+
+		List<Publishable> published = new ArrayList<>();
+		ImprovementLoop loop = loop(source(pack), store, published, true, gitPolicy(false));
+
+		List<PendingCandidate> produced = loop.runOnce();
+
+		assertThat(published).isEmpty(); // the doomed publish is never attempted
+		assertThat(produced).extracting(PendingCandidate::spec).containsExactly("extract");
+		assertThat(loop.queue().pending()).extracting(PendingCandidate::spec).containsExactly("extract");
+	}
+
+	@Test
+	void aFolderSourcePublishesWithPushingOff() throws IOException {
+		AgentSpec pack = TestFixtures.pack("extract", "s1", "s2");
+		JsonlTraceStore store = store();
+		store.append(TestFixtures.failedTrace("r1", "extract", "input", TestFixtures.step("s2", "failed", "bad")));
+
+		List<Publishable> published = new ArrayList<>();
+		ImprovementLoop loop = loop(source(pack), store, published, true, folderPolicy(false));
+
+		List<PendingCandidate> produced = loop.runOnce();
+
+		assertThat(published).hasSize(1); // a local write is already durable
+		assertThat(produced).isEmpty();
+		assertThat(loop.queue().size()).isZero();
 	}
 
 	@Test
@@ -167,8 +273,8 @@ class ImprovementLoopTest {
 			return input -> "pass";
 		}, tasks, (p, overwrite, push) -> {
 			published.add(p);
-			return new PublishResult(Path.of("/tmp/" + p.name()), false);
-		}, true);
+			return new PublishResult("/tmp/" + p.name(), false);
+		}, folderPolicy(false), true);
 		loop.inFlight().begin("extract"); // simulate a concurrent iteration already
 											// improving it
 
@@ -193,8 +299,8 @@ class ImprovementLoopTest {
 		ImprovementLoop loop = new ImprovementLoop(source(pack), store, (current, feedback) -> current + " [revised]",
 				p -> input -> "fail", tasks, (p, overwrite, push) -> {
 					published.add(p);
-					return new PublishResult(Path.of("/tmp/" + p.name()), false);
-				}, true);
+					return new PublishResult("/tmp/" + p.name(), false);
+				}, folderPolicy(false), true);
 
 		loop.runOnce();
 
@@ -225,8 +331,8 @@ class ImprovementLoopTest {
 			return input -> "pass";
 		}, tasks, (p, overwrite, push) -> {
 			published.add(p);
-			return new PublishResult(Path.of("/tmp/" + p.name()), false);
-		}, true);
+			return new PublishResult("/tmp/" + p.name(), false);
+		}, folderPolicy(false), true);
 
 		loop.runOnce();
 
@@ -250,8 +356,8 @@ class ImprovementLoopTest {
 				p -> input -> "fail", // scores 0.0, below the 0.9 baseline
 				tasks, (p, overwrite, push) -> {
 					published.add(p);
-					return new PublishResult(Path.of("/tmp/" + p.name()), false);
-				}, true);
+					return new PublishResult("/tmp/" + p.name(), false);
+				}, folderPolicy(false), true);
 
 		loop.runOnce();
 
@@ -310,8 +416,8 @@ class ImprovementLoopTest {
 			return current + " [revised]";
 		}, p -> input -> "fail", tasks, (p, overwrite, push) -> {
 			published.add(p);
-			return new PublishResult(Path.of("/tmp/" + p.name()), false);
-		}, true);
+			return new PublishResult("/tmp/" + p.name(), false);
+		}, folderPolicy(false), true);
 
 		loop.runOnce();
 
@@ -320,6 +426,40 @@ class ImprovementLoopTest {
 		LifecycleMetadata lifecycle = Yaml.mapper()
 			.readValue(Files.readString(root.resolve("extract").resolve("lifecycle.yml")), LifecycleMetadata.class);
 		assertThat(lifecycle.state()).isEqualTo(LifecycleState.RETIRED);
+	}
+
+	/**
+	 * A loop publish leaves a versioned row (change: publish-keeps-versions, tasks 2.4
+	 * and 3.3). The destination is a real folder publisher so the row and the written
+	 * pack can be compared, and the store is a mock so the write itself is observed.
+	 */
+	@Test
+	void aLoopPublishLeavesARowAtTheCandidateVersion() throws IOException {
+		AgentSpec pack = TestFixtures.pack("extract", "s1", "s2"); // version 1.0.0
+		Path destination = this.tmp.resolve("published");
+		JsonlTraceStore store = store();
+		store.append(TestFixtures.failedTrace("r1", "extract", "input", TestFixtures.step("s2", "failed", "bad")));
+
+		ProcessStore packStore = mock(ProcessStore.class);
+		ImprovementLoop loop = new ImprovementLoop(source(pack), store, (current, feedback) -> current + " [revised]",
+				passingInvoker, tasks, new FolderPublisher(PublishTarget.parse("folder:" + destination)),
+				folderPolicy(false, packStore), true); // auto-publish, so the publish
+														// happens in the pass
+
+		loop.runOnce();
+
+		ArgumentCaptor<AgentSpec> saved = ArgumentCaptor.forClass(AgentSpec.class);
+		verify(packStore).savePackWhenConfigured(saved.capture());
+		// Mutation "increment removed": the candidate would be the baseline's 1.0.0 and
+		// this would fail. Mutation "save-out removed": the verify above never happens.
+		assertThat(saved.getValue().name()).isEqualTo("extract");
+		assertThat(saved.getValue().version()).isEqualTo("1.0.1");
+
+		// The folder and the row are the same pack at the same version — the folder is
+		// named by the pack alone, so the version has to agree rather than be inferred.
+		AgentSpec written = new AgentSpecReader().read(destination.resolve("extract"));
+		assertThat(written.version()).isEqualTo(saved.getValue().version());
+		assertThat(written.step("s2").prompt()).isEqualTo(saved.getValue().step("s2").prompt());
 	}
 
 }

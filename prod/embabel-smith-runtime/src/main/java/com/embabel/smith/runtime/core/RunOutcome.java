@@ -22,7 +22,10 @@ import com.embabel.agent.core.AgentProcess;
  */
 public record RunOutcome(AgentProcess process, boolean success, String output, String error, String plannerName) {
 
-	/** A run that failed before a process was created (tier block, goal not found). */
+	/**
+	 * A run that failed before a process was created (tier block, lifecycle block, goal
+	 * not found).
+	 */
 	public static RunOutcome failed(String error) {
 		return new RunOutcome(null, false, null, error, null);
 	}

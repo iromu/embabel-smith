@@ -2,7 +2,7 @@
 
 A **GOAP-based Embabel agent builder** — a general-purpose builder agent that emits deployable,
 no-code *agent specs* (declarative YAML step definitions), plus the fixed no-code runtime that
-ingests them. Greenfield POC multi-module project on **Embabel 1.5.4 / Java 21**.
+ingests them. Product code and POC evidence in one repository, on **Embabel 1.5.4 / Java 21**.
 
 The core idea: a builder *agent* turns a natural-language description into an **agent spec** (a
 pure-data YAML directory of Embabel step definitions — goals and actions), validates it before
@@ -14,9 +14,19 @@ for the design.
 
 ## Modules
 
+`smith-common` and the six `prod/` modules below are the **default reactor** — the shipped product.
+The `poc-*` rows after them are **frozen evidence**: built only with `-Ppoc`, never depended on by the
+product. See [`docs/05-architecture.md`](docs/05-architecture.md) for the module map and why.
+
 | Module | Purpose |
 | --- | --- |
 | `smith-common` | The shared agent-spec format: data model, YAML I/O, validation, sample specs. Framework-free, fully offline-testable. |
+| `embabel-smith-specsource` | Spec sources: the `folder:` / `git:` grammar, pack discovery, the git cache and ref pinning, content hashes, and the publish rules. The one piece shared by more than one product module — the runtime reads it, the builder publishes into it, the studio browses it — and it holds no Embabel agent code, so it stays offline-testable. |
+| `embabel-smith-runtime` | Ingests packs with **zero compilation** and runs a GOAP plan over an exported goal: multi-pack chaining through shared types, trust tiers, the lifecycle gate on retired packs, the trace record every run emits, and the remote-action bridge client. `smith run`. |
+| `embabel-smith-runtime-a2a` | The runtime's A2A surface: `message/send`, `message/stream`, `tasks/get`, `tasks/cancel` and the agent card over protocol 0.3 — **five** operations, listing tasks not among them. An A2A run is the same run `smith run` makes: same trust-tier gate, same planner selection, same trace record, and no model call of the module's own. The only prod module that gains a servlet engine **from a dependency** rather than declaring one, so it is a deliberate network surface — an explicit non-default port, no authentication and no TLS, i.e. a local development endpoint. `make run-a2a`. |
+| `embabel-smith-builder` | The builder: generation techniques (single-shot by default), validate-before-write, eval and refinement bounds, the skill and process targets, retrieval ranking with lifecycle curation, and the security gate on what is allowed to publish. `smith build`. |
+| `embabel-smith-skillevaluator` | Tier 1 static skill validator (`Tier1Runner`): schema, license, hygiene, version, quality score, script lint, Python syntax, code risk, and the security family (secrets, PII, Unicode smuggling). A port of a Python `tier1` validator, so it runs with no model call. **Consumed by the builder's `skill` target** as the `inspect` gate: six binary-free checks block a build (`schema`, `version`, `quality`, `unicode`, `lint`, `license`) and `pii` runs as an advisory, while `security`, `secrets` and `code-integrity` are not requested on a default build because each needs an external scanner — so a default skill build runs no SkillSpector, Gitleaks, Bandit or Semgrep, and this module is not the builder's security gate. See [`docs/08-builder.md`](docs/08-builder.md). Carries an upstream attribution; see [`NOTICE`](NOTICE). |
+| `embabel-smith-studio` | The browser UI over a thin REST layer: the process workspace, retrieval and remote panes, the self-improvement loop with its approval queue, and hot-swappable Postgres storage. |
 | `poc-1-no-code-runtime` | **POC 1 (keystone).** Fixed launcher that ingests an agent spec via `YmlStepSpecRepository` + `StepSpecAgentScopeBuilder.deploy()` and runs a GOAP plan over the exported goal. |
 | `poc-2-nl-compile` | **POC 2.** Natural-language → draft via `NaturalLanguageCompiler.compileAgent`; reports the draft's goal-shape quality (the `DraftQuality` classifier — doc 02 caveat #2). |
 | `poc-3-builder-agent` | **POC 3.** The builder as a code-backed `@Agent` (GOAP): `compileFromDescription → validateDraft → writeAgentSpec`; logs the draft quality before and after `normalizeGoalOutput`. |
@@ -63,8 +73,8 @@ Full index: [`docs/index.md`](docs/index.md).
 | [`docs/10-self-improvement.md`](docs/10-self-improvement.md) | Detect → refine → gate → publish, gate ordering, strict-baseline rationale, what is advisory in v1. |
 | [`docs/11-spec-selection-pocs.md`](docs/11-spec-selection-pocs.md) | Shared benchmark methodology and gating for POCs 17, 19 and 23, plus the caveats that must travel with their numbers. |
 | [`docs/12-backlog.md`](docs/12-backlog.md) | Every known open or deliberately-accepted gap, each with the reason and the check that confirms it is still open. |
-| [`docs/03-embabel-spec-agent-builder-design.md`](docs/03-embabel-spec-agent-builder-design.md) | The spec-first design synthesis the product implements. |
-| [`docs/04-poc-run-results.md`](docs/04-poc-run-results.md) | POC evidence read against the hypothesis; §7 holds the authoritative shared results. |
+| [`docs/03-embabel-spec-agent-builder-design.md`](docs/03-embabel-spec-agent-builder-design.md) | The spec-first design synthesis the product grew from — design history. Where it names files or modules, `agent-spec-format.md` and `05-architecture.md` outrank it. |
+| [`docs/04-poc-run-results.md`](docs/04-poc-run-results.md) | POC evidence read against the hypothesis; §7 holds the shared results for POCs 8–21, 23 and 26. POCs 22, 24 and 25 are covered only in their own READMEs. |
 | [`docs/research/`](docs/research/) | 01 — Embabel research and decisive evidence; 02 — the "skills, not agents" literature survey. |
 
 [`AGENTS.md`](AGENTS.md) records the working conventions; the POC READMEs under `poc/` are frozen
@@ -79,11 +89,54 @@ mvn -q verify
 Every module's offline tests are green without a model endpoint. Tests that exercise the model are
 **endpoint-gated** and are not run offline.
 
+Those guarantees are enforced without anyone remembering to run them:
+`.github/workflows/offline-verification.yml` runs `make build`, `make test` and `make lint` on every
+pull request and every push to the default branch, with no model endpoint and no secrets, on the
+default reactor only.
+
+The `make` entry points are `build`, `test`, `test-live`, `lint` and one launcher — `make run-a2a`,
+which starts the runtime's A2A development endpoint (`SERVER_PORT=`, `SMITH_A2A_SOURCE=`,
+`SMITH_A2A_TRUST_TIER=`, port 18090 by default). It is the only target that opens a port, and the
+endpoint it starts has **no authentication and no TLS**, so read
+[`docs/07-runtime.md`](docs/07-runtime.md) before running it anywhere but your own machine.
+
+### Live tests are opt-in by tag
+
+Every test that needs a real model endpoint carries `@Tag("live")`, and the root `pom.xml` excludes
+that group through the overridable `test.excludedGroups` property (default `live`). So a plain
+`mvn test` runs no live test whether or not an endpoint happens to be configured — and
+`make test` still exports the endpoint env, it just no longer decides whether live tests run.
+
+`make test-live` is the one supported way to opt in: it sources `~/.config/env/llm.env`, exports the
+endpoint variables, and runs the live group. The equivalent by hand is the flag pair below, and the
+pair matters — **`mvn test -Dgroups=live` alone selects nothing**, because Surefire applies the
+selection and the default exclusion together and the exclusion still says "exclude `live`". Clearing
+the exclusion is the other half of opting in:
+
+```bash
+make test-live                                        # the documented entry point
+./mvnw test -Dtest.excludedGroups= -Dgroups=live      # the same thing, by hand
+```
+
+On a machine with no endpoint configured, an opted-in run reports the live tests **skipped** rather
+than failed: each of them keeps `@EnabledIfEnvironmentVariable` alongside the tag. The tag answers
+"should this run by default", the env check answers "can it run here".
+
+The other side of that: because the group is excluded by default, a green `make test` proves nothing
+about the four things those tests alone exercise — a build publishing a pack the model really
+produced, a run that achieves its goal, the REST surfaces with the model-backed cores wired, and one
+loop iteration end to end. [`docs/05-architecture.md`](docs/05-architecture.md) says what rests on
+them.
+
+The 26 POC modules are **not** in the default reactor — they sit behind the `poc` Maven profile, so
+the commands above cover `smith-common` and `prod/` only. Add `-Ppoc` (or `POC=1` to a `make`
+target) to build or test them too.
+
 To run a POC launcher, install the modules once (so `smith-common` and sibling modules resolve from
 the local repo), then run a single module by `-pl`:
 
 ```bash
-mvn install -DskipTests          # one-time (re-run after changes)
+mvn -Ppoc install -DskipTests    # one-time (re-run after changes)
 ```
 
 ## Model endpoint (env-driven, design D4)
@@ -126,6 +179,11 @@ before.
 
 Each command runs the POC's launcher for a single module (deps resolve from the local repo after
 `mvn install`). The endpoint-gated ones need the env vars above.
+
+**Add `-Ppoc` to every command below.** The POC reactor is off by default (see
+[Build & test](#build--test-offline)), and Maven can only select a module that is in the reactor, so
+`mvn -pl poc/…` without the profile fails with *"Could not find the selected project in the
+reactor"*.
 
 Per-run inputs are **OS environment variables**, not `-D` Maven properties: `spring-boot:run`
 forks the app with the module dir as its working directory and does **not** forward `-D` system

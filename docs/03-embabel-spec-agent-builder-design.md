@@ -1,6 +1,10 @@
 # Embabel Spec-First Agent Builder
 ## Synthesis: "Specs, Not Agents" Paradigm + Embabel Architecture
-*Compiled 2026-10-30*
+*Compiled 2026-10-30; annotated after 2026-11-04 against the POC run. Design history — read it with
+[`04-poc-run-results.md`](04-poc-run-results.md), which records which of these gaps closed. Where this
+page names files or modules, it is a design-time sketch, not the shipped layout:
+[`agent-spec-format.md`](agent-spec-format.md) and
+[`05-architecture.md`](05-architecture.md) are the current contract.*
 
 ---
 
@@ -27,10 +31,10 @@
 | **Skill acquisition (agent learns skills)** | **NaturalLanguageCompiler** (NL → YAML draft) + **eval loop** (LLM rewrites prompts from failures) | ✅ Built-in |
 | **Hierarchical skill base** | **DynamicType inheritance** + **GOAP planning over typed graph** (actions = edges, types = nodes) | ✅ Emergent |
 | **Skill programs / executable guardrails (HASP)** | **SpEL pre/post conditions** + **PromptCondition** (LLM-evaluated) + **remote actions** (deterministic code) | ✅ Partial |
-| **Skill retrieval at scale** | **DataDictionary** (type registry) + GOAP planner (selects actions by pre/post match) | ⚠️ Needs spec index layer |
-| **Spec shadowing (selection failure at scale)** | **GOAP planner picks by type matching** — but no semantic retrieval; fails when many specs share types | 🔴 Gap |
-| **Security / trust tiers (T1–T4)** | **Guardrails** (global + per-action SpEL) + **@SecureAgentTool** (Java only) | ⚠️ Partial |
-| **Spec decay / lifecycle** | **No native lifecycle** — but eval harness + git versioning gives audit trail | 🔴 Gap |
+| **Skill retrieval at scale** | **DataDictionary** (type registry) + GOAP planner (selects actions by pre/post match) | ⚠️ Needs spec index layer → **closed** by POC 8/12/17/20/23 |
+| **Spec shadowing (selection failure at scale)** | **GOAP planner picks by type matching** — but no semantic retrieval; fails when many specs share types | 🔴 Gap → **closed** by POC 17/20/23 |
+| **Security / trust tiers (T1–T4)** | **Guardrails** (global + per-action SpEL) + **@SecureAgentTool** (Java only) | ⚠️ Partial → **closed** by POC 10 + POC 21 |
+| **Spec decay / lifecycle** | **No native lifecycle** — but eval harness + git versioning gives audit trail | 🔴 Gap → **closed** by POC 18 |
 
 **Key insight:** Embabel *is* a specs runtime. The "agent" in Embabel is just a **typed planning graph over specs** (exported goals + actions). The "specs, not agents" paradigm maps 1:1 to **Embabel's single AgentPlatform + many exported goals**.
 
@@ -353,7 +357,7 @@ $ embabel-builder test --spec research-web --input "Acme Corp competitors"
 | **1. Specs Layer** | Spec Registry + Composer + Runtime Adapter | + `embabel-agent-remote` (for CLI bridging) | `SpecRegistry`, `SpecComposer`, `RemoteActionBridge`, `ShellToolGroupConfig` |
 | **2. Trust & Governance** | T1–T4 tiers, guardrail library, drift detection | + global guardrails config | `TrustTierPolicy`, `GuardrailLibrary`, `DriftWatcher` (scheduled eval) |
 | **3. Scale & Intelligence** | Semantic spec selection (build-time, POCs 8/12/17/19/20/23), SkillGrad-style self-improvement, SE-GoS graph evolution | (custom) | Vector index, `SpecOptimizer` (LLM rewrites prompts from eval failures), `SpecGraph` |
-| **4. Ecosystem** | Remote spec marketplace, MCP spec server, A2A spec mesh | + `embabel-agent-starter-mcpserver`, A2A | Spec pack registry (git/HTTP), MCP server mode, A2A spec discovery |
+| **4. Ecosystem** | Remote spec marketplace, MCP spec server, A2A spec mesh | + `embabel-agent-starter-mcpserver`, A2A | Spec pack registry (git/HTTP), MCP server mode, A2A spec discovery (still open, and this row is spec *discovery*: the runtime's own A2A endpoint already exists as `prod/embabel-smith-runtime-a2a` and serves runs, not spec discovery — [`07-runtime.md`](07-runtime.md)) |
 
 **MVP (Phase 0 + 1)** is **buildable today** with Embabel 1.5.4. The "specs, not agents" paradigm is not a research project — it's *how Embabel already works*; the builder just needs to surface it.
 

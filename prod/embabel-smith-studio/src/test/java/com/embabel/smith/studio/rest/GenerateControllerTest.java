@@ -5,12 +5,12 @@
 
 package com.embabel.smith.studio.rest;
 
+import com.embabel.smith.builder.blueprint.BlueprintLoader;
 import com.embabel.smith.common.config.ModelEndpointConfig;
 import com.embabel.smith.common.model.ActionStepSpec;
 import com.embabel.smith.common.model.AgentSpec;
 import com.embabel.smith.common.model.AgentSpecManifest;
 import com.embabel.smith.common.model.GoalStepSpec;
-import com.embabel.smith.studio.generate.BlueprintLoader;
 import com.embabel.smith.studio.rest.dto.GenerateRequest;
 import com.embabel.smith.studio.rest.dto.GenerateResponse;
 import org.junit.jupiter.api.Test;

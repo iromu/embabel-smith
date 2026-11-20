@@ -8,7 +8,6 @@ package com.embabel.smith.studio.improve;
 import com.embabel.smith.builder.publish.PublishResult;
 import org.junit.jupiter.api.Test;
 
-import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -40,7 +39,7 @@ class ApprovalQueueConcurrencyTest {
 		var published = new CopyOnWriteArrayList<PendingCandidate>();
 		ApprovalQueue.LoopPublisher publisher = c -> {
 			published.add(c);
-			return new PublishResult(Path.of("/tmp/" + c.id()), false);
+			return new PublishResult("/tmp/" + c.id(), false);
 		};
 
 		CountDownLatch start = new CountDownLatch(1);

@@ -63,11 +63,10 @@ class SkillGraderTest {
 
 		assertThat(this.systems).containsExactly("You are a strict grader");
 		assertThat(this.users).hasSize(1);
-		assertThat(this.users.get(0)).contains("TASK:\nreceive a chilled pallet")
-			.contains("ANSWER:\nthe answer text")
-			.contains("EXPECTATIONS:")
-			.contains("1. a")
-			.contains("3. c");
+		assertThat(this.users.get(0)).contains("<task>\nreceive a chilled pallet\n</task>")
+			.contains("<answer>\nthe answer text\n</answer>")
+			.contains("<expectations>\n1. a")
+			.contains("3. c\n</expectations>");
 	}
 
 	@Test

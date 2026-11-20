@@ -10,16 +10,15 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
 import org.iromu.embabel.smith.skillevaluator.util.ToolRunner;
 
 /**
  * Default {@link SecretsScannerTool}: the Gitleaks CLI.
- *
  * <p>
  * Executable resolution, version probing and error text follow the Python
  * {@code ExternalTool} that backs {@code Tools.gitleaks}. Two documented deviations from
  * that Python wrapper:
- *
  * <ul>
  * <li><b>Managed provisioning.</b> Upstream can download a pinned Gitleaks binary when
  * none is on {@code PATH} ({@code skillevaluator.utils.scanner_install}). This port has
@@ -37,6 +36,8 @@ import org.iromu.embabel.smith.skillevaluator.util.ToolRunner;
  * {@code incomplete}. The Python upstream behaves the same way with the same binary, so
  * the argv was left untouched rather than adapted.</li>
  * </ul>
+ *
+ * @author Ivan Rodriguez
  */
 public final class SecretsGitleaksCli implements SecretsScannerTool {
 
@@ -76,7 +77,7 @@ public final class SecretsGitleaksCli implements SecretsScannerTool {
 
 	@Override
 	public boolean isAvailable() {
-		return path != null;
+		return this.path != null;
 	}
 
 	/**
@@ -85,17 +86,17 @@ public final class SecretsGitleaksCli implements SecretsScannerTool {
 	 */
 	@Override
 	public String version() {
-		if (path == null) {
+		if (this.path == null) {
 			return null;
 		}
-		if (cachedVersion == null) {
-			ToolRunner.ToolResult probe = ToolRunner.run(List.of(path, "version"), null, VERSION_TIMEOUT_SECONDS);
+		if (this.cachedVersion == null) {
+			ToolRunner.ToolResult probe = ToolRunner.run(List.of(this.path, "version"), null, VERSION_TIMEOUT_SECONDS);
 			Matcher stdout = VERSION_PATTERN.matcher(probe.stdout());
 			Matcher stderr = VERSION_PATTERN.matcher(probe.stderr());
 			String found = stdout.find() ? stdout.group() : (stderr.find() ? stderr.group() : "");
-			cachedVersion = found;
+			this.cachedVersion = found;
 		}
-		return cachedVersion.isEmpty() ? null : cachedVersion;
+		return this.cachedVersion.isEmpty() ? null : this.cachedVersion;
 	}
 
 	@Override
@@ -104,7 +105,7 @@ public final class SecretsGitleaksCli implements SecretsScannerTool {
 			return new RunResult(false, "", "", -1, name() + " not installed. " + installHint());
 		}
 		List<String> cmd = new ArrayList<>();
-		cmd.add(path);
+		cmd.add(this.path);
 		cmd.addAll(args);
 		ToolRunner.ToolResult raw = ToolRunner.run(cmd, cwd, TIMEOUT_SECONDS);
 		if (raw.exitCode() == -1) {

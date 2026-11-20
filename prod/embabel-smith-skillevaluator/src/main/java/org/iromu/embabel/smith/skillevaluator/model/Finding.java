@@ -17,11 +17,12 @@ import java.util.Map;
 
 /**
  * Structured validation issue with full context for CI reporting.
- *
  * <p>
  * Mirrors the Python {@code Finding} dataclass, including the deterministic semantic
  * identity ({@code SEF-…}) and occurrence identity ({@code SEO-…}) used by reporters to
  * reconcile findings across runs.
+ *
+ * @author Ivan Rodriguez
  */
 public final class Finding {
 
@@ -46,14 +47,14 @@ public final class Finding {
 	public Finding(String category, Severity severity, String checkName, String message, String filePath,
 			Integer lineNumber, String lineContent, String suggestion, Map<String, Object> metadata) {
 		this.category = category;
-		this.severity = severity == null ? Severity.MEDIUM : severity;
+		this.severity = (severity != null) ? severity : Severity.MEDIUM;
 		this.checkName = checkName;
 		this.message = message;
 		this.filePath = filePath;
 		this.lineNumber = lineNumber;
 		this.lineContent = lineContent;
 		this.suggestion = suggestion;
-		this.metadata = metadata == null ? new LinkedHashMap<>() : new LinkedHashMap<>(metadata);
+		this.metadata = (metadata != null) ? new LinkedHashMap<>(metadata) : new LinkedHashMap<>();
 	}
 
 	public Finding(String category, Severity severity, String checkName, String message, String filePath) {
@@ -61,62 +62,77 @@ public final class Finding {
 	}
 
 	public String getCategory() {
-		return category;
+		return this.category;
 	}
 
 	public Severity getSeverity() {
-		return severity;
+		return this.severity;
 	}
 
 	public String getCheckName() {
-		return checkName;
+		return this.checkName;
 	}
 
 	public String getMessage() {
-		return message;
+		return this.message;
 	}
 
 	public String getFilePath() {
-		return filePath;
+		return this.filePath;
 	}
 
 	public Integer getLineNumber() {
-		return lineNumber;
+		return this.lineNumber;
 	}
 
 	public String getLineContent() {
-		return lineContent;
+		return this.lineContent;
 	}
 
 	public String getSuggestion() {
-		return suggestion;
+		return this.suggestion;
 	}
 
 	public Map<String, Object> getMetadata() {
-		return metadata;
+		return this.metadata;
 	}
 
-	/** Formatted tag such as {@code [SCHEMA-HIGH]}. */
+	/**
+	 * Formatted tag such as {@code [SCHEMA-HIGH]}.
+	 * @return the category and the uppercase severity name, in brackets
+	 */
 	public String getTag() {
-		return "[" + category + "-" + severity.name().toUpperCase(Locale.ROOT) + "]";
+		return "[" + this.category + "-" + this.severity.name().toUpperCase(Locale.ROOT) + "]";
 	}
 
-	/** Formatted location such as {@code file.py:42}. */
+	/**
+	 * Formatted location such as {@code file.py:42}.
+	 * @return the file path, suffixed {@code :<line>} when a non-zero line number is
+	 * known
+	 */
 	public String getLocation() {
-		String loc = filePath;
-		if (lineNumber != null && lineNumber != 0) {
-			loc += ":" + lineNumber;
+		String loc = this.filePath;
+		if (this.lineNumber != null && this.lineNumber != 0) {
+			loc += ":" + this.lineNumber;
 		}
 		return loc;
 	}
 
 	public String toLegacyString() {
-		return getTag() + " " + message + " in " + getLocation();
+		return getTag() + " " + this.message + " in " + getLocation();
 	}
 
-	/** Copy this finding with {@code [prefix]} applied to every location it names. */
+	/**
+	 * Copy this finding with {@code [prefix]} applied to every location it names.
+	 * @param prefix bundle label prepended, in brackets, to the file path and to the
+	 * {@code file} entry of each {@code occurrences} and {@code skillspector_occurrences}
+	 * item
+	 * @param extraMetadata metadata merged into the copy, overriding same-named keys;
+	 * {@code null} leaves the copy's metadata as this finding's
+	 * @return a new finding with prefixed locations and a fresh metadata map
+	 */
 	public Finding withPrefix(String prefix, Map<String, Object> extraMetadata) {
-		Map<String, Object> newMetadata = new LinkedHashMap<>(metadata);
+		Map<String, Object> newMetadata = new LinkedHashMap<>(this.metadata);
 		for (String key : List.of("occurrences", "skillspector_occurrences")) {
 			Object listed = newMetadata.get(key);
 			if (!(listed instanceof List<?> items)) {
@@ -139,52 +155,65 @@ public final class Finding {
 		if (extraMetadata != null) {
 			newMetadata.putAll(extraMetadata);
 		}
-		return new Finding(category, severity, checkName, message, "[" + prefix + "] " + filePath, lineNumber,
-				lineContent, suggestion, newMetadata);
+		return new Finding(this.category, this.severity, this.checkName, this.message,
+				"[" + prefix + "] " + this.filePath, this.lineNumber, this.lineContent, this.suggestion, newMetadata);
 	}
 
 	public Finding withPrefix(String prefix) {
 		return withPrefix(prefix, null);
 	}
 
-	/** Deterministic semantic identity independent of location: {@code SEF-<20 hex>}. */
+	/**
+	 * Deterministic semantic identity independent of location: {@code SEF-<20 hex>}.
+	 * @return the digest of the normalized category, check name, location-free message
+	 * and suggestion, prefixed {@code SEF-}
+	 */
 	public String getFindingId() {
-		String identity = String.join("\u001f", normalizeIdentityText(category), normalizeIdentityText(checkName),
-				normalizeIdentityText(identityMessage()), normalizeIdentityText(suggestion));
+		String identity = String.join("\u001f", normalizeIdentityText(this.category),
+				normalizeIdentityText(this.checkName), normalizeIdentityText(identityMessage()),
+				normalizeIdentityText(this.suggestion));
 		return "SEF-" + sha256Prefix(identity);
 	}
 
-	/** Deterministic identity for a concrete location: {@code SEO-<20 hex>}. */
+	/**
+	 * Deterministic identity for a concrete location: {@code SEO-<20 hex>}.
+	 * @param path occurrence file path; backslashes count as separators and {@code null}
+	 * reads as empty
+	 * @param line occurrence line number, stringified as given or empty when {@code null}
+	 * @param content matched line text, normalized like the identity fields
+	 * @return the digest of this finding's semantic identity with the given location,
+	 * prefixed {@code SEO-}
+	 */
 	public String locationOccurrenceId(String path, Object line, String content) {
-		String identity = String.join("\u001f", getFindingId(), (path == null ? "" : path).replace('\\', '/'),
-				line == null ? "" : String.valueOf(line), normalizeIdentityText(content));
+		String identity = String.join("\u001f", getFindingId(), ((path != null) ? path : "").replace('\\', '/'),
+				(line != null) ? String.valueOf(line) : "", normalizeIdentityText(content));
 		return "SEO-" + sha256Prefix(identity);
 	}
 
 	public String getOccurrenceId() {
-		return locationOccurrenceId(filePath, lineNumber, lineContent);
+		return locationOccurrenceId(this.filePath, this.lineNumber, this.lineContent);
 	}
 
 	public Map<String, Object> toMap() {
 		Map<String, Object> map = new LinkedHashMap<>();
 		map.put("finding_id", getFindingId());
 		map.put("occurrence_id", getOccurrenceId());
-		map.put("category", category);
-		map.put("severity", severity.name().toLowerCase(Locale.ROOT));
-		map.put("check_name", checkName);
-		map.put("message", message);
-		map.put("file_path", filePath);
-		map.put("line_number", lineNumber);
-		map.put("line_content", lineContent);
-		map.put("suggestion", suggestion);
-		map.put("metadata", metadata);
+		map.put("category", this.category);
+		map.put("severity", this.severity.name().toLowerCase(Locale.ROOT));
+		map.put("check_name", this.checkName);
+		map.put("message", this.message);
+		map.put("file_path", this.filePath);
+		map.put("line_number", this.lineNumber);
+		map.put("line_content", this.lineContent);
+		map.put("suggestion", this.suggestion);
+		map.put("metadata", this.metadata);
 		return map;
 	}
 
 	// --- identity helpers (ports of the Python privates) ---
 
 	static String normalizeIdentityText(Object value) {
-		String text = (value == null ? "" : String.valueOf(value)).toLowerCase(Locale.ROOT);
+		String text = ((value != null) ? String.valueOf(value) : "").toLowerCase(Locale.ROOT);
 		StringBuilder sb = new StringBuilder();
 		boolean pendingSpace = false;
 		for (int i = 0; i < text.length(); i++) {
@@ -205,6 +234,9 @@ public final class Finding {
 
 	/**
 	 * {@code file_path} plus the shorter paths a message may name it by, longest first.
+	 * @param path the finding's file path, possibly {@code [bundle] }-prefixed
+	 * @return the path as given, then its unbracketed forms and every suffix that follows
+	 * a path separator
 	 */
 	private static List<String> locationPaths(String path) {
 		List<String> paths = new ArrayList<>();
@@ -225,13 +257,17 @@ public final class Finding {
 		return paths;
 	}
 
-	/** Message without the location/occurrence text the finding records elsewhere. */
+	/**
+	 * Message without the location/occurrence text the finding records elsewhere.
+	 * @return the message with one {@code in <path>:<line>} span and a multi-occurrence
+	 * suffix stripped, or unchanged when neither is present
+	 */
 	private String identityMessage() {
-		String msg = message == null ? "" : message;
-		if (filePath != null && lineNumber != null) {
+		String msg = (this.message == null) ? "" : this.message;
+		if (this.filePath != null && this.lineNumber != null) {
 			String slashed = msg.replace('\\', '/');
-			for (String location : locationPaths(filePath)) {
-				String text = (" in " + location + ":" + lineNumber).replace('\\', '/');
+			for (String location : locationPaths(this.filePath)) {
+				String text = (" in " + location + ":" + this.lineNumber).replace('\\', '/');
 				int index = slashed.indexOf(text);
 				if (index >= 0) {
 					msg = slashed.substring(0, index) + slashed.substring(index + text.length());
@@ -239,7 +275,7 @@ public final class Finding {
 				}
 			}
 		}
-		Object occurrences = metadata.get("occurrences");
+		Object occurrences = this.metadata.get("occurrences");
 		if (occurrences instanceof List<?> list && list.size() > 1) {
 			String marker = " \u2014 " + list.size() + " occurrences (";
 			int index = msg.lastIndexOf(marker);
@@ -256,8 +292,8 @@ public final class Finding {
 			byte[] hash = digest.digest(input.getBytes(StandardCharsets.UTF_8));
 			return HexFormat.of().formatHex(hash).substring(0, 20);
 		}
-		catch (NoSuchAlgorithmException e) {
-			throw new IllegalStateException("SHA-256 unavailable", e);
+		catch (NoSuchAlgorithmException ex) {
+			throw new IllegalStateException("SHA-256 unavailable", ex);
 		}
 	}
 

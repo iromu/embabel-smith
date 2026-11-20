@@ -5,6 +5,9 @@
 
 package com.embabel.smith.builder.skill;
 
+import java.util.List;
+
+import com.embabel.smith.builder.core.PromptData;
 import com.embabel.smith.builder.core.SpecPromptCaller;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -23,6 +26,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  * @author Ivan Rodriguez
  */
 public class SkillGenerator {
+
+	/**
+	 * How many inspection findings one redraft request carries. The bound is here, on the
+	 * class that applies it, because it protects the prompt and nothing else: a
+	 * pathological draft can report findings without limit, and the build report is not
+	 * capped by it.
+	 */
+	static final int MAX_FINDINGS_IN_PROMPT = 20;
 
 	private final SpecPromptCaller caller;
 
@@ -43,8 +54,24 @@ public class SkillGenerator {
 	 * @throws IllegalStateException when the model omits the description or the body.
 	 */
 	public Skill generate(String skillName, String description) {
+		return generate(skillName, description, List.of());
+	}
+
+	/**
+	 * Redrafts the skill, telling the model what the inspection gate refused in the
+	 * previous draft. The original instruction block is sent unchanged — the findings are
+	 * appended to it, so a redraft is asked to fix the named findings and not to answer a
+	 * different question.
+	 * @param skillName the skill name to use (derived from the description).
+	 * @param description the business-process description.
+	 * @param blockingFindings the previous round's blocking findings, in report order;
+	 * empty asks for a first draft
+	 * @return the generated skill.
+	 * @throws IllegalStateException when the model omits the description or the body.
+	 */
+	public Skill generate(String skillName, String description, List<String> blockingFindings) {
 		String user = "Below is a business-process description. Generate the skill for the skill named '" + skillName
-				+ "'.\n\n" + description;
+				+ "'.\n\n" + PromptData.block("document", description) + redraftFindings(blockingFindings);
 		JsonNode node = LlmJson.callAndParse(this.caller, this.prompt, user, 3, "the generated skill",
 				(raw) -> this.json.readTree(raw));
 		String skillDescription = node.path("description").asText("");
@@ -53,6 +80,28 @@ public class SkillGenerator {
 			throw new IllegalStateException("Skill generation returned a missing description or body");
 		}
 		return new Skill(skillName, skillDescription, body);
+	}
+
+	/**
+	 * The redraft instruction and the findings it names, or nothing for a first draft.
+	 * Findings beyond {@link #MAX_FINDINGS_IN_PROMPT} are counted rather than quoted, so
+	 * the model is not told the list was the whole verdict.
+	 * @param blockingFindings the previous round's blocking findings
+	 * @return the text to append to the generation request, empty for a first draft
+	 */
+	private static String redraftFindings(List<String> blockingFindings) {
+		if (blockingFindings.isEmpty()) {
+			return "";
+		}
+		List<String> quoted = blockingFindings.stream().limit(MAX_FINDINGS_IN_PROMPT).toList();
+		String findings = String.join("\n", quoted);
+		int omitted = blockingFindings.size() - quoted.size();
+		if (omitted > 0) {
+			findings = findings + "\n(and " + omitted + " more findings of the same kind)";
+		}
+		return "\n\nA previous draft of this skill was refused by the skill inspection gate. Rewrite it so every "
+				+ "finding below is resolved, keeping what the earlier draft already got right.\n\n"
+				+ PromptData.block("findings", findings);
 	}
 
 }

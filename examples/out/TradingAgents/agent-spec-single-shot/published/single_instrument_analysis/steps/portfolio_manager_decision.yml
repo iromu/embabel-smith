@@ -1,0 +1,23 @@
+---
+stepType: "action"
+name: "portfolio_manager_decision"
+description: "Issue the final five-level rating, executive summary, and investment\
+  \ thesis."
+inputTypeNames:
+- "InvestmentPlan"
+- "TransactionProposal"
+- "AggressiveRiskView"
+- "ConservativeRiskView"
+- "NeutralRiskView"
+- "UserInput"
+outputTypeName: "FinalDecision"
+prompt: "You are the Portfolio Manager. Read the Investment Plan {{investmentPlan}},\
+  \ Transaction Proposal {{transactionProposal}}, and the full Risk Debate: Aggressive\
+  \ {{aggressiveRiskView}}, Conservative {{conservativeRiskView}}, and Neutral {{neutralRiskView}}.\
+  \ Consider any lessons from past decisions implied by {{userInput}}. Issue the final\
+  \ decision: a five-level rating (Buy/Overweight/Hold/Underweight/Sell), an executive\
+  \ summary, an investment thesis explaining the evidence, and optionally a target\
+  \ price and time horizon."
+pre: []
+post: []
+toolGroups: []

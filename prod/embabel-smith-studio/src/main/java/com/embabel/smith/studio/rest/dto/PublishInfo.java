@@ -17,6 +17,6 @@ import com.embabel.smith.builder.publish.PublishResult;
 public record PublishInfo(String location, boolean pushed) {
 
 	public static PublishInfo of(PublishResult result) {
-		return new PublishInfo(result.location().toString(), result.pushed());
+		return new PublishInfo(result.location(), result.pushed());
 	}
 }

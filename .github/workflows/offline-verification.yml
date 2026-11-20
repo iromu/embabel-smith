@@ -1,0 +1,69 @@
+name: Offline verification
+
+# Compiles the reactor, runs the offline test suite and runs the project's style
+# checks on every pull request and on every push to the default branch, using the
+# repository's own Makefile targets (`make build`, `make test`, `make lint`) so a
+# failure here reproduces with the command a developer runs.
+#
+# SCOPE — what a green run does NOT cover:
+#   * The default reactor only. `poc/` sits behind the `poc` Maven profile and is
+#     not built here; it is frozen evidence, not a gate.
+#   * No model endpoint is configured and no secrets are used. On a runner the
+#     endpoint env file `make test` sources is absent, so nothing is exported —
+#     and the live group stays excluded through the root pom's
+#     `test.excludedGroups` default (`live`) regardless of what is exported,
+#     which is the mechanism that keeps this run model-free (README.md, "Live
+#     tests are opt-in by tag"; docs/05-architecture.md). The four @Tag("live")
+#     tests (build-publish, run, loop, studio REST) therefore do not run here,
+#     and green says nothing about the paths only they exercise.
+#   * Nothing is published or deployed, and no coverage threshold is enforced.
+on:
+  push:
+    # The repository's default branch, as `gh repo view` reports it. Not
+    # `poc/builder`, which wiki-pages.yml still names and which no longer
+    # exists on the remote — a push trigger naming a dead branch never fires.
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: offline-verification-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Keep this equal to <java.version> in pom.xml; the first step checks it.
+  JAVA_VERSION: '21'
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: The JDK pin matches the pom
+        # A java.version bump without a matching edit here must fail visibly rather
+        # than quietly build against a different JDK than the project targets.
+        run: |
+          pom_version=$(sed -n 's:.*<java\.version>\(.*\)</java\.version>.*:\1:p' pom.xml | head -1)
+          echo "pom.xml java.version=$pom_version workflow pin=$JAVA_VERSION"
+          test -n "$pom_version"
+          test "$pom_version" = "$JAVA_VERSION"
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: maven
+
+      - name: Build the reactor
+        run: make build
+
+      - name: Run the offline test suite
+        run: make test
+
+      - name: Run the style checks
+        run: make lint

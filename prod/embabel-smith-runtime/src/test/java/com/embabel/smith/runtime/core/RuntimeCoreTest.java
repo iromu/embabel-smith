@@ -21,11 +21,13 @@ import org.springframework.test.context.DynamicPropertySource;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.file.Files;
 import java.net.InetSocketAddress;
 import java.nio.file.Path;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
@@ -92,6 +94,12 @@ class RuntimeCoreTest {
 		return new RuntimeCore(platform);
 	}
 
+	/** Stamps a pack's lifecycle state into the sidecar the runtime reads at ingest. */
+	private static void stamp(Path packDir, String state) throws IOException {
+		Files.writeString(packDir.resolve(LifecycleSidecar.FILE_NAME),
+				"contentHash: 0be2d86f\nbaselinePassRate: 1.0\nstate: " + state + "\nupdatedAt: now\n");
+	}
+
 	@Test
 	void multiPackIngestDeploysAllGoalsAndResolvesTheGoalPack(@TempDir Path tmp) throws Exception {
 		ResolvedSpecSource resolved = TestPacks.resolve(TestPacks.library(tmp, "extract", "explain"));
@@ -120,6 +128,79 @@ class RuntimeCoreTest {
 			.hasMessageContaining("duplicate goal name 'sameGoal'")
 			.hasMessageContaining("dup-a")
 			.hasMessageContaining("dup-b");
+	}
+
+	@Test
+	void aRetiredPackIsNotDeployedAndIsNamedAsExcluded(@TempDir Path tmp) throws Exception {
+		Path library = TestPacks.library(tmp, "extract", "explain");
+		stamp(library.resolve("explain"), "RETIRED");
+
+		IngestedSource ingested = core().ingest(TestPacks.resolve(library));
+
+		assertThat(ingested.goalNames()).containsExactly("briefDone");
+		assertThat(ingested.packs()).extracting(AgentSpec::name).containsExactly("extract");
+		assertThat(ingested.excluded()).extracting(IngestedSource.ExcludedPack::name).containsExactly("explain");
+	}
+
+	@Test
+	void aSourceWhoseOnlyPackIsRetiredFailsAsAnEmptySourceNamingIt(@TempDir Path tmp) throws Exception {
+		Path library = TestPacks.library(tmp, "explain");
+		stamp(library.resolve("explain"), "RETIRED");
+
+		assertThatThrownBy(() -> core().ingest(TestPacks.resolve(library))).isInstanceOf(IllegalStateException.class)
+			.hasMessageContaining("contains no agent specs")
+			.hasMessageContaining("explain");
+	}
+
+	@Test
+	void aRetiredTwinIsNotReportedAsADuplicateGoalCollision(@TempDir Path tmp) throws Exception {
+		Path library = TestPacks.library(tmp, "dup-a", "dup-b");
+		stamp(library.resolve("dup-b"), "RETIRED");
+
+		IngestedSource ingested = core().ingest(TestPacks.resolve(library));
+
+		assertThat(ingested.goalNames()).containsExactly("sameGoal");
+		assertThat(ingested.packs()).extracting(AgentSpec::name).containsExactly("dup-a");
+		assertThat(ingested.excluded()).extracting(IngestedSource.ExcludedPack::name).containsExactly("dup-b");
+	}
+
+	@Test
+	void aGoalOnlyARetiredPackExportsIsALifecycleBlockNotAGoalNotFound(@TempDir Path tmp) throws Exception {
+		Path library = TestPacks.library(tmp, "extract", "explain");
+		stamp(library.resolve("explain"), "RETIRED");
+		IngestedSource ingested = core().ingest(TestPacks.resolve(library));
+
+		assertThatThrownBy(() -> core().run(ingested, "explainDone", "input", null, TrustTier.STANDARD))
+			.isInstanceOf(LifecycleBlockedException.class)
+			.hasMessageContaining("Run blocked by lifecycle state")
+			.hasMessageContaining("'explain'")
+			.hasMessageNotContaining("No goal named");
+	}
+
+	@Test
+	void aLiveTwinStillWinsTheGoalItsRetiredTwinAlsoExported(@TempDir Path tmp) throws Exception {
+		Path library = TestPacks.library(tmp, "dup-a", "dup-b");
+		stamp(library.resolve("dup-b"), "RETIRED");
+		IngestedSource ingested = core().ingest(TestPacks.resolve(library));
+
+		// The retired twin's exclusion is reported, but it must not block the goal the
+		// live
+		// pack still exports: the run is attempted rather than refused as retired.
+		assertThat(ingested.packForGoal("sameGoal").name()).isEqualTo("dup-a");
+		assertThat(ingested.excluded()).extracting(IngestedSource.ExcludedPack::name).containsExactly("dup-b");
+		assertThatCode(() -> core().run(ingested, "sameGoal", "input", null, TrustTier.STANDARD))
+			.doesNotThrowAnyException();
+	}
+
+	@Test
+	void aDegradedPackIsStillDeployed(@TempDir Path tmp) throws Exception {
+		Path library = TestPacks.library(tmp, "extract", "explain");
+		stamp(library.resolve("explain"), "DEGRADED");
+
+		IngestedSource ingested = core().ingest(TestPacks.resolve(library));
+
+		assertThat(ingested.goalNames()).containsExactlyInAnyOrder("briefDone", "explainDone");
+		assertThat(ingested.excluded()).isEmpty();
 	}
 
 	@Test

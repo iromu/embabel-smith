@@ -22,12 +22,26 @@ generation and its with/without-skill eval) and never depends on a `poc-*` artif
 ## Usage
 
 ```
-smith build "<description>" --out <source-uri> [--target <agent-spec|skill>]
+smith build ("<description>" | --docs <path>) --out <source-uri>
+                            [--extract] [--target <agent-spec|skill>]
                             [--technique <single-shot|embabel>]
                             [--max-refine <n>] [--overwrite] [--push]
 ```
 
-- `<description>` (required) — the natural-language description of the spec to build.
+- `<description>` — the natural-language description of the spec to build. Mutually exclusive with
+  `--docs`; exactly one of the two is required, and naming neither or both is a usage error
+  (exit **2**).
+- `--docs` — a directory of business-process documents to build from. The `.md`, `.markdown` and
+  `.txt` files under it are read, sorted and concatenated into one corpus, each labelled with its
+  path relative to the directory, capped at 200K characters so an oversized tree cannot exceed the
+  model's context.
+- `--extract` — run the `business_process_discovery` prompt over `--docs` first and build the
+  business-process description it extracts, rather than the documents as written. Requires `--docs`
+  (usage error, exit **2**, without it). Opt-in because it costs a model call. Note what the prompt
+  asks for: a **codebase** ("Analyse the entire codebase", "Do not describe classes, functions,
+  modules or files"), so it earns its keep in front of source code, not in front of documents that
+  are already a business-process description — over those it re-summarises and loses detail. Nothing
+  in `prod/` feeds it source yet: `--docs` reads `.md`, `.markdown` and `.txt` only.
 - `--out` (required) — source URI to publish to: `folder:<path>` or `git:<url>[@ref]`.
 - `--target` — the artifact to produce: `agent-spec` (default, an executable pack) or `skill`
   (a `SKILL.md` validated by the with/without-skill lift; see

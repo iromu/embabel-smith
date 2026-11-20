@@ -7,6 +7,7 @@ package com.embabel.smith.builder;
 
 import com.embabel.agent.api.common.Ai;
 import com.embabel.agent.core.AgentPlatform;
+import com.embabel.smith.builder.cli.BlueprintCommand;
 import com.embabel.smith.builder.cli.BuildCommand;
 import com.embabel.smith.builder.cli.SmithBuilderCommand;
 import com.embabel.smith.builder.core.BuilderAgent;
@@ -22,7 +23,8 @@ import org.springframework.context.annotation.FilterType;
 /**
  * Spring entry point of the builder product: boots the Embabel {@link AgentPlatform} and
  * {@link Ai} (model endpoint fully env-driven, see {@code application.yml}) and hands the
- * CLI arguments to the picocli command line ({@code smith build ...}).
+ * CLI arguments to the picocli command line ({@code smith build ...} and
+ * {@code smith blueprint ...}).
  *
  * <p>
  * {@link BuilderAgent} is a code-backed {@code @Agent} (hence a Spring {@code @Component}
@@ -48,6 +50,7 @@ public class SmithBuilderApplication {
 			Ai ai = context.getBean(Ai.class);
 			CommandLine smith = new CommandLine(new SmithBuilderCommand());
 			smith.addSubcommand(new BuildCommand(platform, ai));
+			smith.addSubcommand(new BlueprintCommand(ai));
 			exitCode = smith.execute(args);
 		}
 		catch (Exception ex) {

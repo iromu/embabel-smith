@@ -1,0 +1,5 @@
+---
+name: "TransactionProposal"
+description: "A concrete transaction proposal with action, entry, stop, and sizing."
+ownProperties: []
+parents: []

@@ -14,6 +14,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Supplier;
+
 import org.iromu.embabel.smith.skillevaluator.model.ValidationResult;
 import org.iromu.embabel.smith.skillevaluator.spi.SecretsScanner;
 import org.iromu.embabel.smith.skillevaluator.spi.SecurityScanner;
@@ -35,7 +36,6 @@ import org.iromu.embabel.smith.skillevaluator.validator.VersionValidator;
  * Tier 1 validation pipeline: runs the selected static checks over a skill (or a folder
  * of skills) and returns one {@link ValidationResult} per validator, in canonical
  * pipeline order.
- *
  * <p>
  * Port of {@code tier1/commands.py#run_validation}, scoped to skill content. Deviations
  * from upstream, by design:
@@ -47,12 +47,13 @@ import org.iromu.embabel.smith.skillevaluator.validator.VersionValidator;
  * <li>Content-type auto-detection (rules/workflows/plugins) is not ported; non-skill
  * targets simply produce no skill findings.</li>
  * </ul>
- *
  * <p>
  * The {@code security} and {@code secrets} checks delegate to pluggable scanner engines
  * ({@link SecurityScanner} / {@link SecretsScanner}); the built-in defaults shell out to
  * the same external CLIs upstream uses and mark their scan incomplete when the tool is
  * missing.
+ *
+ * @author Ivan Rodriguez
  */
 public final class Tier1Runner {
 
@@ -70,6 +71,7 @@ public final class Tier1Runner {
 	public static final Set<String> SKIPPABLE_CHECKS = Set.copyOf(
 			java.util.stream.Stream.concat(DEFAULT_CHECKS.stream(), java.util.stream.Stream.of("secrets")).toList());
 
+	/** Description recorded on a check the caller asked to skip. */
 	public static final String SKIP_REASON = "skipped with --skip";
 
 	private static final Map<String, String> CHECK_ALIASES = Map.of("code", "code-integrity", "code-risk",
@@ -85,125 +87,6 @@ public final class Tier1Runner {
 			"code-integrity", List.of("Code Risk Analysis", "Secrets Detection", "Code Integrity & Hygiene"), "unicode",
 			List.of("Unicode Smuggling Detection"), "quality", List.of("Quality Score (4-Dimension Analysis)"), "lint",
 			List.of("Script Lint (Advisory)"));
-
-	/** Immutable run configuration; obtain via {@link #builder()}. */
-	public static final class Options {
-
-		private final Set<String> checks;
-
-		private final Set<String> skip;
-
-		private final int minScore;
-
-		private final String previousVersion;
-
-		private final boolean failFast;
-
-		private final boolean continueOnFailure;
-
-		private final SecretsScanner secretsScanner;
-
-		private final SecurityScanner securityScanner;
-
-		private Options(Builder b) {
-			checks = b.checks;
-			skip = b.skip;
-			minScore = b.minScore;
-			previousVersion = b.previousVersion;
-			failFast = b.failFast;
-			continueOnFailure = b.continueOnFailure;
-			secretsScanner = b.secretsScanner;
-			securityScanner = b.securityScanner;
-		}
-
-		public Set<String> getChecks() {
-			return checks;
-		}
-
-		public int getMinScore() {
-			return minScore;
-		}
-
-		public boolean isFailFast() {
-			return failFast;
-		}
-
-	}
-
-	public static final class Builder {
-
-		private Set<String> checks = Set.of();
-
-		private Set<String> skip = Set.of();
-
-		private int minScore = Constants.QUALITY_DEFAULT_MIN_SCORE;
-
-		private String previousVersion;
-
-		private boolean failFast;
-
-		private boolean continueOnFailure;
-
-		private SecretsScanner secretsScanner;
-
-		private SecurityScanner securityScanner;
-
-		/**
-		 * Restrict the run to these check names (aliases accepted). Empty means the
-		 * default lineup.
-		 */
-		public Builder checks(String... names) {
-			checks = parse(names);
-			return this;
-		}
-
-		/**
-		 * Skip these checks (aliases accepted; {@code secrets} alone skips only the
-		 * Gitleaks scan).
-		 */
-		public Builder skip(String... names) {
-			skip = parse(names);
-			return this;
-		}
-
-		public Builder minScore(int value) {
-			minScore = value;
-			return this;
-		}
-
-		public Builder previousVersion(String value) {
-			previousVersion = value;
-			return this;
-		}
-
-		public Builder failFast(boolean value) {
-			failFast = value;
-			return this;
-		}
-
-		/**
-		 * Scan every skill past a CRITICAL finding instead of stopping the folder early.
-		 */
-		public Builder continueOnFailure(boolean value) {
-			continueOnFailure = value;
-			return this;
-		}
-
-		public Builder secretsScanner(SecretsScanner value) {
-			secretsScanner = value;
-			return this;
-		}
-
-		public Builder securityScanner(SecurityScanner value) {
-			securityScanner = value;
-			return this;
-		}
-
-		public Options build() {
-			return new Options(this);
-		}
-
-	}
 
 	public static Builder builder() {
 		return new Builder();
@@ -222,21 +105,29 @@ public final class Tier1Runner {
 		return out;
 	}
 
-	/** Resolve skip names (aliases included) to canonical check names. */
+	/**
+	 * Resolve skip names (aliases included) to canonical check names.
+	 * @param skip comma-separated check names, or {@code null} for none
+	 * @return the canonical names to skip, empty when {@code skip} is blank
+	 */
 	public static Set<String> skippedChecks(String skip) {
-		return skip == null || skip.isBlank() ? Set.of() : parse(skip);
+		return (skip == null || skip.isBlank()) ? Set.of() : parse(skip);
 	}
 
 	/**
 	 * Resolve a comma-separated check list to canonical names; empty input yields the
 	 * default lineup.
+	 * @param checks comma-separated check names, or {@code null} for the defaults
+	 * @return the canonical names to run, in pipeline order
 	 */
 	public static Set<String> enabledChecks(String checks) {
-		return checks == null || checks.isBlank() ? new LinkedHashSet<>(DEFAULT_CHECKS) : parse(checks);
+		return (checks == null || checks.isBlank()) ? new LinkedHashSet<>(DEFAULT_CHECKS) : parse(checks);
 	}
 
 	/**
 	 * Run the selected Tier 1 checks over {@code targetPath}.
+	 * @param targetPath the skill file or folder of skills to validate
+	 * @param options the run configuration from {@link #builder()}
 	 * @return one result per validator (skipped checks included as skipped results), in
 	 * canonical pipeline order
 	 */
@@ -257,7 +148,7 @@ public final class Tier1Runner {
 						"Semantic Version Validation",
 						"Validate optional metadata.version labels and require strict bumps"))));
 		steps.add(new Step("security", () -> {
-			SecurityValidator validator = options.securityScanner == null ? new SecurityValidator()
+			SecurityValidator validator = (options.securityScanner == null) ? new SecurityValidator()
 					: new SecurityValidator(options.securityScanner);
 			return List
 				.of(named(validator.validateSecurityOnly(targetPath), "Security Scan", validator.getDescription()));
@@ -276,7 +167,7 @@ public final class Tier1Runner {
 				out.add(skippedResult("Secrets Detection"));
 			}
 			else {
-				SecretsValidator secrets = options.secretsScanner == null ? new SecretsValidator()
+				SecretsValidator secrets = (options.secretsScanner == null) ? new SecretsValidator()
 						: new SecretsValidator(options.secretsScanner);
 				out.add(asResult(secrets.validate(targetPath), secrets));
 			}
@@ -329,21 +220,25 @@ public final class Tier1Runner {
 			for (Step step : active) {
 				List<ValidationResult> stepResults = step.build().get();
 				results.addAll(stepResults);
-				if (options.failFast && !options.continueOnFailure && results.stream().anyMatch(r -> !r.isPassed())) {
+				if (options.failFast && !options.continueOnFailure && results.stream().anyMatch((r) -> !r.isPassed())) {
 					return results;
 				}
 			}
 		}
-		catch (RuntimeException e) {
-			throw e;
+		catch (RuntimeException ex) {
+			throw ex;
 		}
-		catch (Exception e) {
-			throw new IllegalStateException("continue-on-failure scope failed to close", e);
+		catch (Exception ex) {
+			throw new IllegalStateException("continue-on-failure scope failed to close", ex);
 		}
 		return results;
 	}
 
-	/** Convenience: run the default lineup with default options. */
+	/**
+	 * Convenience: run the default lineup with default options.
+	 * @param targetPath the skill file or folder of skills to validate
+	 * @return one result per validator, in canonical pipeline order
+	 */
 	public List<ValidationResult> run(Path targetPath) {
 		return run(targetPath, builder().build());
 	}
@@ -372,6 +267,131 @@ public final class Tier1Runner {
 		metadata.put("skip_reason", SKIP_REASON);
 		result.getMetadata().putAll(metadata);
 		return result;
+	}
+
+	/** Immutable run configuration; obtain via {@link #builder()}. */
+	public static final class Options {
+
+		private final Set<String> checks;
+
+		private final Set<String> skip;
+
+		private final int minScore;
+
+		private final String previousVersion;
+
+		private final boolean failFast;
+
+		private final boolean continueOnFailure;
+
+		private final SecretsScanner secretsScanner;
+
+		private final SecurityScanner securityScanner;
+
+		private Options(Builder b) {
+			this.checks = b.checks;
+			this.skip = b.skip;
+			this.minScore = b.minScore;
+			this.previousVersion = b.previousVersion;
+			this.failFast = b.failFast;
+			this.continueOnFailure = b.continueOnFailure;
+			this.secretsScanner = b.secretsScanner;
+			this.securityScanner = b.securityScanner;
+		}
+
+		public Set<String> getChecks() {
+			return this.checks;
+		}
+
+		public int getMinScore() {
+			return this.minScore;
+		}
+
+		public boolean isFailFast() {
+			return this.failFast;
+		}
+
+	}
+
+	public static final class Builder {
+
+		private Set<String> checks = Set.of();
+
+		private Set<String> skip = Set.of();
+
+		private int minScore = Constants.QUALITY_DEFAULT_MIN_SCORE;
+
+		private String previousVersion;
+
+		private boolean failFast;
+
+		private boolean continueOnFailure;
+
+		private SecretsScanner secretsScanner;
+
+		private SecurityScanner securityScanner;
+
+		/**
+		 * Restrict the run to these check names (aliases accepted). Empty means the
+		 * default lineup.
+		 * @param names check names, comma-separated or as separate arguments
+		 * @return this builder
+		 */
+		public Builder checks(String... names) {
+			this.checks = parse(names);
+			return this;
+		}
+
+		/**
+		 * Skip these checks (aliases accepted; {@code secrets} alone skips only the
+		 * Gitleaks scan).
+		 * @param names check names, comma-separated or as separate arguments
+		 * @return this builder
+		 */
+		public Builder skip(String... names) {
+			this.skip = parse(names);
+			return this;
+		}
+
+		public Builder minScore(int value) {
+			this.minScore = value;
+			return this;
+		}
+
+		public Builder previousVersion(String value) {
+			this.previousVersion = value;
+			return this;
+		}
+
+		public Builder failFast(boolean value) {
+			this.failFast = value;
+			return this;
+		}
+
+		/**
+		 * Scan every skill past a CRITICAL finding instead of stopping the folder early.
+		 * @param value {@code true} to keep scanning after a CRITICAL finding
+		 * @return this builder
+		 */
+		public Builder continueOnFailure(boolean value) {
+			this.continueOnFailure = value;
+			return this;
+		}
+
+		public Builder secretsScanner(SecretsScanner value) {
+			this.secretsScanner = value;
+			return this;
+		}
+
+		public Builder securityScanner(SecurityScanner value) {
+			this.securityScanner = value;
+			return this;
+		}
+
+		public Options build() {
+			return new Options(this);
+		}
+
 	}
 
 }

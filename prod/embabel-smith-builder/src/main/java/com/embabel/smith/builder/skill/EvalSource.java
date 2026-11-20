@@ -5,6 +5,7 @@
 
 package com.embabel.smith.builder.skill;
 
+import com.embabel.smith.builder.core.PromptData;
 import com.embabel.smith.builder.core.SpecPromptCaller;
 
 /**
@@ -30,7 +31,7 @@ public final class EvalSource {
 	 */
 	public static EvalSuite generate(SpecPromptCaller caller, String prompt, String skillName, String description) {
 		String user = "Below is a business-process description. Create the evals.json suite for the skill named '"
-				+ skillName + "'.\n\n" + description;
+				+ skillName + "'.\n\n" + PromptData.block("document", description);
 		return LlmJson.callAndParse(caller, prompt, user, 3, "the generated evals", EvalSuite::parse);
 	}
 

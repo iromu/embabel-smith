@@ -8,6 +8,7 @@ package com.embabel.smith.builder.skill;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import com.embabel.smith.builder.BuildOptions;
 import com.embabel.smith.builder.BuilderService;
@@ -40,12 +41,15 @@ import com.embabel.smith.builder.security.ScanVerdict;
  * <pre>
  *   1. SkillGenerator   — description → SKILL.md (name fixed by the description)
  *   2. SkillMdValidator — Agent Skills frontmatter constraints
- *   3. EvalSource       — the model drafts the evals.json suite
- *   4. EvalRunner       — every scenario run with the skill and without it
- *   5. Benchmark        — the two pass rates and the lift between them (the gate)
- *   6. security scan    — the static prompt-injection scan over the SKILL.md
- *   7. LifecycleStamper — content hash + with-skill pass rate as baseline + incubating
- *   8. Publisher        — FolderPublisher | GitPublisher (collision gate; no push by default)
+ *   3. SkillInspector   — the skill writing guidelines, redrafting the draft while the
+ *                         gate still refuses it (bounded by --max-inspect)
+ *   4. EvalSource       — the model drafts the evals.json suite
+ *   5. EvalRunner       — every scenario run with the skill and without it
+ *   6. Benchmark        — the two pass rates and the lift between them (the gate)
+ *   7. security scan    — the static prompt-injection scan over both documents the build
+ *                         publishes from model output: SKILL.md and evals.json
+ *   8. LifecycleStamper — content hash + with-skill pass rate as baseline + incubating
+ *   9. Publisher        — FolderPublisher | GitPublisher (collision gate; no push by default)
  * </pre>
  *
  * <p>
@@ -70,6 +74,8 @@ public class SkillBuilderService {
 
 	private final LifecycleStamper stamper = new LifecycleStamper();
 
+	private final SkillInspector inspector = new SkillInspector();
+
 	public SkillBuilderService(SpecPromptCaller caller) {
 		this(caller, SkillPrompts.generateSkill(), SkillPrompts.generateEvals(), SkillPrompts.gradeEval(),
 				SkillPrompts.agentWithSkill(), SkillPrompts.agentBaseline());
@@ -88,70 +94,133 @@ public class SkillBuilderService {
 	 * @param description the business-process description to compile.
 	 * @param target the destination to publish to.
 	 * @param options the per-build knobs; the skill gate reads
-	 * {@link BuildOptions#minLift()}.
+	 * {@link BuildOptions#minLift()}, and the inspection gate reads
+	 * {@link BuildOptions#maxInspect()} and {@link BuildOptions#fullInspection()}.
 	 * @return the build outcome, including the lift it was gated on.
 	 */
 	public SkillBuildResult build(String description, PublishTarget target, BuildOptions options) {
-		// 1. Generate: the name is fixed by the description so a rebuild targets the same
-		// source location, which is what the collision gate detects.
+		// 1–3. Generate, frontmatter, inspect — and redraft, up to --max-inspect times,
+		// while the inspection still refuses the draft. The bound is an explicit break on
+		// the last round, so the skill that leaves the loop is the one that was inspected
+		// and no redraft is paid for after the verdict is already known.
 		String skillName = PackName.slug(description);
-		Skill skill;
-		try {
-			skill = this.generator.generate(skillName, description);
-		}
-		catch (IllegalStateException ex) {
-			return SkillBuildResult.blocked("generate", skillName, List.of(ex.getMessage()), null, null);
-		}
+		int maxInspect = Math.max(0, options.maxInspect());
+		Skill skill = null;
+		SkillInspector.Inspection inspection = null;
+		int drafts = 0;
+		for (int round = 0; round <= maxInspect; round++) {
+			drafts++;
+			try {
+				skill = (inspection != null)
+						? this.generator.generate(skillName, description, inspection.blockingFindings())
+						: this.generator.generate(skillName, description);
+			}
+			catch (IllegalStateException ex) {
+				return SkillBuildResult.blocked("generate", skillName, List.of(ex.getMessage()), null, null);
+			}
 
-		// 2. Frontmatter gate: an ill-formed SKILL.md is never published.
-		List<String> frontmatter = SkillMdValidator.validate(skill.name(), skill.description());
-		if (!frontmatter.isEmpty()) {
-			return SkillBuildResult.blocked("validate", skillName, frontmatter, null, null);
-		}
+			// 2. Frontmatter gate: an ill-formed SKILL.md is never published, and a
+			// redraft is not asked to fix one — the record itself is wrong, not the
+			// writing.
+			List<String> frontmatter = SkillMdValidator.validate(skill.name(), skill.description());
+			if (!frontmatter.isEmpty()) {
+				return SkillBuildResult.blocked("validate", skillName, frontmatter, null, null);
+			}
 
-		// 3–5. Both arms, and the lift between them.
+			// 3. Inspection gate, before any eval scenario is drafted: it costs no model
+			// calls, and a draft it refuses would have made every arm a waste. Only the
+			// blocking findings go back to the model; advisories are reported, not fed
+			// back.
+			inspection = this.inspector.inspect(skill, options.fullInspection());
+			if (inspection.passed()) {
+				break;
+			}
+			if (round == maxInspect) {
+				return SkillBuildResult.blocked("inspect", skillName, inspection.blockingFindings(), null, null,
+						inspectionReport(inspection, drafts, options.fullInspection()));
+			}
+		}
+		SkillBuildResult.InspectionReport inspected = inspectionReport(inspection, drafts, options.fullInspection());
+
+		// 4–6. Both arms, and the lift between them.
 		EvalSuite evals;
 		try {
 			evals = EvalSource.generate(this.caller, this.evalsPrompt, skillName, description);
 		}
 		catch (IllegalStateException ex) {
-			return SkillBuildResult.blocked("eval", skillName, List.of(ex.getMessage()), null, null);
+			return SkillBuildResult.blocked("eval", skillName, List.of(ex.getMessage()), null, null, inspected);
 		}
 		if (evals.evals().isEmpty()) {
 			return SkillBuildResult.blocked("eval", skillName,
-					List.of("the model drafted no eval scenarios, so the skill cannot be validated"), null, null);
+					List.of("the model drafted no eval scenarios, so the skill cannot be validated"), null, null,
+					inspected);
+		}
+		// A scenario with no expectations contributes 0/0 to both arms, so it cannot
+		// move the lift: a suite of them blocks with "+0.000" indistinguishable from a
+		// genuinely useless skill, and a mixed suite silently gates on the scenarios
+		// that do measure something. Refused here, before either arm is paid for.
+		List<Integer> unmeasurable = evals.evals()
+			.stream()
+			.filter((eval) -> eval.expectations().isEmpty())
+			.map(EvalSuite.Eval::id)
+			.toList();
+		if (!unmeasurable.isEmpty()) {
+			return SkillBuildResult.blocked("eval", skillName,
+					List.of("the model drafted eval scenarios with no expectations (scenario "
+							+ unmeasurable.stream().map(String::valueOf).collect(Collectors.joining(", "))
+							+ "), so they measure nothing; every scenario must state at least one expectation"),
+					null, null, inspected);
 		}
 		Benchmark.Summary summary = Benchmark.aggregate(this.runner.run(skill, evals));
 		if (summary.lift() <= options.minLift()) {
-			return SkillBuildResult.blocked("eval", skillName, liftIssues(summary, options.minLift()), summary, null);
+			return SkillBuildResult.blocked("eval", skillName, liftIssues(summary, options.minLift()), summary, null,
+					inspected);
 		}
 
-		// 6. Security gate (static, offline) over the SKILL.md the skill publishes as.
-		ScanReport scan = this.scanner.scanText(skillName, skill.toSkillMd());
+		// 7. Security gate (static, offline) over every document the skill publishes from
+		// model output. The lifecycle sidecar is excluded: the builder wrote it, not the
+		// model.
+		ScanReport scan = this.scanner.scanText(skillName, List.of(skill.toSkillMd(), evals.toJson()));
 		if (scan.verdict() == ScanVerdict.BLOCK) {
 			List<String> findings = scan.findings()
 				.stream()
 				.map((f) -> f.severity() + " " + f.category() + ": " + f.message() + " [" + f.evidence() + "]")
 				.toList();
-			return SkillBuildResult.blocked("security", skillName, findings, summary, scan);
+			return SkillBuildResult.blocked("security", skillName, findings, summary, scan, inspected);
 		}
 
-		// 7. Lifecycle stamp: the with-skill pass rate is the baseline the library later
+		// 8. Lifecycle stamp: the with-skill pass rate is the baseline the library later
 		// compares against.
 		LifecycleMetadata lifecycle = this.stamper.stamp(SkillContentHash.of(skill, evals), summary.withPassRate());
 
-		// 8. Publish (collision gate; no push by default)
+		// 9. Publish (collision gate; no push by default)
 		try (Publisher publisher = publisherFor(target)) {
 			PublishResult published = publisher.publish(new SkillPublishable(skill, evals, lifecycle),
 					options.overwrite(), options.push());
-			return SkillBuildResult.built(skillName, summary, scan, lifecycle, published);
+			return SkillBuildResult.built(skillName, summary, scan, lifecycle, published, inspected);
 		}
 		catch (CollisionException ex) {
-			return SkillBuildResult.blocked("publish", skillName, List.of(ex.getMessage()), summary, scan);
+			return SkillBuildResult.blocked("publish", skillName, List.of(ex.getMessage()), summary, scan, inspected);
 		}
 		catch (IOException ex) {
 			throw new IllegalStateException("Failed to publish skill '" + skillName + "': " + ex.getMessage(), ex);
 		}
+	}
+
+	/**
+	 * What the gate did, in the form the build report carries. The checks it requested
+	 * are quoted so a reader can see the lineup was the binary-free one; the checks it
+	 * did not request come from the inspection itself.
+	 * @param inspection the gate's verdict
+	 * @param drafts the number of drafts the gate consumed
+	 * @param fullInspection whether the operator asked for the binary-backed checks
+	 * @return the report's inspection section
+	 */
+	private static SkillBuildResult.InspectionReport inspectionReport(SkillInspector.Inspection inspection, int drafts,
+			boolean fullInspection) {
+		return new SkillBuildResult.InspectionReport(SkillInspector.requestedChecks(fullInspection).size(),
+				inspection.qualityScore(), drafts, inspection.advisoryFindings(), inspection.incompleteScans(),
+				inspection.checksNotRun());
 	}
 
 	/**

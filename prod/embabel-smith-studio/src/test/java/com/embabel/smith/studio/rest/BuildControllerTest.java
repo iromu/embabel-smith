@@ -16,7 +16,6 @@ import com.embabel.smith.studio.rest.dto.BuildRequest;
 import com.embabel.smith.studio.rest.dto.BuildResponse;
 import org.junit.jupiter.api.Test;
 
-import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -67,7 +66,7 @@ class BuildControllerTest {
 			seenOptions.set(options);
 			return BuildResult.built("summarizer", 1.0, null,
 					new LifecycleMetadata("hash", 1.0, LifecycleState.ACTIVE, "now"),
-					new PublishResult(Path.of("/tmp/out/summarizer"), false));
+					new PublishResult("/tmp/out/summarizer", false));
 		}, configured());
 		BuildResponse response = controller
 			.build(new BuildRequest("a summarizer", "folder:/tmp/out", 5, true, false, null));

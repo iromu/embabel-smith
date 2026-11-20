@@ -13,6 +13,7 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
 import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.SafeConstructor;
@@ -23,16 +24,13 @@ import org.yaml.snakeyaml.events.ScalarEvent;
  * The comment-line model behind the PII scan, ported from the module-level helpers of
  * upstream {@code validators/security.py} ({@code _comment_line_numbers} and its
  * per-language helpers).
- *
  * <p>
  * The PII scan skips lines that are comments in the file's own syntax, so an address
  * written in a {@code #} comment is not reported while the same address inside a string
  * literal is. Which lines count is therefore language specific: Python, YAML, shell
  * (heredoc aware) and Markdown (frontmatter plus fenced code, each fence parsed in its
  * own language).
- *
  * <h2>Documented deviations</h2>
- *
  * <ul>
  * <li><b>Python: a line model, not {@code tokenize}.</b> Upstream runs the
  * standard-library tokenizer and keeps the lines whose COMMENT token sits on a physical
@@ -58,6 +56,8 @@ import org.yaml.snakeyaml.events.ScalarEvent;
  * reads files in Python's universal-newline mode, so a CRLF skill arrives here as LF text
  * and no fence or comment line ends in {@code \r}.</li>
  * </ul>
+ *
+ * @author Ivan Rodriguez
  */
 final class PiiCommentLines {
 
@@ -83,11 +83,14 @@ final class PiiCommentLines {
 	/**
 	 * Python {@code _comment_line_numbers}: lines to skip as comments for this file's
 	 * syntax.
+	 * @param filePath the file being scanned, only its name consulted for the language
+	 * @param lines the file split on newlines
+	 * @return 1-based line numbers to skip, chosen by the file's extension
 	 */
 	static Set<Integer> commentLineNumbers(Path filePath, List<String> lines) {
 		String name = filePath.getFileName().toString().toLowerCase(Locale.ROOT);
 		int dot = name.lastIndexOf('.');
-		String suffix = dot < 0 ? "" : name.substring(dot);
+		String suffix = (dot < 0) ? "" : name.substring(dot);
 		switch (suffix) {
 			case ".py" -> {
 				return pythonCommentLineNumbers(lines);
@@ -107,7 +110,11 @@ final class PiiCommentLines {
 		}
 	}
 
-	/** Python {@code _leading_hash_or_slash_comment_lines}. */
+	/**
+	 * Python {@code _leading_hash_or_slash_comment_lines}.
+	 * @param lines the file split on newlines
+	 * @return 1-based lines whose first non-space character is {@code #} or {@code //}
+	 */
 	static Set<Integer> leadingHashOrSlashCommentLines(List<String> lines) {
 		Set<Integer> out = new LinkedHashSet<>();
 		for (int i = 0; i < lines.size(); i++) {
@@ -119,7 +126,12 @@ final class PiiCommentLines {
 		return out;
 	}
 
-	/** Python {@code _shift_line_numbers}. */
+	/**
+	 * Python {@code _shift_line_numbers}.
+	 * @param lineNumbers 1-based numbers relative to a slice of the file
+	 * @param offset zero-based index in the full file where that slice starts
+	 * @return the same numbers renumbered for the whole file
+	 */
 	private static Set<Integer> shiftLineNumbers(Set<Integer> lineNumbers, int offset) {
 		Set<Integer> out = new LinkedHashSet<>();
 		for (int number : lineNumbers) {
@@ -132,6 +144,9 @@ final class PiiCommentLines {
 	 * Python {@code _python_comment_line_numbers}: the tokenizer verdict, modelled as
 	 * "first non-space character is {@code #} outside an open triple-quoted string", with
 	 * the TokenError fallback when a string or bracket is still open at end of file.
+	 * @param lines the file split on newlines
+	 * @return 1-based comment lines, or the leading-{@code #}-or-{@code //} verdict when
+	 * a string or bracket is still open at end of file
 	 */
 	static Set<Integer> pythonCommentLineNumbers(List<String> lines) {
 		Set<Integer> skip = new LinkedHashSet<>();
@@ -160,9 +175,9 @@ final class PiiCommentLines {
 				}
 				if (c == '\'' || c == '"') {
 					if (line.startsWith(String.valueOf(c).repeat(3), i)) {
-						int end = consumeTriple(line, i + 3, c == '"' ? 1 : 2);
+						int end = consumeTriple(line, i + 3, (c == '"') ? 1 : 2);
 						if (end < 0) {
-							openQuote = c == '"' ? 1 : 2;
+							openQuote = (c == '"') ? 1 : 2;
 							break; // unterminated for now: the rest of the line is string
 						}
 						i = end;
@@ -195,9 +210,13 @@ final class PiiCommentLines {
 	/**
 	 * Index just past the closing triple quote starting at {@code from}, or -1 when
 	 * unclosed.
+	 * @param line the line searched from {@code from} to its end
+	 * @param from index just after the opening triple quote
+	 * @param kind quote style: 1 for {@code """} and 2 for {@code '''}
+	 * @return the offset one past the closing marker, or -1 when it never appears
 	 */
 	private static int consumeTriple(String line, int from, int kind) {
-		String marker = kind == 1 ? "\"\"\"" : "'''";
+		String marker = (kind == 1) ? "\"\"\"" : "'''";
 		int i = from;
 		while (i < line.length()) {
 			if (line.charAt(i) == '\\') {
@@ -215,6 +234,9 @@ final class PiiCommentLines {
 	/**
 	 * Index just past a single- or double-quoted string starting at {@code from}, or -1
 	 * when unterminated.
+	 * @param line the line the string starts in
+	 * @param from index of the opening quote
+	 * @return the offset one past the closing quote, or -1 when the line ends first
 	 */
 	private static int consumeQuoted(String line, int from) {
 		char quote = line.charAt(from);
@@ -239,6 +261,8 @@ final class PiiCommentLines {
 	/**
 	 * Python {@code _yaml_scalar_content_lines}: 1-based lines covered by YAML scalars,
 	 * or null when the document cannot be parsed.
+	 * @param source the whole YAML document
+	 * @return the lines each scalar spans, or {@code null} when parsing fails
 	 */
 	static Set<Integer> yamlScalarContentLines(String source) {
 		try {
@@ -249,14 +273,14 @@ final class PiiCommentLines {
 					continue;
 				}
 				int start = scalar.getStartMark().getLine();
-				int end = scalar.getEndMark().getLine() - (scalar.getEndMark().getColumn() == 0 ? 1 : 0);
+				int end = scalar.getEndMark().getLine() - ((scalar.getEndMark().getColumn() == 0) ? 1 : 0);
 				for (int index = start; index <= Math.max(start, end); index++) {
 					covered.add(index + 1);
 				}
 			}
 			return covered;
 		}
-		catch (RuntimeException | StackOverflowError e) {
+		catch (RuntimeException | StackOverflowError ex) {
 			return null;
 		}
 	}
@@ -264,6 +288,9 @@ final class PiiCommentLines {
 	/**
 	 * Python {@code _yaml_comment_line_numbers}: {@code #} comments outside scalar
 	 * content.
+	 * @param lines the file split on newlines
+	 * @return 1-based {@code #} comment lines no scalar covers, empty when the document
+	 * cannot be parsed
 	 */
 	static Set<Integer> yamlCommentLineNumbers(List<String> lines) {
 		Set<Integer> covered = yamlScalarContentLines(String.join("\n", lines));
@@ -282,6 +309,8 @@ final class PiiCommentLines {
 	/**
 	 * Python {@code _shell_comment_line_numbers}: {@code #} comments, excluding heredoc
 	 * payloads.
+	 * @param lines the file split on newlines
+	 * @return 1-based {@code #} comment lines that are not heredoc content
 	 */
 	static Set<Integer> shellCommentLineNumbers(List<String> lines) {
 		Set<Integer> skip = new LinkedHashSet<>();
@@ -312,7 +341,12 @@ final class PiiCommentLines {
 		return skip;
 	}
 
-	/** Python {@code _fence_language}. */
+	/**
+	 * Python {@code _fence_language}.
+	 * @param info the text following the fence markers on the opening line
+	 * @return the first token, stripped of braces and dots and lowercased; empty when the
+	 * fence carries no info
+	 */
 	private static String fenceLanguage(String info) {
 		String trimmed = info.strip();
 		if (trimmed.isEmpty()) {
@@ -322,17 +356,29 @@ final class PiiCommentLines {
 		return token.replaceAll("^[{.]+", "").replaceAll("[}.]+$", "").toLowerCase(Locale.ROOT);
 	}
 
-	/** Python {@code _is_closing_fence}. */
+	/**
+	 * Python {@code _is_closing_fence}.
+	 * @param line the candidate closing line
+	 * @param marker the opening fence run, e.g. three backticks
+	 * @return {@code true} when the stripped line is at least as long as the marker and
+	 * made only of the marker character
+	 */
 	private static boolean isClosingFence(String line, String marker) {
 		String stripped = line.strip();
 		if (stripped.length() < marker.length()) {
 			return false;
 		}
 		char only = marker.charAt(0);
-		return stripped.chars().allMatch(c -> c == only);
+		return stripped.chars().allMatch((c) -> c == only);
 	}
 
-	/** Python {@code _comments_for_language}. */
+	/**
+	 * Python {@code _comments_for_language}.
+	 * @param language the normalized fence info string
+	 * @param lines the fenced body, whose own line numbering the caller shifts back
+	 * @return comment lines in that language's syntax, or the leading-{@code #}-or-{@code
+	 * //} rule for a language not modelled here
+	 */
 	private static Set<Integer> commentsForLanguage(String language, List<String> lines) {
 		if (PYTHON_FENCE_LANGS.contains(language)) {
 			return pythonCommentLineNumbers(lines);
@@ -346,7 +392,12 @@ final class PiiCommentLines {
 		return leadingHashOrSlashCommentLines(lines);
 	}
 
-	/** Python {@code _markdown_frontmatter_end}. */
+	/**
+	 * Python {@code _markdown_frontmatter_end}.
+	 * @param lines the file split on newlines
+	 * @return the zero-based index of the closing {@code ---}, or null when the document
+	 * does not open with frontmatter
+	 */
 	private static Integer markdownFrontmatterEnd(List<String> lines) {
 		if (lines.isEmpty() || !lines.get(0).strip().equals("---")) {
 			return null;
@@ -359,7 +410,12 @@ final class PiiCommentLines {
 		return null;
 	}
 
-	/** Python {@code _markdown_fence_comment_line_numbers}. */
+	/**
+	 * Python {@code _markdown_fence_comment_line_numbers}.
+	 * @param lines the file split on newlines
+	 * @param start zero-based index to begin looking for fences, after the frontmatter
+	 * @return comment lines inside each fenced block, numbered for the whole file
+	 */
 	private static Set<Integer> markdownFenceCommentLineNumbers(List<String> lines, int start) {
 		Set<Integer> skip = new LinkedHashSet<>();
 		int index = start;
@@ -382,7 +438,12 @@ final class PiiCommentLines {
 		return skip;
 	}
 
-	/** Python {@code _markdown_comment_line_numbers}. */
+	/**
+	 * Python {@code _markdown_comment_line_numbers}.
+	 * @param lines the file split on newlines
+	 * @return 1-based comment lines of the YAML frontmatter plus those inside fenced code
+	 * blocks
+	 */
 	static Set<Integer> markdownCommentLineNumbers(List<String> lines) {
 		Set<Integer> skip = new LinkedHashSet<>();
 		int bodyAt = 0;
@@ -395,7 +456,11 @@ final class PiiCommentLines {
 		return skip;
 	}
 
-	/** Python {@code str.rstrip("\r\n")}. */
+	/**
+	 * Python {@code str.rstrip("\r\n")}.
+	 * @param value the line to trim
+	 * @return {@code value} without its trailing carriage returns and newlines
+	 */
 	private static String rstripNewlines(String value) {
 		int end = value.length();
 		while (end > 0 && (value.charAt(end - 1) == '\r' || value.charAt(end - 1) == '\n')) {

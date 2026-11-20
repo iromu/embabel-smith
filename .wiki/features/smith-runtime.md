@@ -44,8 +44,9 @@ without it the CLI exits 1 with a clear configuration error naming the missing v
 
 ## Ingest + run
 
-`AgentSpecRunService` (a plain class — the CLI and the studio both embed it) owns the flow: parse +
-resolve the source, ingest, run, record. `RuntimeCore.ingest(source)` reads every pack, builds a
+`AgentSpecRunService` (a plain class — the CLI, the studio and the A2A endpoint all embed it) owns
+the flow: parse + resolve the source, ingest, run, record. `RuntimeCore.ingest(source)` reads every
+pack, builds a
 shared `DataDictionary` from the built-in I/O types plus every pack's intermediate types
 (deduplicated by name — the shared type is the cross-pack composition glue), assembles step specs,
 and deploys one agent. A source with no packs, or two packs exporting the same goal name, is an
@@ -78,6 +79,13 @@ The overall outcome comes from `getStatus()` / `getFailureInfo()` / `lastResult(
 (it implements `ConditionStep`) against the final `BlackboardWorldState` — a precondition is unmet
 when its key is not `TRUE`. See the module README's "Trace seam" section for the full spike
 findings.
+
+## A third door: the A2A endpoint
+
+`prod/embabel-smith-runtime-a2a` (`make run-a2a`) drives the same `AgentSpecRunService` over the
+A2A protocol, so an A2A run is the same run: same tier gate, same planner selection, one record in
+the same JSONL trace — which is also what its `tasks/get` reads. It is an unauthenticated local
+development surface on port 18090, serving five operations. See [[a2a-endpoint]].
 
 ## Tests
 

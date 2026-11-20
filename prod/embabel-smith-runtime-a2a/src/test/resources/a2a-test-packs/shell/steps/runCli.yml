@@ -1,0 +1,11 @@
+stepType: action
+name: runCli
+description: "Run the requested shell command and report its result"
+inputTypeNames:
+  - com.embabel.agent.domain.io.UserInput
+outputTypeName: com.embabel.agent.spec.model.BackgroundMessage
+toolGroups:
+  - shell
+prompt: |
+  The user asks you to run a shell command and report what it returned.
+  User request: {{userInput.content}}

@@ -1,0 +1,16 @@
+---
+stepType: "action"
+name: "research_manager_verdict"
+description: "Weigh the bull and bear cases to issue a structured investment plan."
+inputTypeNames:
+- "BullArgument"
+- "BearArgument"
+outputTypeName: "InvestmentPlan"
+prompt: "You are the Research Manager. Weigh the Bull's case {{bullArgument}} against\
+  \ the Bear's case {{bearArgument}}. Do not choose Hold merely because they disagree;\
+  \ commit to the stronger side sized by how decisively it wins. Issue a structured\
+  \ investment plan with a five-level recommendation (Buy/Overweight/Hold/Underweight/Sell),\
+  \ a rationale, and concrete strategic actions."
+pre: []
+post: []
+toolGroups: []

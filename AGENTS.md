@@ -27,16 +27,26 @@ multiplier.
 * Finally review the work done by the subagents.
 
 ## What to Read First
-
+0. `graphify-out/graph.json` Before grepping, globbing, or reading raw source files to answer architecture, dependency, or "how does X work" questions, check if `graphify-out/graph.json` exists.
 1. `README.md` — introduction, module table, run book, and the documentation index
 2. `.wiki/index.md` — wiki with all the knowledge you need to know
 3. `docs/index.md` — the durable reference; one page per durable concern
    (architecture, spec format, sources, runtime, builder, studio, improvement loop,
    POC evidence, backlog). Only read here if the wiki and README did not answer.
 
+---
+
+## graphify
+This project has a knowledge graph at `graphify-out/` with god nodes, community structure, and cross-file relationships.
+
+Rules:
+- ALWAYS read `graphify-out/GRAPH_REPORT.md` before reading source files, running searches, or answering codebase questions.
+- Use CLI commands like `graphify query`, `graphify path`, or `graphify explain` for cross-module relationship questions.
+- Update the graph with `graphify update .` after modifying code.
+
+
 ## Documentation status
 
-The OpenSpec planning trees were consolidated into `docs/` and removed on 2026-11-15.
 Do not go looking for `openspec/specs/` or a change folder for a capability — the
 `docs/` page is the contract, and the code outranks it where they disagree. The
 scaffolding still works (`openspec/config.yaml`, the CLI from `make setup`), so
@@ -53,5 +63,3 @@ and the reactor stops at the first failing module, hiding everything behind it.
 
 A vocabulary change is a documentation change: the wiki cross-links 44 pages and is
 published to GitHub Pages, so it needs a wiki lint and a re-publish afterwards.
-
----

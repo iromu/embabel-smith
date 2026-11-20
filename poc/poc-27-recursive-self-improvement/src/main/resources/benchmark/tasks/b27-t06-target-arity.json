@@ -1,0 +1,9 @@
+{
+  "id": "b27-t06",
+  "stage": "build target",
+  "prompt": "An operator runs the build command with `--target process`. Is that accepted, and if not, what does the command do instead?",
+  "require": ["no"],
+  "anyOf": ["usage error", "two targets", "not a target"],
+  "forbid": ["yes"],
+  "check": "Deterministic, no model call: PASS when the answer says the option value is rejected and identifies it as a usage error over the two accepted targets. A process is generated and scored on every agent-spec build and published only when recommended, but it is not a target value, so an answer that says the flag builds the multi-agent process fails."
+}

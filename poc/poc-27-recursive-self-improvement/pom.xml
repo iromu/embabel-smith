@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.iromu.embabel.smith</groupId>
+        <artifactId>embabel-smith-poc</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>poc-27-recursive-self-improvement</artifactId>
+    <name>poc-27-recursive-self-improvement</name>
+    <description>
+        POC 27: asks how much of embabel-smith's improvement loop can be made self-referential — can
+        the process that builds be improved, including the part that does the improving, without
+        grading its own homework. The loop in the studio improves only the prompts of the steps that
+        failed and cannot touch the generator that wrote them, and a builder-built pack is stamped
+        with a baseline equal to its own build-time score, so the strict gate comparison can never
+        pass. This POC fixes an interpreter (the Embabel platform, the scorer, the frozen task set,
+        the labelled trace corpus) and mutates only artifacts that interpreter runs: generated agent
+        specs, generated JavaScript skill scripts run through POC 26's GraalJS engine, and a
+        generated improvement policy expressed as one of those scripts. Improvement is measured as a
+        derivative across at least two generations against a noise floor recorded before any tuning,
+        and every variant is kept in an archive rather than hill-climbed.
+    </description>
+
+    <dependencies>
+        <!-- The in-JVM SkillScriptExecutionEngine the generated policies and skill scripts run on.
+             It reaches the ACTOR side of this module only; the referee (task 3.2) never constructs
+             one, and poc-26's dependency here is why isolation is by process boundary rather than
+             by absent jars. -->
+        <dependency>
+            <groupId>org.iromu.embabel.smith</groupId>
+            <artifactId>poc-26-graaljs-skill-scripts</artifactId>
+        </dependency>
+
+        <!-- The product's gate, reused exactly as it is: GateChain's two-argument constructor takes
+             the frozen task list and an invoker factory, which is the only seam the referee needs
+             (design D2, docs/10-self-improvement.md:8-12). prod/ is not modified.
+
+             The studio's own web and database surface is excluded. GateChain needs only smith-common
+             and the builder, so leaving spring-boot-starter-web, the JPA starter, the Postgres driver
+             and spring-boot-docker-compose on this module's classpath would turn this POC's launcher
+             into a web application bound to port 8080 and would pull in Hibernate and compose
+             auto-configuration, none of which the gate uses. -->
+        <dependency>
+            <groupId>org.iromu.embabel.smith</groupId>
+            <artifactId>embabel-smith-studio</artifactId>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-web</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-data-jpa</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.postgresql</groupId>
+                    <artifactId>postgresql</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-docker-compose</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <!-- EvalTask and InvokerFactory, the two types the gate is constructed over. -->
+        <dependency>
+            <groupId>org.iromu.embabel.smith</groupId>
+            <artifactId>embabel-smith-builder</artifactId>
+        </dependency>
+        <!-- AgentSpec, the candidate the gate judges. -->
+        <dependency>
+            <groupId>org.iromu.embabel.smith</groupId>
+            <artifactId>smith-common</artifactId>
+        </dependency>
+        <!-- The frozen task JSON is read here rather than through the product's codecs, which do not
+             know this format. -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>

@@ -1,0 +1,14 @@
+# The frozen seed prompt the inner loop mutates.
+#
+# This is the mutable surface `detection-policy` in ../evidence/MUTABILITY.md, and it is frozen for
+# a run: every generation applies exactly one mutation operator to this text and to nothing else,
+# which is what makes a generation attributable. The grammar is in ./README.md.
+#
+# The rules below are the product's. The two exclusions are the policy blocks that refining prompts
+# cannot fix, matched by message prefix because prod/.../improve/Detector.java matches them with
+# startsWith -- the corpus decoys are defects precisely because their messages mention the trust
+# tier without carrying this prefix.
+POLICY b27-inner-seed
+TRIGGER failed_step WHEN failed UNLESS error_prefix "Run blocked by trust tier" UNLESS error_prefix "Run blocked by lifecycle state"
+TRIGGER content_drift WHEN hash_differs
+TRIGGER below_baseline WHEN reeval_below_baseline
