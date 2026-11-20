@@ -139,6 +139,17 @@ smith_write_report() {
   local log="$1" file="$2"
   sed -n '/^\(BUILD OK\|BUILD BLOCKED\|SKILL BUILD OK\|SKILL BUILD BLOCKED\):/,$p' "$log" 2>/dev/null |
     awk '(/^[0-9][0-9]:[0-9][0-9]:[0-9][0-9]\./ || /^JvmType - /) && NR > 1 { exit } { print }' >"$file"
+  # A run that never reached a verdict — a rejected argument, a failure during startup — has no
+  # report to cut, and a zero-byte report.md reads as "nothing happened" rather than "nothing
+  # ran". Keep the CLI's last words instead, untimestamped lines only so the log's chatter about
+  # model registration does not drown them.
+  if [ ! -s "$file" ]; then
+    {
+      echo "NO REPORT: the CLI printed no verdict line, so nothing was built or blocked at a gate."
+      echo "The last things it said:"
+      grep -vE '^[0-9]{2}:[0-9]{2}:[0-9]{2}\.' "$log" | tail -20
+    } >"$file"
+  fi
 }
 
 # Run the builder CLI with the arguments given. Paths must be ABSOLUTE: --docs and --out

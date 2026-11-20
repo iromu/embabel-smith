@@ -76,7 +76,16 @@ if [ -z "$blueprint" ]; then
 fi
 shift
 docs="$(blueprint_dir "$blueprint")"
-extra=("$@")
+# Same contract as generate-spec.sh: everything after a literal `--` goes to `smith build`, and
+# the `--` itself is consumed here. Passing it on would be read by picocli as end-of-options,
+# which turns the flags after it into unknown positional arguments and fails the run at startup.
+extra=()
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --) shift; extra=("$@"); break ;;
+    *) extra+=("$1"); shift ;;
+  esac
+done
 
 smith_load_endpoint_env
 
