@@ -133,9 +133,13 @@ public final class Referee {
 	 * same failure — the loop setting its own pass mark.
 	 *
 	 * <p>
-	 * Presence is what is checked, not content. Task 2.4 has not named the path its
-	 * recorded baseline will be written to, so this is the path the referee looks for;
-	 * when 2.4 lands it either writes here or this constant changes with it.
+	 * Presence is what is checked, not content — and that is a real limitation now that
+	 * both artifacts exist. Task 2.4 wrote its measured baseline at exactly the path this
+	 * referee chose, so the path needed no renegotiation; but a {@code baseline.json}
+	 * recording {@code headroom: false} sitting beside a floor would be waved through,
+	 * because this method only asks whether the files are there. A launcher that starts a
+	 * paid run therefore has to read {@code headroom} and the verdict from the artifact,
+	 * not merely its existence.
 	 * @throws IllegalStateException naming every artifact that has not been recorded yet
 	 */
 	public void assertOuterLoopMayStart() {

@@ -71,6 +71,11 @@ impossible questions — it is a spread.
 | `b27-t06` | build target | fail — three targets is the natural assumption |
 
 That is a 2/6 baseline expectation, deliberately: a baseline pinned near the ceiling gives the strict
-comparison nothing to do, which is the failure mode already on record for builder-built packs. The
-measured baseline replaces this table when task 2.4 runs; this table is the design intent, not a
-result.
+comparison nothing to do, which is the failure mode already on record for builder-built packs. Task 2.4
+has since run, and `evidence/baseline.json` is the result; this table is the design intent it replaced,
+kept because the *disagreement* between them is informative. The aggregate agrees — the human label
+scored 2/6 — but by a different route: four of these six per-task predictions held, while `b27-t01`
+passed against the expectation that the "HIGH exists" prior would win, and `b27-t05` failed against the
+expectation that not-pushing is a common default. And the two arms are not interchangeable: the gate's
+substring arm scored 4/6 on the same answers, because it cannot carry the `anyOf` and `forbid` clauses
+that decide `t05` and `t06`. Read a figure here as naming its arm.

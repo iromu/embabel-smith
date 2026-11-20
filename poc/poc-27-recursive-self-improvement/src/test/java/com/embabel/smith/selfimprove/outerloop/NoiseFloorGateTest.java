@@ -28,9 +28,14 @@ import com.embabel.smith.selfimprove.referee.Referee;
  * inside the floor is both reported as no improvement and refused by the gate.
  *
  * <p>
- * The floor is injected as a value throughout. It is not read from
- * {@code evidence/noise-floor.json}, because task 2.5 has not measured one and this test
- * must not manufacture the artifact that file is supposed to record.
+ * The floor is injected as a value throughout, not read from
+ * {@code evidence/noise-floor.json}. Two reasons, and the second only arrived with the
+ * measurement. This test has to vary the floor, because its whole claim is that one delta
+ * is refused at a floor of 0.2 and accepted at 0.05 — an artifact holding a single value
+ * cannot express that, and reading one here would leave the class asserting a threshold
+ * rather than the comparison. And the measured floor, now that 2.5 has produced it, is
+ * 0.0, so nothing on disk supplies the pair this test needs. Neither reason licenses
+ * manufacturing the artifact, and no test here writes it.
  *
  * @author Ivan Rodriguez
  */
@@ -124,9 +129,9 @@ class NoiseFloorGateTest {
 		rows.putAll(OuterLoopFixtures.tableOf(gen2, OPERATORS, gen2Passing));
 		Referee referee = OuterLoopFixtures.referee(tasks, rows, this.meter);
 		return new OuterLoop(referee, this.meter, new HeldForApproval()).run(new OuterLoop.Request(gen1, OPERATORS,
-				Baseline.injected(OuterLoopFixtures.scoreOf(), "task 2.4 has not recorded a baseline"),
-				NoiseFloor.injected(floor, "task 2.5 has not measured a noise floor"), Budget.declare(200, 2),
-				this.work));
+				Baseline.injected(OuterLoopFixtures.scoreOf(), "a score this test chooses, not the measured baseline"),
+				NoiseFloor.injected(floor, "a threshold this test chooses, not the measured artifact"),
+				Budget.declare(200, 2), this.work));
 	}
 
 	private static VariantRecord variant(OuterRun run, int generation, MutationOperator operator) {

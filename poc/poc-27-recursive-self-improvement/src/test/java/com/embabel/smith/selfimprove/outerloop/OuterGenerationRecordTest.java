@@ -131,8 +131,9 @@ class OuterGenerationRecordTest {
 		Referee referee = OuterLoopFixtures.referee(tasks, OuterLoopFixtures.tableOf(improver, OPERATORS, passing),
 				this.meter);
 		return new OuterLoop(referee, this.meter, new HeldForApproval()).run(new OuterLoop.Request(improver, OPERATORS,
-				Baseline.injected(OuterLoopFixtures.scoreOf(), "task 2.4 has not recorded a baseline"),
-				NoiseFloor.injected(0.05, "task 2.5 has not measured a noise floor"), budget, this.work));
+				Baseline.injected(OuterLoopFixtures.scoreOf(), "a score this test chooses, not the measured baseline"),
+				NoiseFloor.injected(0.05, "a threshold this test chooses, not the measured artifact"), budget,
+				this.work));
 	}
 
 }

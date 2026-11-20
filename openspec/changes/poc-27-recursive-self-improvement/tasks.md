@@ -378,9 +378,11 @@ version again (`git diff --quiet` clean).
       claim. A run that scored nothing claims nothing.
 
 **Section 7 verification.** Twenty offline tests across seven suites → 0 failures, 0 errors, 0 skipped,
-0 Checkstyle violations. **No live outer-loop test exists at all** — none was written, because
-`Referee.assertOuterLoopMayStart()` refuses until `evidence/baseline.json` and `evidence/noise-floor.json`
-exist and fabricating them was refused. So the paid path is unexercised and belongs to 10.2. Nine
+0 Checkstyle violations. **No live outer-loop test exists at all** — none was written, because when §7
+landed neither artifact existed and writing one would have meant fabricating the evidence the referee
+guards. **That reason has since expired** — 2.4 and 2.5 recorded both files, so the guard now passes
+against real resources — but the conclusion stands unchanged: the paid path is unexercised here and
+belongs to 10.2. Nine
 test-compile defects were found and fixed by the section's own author on a second pass (seven missing
 `java.nio.file.Path` imports, one missing `FrozenTaskSet`, and a for-each over `PolicyImprover.Batch`
 instead of `.proposals()`); its fixture now also **throws if the test prepared answers for an operator

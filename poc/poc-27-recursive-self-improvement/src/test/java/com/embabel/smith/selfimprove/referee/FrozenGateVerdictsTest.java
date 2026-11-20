@@ -21,10 +21,12 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * <p>
  * The baseline these tests compare against is the known-bad fixture's measured score, not
- * a recorded number: task 2.4 has not recorded one, and inventing a constant would hide
- * the very comparison this is meant to exercise. Using the fixture's own measurement also
- * exercises the gate's strict comparison, because the bad candidate then has to beat its
- * own score to pass and does not.
+ * the recorded one. A recorded number now exists — task 2.4 measured 0.667 on the gate
+ * arm — but reading it here would test the wrong thing: these are offline tests over
+ * typed-in answers, and borrowing the live figure would make a fixture's verdict depend
+ * on what a model happened to answer. Using the fixture's own measurement also exercises
+ * the gate's strict comparison, because the bad candidate then has to beat its own score
+ * to pass and does not.
  *
  * @author Ivan Rodriguez
  */

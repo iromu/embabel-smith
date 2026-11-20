@@ -18,8 +18,11 @@ import com.embabel.smith.selfimprove.referee.Referee;
  * the baseline as an artifact a generation may not touch, and {@code Referee} refuses to
  * start a paid outer loop while {@code evidence/baseline.json} is absent. A run that was
  * given a number instead of reading the recorded one is still allowed to run — the
- * offline suite has to, and task 2.4 has not recorded a baseline yet — but it must say so
- * in its own report rather than let an assumed pass-rate read as a measured one.
+ * offline suite has to, and a test that varies the pass-rate it is checking cannot read
+ * the recorded one — but it must say so in its own report rather than let an assumed
+ * pass-rate read as a measured one. Task 2.4 has since recorded it, at 0.667 on the gate
+ * arm, so a caller that passes some other number is now departing from a measurement
+ * rather than filling a gap.
  *
  * @param passRate the pass-rate a candidate must beat, in {@code [0, 1]}
  * @param source where the number came from, in the run's own words

@@ -31,7 +31,12 @@ import com.embabel.smith.selfimprove.referee.Referee;
  * retention, the paired-delta judgement, the budget boundary, which curve is which, what
  * a run is allowed to claim. It does not measure model quality, and no score in these
  * tests is evidence about a model: the answers are typed in. A real score needs the
- * recorded baseline and the measured floor, which tasks 2.4 and 2.5 have not produced.
+ * recorded baseline and the measured floor. Both now exist — tasks 2.4 and 2.5 measured
+ * them into {@code evidence/baseline.json} and {@code evidence/noise-floor.json} — and
+ * these fixtures still decline to read them, because they hold the loop's mechanism under
+ * conditions a single measured pair cannot give: the gate arm's real score is one number
+ * and its real floor is 0.0, which cannot express a regression, a tie, or an improvement
+ * refused for being too small.
  *
  * <p>
  * The two answer sets are restated from the referee package's own fixtures rather than

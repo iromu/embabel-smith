@@ -32,8 +32,9 @@ import static org.assertj.core.api.Assertions.within;
  * <p>
  * This is where the two tasks meet the section that depends on them. Task 3.4 left the
  * naming of these paths open ("when 2.4 lands it either writes here or this constant
- * changes"); these tests close that by writing to the referee's own constants and handing
- * it the directory back. No model is called.
+ * changes"), and 2.4 closed the question by landing at exactly the referee's path — so
+ * the constant never had to move, which these tests also pin by writing to the referee's
+ * own constants and handing it the directory back. No model is called.
  *
  * @author Ivan Rodriguez
  */

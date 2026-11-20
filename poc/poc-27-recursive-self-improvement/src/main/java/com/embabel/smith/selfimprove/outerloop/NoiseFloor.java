@@ -22,10 +22,12 @@ import com.embabel.smith.selfimprove.referee.Referee;
  *
  * <p>
  * The floor is carried as a value rather than read from {@code evidence/noise-floor.json}
- * because that file has not been measured yet (task 2.5 is open), and the referee refuses
- * to start a paid outer loop until it exists. A caller that supplies the number is asking
- * the loop to exercise its selection logic, not asking it to certify an improvement — and
- * {@link #measured()} is how the run report says which one happened.
+ * because a caller that supplies the number is asking the loop to exercise its selection
+ * logic, not asking it to certify an improvement — and {@link #measured()} is how the run
+ * report says which one happened. The artifact now exists: task 2.5 measured it, and the
+ * measured floor is {@code 0.0}, so a run that reads it compares strictly rather than
+ * against a tolerance, and only a caller that injects a larger floor can exercise the
+ * inside-the-floor branch.
  *
  * @param delta the minimum score move that counts as improvement
  * @param source where the number came from, in the run's own words

@@ -107,8 +107,8 @@ class SingleGenerationOutcomeTest {
 		rows.putAll(OuterLoopFixtures.tableOf(gen2, OPERATORS, gen2Passing));
 		Referee referee = OuterLoopFixtures.referee(OuterLoopFixtures.frozenTasks(), rows, this.meter);
 		return new OuterLoop(referee, this.meter, new HeldForApproval()).run(new OuterLoop.Request(gen1, OPERATORS,
-				Baseline.injected(OuterLoopFixtures.scoreOf(), "task 2.4 has not recorded a baseline"),
-				NoiseFloor.injected(0.05, "task 2.5 has not measured a noise floor"),
+				Baseline.injected(OuterLoopFixtures.scoreOf(), "a score this test chooses, not the measured baseline"),
+				NoiseFloor.injected(0.05, "a threshold this test chooses, not the measured artifact"),
 				Budget.declare(OuterLoopFixtures.frozenTasks().ids().size() * 20, generations), this.work));
 	}
 
