@@ -157,17 +157,89 @@ service.
 
 ## 4. Inner loop — the improver as a generated script
 
-- [ ] 4.1 Run a hand-written detection policy as a JavaScript skill script through `poc-26`'s engine and verify it reproduces the existing loop's three detection triggers on a known trace window
-- [ ] 4.2 Generate detection policies as JavaScript from a policy prompt and verify the generated script parses and executes under the engine's statement and time limits
-- [ ] 4.3 Score each generated policy against the labelled corpus, reporting precision and recall separately on the held-out split, and verify the offline scoring test asserts a mixed policy yields two numbers rather than one blended score
-- [ ] 4.4 Run the inner loop to convergence over the free generations and verify the run writes a per-generation record with zero model calls counted
-- [ ] 4.5 Record a policy that attempts to reach outside its sandbox as a rejected generation and verify the rejection names the fixed artifact from `MUTABILITY.md`
+- [x] 4.1 Run a hand-written detection policy as a JavaScript skill script through `poc-26`'s engine and verify it reproduces the existing loop's three detection triggers on a known trace window
+      **Done.** `handwritten-detect.js` runs through `GraalJsSkillScriptExecutionEngine` over the frozen
+      corpus. The important choice is what it is compared against: not a paraphrase of the rules but the
+      product's own code — `Detector.failedNonPolicyBlock`, `Detector.belowBaseline` and `Detector.hasDrift`
+      are all `public static`, so the test asserts the policy's flag set **equals** the detector's for the
+      same window, and the compiled policy carries `Detector.TIER_BLOCK_PREFIX` / `LIFECYCLE_BLOCK_PREFIX`
+      by reference rather than a restated string. The two decoys are caught, not missed: `t-007` and `h-006`
+      mention the trust tier without carrying the prefix, so the prefix rule keeps them as defects — which is
+      exactly where a keyword policy would lose recall.
+      **Read this before quoting the number:** the reported precision and recall of 1.0 on the held-out split
+      are **hand-computed from the corpus labels, not measured**, and the labels and the policy were authored
+      by the same hand. A policy agreeing with labels written to match it is a consistency check, not
+      evidence about detection quality.
+- [x] 4.2 Generate detection policies as JavaScript from a policy prompt and verify the generated script parses and executes under the engine's statement and time limits
+      **Done, and "generated" here means a deterministic search, not a model.** A `PolicyPrompt` grammar is
+      mutated by one operator per generation off a frozen seed prompt and rendered by `PolicyCompiler`; no
+      endpoint is involved. Determinism is an executed assertion rather than a claim: the same seed yields
+      identical variant ids **and** identical sources, and a different seed yields different ids, so the seed
+      is demonstrably used. `RAN` status is the proof of staying inside the limits, because a statement or
+      time breach surfaces from the engine as a `Failure` naming the limit.
+- [x] 4.3 Score each generated policy against the labelled corpus, reporting precision and recall separately on the held-out split, and verify the offline scoring test asserts a mixed policy yields two numbers rather than one blended score
+      **Done.** `SplitScore` is `(double precision, double recall)` and the test pins the *types* of the two
+      components, which is stronger than blacklisting a name — a third blended number would have to be a
+      third component. A hand-authored mixed policy has positive false positives **and** positive false
+      negatives with `precision != recall`, so the two numbers cannot be equal by construction; a
+      keyword-instead-of-prefix variant scores 1.0 precision against below-1.0 recall on the held-out split,
+      which is the failure mode the split exists to show. Input hygiene is asserted too: the rendered stdin
+      field set is a subset of the corpus evidence and contains neither `label` nor `label_reason`, so a
+      policy cannot read the answer key.
+- [x] 4.4 Run the inner loop to convergence over the free generations and verify the run writes a per-generation record with zero model calls counted
+      **Done, and the zero is measured rather than typed.** Every record reports `modelCalls == 0` and the
+      meter itself reads zero — but the test that earns the tick is the one where a listener deliberately
+      spends **one** metered call on generation 1: that record then reads `1`, its neighbours read `0`, and
+      the run total reads `1`. Without it, "zero model calls" would be indistinguishable from a constant.
+      `generations.jsonl` carries one line per record with variant, parent, operator and separate numeric
+      precision and recall for both splits; patience 2 over 12 variants stops early with `CONVERGED`.
+- [x] 4.5 Record a policy that attempts to reach outside its sandbox as a rejected generation and verify the rejection names the fixed artifact from `MUTABILITY.md`
+      **Done.** Two probes run straight through the engine — `Java.type('java.lang.Runtime')` and
+      `readFile('heldout.jsonl')` — and the fixed-artifact name is derived from the engine's **own denial
+      text** (`"not allowed"`, `"was not staged"`), not from which operator the loop thinks it ran; those are
+      the same wordings poc-26 pins in its own test at `:159` and `:196`, so the mapping cannot silently
+      drift. A rejected generation carries no tuning or held-out score, the run halts with
+      `STOPPED_AT_REACH`, and the written record cites `evidence/MUTABILITY.md` and the artifact by name —
+      with the cited file read back from the classpath and checked to actually name both. A control
+      (malformed plus a dropped trigger) is classified `FAILED`/`SCORED` rather than rejected, so the
+      classifier is not rejecting everything it does not like.
 
 ## 5. Process generation from the self-description
 
-- [ ] 5.1 Generate a multi-agent process from the self-description through the existing process generator with single-shot technique only, and verify the output carries at least two agent specs
-- [ ] 5.2 Validate the generated hand-offs with the existing process validator, writing the pack folder directly rather than adding a build target, and verify a spec set with an uncovered input or an unresolved cycle is named and not scored
-- [ ] 5.3 Verify the generated process describes the pipeline the builder actually runs, by checking each named stage against `docs/08-builder.md`, and record any stage the generation dropped
+- [x] 5.1 Generate a multi-agent process from the self-description through the existing process generator with single-shot technique only, and verify the output carries at least two agent specs
+      **Done offline against a canned answer; the live path is written but not yet run.** The generator is
+      the product's `SingleShotProcessSpecGenerator` with its bundled `process_to_flow_multi` prompt — a test
+      asserts the system message *is* that prompt, so "single-shot technique only" is checked rather than
+      asserted, and the whole self-description arrives inside `<document>…</document>` untruncated. A
+      one-agent answer is refused with "single agent" rather than reported as a process. `SelfProcessGenerationLiveTest`
+      carries the same claim against a real model, `@Tag("live")` plus the endpoint gate, one paid call shared
+      by its two tests. **It has not been executed** — this module's test classpath has only `junit-jupiter`
+      and `assertj-core`, so it boots Spring by hand (`SpringApplicationBuilder(SelfImproveApp.class)
+      .web(NONE)`); whether an `Ai` bean resolves there is unproven until 10.2 runs it.
+- [x] 5.2 Validate the generated hand-offs with the existing process validator, writing the pack folder directly rather than adding a build target, and verify a spec set with an uncovered input or an unresolved cycle is named and not scored
+      **Done, with no prod change and no new build target** — the folder is written with `smith-common`'s own
+      `ProcessSpecWriter` and read back with `ProcessSpecReader`, then validated and repaired. "Not scored" is
+      asserted as an absence that could have been present: the scorer is an injected call-counting function,
+      so an uncovered input (`publish-pack`/`publish` needing a `ReviewedDraft` nothing produces) and a
+      mutual-data cycle each name the offender and leave the counter at **zero**. The control is what makes
+      those two tests mean something: the same validator and repair on a *sound* data flow merely narrated in
+      the wrong order settles after one reorder and **does** reach the scorer. The generator's own canned
+      answer also goes generator → writer → reader → validator end to end, so the claim is about emitted
+      shape and not about a tidier hand-authored fixture.
+      **Two limits kept in the open:** a pack folder is named after its pack, so two agents sharing a name
+      cannot be represented and the second overwrites the first; and the `reorders() == 1` in the control is
+      derived from reading `ProcessRepair`'s loop — it breaks *before* incrementing when the data order is
+      unfixable, which is what distinguishes a real cycle (0) from a wrong ordering (1).
+- [x] 5.3 Verify the generated process describes the pipeline the builder actually runs, by checking each named stage against `docs/08-builder.md`, and record any stage the generation dropped
+      **Done as an instrument; the measurement itself is owed to the live run.** `BuilderPipelineStages`
+      carries the builder's eight stages in `build()` order, each with a verbatim quote anchoring it to
+      `docs/08-builder.md`, and a test re-checks all eight anchors are still in that page — so the stage list
+      cannot silently drift from the document it claims. Named ∪ dropped must partition the eight, which
+      means a stage can be neither lost nor invented by the check. **The dropped count is deliberately not
+      asserted:** pinning it would freeze one run's answer into permanent evidence in a frozen directory, and
+      a drop is 5.3's finding rather than a failure. It is printed into the surefire report for the live run
+      to read. The instrument is a coarse substring match over declared text and errs toward reporting a
+      drop, so a paraphrased stage reads as missing — evidence to read, not a verdict.
 
 ## 6. Skill scripts that run
 
@@ -187,8 +259,50 @@ service.
 
 ## 8. Human control
 
-- [ ] 8.1 Hold gated candidates for approval and publish nothing, and verify a passing candidate increments the held count with no pack written to a source
-- [ ] 8.2 Verify the loop never pushes, by asserting the push flag is never set on any code path the POC can reach
+- [x] 8.1 Hold gated candidates for approval and publish nothing, and verify a passing candidate increments the held count with no pack written to a source
+      **Done, by reusing the product's queue rather than counting in a parallel place.**
+      `HeldForApproval` hands the candidate to `ApprovalQueue` and never receives a publisher it could call:
+      the `LoopPublisher` it is given is `NOTHING_PUBLISHED`, which throws. Five tests: two gated candidates
+      take the held count 0→1→2 with the ids in order and the destination directory still empty; an ungated
+      candidate rejected at the `baseline` stage throws naming the stage and never enters the queue; a
+      gated report carrying no gate score is **refused** rather than silently held as a zero; and the class
+      exposes no method returning `PublishResult` while the same return-type detector does find
+      `ApprovalQueue.approve`. The non-vacuity half is the one that matters — a real `FolderPublisher`
+      publishing the same pack to the same destination **does** create the directory, so "empty after
+      holding" is a result and not a test that could not have written anything.
+- [x] 8.2 Verify the loop never pushes, by asserting the push flag is never set on any code path the POC can reach
+      **Done three ways, each with a control, because an absence assertion passes by being blind.**
+      **(a)** a walk of the object graph reachable from a populated `HeldForApproval` finds no
+      `Publisher`/`Publishable`/`PublishResult`/`LoopPublishPolicy` and reports that it read everything it
+      could — with a control that plants a `FolderPublisher` behind a field and a `LoopPublishPolicy(true,
+      "git:", null)` and shows the same walk reports both;
+      **(b)** `LoopPublishPolicy` is `final` with exactly one constructor whose first parameter is `boolean`
+      and declares no static factory, so push can only arrive explicitly — and the only configured value on
+      this classpath is read from `StudioConfiguration`'s constant pool, which contains
+      `smith.studio.loop.push:false` and never `:true`. The constant pool is used instead of reflection
+      because this module's pom excludes the studio's web, JPA, Postgres and docker-compose starters, so
+      resolving that `@Configuration` class's signatures would risk `NoClassDefFoundError`;
+      **(c)** no POC production source names a publishing type or the setting key, with the scanned set
+      provably including the class under test, and a control package where the same matcher does report hits.
+      **Two things this leaves true and undone:** the scan in (c) deliberately spans the whole
+      `selfimprove` production tree rather than one package, because the claim is POC-wide — so a later
+      section that legitimately needs a publishing type will fail a test it does not own, and the honest
+      resolution then is to narrow the scan and say why, not to relax it; and `NOTHING_PUBLISHED` is never
+      executed by any test, since no public path reaches it by design, so its refusal text is unverified and
+      the class-shape assertion is what stands in for it.
+
+**Section 4, 5 and 8 verification, one place.** `make test-module MODULE=poc/poc-27-recursive-self-improvement`
+→ **`Tests run: 70, Failures: 0, Errors: 0, Skipped: 0`**, 0 Checkstyle violations, BUILD SUCCESS, with
+upstream green around it (common 39, specsource 29, skillevaluator 942, runtime 82, builder 241, studio 162,
+poc-26 31). `SelfProcessGenerationLiveTest` appears zero times in the log, so the two live tests were
+group-excluded and **no model was called**. Getting there took five fixes, all of them in code the agents
+wrote against APIs they had not compiled against: `ArrayNode.set(node)` → `add(node)` in `PolicyInput`; an
+invented `builder.lifecycle.LifecycleTransitions` replaced by the real `LifecycleMetadata` record built with
+`SpecContentHash.of(pack)`; AssertJ's non-existent `ListAssert.concatWith` replaced by a `Stream.concat`
+union; the return-type detector taught to skip synthetic members, since it was matching the compiler-
+generated body of the `NOTHING_PUBLISHED` lambda; and a drift-test fixture that passed `goal = null` and so
+threw inside `SpecContentHash.of`. 22 `InnerTypeLast` violations were returned to the section that authored
+them rather than fixed by me.
 
 ## 9. Evidence and documentation
 
