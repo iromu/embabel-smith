@@ -292,13 +292,64 @@ version again (`git diff --quiet` clean).
 
 ## 7. Outer loop — generations and the archive
 
-- [ ] 7.1 Run the surviving offline policy as the generation-1 improver and score its candidates through the referee, and verify the run records score, parent and cost per variant
-- [ ] 7.2 Retain every variant including ones that score below their parent, and verify an archive query returns a losing variant by its parent pointer
-- [ ] 7.3 Derive generation 2's improver from generation 1's and run it, and verify the report states improvement per generation rather than a single score
-- [ ] 7.4 Judge improvement as a paired delta against the recorded noise floor and verify a delta inside the floor is reported as "no improvement" and rejected by the gate
-- [ ] 7.5 Compare archive selection against greedy selection over the identical generations and verify both curves are reported
-- [ ] 7.6 Declare the model-call and generation budget before the first call and verify a run that exhausts it stops at the boundary and states which measurements were not taken
-- [ ] 7.7 Report a single-completed-generation outcome as one round of hill-climbing with the recursive claim marked untested, and verify the reporting path is covered by a test
+- [x] 7.1 Run the surviving offline policy as the generation-1 improver and score its candidates through the referee, and verify the run records score, parent and cost per variant
+      **Done, with generation 1 anchored to a fact rather than to a choice.** The improver gen 1 runs *is*
+      the frozen seed prompt that `InnerLoopConvergenceTest` establishes survives the inner loop, so the
+      outer loop does not quietly pick a nicer starting policy. Every scored variant records a frozen
+      score, a parent pointer (root for the unchanged policy, the improver for mutations) and a metered
+      call count, and the per-variant cost is asserted equal to the frozen set's size rather than left
+      uncounted.
+- [x] 7.2 Retain every variant including ones that score below their parent, and verify an archive query returns a losing variant by its parent pointer
+      **Done, and the retention is enforced rather than incidental.** After a generation where every
+      variant scores below its parent, all ten are still in the archive, `withParent(gen1Winner)` returns
+      the losers and marks them `regression`, and re-retaining an id **throws** rather than overwriting a
+      recorded score — so the archive cannot be quietly rewritten into looking like hill-climbing.
+- [x] 7.3 Derive generation 2's improver from generation 1's and run it, and verify the report states improvement per generation rather than a single score
+      **Done, and "no single score" is proved structurally.** Gen 2's improver names gen 1's selected
+      variant as its origin and each generation reports its own paired delta against its own reference.
+      The type-level half asserts that no `OuterRun` accessor returns a `double`/`Double`, with
+      `GenerationReport` as the control that *does* return one — so the detector is shown to see a score
+      when one is present. A mutation operator that does not fit the prompt is reported rather than
+      silently dropped, and the refusal reaches the run's `notMeasured`.
+- [x] 7.4 Judge improvement as a paired delta against the recorded noise floor and verify a delta inside the floor is reported as "no improvement" and rejected by the gate
+      **Done, and read the caveat before quoting it.** One task of six (0.167) is no improvement against a
+      0.2 floor and is improvement against 0.05; the same variant is refused by the product's own gate at
+      stage `baseline` and never reaches the approval queue, with a control where only the floor changes
+      and it is gated and held. **But every floor in these tests is `injected`, not `measured`** — the
+      loop is not permitted to run before `evidence/noise-floor.json` exists, and task 2.5 has not
+      produced it. The distinction is carried honestly in the type (`measured()` vs `injected()`, with the
+      provenance printed in the run report), so this verifies the *mechanism* of floor-gating, not a
+      measured threshold. It also cannot be quoted as a unit-mixing risk resolved: the floor and the delta
+      must come from the same scorer, which §2.5's ruling now enforces in the evidence schema.
+- [x] 7.5 Compare archive selection against greedy selection over the identical generations and verify both curves are reported
+      **Done, and the divergence is the point.** Over identical hand-built generations where the eventual
+      winner descends from a *discarded* variant, archive selection reaches 0.9 while greedy stalls at
+      0.7, diverging at generation 2. The control is the honest half: when the winner does descend from
+      the champion the two curves are identical and the report says the run does not separate the rules —
+      so this POC cannot claim archive-beats-greedy from a run that did not test it. Note this is a
+      constructed fixture, not a measured run, and per §9.1 `design.md` D6's contrast with DGM is this
+      POC's own analogy, not a finding of `2505.22954`.
+- [x] 7.6 Declare the model-call and generation budget before the first call and verify a run that exhausts it stops at the boundary and states which measurements were not taken
+      **Done, and the check is before the call, not after.** A budget of exactly two candidates spends
+      exactly two, stops at the model-call boundary and names the three unscored variants plus the
+      generation never run; a budget that cannot buy one candidate spends **nothing** and scores nothing;
+      a generation-budget stop is labelled a generation-budget stop rather than looking finished; and a
+      zero-call, zero-generation or 1.0-floor budget is rejected at declaration.
+- [x] 7.7 Report a single-completed-generation outcome as one round of hill-climbing with the recursive claim marked untested, and verify the reporting path is covered by a test
+      **Done, and the wording changes only for a reason a test can see.** One completed generation says
+      "one round of hill-climbing, recursive claim untested" even when that generation beat its baseline,
+      and the run report ends on that sentence. The control adds one generation to the same fixtures and
+      the claim changes *because the generation count did*, stopping explicitly short of the interpreter
+      claim. A run that scored nothing claims nothing.
+
+**Section 7 verification.** Twenty offline tests across seven suites → 0 failures, 0 errors, 0 skipped,
+0 Checkstyle violations. **No live outer-loop test exists at all** — none was written, because
+`Referee.assertOuterLoopMayStart()` refuses until `evidence/baseline.json` and `evidence/noise-floor.json`
+exist and fabricating them was refused. So the paid path is unexercised and belongs to 10.2. Nine
+test-compile defects were found and fixed by the section's own author on a second pass (seven missing
+`java.nio.file.Path` imports, one missing `FrozenTaskSet`, and a for-each over `PolicyImprover.Batch`
+instead of `.proposals()`); its fixture now also **throws if the test prepared answers for an operator
+that proposed nothing**, which closes a hole where a test would assert against a variant that never ran.
 
 ## 8. Human control
 
@@ -375,6 +426,20 @@ them rather than fixed by me.
 - [ ] 10.2 Run the documented end-to-end sequence once against a live endpoint and verify it produces the archive, the per-generation report, and the held-candidate count in one pass
 
 ## Workflow follow-up
+
+- **`Referee.assertOuterLoopMayStart()` checks presence, not content** (verified in
+  `referee/Referee.java:141-153`: it only calls `Files.isRegularFile`). A `baseline.json` recording
+  `headroom: false` sitting next to a `noise-floor.json` would therefore let the outer loop start,
+  which is the exact case task 2.4's stop-and-record path exists to prevent. It does not bite today —
+  the baseline writer refuses to write the floor when there is no headroom, so the guard's absence
+  check catches it by accident of write order. **Task 10's launcher must read `headroom` and the
+  verdict from `baseline.json`, not just its existence.** Decided not to widen the guard now: it is
+  §3's tested class, and the honest fix belongs with whoever wires 10.2.
+- **`Baseline` and `NoiseFloor` each exist twice** — `selfimprove/baseline/` (the artifact shapes) and
+  `selfimprove/outerloop/` (the run's reference values carrying measured-vs-injected provenance).
+  Different packages, so it compiles and the semantics genuinely differ. Flagged as a readability
+  hazard for a rename on one side; deliberately not renamed mid-POC, because two agents own the two
+  sides and a cross-package rename is not a drive-by fix.
 
 - Update `.wiki/` for the new POC and vocabulary, run the wiki lint, and re-publish to GitHub Pages (AGENTS.md: a vocabulary change is a documentation change).
 - Commit the change; do not push (AGENTS.md and `docs/05-architecture.md`).
