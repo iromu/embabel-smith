@@ -163,6 +163,10 @@ confound a self-improvement result with a known upstream block.
   a collapsed generation is visible as a regression rather than as the new normal.
 - **Run-to-run variance swamps the effect** → paired repeats, a pre-recorded noise floor, and the
   derivative test; a delta inside the floor is reported as "no improvement", not as a small improvement.
+  **Part of this defence did not survive contact with the endpoint:** the measured floor is 0.0 across
+  three repeats with no task flipping, so on this setup the inside-the-floor branch cannot fire and the
+  protection reduces to the paired repeats and the derivative test. That is a property of a
+  near-deterministic local model, not a reason to raise the threshold.
 - **The detector overfits the labelled corpus** → hold out a labelled split, report precision and recall
   separately, and expect a high-recall low-precision policy (a loop prefers to believe failures exist).
 - **The improver makes easy candidates instead of better ones** → the task set is frozen and a candidate
@@ -183,5 +187,12 @@ throughout, so nothing else can be affected.
 ## Open Questions
 
 - How many tasks the frozen set needs, decided by the measured headroom rather than in advance.
+  **Half answered:** 2.4 measured headroom as true on six tasks — two of six fail the gate arm — so the
+  set is not what is constraining the loop. Six is enough to leave room; whether it is enough to
+  *distinguish* candidates is a question the six-task set cannot answer on its own, since one flipped
+  task moves the score by 0.167.
 - Whether the outer loop buys two generations or three, decided once the noise floor and per-generation
-  endpoint time are known.
+  endpoint time are known. **One of the two is now known, and it argues for the longer run, not the
+  shorter one:** the measured floor is 0.0, so there is no variance for an extra generation to have to
+  overcome — the only reason to stop early was that a later generation's gain might not clear the floor.
+  Per-generation endpoint time is the remaining half, and 10.2's run is what measures it.
