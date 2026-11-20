@@ -21,8 +21,10 @@ one place that names the accepted schemes (`publish/PublishTarget.parse`).
 **Discovery is one level deep, deliberately.** A folder source scans immediate subdirectories and
 treats a directory as a pack when it has a `manifest.yml` *and* it validates — discovery reuses
 `smith-common`'s validator rather than re-implementing a check, so the two can never disagree.
-Deeper nesting is a future concern, not a v1 feature. An invalid candidate is reported as a warning
-and skipped; an empty source is a warning, not an error.
+Deeper nesting is a future concern, not a v1 feature. It is also why a published destination holds one
+directory per pack name rather than one per version: the versions of a pack live in the store
+(§Publishing), never as `pack/v2/` nesting inside a source. An invalid candidate is reported as a
+warning and skipped; an empty source is a warning, not an error.
 
 ## Git resolution
 
@@ -74,10 +76,20 @@ That is why the collision gate and the no-push rule are stated once here instead
 | Behaviour | Rule | Why |
 | --- | --- | --- |
 | Target grammar | the same `folder:` / `git:` grammar as reads | one grammar for the whole system |
-| Name collision | refused unless `--overwrite` is passed | a silent overwrite of someone else's pack is the worst possible default |
+| Name collision | a CLI publish is refused unless `--overwrite` is passed; the improvement loop passes it, so its destination directory is replaced | a silent overwrite of someone else's pack is the worst possible default — and the flag is a human being asked to confirm a replacement, which is an ask the loop cannot answer for |
 | Git publish | **commit, never push** by default; `--push` is opt-in | pushing is a shared-state action needing credentials and intent |
 | Commit message | `smith: publish <unit> (baseline <score>)` | the baseline the improvement loop later compares against is in history |
 | Reported location | `folder:` → the directory it wrote; `git:` → `git:<repo>#<unit>` | a location has to still be true when it is read. The git publisher clones into a temporary working tree and `close()` deletes it, so a path inside that tree names nothing; the repository and the unit's path within it is where the artifact actually lives |
+
+A loop publish has a second destination, and that is where its history lives. `FolderPublisher`
+names the directory it writes from `Publishable.name()`, so the artifact's version is nowhere in the
+path and a republish replaces the directory; the loop's `LoopPublishPolicy.publish` then records the
+pack it just published through `ProcessStore.savePackWhenConfigured`, and the studio's `packs` table
+is keyed by `(name, version)` — the version the artifact declares, or `1.0.0` for one that declares
+none. **A bare pack name means that pack's highest version**, compared segment by segment and
+numerically where a segment is a number, in `store/ProcessStore` rather than in a query; the listing
+resolves through the same rule so it cannot disagree with a load. A studio with no database bound
+records nothing and still publishes.
 
 The location is one value, stated in the source's own terms, and every surface that reports it
 prints it unchanged: `BuildResult.report()` and `skill/SkillBuildResult.report()` print it, and the

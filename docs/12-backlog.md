@@ -176,12 +176,27 @@ no longer wraps `PocOnlyPane.vue`.
   `PUSH_DISABLED` instead of reporting a publish. A `folder:` source is unchanged. Check:
   `grep -rn 'proposedLifecycle(), true, true'
   prod/embabel-smith-studio/src/main/java/` returns nothing.
-- **Open — the loop still forces `overwrite = true`.** The same publish call passes the collision flag
-  hard-coded, so an iteration replaces a same-named published pack without the `--overwrite` intent
-  [`06-spec-sources.md`](06-spec-sources.md) asks for. Deliberately left out of the push decision:
-  folding an unrelated behaviour change into a shared-state fix hides it. Decide whether the loop has
-  to give collision intent too. Check: `grep -rn 'boolean overwrite = true'
-  prod/embabel-smith-studio/src/main/java/com/embabel/smith/studio/improve/LoopPublishPolicy.java`.
+- **Closed — the loop no longer depends on the folder for durability.** The forced `overwrite = true`
+  is still there, deliberately: `FolderPublisher` names the destination directory from
+  `Publishable.name()` and `Publishable` exposes no version, so clearing the flag would make the loop's
+  second publish throw `CollisionException` — unchecked, and caught nowhere on the loop's path —
+  instead of improving. What changed is where the previous version survives. A publish that succeeds
+  now also records the pack through `ProcessStore.savePackWhenConfigured`, and `packs` is keyed by
+  `(name, version)`: `improve/Refiner` builds the candidate one patch above the pack it improves, an
+  artifact declaring no version is stored at `PackEntity.DEFAULT_VERSION`, a bare name resolves to the
+  highest version, and `storage/PacksKeyMigration` re-keys an existing name-keyed table when the
+  database is bound, because `hbm2ddl.auto = update` adds columns but never re-keys a primary key. `ProcessStoreTest`'s
+  `twoVersionsOfOneNameAreStoredAsTwoRows` and `highestVersionComparesNumericallyNotLexically`,
+  `RefinerTest`'s `candidateIsOnePatchAboveThePackItImproves` and
+  `candidateOfAPackDeclaringNoVersionStartsAboveTheStoredDefault`, and `ImprovementLoopTest`'s
+  `aLoopPublishLeavesARowAtTheCandidateVersion` pin it; the builder gained no persistence dependency,
+  and `builder/eval/RefinementLoop` still returns the version it was given
+  (`RefinementLoopTest.aRefinedPackKeepsTheVersionItWasGiven`) because a `--max-refine` build does not
+  publish. The rule is stated once, in [`06-spec-sources.md`](06-spec-sources.md) §Publishing. Check:
+  `grep -rn 'savePackWhenConfigured(candidate.candidate())'
+  prod/embabel-smith-studio/src/main/java/com/embabel/smith/studio/improve/LoopPublishPolicy.java`
+  returns the post-publish save. `grep -rn 'boolean overwrite = true'` on that same file still returns
+  a line: the flag's survival is the ruling, not the gap.
 
 ## Skill evaluator
 

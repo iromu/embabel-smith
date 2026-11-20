@@ -222,30 +222,59 @@ schema the rest sits on.
 Four pages speak about this rule, and a change that lands without updating all four leaves three of them
 describing a behaviour that no longer exists. Each is named with what it currently says.
 
-- [ ] 5.1 `docs/06-spec-sources.md` — rewrite the `## Publishing` table row "Name collision | refused
+- [x] 5.1 `docs/06-spec-sources.md` — rewrite the `## Publishing` table row "Name collision | refused
       unless `--overwrite` is passed" to say what the code now does: the CLI still refuses without the flag,
       and the loop still replaces its folder destination but keeps every published version as a row keyed by
       `(name, version)`. Check whether `## Discovery is one level deep, deliberately` needs a clause
       confirming versions are **not** nested directories — decision 7 keeps the folder named by the pack
       alone, so that section is now the reason the folder cannot hold versions, and the page should say so.
       Verify by reading every rule on the page back out of the classes it names.
-- [ ] 5.2 `docs/10-self-improvement.md` — it currently ends its publish paragraph with "The loop's forced
+      Done 2026-11-20. The table row now separates the two callers: a CLI publish is refused without
+      `--overwrite`, the loop passes it and its destination directory is replaced, with the reason — the flag is
+      a human being asked to confirm a replacement, which is an ask the loop cannot answer for. The store rule
+      decision 2 required to be stated once is stated here: `FolderPublisher` names the directory from
+      `Publishable.name()`, the version is nowhere in the path, and `ProcessStore.savePackWhenConfigured` is
+      where the replaced version survives, keyed `(name, version)`, `1.0.0` for an artifact declaring none, a
+      bare name meaning the highest version compared segment by segment in Java rather than a query.
+      `## Discovery is one level deep, deliberately` gained the clause: that section is why a destination holds
+      one directory per pack name and never `pack/v2/` nesting.
+- [x] 5.2 `docs/10-self-improvement.md` — it currently ends its publish paragraph with "The loop's forced
       `overwrite` is a separate decision, still open in `12-backlog.md`". That sentence becomes false the
       moment this change lands. Replace it with what the loop does now: it still replaces the folder, and the
       improvement survives in the store at an incremented version.
-- [ ] 5.3 `docs/12-backlog.md` — there is already an item reading "Open — the loop still forces
+      Done 2026-11-20. That sentence is gone; the paragraph now says the loop still passes the collision flag
+      and why clearing it would collide rather than improve, and that the improvement survives in the
+      `(name, version)` store at one patch above the pack improved, resolving by bare name through the rule in
+      `06-spec-sources.md`. **One sentence on the same page is still not true and is not this task's to fix:**
+      "A `folder:` source is unaffected — a local write is already durable" holds for a configured folder, not
+      for the unconfigured case that `StudioConfiguration.loopPublisher` still routes to the system temp
+      directory. Task 4.1 owns that fallback; re-read the sentence when 4.1 lands.
+- [x] 5.3 `docs/12-backlog.md` — there is already an item reading "Open — the loop still forces
       `overwrite = true`", with `Check: grep -rn 'boolean overwrite = true' prod/embabel-smith-studio/src/main/java/com/embabel/smith/studio/improve/LoopPublishPolicy.java`.
       **Do not close it as an absence: decision 7 keeps that line on purpose.** Rewrite the item in the
       page's `Closed —` form around what actually changed — the loop no longer *depends* on the folder for
       durability — and change its `Check:` to something that is true afterwards (e.g. that the loop's
       publish leaves a versioned row). Leaving the original check pointing at a string that still exists
       would make a closed item look open, and deleting the item would lose the reason the flag survived.
-- [ ] 5.4 `docs/05-architecture.md` carries "Name collisions need an explicit `--overwrite`" and
+- [x] 5.4 `docs/05-architecture.md` carries "Name collisions need an explicit `--overwrite`" and
       `docs/08-builder.md` lists `[--overwrite]` on the build command — both still true for the CLI, so
       verify rather than edit, and only change them if the wording implies the loop behaves the same way.
       **Watch the second `[--overwrite]` on that `docs/08` page**: it belongs to the blueprint command,
       whose refusal is a different gate in `BlueprintGenerator` that throws `IllegalStateException` and is
       explicitly out of scope here. Verify you edited the right one by checking which command each line
       documents.
-- [ ] 5.5 Re-run the wiki lint for the pages touched and note the Pages publish as owed, as the other
+      Done 2026-11-20, verified and **not edited**, which is what the task asked for. `docs/05-architecture.md`
+      states the rule as a CLI invariant and names the flag only `BuildCommand`/`BlueprintCommand` take
+      (`BuildCommand` → `BuildOptions.overwrite()` → `BuilderService`), so it makes no claim about the loop; the
+      loop's exception is documented on the three pages above. Both `[--overwrite]` lines on `docs/08-builder.md`
+      were checked against the command each documents — the build one and the blueprint one, whose refusal is the
+      separate `BlueprintGenerator` gate — and neither was touched.
+- [x] 5.5 Re-run the wiki lint for the pages touched and note the Pages publish as owed, as the other
       changes in this repo do.
+      Done 2026-11-20: the lint reports 45 pages, **0 broken links, 0 orphans, 0 stale**. One wiki page was
+      actually wrong about the schema — `features/smith-studio-storage.md` recorded `packs (name PK …)` — and now
+      records the `(name, version)` key, the bare-name rule and `PacksKeyMigration`, with the two new source
+      files added to its `source_paths`. The 19 `source_paths` the lint reports as missing are pre-existing and
+      unrelated: deleted `openspec/specs/` and archive paths, plus moved studio `generate/`/`discover/` files.
+      **The GitHub Pages re-publish is owed, not done**: `wiki-pages.yml` deploys on a push to the default
+      branch, and this work is on `poc/iteration-2`, so the site still shows the pre-change wiki.

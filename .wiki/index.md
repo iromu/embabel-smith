@@ -16,6 +16,11 @@ broken links, 0 orphans, 0 stale). GitHub Pages re-publish is OWED: `wiki-pages.
 https://iromu.github.io/embabel-smith/ still shows the pre-A2A wiki (manual `gh workflow run` is the
 alternative). -->
 
+<!-- Scoped edit 2026-11-20: [[smith-studio-storage]] — the `packs` table's key is `(name, version)`,
+not the bare name, and `PacksKeyMigration` re-keys a deployed name-keyed table at bind time.
+`last_commit` again deliberately NOT advanced. Lint re-ran clean over all 45 pages (0 broken links, 0
+orphans, 0 stale). GitHub Pages re-publish is still OWED for the same reason. -->
+
 # Embabel Smith
 
 A **GOAP-based agent builder** on the Embabel platform (v1.5.4, Java 21). One part *builds* a

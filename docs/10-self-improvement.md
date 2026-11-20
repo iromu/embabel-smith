@@ -50,7 +50,13 @@ the `ApprovalQueue`, and an auto-publishing iteration records that it published 
 (`IterationInfo.errorCode` = `PUSH_DISABLED`). A `folder:` source is unaffected — a local write is
 already durable and the folder publisher ignores the flag. Both write paths
 (`ImprovementLoop.publishCandidate`, `LoopService.publish`) share the one `LoopPublishPolicy`. The
-loop's forced `overwrite` is a separate decision, still open in [`12-backlog.md`](12-backlog.md).
+loop still passes the collision flag, so its destination directory is replaced on every publish — the
+directory is named by the pack alone, so clearing the flag would make the second publish collide
+rather than improve. The improvement survives elsewhere: a publish that succeeds also records the
+candidate in the studio store, whose `packs` table is keyed by `(name, version)`, and the candidate
+carries one patch version above the pack it improved (`improve/Refiner`). Reading a pack back by bare
+name therefore returns the improved one, because a bare name means its highest version
+([`06-spec-sources.md`](06-spec-sources.md) §Publishing).
 
 **Retirement is enforced; the other states are advisory.** The runtime refuses to ingest a pack
 whose sidecar says `retired`, and a run asking for that pack's goal is a named lifecycle block the
