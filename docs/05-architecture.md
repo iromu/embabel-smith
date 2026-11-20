@@ -204,9 +204,10 @@ condition says "can it run here". An opted-in run on a laptop with no endpoint i
 not a wall of failures. Removing the env condition is what turns that into failures; removing the tag
 is what makes `make test` depend on a model agreeing.
 
-The live tests are the builder's `LiveBuildIntegrationTest`, the runtime's `LiveRunIntegrationTest`,
-the a2a launcher's `SmithA2aLiveTest`, and the studio's `improve/RestIntegrationTest` and
-`improve/LiveLoopIntegrationTest` — and that is the whole list. **It is deliberately stated without a
+The live tests are the builder's `LiveBuildIntegrationTest` and `LiveExampleBuildTest`, the runtime's
+`LiveRunIntegrationTest`, the a2a launcher's `SmithA2aLiveTest`, and the studio's
+`improve/RestIntegrationTest` and `improve/LiveLoopIntegrationTest` — and that is the whole list.
+**It is deliberately stated without a
 count**: a fifth joined it when the a2a launcher landed, and a page that says "exactly these four"
 silently becomes false the moment someone adds a test, which is what happened here. Check the list
 against the tree rather than against this page:
@@ -237,8 +238,11 @@ substituted generator, caller, platform or publisher:
   `completed` status update. Offline, `RunBackedA2ARequestHandlerTest` stubs the run service, so it
   proves the handler drives the runner correctly — never that a goal actually runs behind it.
 
-The affordable response is the cheap live test [`08-builder.md`](08-builder.md) already names: a small
-blueprint with a known expected spec and skill, which can be asserted rather than merely recorded.
+The affordable response the earlier version of this page pointed at now exists:
+`LiveExampleBuildTest`, described in [`08-builder.md`](08-builder.md), builds one hand-written 1.5 KB
+blueprint through both targets and asserts the shape the document dictates — the goal's output type is
+the deliverable it names, the stages are there, the skill carries a gradeable suite. It is asserted,
+not recorded, which is what the `examples/` scripts cannot be.
 
 **Checkstyle runs in Maven's `validate` phase**, so a style violation fails `make build` and
 `make test` too, not just `make lint`. Because the reactor stops at the first failing module, one

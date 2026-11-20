@@ -309,8 +309,13 @@ have to pay for twice: a repository download yields the same corpus as the clone
 the example repository), so iterating on an example means pointing the script at an archive.
 
 `make test-live` still runs the endpoint-gated integration tests that carry `@Tag("live")`; the
-examples are not part of it. The live test worth adding next is the cheap one — a small blueprint
-with a known expected spec and skill, which can be asserted rather than merely recorded.
+examples are not part of it. The cheap live test this page used to call "worth adding next" is now
+`LiveExampleBuildTest`: one hand-written 1.5 KB blueprint (`src/test/resources/blueprints/parcel-claims/`)
+built through both targets, asserting the shape the document dictates rather than the text the model
+chose. Its one content assertion is the deliverable token the fixture states twice — proven to bite by
+changing that constant and watching the test fail on it while still publishing. The fixture is not a
+stylistic choice: the smallest real blueprint is 31 KB, and a live build over it took 12 minutes and 18
+endpoint timeouts, against 39 seconds for this one.
 
 ## What the builder does *not* do
 

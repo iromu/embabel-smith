@@ -241,7 +241,7 @@ no longer wraps `PocOnlyPane.vue`.
 ## Test coverage
 
 - **Closed — nothing recorded that the default test run leaves unproven.** The endpoint-gated
-  integration tests (`LiveBuildIntegrationTest`, `LiveRunIntegrationTest`, `SmithA2aLiveTest`,
+  integration tests (`LiveBuildIntegrationTest`, `LiveExampleBuildTest`, `LiveRunIntegrationTest`, `SmithA2aLiveTest`,
   `LiveLoopIntegrationTest`, `RestIntegrationTest`) are now tagged `@Tag("live")` *as well as* env-gated, and the group is
   excluded by default through `test.excludedGroups`, with `make test-live` the single opt-in — that
   machinery shipped on 2026-11-17. What was missing was the consequence, and it is now stated in
@@ -251,8 +251,10 @@ no longer wraps `PocOnlyPane.vue`.
   REST surfaces with model-backed cores, one full loop iteration — and that a green default run
   evidences none of them. That page names its list by a grep so it cannot rot silently; the builder's
   example suites it used to list were removed on 2026-11-17 and are not part of `make test-live`.
-  The affordable next live test — a small blueprint with a known expected spec and skill — is named in
-  [`08-builder.md`](08-builder.md). **What changed since is who runs the offline suite, not what it
+  The affordable next live test — a small blueprint with a known expected spec and skill — was named in
+  [`08-builder.md`](08-builder.md) and **now exists**: the builder's `LiveExampleBuildTest` builds one
+  hand-written 1.5 KB blueprint through both targets and asserts the deliverable its fixture names twice,
+  with the assertion proven to bite by mutating the expected token. **What changed since is who runs the offline suite, not what it
   proves:** `.github/workflows/offline-verification.yml` now runs `make build`, `make test` and
   `make lint` on every pull request and every push to the default branch, with no endpoint and no
   secrets, on the default reactor. So a green CI badge is the same evidence as a green local `make test`
