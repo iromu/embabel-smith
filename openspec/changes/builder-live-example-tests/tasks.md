@@ -49,10 +49,15 @@ while ingestion lives in the studio the builder's test sources cannot reach it.
 > blueprints. See the Direction change in `proposal.md`.
 
 
-- [ ] 3.1 Implement `BlueprintExtractionLiveTest`: for each declared example, load and assemble its
+- [ ] ~~3.1 Implement `BlueprintExtractionLiveTest`: for each declared example, load and assemble its
       blueprint through the builder and write the extracted description to
       `examples/cases/<slug>/description.md`, and verify a live run leaves one non-empty description per
-      declared example.
+      declared example.~~
+      **Superseded 2026-11-17 by the section note above, and struck through 2026-11-20 so a closed section
+      does not read as an open task.** The layout it names is gone: there is no `examples/cases/` directory,
+      and the examples are hand-written blueprints under `examples/blueprints/` consumed directly by
+      `examples/generate-spec.sh` and `examples/generate-skill.sh`. Nothing was implemented for it and nothing
+      should be — the extraction prompt it would have driven is written for a codebase, not for a blueprint.
 - [x] 3.2 Verify the skip path: with the live group requested and no endpoint configured, the suite is
       reported skipped rather than failed.
 

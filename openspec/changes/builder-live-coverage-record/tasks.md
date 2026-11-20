@@ -28,14 +28,21 @@
 - [x] 3.1 Replace the *Test coverage* item in `docs/12-backlog.md` with a pointer to the section that
       now carries the statement, and verify the page does not still describe the four tests as merely
       `@EnabledIfEnvironmentVariable`-gated (they are tagged as well since 2026-11-17).
-- [ ] 3.2 Run the wiki lint the repo rule prescribes for a `docs/` edit and verify no cross-link to
-      `05-architecture.md` broke; no heading is renamed by this change. **Left open deliberately, and it
-      cannot be closed yet.** The `git-wiki` rule set makes ingest and lint operate on committed content
-      at `HEAD` and explicitly ignore uncommitted changes, so running the lint now would lint the
-      pre-change wiki and report green while seeing none of these edits. The lint and the Pages
-      re-publish are owed **after** the `docs/` edits are committed. Supporting evidence that nothing is
-      already broken: this run touched no file under `.wiki/`, no `.wiki/` page links
-      `docs/05-architecture.md` (the wiki uses `[[wikilinks]]`), and no heading was renamed.
+- [x] 3.2 Run the wiki lint the repo rule prescribes for a `docs/` edit and verify no cross-link to
+      `05-architecture.md` broke; no heading is renamed by this change. **Closed 2026-11-20.** Both
+      reasons this was held open have gone: the `docs/` edits are committed, and the `git-wiki` skill
+      resolves at `.agents/skills/git-wiki`, so the lint ran as its rules define it — over the committed
+      tree, on the link syntax the wiki actually uses (`[[page-slug]]`, per the skill's "Wiki links" rule).
+      Result: **44 pages (excluding `index.md`), 451 `[[links]]`, 0 broken targets, 0 orphans**, and
+      `.wiki/index.md:last_commit` still `7805939` with its "1083 tracked files changed since it" note,
+      so the scoped edits did not falsely advance the checkpoint. On the `docs/` side, markdown links
+      resolve with 0 broken and `docs/05-architecture.md` has 8 inbound links.
+      Caveat worth keeping: the first two attempts at this check counted markdown `[text](target.md)`
+      links across `docs/` and `.wiki/` together and reported 81 links and **44 orphans** — every wiki
+      page. That was the instrument, not the wiki. A wiki lint must parse `[[slug]]`; a markdown-link
+      scan of this root reports the entire wiki as orphaned.
+      The Pages re-publish remains owed by a human: `wiki-pages.yml` deploys the default branch and this
+      work is on `poc/iteration-2`.
 - [x] 3.3 Verify the change touched no code: `git status --short` lists only `docs/` and `README.md`.
       **Verified by substitution**, because the shared working tree also holds
       `builder-publish-location`'s `prod/` edits, so the unscoped check cannot read clean here: the
