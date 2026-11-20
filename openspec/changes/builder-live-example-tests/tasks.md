@@ -160,5 +160,45 @@ while ingestion lives in the studio the builder's test sources cannot reach it.
       - **What this does not settle:** one blueprint, one technique, one model, `--max-refine 0`.
         Nothing was pushed through `--technique embabel` (its block is already recorded from the
         matrix), and the security refusal above is unexplained.
-- [ ] 7.6 Deferred: the live test worth adding — a small blueprint with a known expected agent spec
+- [x] 7.6 Deferred: the live test worth adding — a small blueprint with a known expected agent spec
       and skill, asserted rather than recorded.
+      **Done 2026-11-20 (`dee0589`): `builder/src/test/.../LiveExampleBuildTest`, with its own fixture
+      at `src/test/resources/blueprints/parcel-claims/process.md` — 1.5 KB of prose, three stages, one
+      deliverable named twice. Tagged `@Tag("live")` beside the env condition, so `make test-live`
+      runs it and `make test` does not.**
+      - It asserts, which the scripts above cannot: the goal's output type is the deliverable the
+        blueprint names, the process has at least two stages each with a non-blank output type,
+        `manifest.yml`/`goal.yml`/`lifecycle.yml` are published, the read-back pack declares types,
+        and the skill target publishes exactly one `SKILL.md` plus one `evals.json` with a non-empty
+        suite. Everything else is shape, not text — step names, prompts and type properties are the
+        model's choice, and this repo's known live failure is a test that breaks on model variance
+        rather than on a code change.
+      - **Run 2026-11-20 against `http://spark.local:4000/v1` with `Qwen-instruct`: `Tests run: 2,
+        Failures: 0` in 412 s.** The log shows the published pack's actions
+        `gather_claim_facts → assess_liability → settle_claim` producing `DynamicType(name=ClaimDecision)`
+        and the goal achieved by GOAP in 14.3 s — the deliverable the fixture names, reached by a plan
+        the model wrote. Offline gates stayed green around it: `make build`, `make test` and `make lint`
+        all exit 0.
+      - **Non-vacuity proven by mutation.** With `DELIVERABLE` changed to `"RefundOutcome"` the test
+        failed at the deliverable assertion, its failure message carrying `[BUILD OK:
+        parcel_claims_triage …]` — so it fails on the wrong answer rather than on the build never
+        getting there. That run still published, in **39 s** against the 12 minutes the 31 KB `Sentinel`
+        blueprint costs. The small fixture is not a stylistic choice.
+      - **Two substitutions the brief assumed wrong, both verified in source before accepting**: a
+        successful `BuildResult` carries no spec (`built(...)` nulls the draft), so the pack is read
+        back with `AgentSpecReader` from the publish location, which is also what a consumer of the
+        library would do; and `evals.json` is an object with an `evals` array, not a bare array. The
+        type check asserts `spec.types()` non-empty rather than a `types/` listing, because the writer
+        drops a `.gitkeep` into an empty one and a listing therefore passes on a pack declaring nothing.
+      - **Known limit, recorded rather than smoothed over**: the layout assertion names `manifest.yml`
+        at the published root, so if a future build recommends the *multi-agent* candidate for this
+        blueprint — which publishes a root `process.yml` — this test fails on that assertion, where
+        `LiveBuildIntegrationTest` tolerates either form with an OR. It is acceptable while the
+        single-agent candidate is what a small blueprint wins on, which is what both live runs above
+        observed; it stops being acceptable the moment that changes, and the fix is the same OR, not a
+        weakened assertion.
+      - **What this does not cover**: one blueprint, one model, `SINGLE_SHOT` only (the `embabel`
+        technique's block is evidenced by `LiveBuildIntegrationTest`, and its upstream limit is
+        documented in [`08-builder.md`](../../docs/08-builder.md)), and the skill half asserts published
+        shape rather than the lift, because the lift's judge is non-deterministic and the number is not
+        assertable across runs.
