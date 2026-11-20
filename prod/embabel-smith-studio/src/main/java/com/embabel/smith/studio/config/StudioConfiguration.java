@@ -380,18 +380,21 @@ public class StudioConfiguration {
 	/**
 	 * The loop's publish policy: whether an approved candidate is pushed to the improve
 	 * source's remote, and whether a publish may be attempted at all. Not runtime-
-	 * toggleable — pushing is the credential-and-intent decision.
+	 * toggleable — pushing is the credential-and-intent decision. The policy also records
+	 * each published candidate in the durable store, which is where the version the
+	 * destination folder replaced survives.
 	 * @param push the configured value of {@code smith.studio.loop.push}.
 	 * @param improveSourceUri the configured improve source URI, or empty for the
 	 * default.
 	 * @param sources the comma-separated configured sources.
+	 * @param packStore the store a published candidate is recorded in.
 	 * @return the loop's publish policy.
 	 */
 	@Bean
 	public LoopPublishPolicy loopPublishPolicy(@Value("${smith.studio.loop.push:false}") boolean push,
 			@Value("${smith.studio.improve-source:}") String improveSourceUri,
-			@Value("${smith.studio.sources:}") String sources) {
-		return new LoopPublishPolicy(push, improveSourceUri(improveSourceUri, sources));
+			@Value("${smith.studio.sources:}") String sources, ProcessStore packStore) {
+		return new LoopPublishPolicy(push, improveSourceUri(improveSourceUri, sources), packStore);
 	}
 
 	@Bean

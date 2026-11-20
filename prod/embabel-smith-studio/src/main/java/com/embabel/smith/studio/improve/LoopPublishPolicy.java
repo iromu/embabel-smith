@@ -10,10 +10,14 @@ import java.io.IOException;
 import com.embabel.smith.builder.publish.PublishResult;
 import com.embabel.smith.builder.publish.PublishTarget;
 import com.embabel.smith.builder.publish.Publisher;
+import com.embabel.smith.studio.store.ProcessStore;
 
 /**
  * The self-improvement loop's publish policy: whether an approved candidate is pushed to
- * the improve source's remote, and whether the publish may be attempted at all.
+ * the improve source's remote, and whether the publish may be attempted at all. After a
+ * publish succeeds it also records the pack in the studio store, which is where the
+ * version the destination lost stays addressable (change: publish-keeps-versions,
+ * decision 7).
  *
  * <p>
  * Pushing defaults to off, so an unattended loop cannot write to shared state — the
@@ -26,8 +30,10 @@ import com.embabel.smith.builder.publish.Publisher;
  * publishing proceeds unchanged.
  *
  * <p>
- * The loop's forced {@code overwrite} is deliberately not part of this policy — it is a
- * separate, still-open decision.
+ * The loop's forced {@code overwrite} is deliberately kept: the destination directory is
+ * named by the pack alone, so clearing the flag would make the loop's second publish
+ * collide rather than improve. Durability does not depend on it, because every published
+ * version is recorded in the store.
  *
  * @author Ivan Rodriguez
  */
@@ -43,17 +49,22 @@ public final class LoopPublishPolicy {
 
 	private final boolean gitSource;
 
+	private final ProcessStore packStore;
+
 	/**
 	 * Creates the policy for one improve source.
 	 * @param push whether a published candidate is pushed to the remote — the configured
 	 * value of {@code smith.studio.loop.push}
 	 * @param improveSourceUri the configured improve-source URI, or empty when no source
 	 * is configured (then there is no git target to refuse)
+	 * @param packStore the studio store a published candidate is recorded in; it records
+	 * nothing while no database is bound
 	 */
-	public LoopPublishPolicy(boolean push, String improveSourceUri) {
+	public LoopPublishPolicy(boolean push, String improveSourceUri, ProcessStore packStore) {
 		this.push = push;
 		this.gitSource = (improveSourceUri != null && !improveSourceUri.isBlank())
 				&& PublishTarget.parse(improveSourceUri).type() == PublishTarget.Type.GIT;
+		this.packStore = packStore;
 	}
 
 	/**
@@ -75,7 +86,8 @@ public final class LoopPublishPolicy {
 
 	/**
 	 * Publishes a candidate under this policy, with the loop's existing forced
-	 * {@code overwrite}.
+	 * {@code overwrite}, and records the pack that was written in the studio store at the
+	 * version it carries.
 	 * @param publisher the publisher writing to the improve source
 	 * @param candidate the approved candidate to publish
 	 * @return the publish result
@@ -93,7 +105,14 @@ public final class LoopPublishPolicy {
 		}
 		// overwrite stays forced as it always was; only push is now a configured value.
 		boolean overwrite = true;
-		return publisher.publish(candidate.candidate(), candidate.proposedLifecycle(), overwrite, this.push);
+		PublishResult result = publisher.publish(candidate.candidate(), candidate.proposedLifecycle(), overwrite,
+				this.push);
+		// Recorded after the write, so a publish that failed leaves no row. The pack
+		// saved
+		// is the one just handed to the publisher, so the destination and the row cannot
+		// report success at two different versions.
+		this.packStore.savePackWhenConfigured(candidate.candidate());
+		return result;
 	}
 
 }

@@ -11,15 +11,20 @@ import com.embabel.smith.builder.lifecycle.LifecycleMetadata;
 import com.embabel.smith.builder.lifecycle.LifecycleStamper;
 import com.embabel.smith.builder.lifecycle.LifecycleState;
 import com.embabel.smith.builder.publish.PublishResult;
+import com.embabel.smith.builder.publish.PublishTarget;
 import com.embabel.smith.builder.publish.Publishable;
+import com.embabel.smith.builder.publish.FolderPublisher;
+import com.embabel.smith.common.io.AgentSpecReader;
 import com.embabel.smith.common.io.AgentSpecWriter;
 import com.embabel.smith.common.io.Yaml;
 import com.embabel.smith.common.model.AgentSpec;
 import com.embabel.smith.runtime.trace.JsonlTraceStore;
 import com.embabel.smith.specsource.FolderSpecSource;
 import com.embabel.smith.specsource.SpecSource;
+import com.embabel.smith.studio.store.ProcessStore;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.ArgumentCaptor;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -28,6 +33,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 class ImprovementLoopTest {
 
@@ -50,14 +57,23 @@ class ImprovementLoopTest {
 		return new JsonlTraceStore(tmp.resolve("traces.jsonl"));
 	}
 
+	/** A store that records nothing — these tests are about the publish, not the row. */
+	private ProcessStore unusedStore() {
+		return mock(ProcessStore.class);
+	}
+
 	/** The policy for a folder improve source — the loop's common case. */
 	private LoopPublishPolicy folderPolicy(boolean push) {
-		return new LoopPublishPolicy(push, "folder:" + this.tmp.resolve("source"));
+		return folderPolicy(push, unusedStore());
+	}
+
+	private LoopPublishPolicy folderPolicy(boolean push, ProcessStore packStore) {
+		return new LoopPublishPolicy(push, "folder:" + this.tmp.resolve("source"), packStore);
 	}
 
 	/** The policy for a git improve source, whose commit needs a push to survive. */
 	private LoopPublishPolicy gitPolicy(boolean push) {
-		return new LoopPublishPolicy(push, "git:https://example.com/iromu/published-packs.git");
+		return new LoopPublishPolicy(push, "git:https://example.com/iromu/published-packs.git", unusedStore());
 	}
 
 	private ImprovementLoop loop(SpecSource source, JsonlTraceStore store, List<Publishable> published,
@@ -410,6 +426,40 @@ class ImprovementLoopTest {
 		LifecycleMetadata lifecycle = Yaml.mapper()
 			.readValue(Files.readString(root.resolve("extract").resolve("lifecycle.yml")), LifecycleMetadata.class);
 		assertThat(lifecycle.state()).isEqualTo(LifecycleState.RETIRED);
+	}
+
+	/**
+	 * A loop publish leaves a versioned row (change: publish-keeps-versions, tasks 2.4
+	 * and 3.3). The destination is a real folder publisher so the row and the written
+	 * pack can be compared, and the store is a mock so the write itself is observed.
+	 */
+	@Test
+	void aLoopPublishLeavesARowAtTheCandidateVersion() throws IOException {
+		AgentSpec pack = TestFixtures.pack("extract", "s1", "s2"); // version 1.0.0
+		Path destination = this.tmp.resolve("published");
+		JsonlTraceStore store = store();
+		store.append(TestFixtures.failedTrace("r1", "extract", "input", TestFixtures.step("s2", "failed", "bad")));
+
+		ProcessStore packStore = mock(ProcessStore.class);
+		ImprovementLoop loop = new ImprovementLoop(source(pack), store, (current, feedback) -> current + " [revised]",
+				passingInvoker, tasks, new FolderPublisher(PublishTarget.parse("folder:" + destination)),
+				folderPolicy(false, packStore), true); // auto-publish, so the publish
+														// happens in the pass
+
+		loop.runOnce();
+
+		ArgumentCaptor<AgentSpec> saved = ArgumentCaptor.forClass(AgentSpec.class);
+		verify(packStore).savePackWhenConfigured(saved.capture());
+		// Mutation "increment removed": the candidate would be the baseline's 1.0.0 and
+		// this would fail. Mutation "save-out removed": the verify above never happens.
+		assertThat(saved.getValue().name()).isEqualTo("extract");
+		assertThat(saved.getValue().version()).isEqualTo("1.0.1");
+
+		// The folder and the row are the same pack at the same version — the folder is
+		// named by the pack alone, so the version has to agree rather than be inferred.
+		AgentSpec written = new AgentSpecReader().read(destination.resolve("extract"));
+		assertThat(written.version()).isEqualTo(saved.getValue().version());
+		assertThat(written.step("s2").prompt()).isEqualTo(saved.getValue().step("s2").prompt());
 	}
 
 }

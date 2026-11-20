@@ -13,13 +13,16 @@ import java.util.Set;
 import com.embabel.smith.builder.eval.PromptRewriter;
 import com.embabel.smith.common.model.ActionStepSpec;
 import com.embabel.smith.common.model.AgentSpec;
+import com.embabel.smith.common.model.AgentSpecManifest;
 import com.embabel.smith.runtime.trace.TraceRecord;
+import com.embabel.smith.studio.storage.entity.PackEntity;
 
 /**
  * Builds a candidate pack by rewriting the prompts of the steps implicated in the
  * failures, using the failure traces as evidence (the POC 9 pattern). Steps without
  * failure evidence are left unchanged, so the candidate differs from the current pack
- * only in the failing steps' prompts (plus the lifecycle metadata the loop adds later).
+ * only in the failing steps' prompts, in the version it is published at, and in the
+ * lifecycle metadata the loop adds later.
  *
  * @author Ivan Rodriguez
  */
@@ -60,8 +63,56 @@ public class Refiner {
 			steps.set(i, withPrompt(step, newPrompt));
 			changed.add(step.name());
 		}
-		AgentSpec candidate = new AgentSpec(current.manifest(), current.goal(), steps, current.types());
+		AgentSpec candidate = new AgentSpec(nextVersion(current.manifest()), current.goal(), steps, current.types());
 		return new Refinement(candidate, List.copyOf(changed));
+	}
+
+	/**
+	 * The manifest the candidate is published at: the pack it improves, one patch version
+	 * up. The improvement is a new version rather than an update of the version it
+	 * replaces, which is what lets the store keep both (change: publish-keeps-versions,
+	 * decision 7). The baseline's manifest is not modified — the loop reads the baseline
+	 * again as the next pass's baseline — and its declared planner and model are carried
+	 * across, because the record has no {@code withVersion} and a replacement that
+	 * omitted them would drop them silently.
+	 * <p>
+	 * A pack declaring no version is read as the version the store defaults it to, so its
+	 * candidate lands one patch above that. A version whose last segment is not a number
+	 * is left as declared: inventing a numeric segment would rewrite a version the
+	 * artifact states, and the outcome is then the store's same-version update, which is
+	 * the honest answer for an artifact that does not count its own versions.
+	 * @param manifest the manifest of the pack being improved, or {@code null} when it
+	 * has none
+	 * @return the candidate's manifest.
+	 */
+	private static AgentSpecManifest nextVersion(AgentSpecManifest manifest) {
+		if (manifest == null) {
+			return null;
+		}
+		return new AgentSpecManifest(manifest.name(), nextPatch(manifest.version()), manifest.defaultPlanner(),
+				manifest.defaultModel());
+	}
+
+	/**
+	 * The version one patch above {@code version}, where the last dot-separated segment
+	 * is the patch.
+	 * @param version the declared version, or {@code null} when none is declared
+	 * @return the next patch version, or {@code version} unchanged when its last segment
+	 * is not a number.
+	 */
+	private static String nextPatch(String version) {
+		String declared = (version == null || version.isBlank()) ? PackEntity.DEFAULT_VERSION : version.trim();
+		int lastDot = declared.lastIndexOf('.');
+		String lastSegment = (lastDot < 0) ? declared : declared.substring(lastDot + 1);
+		int patch;
+		try {
+			patch = Integer.parseInt(lastSegment);
+		}
+		catch (NumberFormatException ex) {
+			return declared;
+		}
+		String prefix = (lastDot < 0) ? "" : declared.substring(0, lastDot + 1);
+		return prefix + (patch + 1);
 	}
 
 	/**

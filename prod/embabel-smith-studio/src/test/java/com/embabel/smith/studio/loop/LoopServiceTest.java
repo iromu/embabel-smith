@@ -21,8 +21,10 @@ import com.embabel.smith.studio.improve.PendingCandidate;
 import com.embabel.smith.studio.rest.dto.ApproveResponse;
 import com.embabel.smith.studio.rest.dto.IterationInfo;
 import com.embabel.smith.studio.rest.dto.RejectResponse;
+import com.embabel.smith.studio.store.ProcessStore;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -43,7 +45,8 @@ import static org.mockito.Mockito.when;
  * each produced candidate; a publish failure leaves the candidate pending; hold mode
  * queues without publishing; a publish that the loop's push policy refuses is reported
  * and leaves the candidate pending; and approve/reject on an unknown id surface the
- * error.
+ * error. A successful publish also leaves a versioned row in the store, and a publish
+ * that did not happen leaves none (change: publish-keeps-versions, task 3.3).
  */
 @ExtendWith(MockitoExtension.class)
 class LoopServiceTest {
@@ -54,6 +57,9 @@ class LoopServiceTest {
 	@Mock
 	Publisher publisher;
 
+	@Mock
+	ProcessStore packStore;
+
 	private static ModelEndpointConfig configured() {
 		return new ModelEndpointConfig("http://localhost:4000", "key", "m1", "m1");
 	}
@@ -63,13 +69,13 @@ class LoopServiceTest {
 	}
 
 	/** The shipped default: pushing off, over a folder improve source. */
-	private static LoopPublishPolicy folderPolicy() {
-		return new LoopPublishPolicy(false, "folder:/tmp/packs");
+	private LoopPublishPolicy folderPolicy() {
+		return new LoopPublishPolicy(false, "folder:/tmp/packs", this.packStore);
 	}
 
 	/** A git improve source with pushing off — a publish there could not persist. */
-	private static LoopPublishPolicy gitPolicyWithoutPush() {
-		return new LoopPublishPolicy(false, "git:https://example.com/iromu/published-packs.git");
+	private LoopPublishPolicy gitPolicyWithoutPush() {
+		return new LoopPublishPolicy(false, "git:https://example.com/iromu/published-packs.git", this.packStore);
 	}
 
 	private static PendingCandidate candidate(String id, String spec) {
@@ -133,6 +139,35 @@ class LoopServiceTest {
 		assertThat(info.queuedSpecs()).containsExactly("extract"); // left pending for a
 																	// manual decision
 		assertThat(queue.size()).isEqualTo(1);
+		// A publish that did not happen leaves no row behind.
+		verify(this.packStore, never()).savePackWhenConfigured(any());
+	}
+
+	/**
+	 * The row a loop publish leaves (change: publish-keeps-versions, task 3.3). Fails if
+	 * the save-out after a successful publish is removed, and fails if the row is written
+	 * at a version other than the one the published pack declares.
+	 */
+	@Test
+	void aLoopPublishRecordsTheCandidateAtItsVersion() throws IOException {
+		PendingCandidate candidate = candidate("c1", "extract"); // declares 1.0.0
+		ApprovalQueue queue = new ApprovalQueue();
+		queue.enqueue(candidate, false, x -> new PublishResult("/tmp/extract", false)); // held
+		when(loop.runOnce(null)).thenReturn(List.of(candidate));
+		when(loop.queue()).thenReturn(queue);
+		when(publisher.publish(any(), any(), anyBoolean(), anyBoolean()))
+			.thenReturn(new PublishResult("/tmp/extract", false));
+		LoopService service = new LoopService(loop, new LoopSchedulerState(true), publisher, folderPolicy(),
+				configured());
+
+		service.trigger();
+
+		ArgumentCaptor<AgentSpec> saved = ArgumentCaptor.forClass(AgentSpec.class);
+		verify(this.packStore).savePackWhenConfigured(saved.capture());
+		// The pack saved is the one handed to the publisher, so the destination and the
+		// row cannot disagree about its version.
+		assertThat(saved.getValue()).isSameAs(candidate.candidate());
+		assertThat(saved.getValue().version()).isEqualTo("1.0.0");
 	}
 
 	@Test
@@ -165,6 +200,8 @@ class LoopServiceTest {
 		assertThat(response.location()).isNull();
 		assertThat(service.candidates()).extracting(PendingCandidate::id).containsExactly("c1");
 		verify(publisher, never()).publish(any(), any(), anyBoolean(), anyBoolean());
+		verify(this.packStore, never()).savePackWhenConfigured(any()); // nothing to
+																		// record
 	}
 
 	@Test

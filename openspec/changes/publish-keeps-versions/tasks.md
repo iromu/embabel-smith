@@ -94,7 +94,7 @@ schema the rest sits on.
       duplicate.
       Done 2026-11-19 by `republishOfTheSameVersionUpdatesThatRow`: one row at `1.0.0` after two saves of it,
       the goal updated in place, then a save at `1.1.0` adds a second row.
-- [ ] 2.4 **Decided by `design.md` decision 7: the studio's existing store path writes the versioned row;
+- [x] 2.4 **Decided by `design.md` decision 7: the studio's existing store path writes the versioned row;
       the builder gains no persistence.** The search for 1.3 found that the publish path never touches
       `packs` — `LoopPublishPolicy.publish` ends at a `Publisher` writing to a folder or a git clone — so
       "the studio records the version alongside the publish it observes" is not a smaller alternative to
@@ -104,6 +104,17 @@ schema the rest sits on.
       check that no JPA, `spring-data` or JDBC dependency was added; a test that a loop publish leaves a row
       whose version is the candidate's, readable afterwards; and that the folder destination's content is
       unchanged by the new write (the save is additive, not a replacement of publishing).
+      Done 2026-11-19. The builder pom gained nothing — `grep -nE 'jpa|jdbc|spring-data|hibernate|postgres|h2'
+      prod/embabel-smith-builder/pom.xml` returns nothing, and the only builder-side file this change touched
+      is a test. The save lives in `LoopPublishPolicy.publish`, **after** `publisher.publish(...)` returns, so
+      a refused or failed publish leaves no row; it hands the publisher the *same* `AgentSpec` instance it
+      saves, so the destination and the row cannot report success at two versions. `ProcessStore` gained
+      `savePackWhenConfigured`, which records nothing while no database is bound — the studio stays usable
+      with no storage. Verified by `ImprovementLoopTest.aLoopPublishLeavesARowAtTheCandidateVersion`, which
+      publishes through a real `FolderPublisher` into a temp dir, asserts the stored row is at `1.0.1`, and
+      re-reads the folder with `AgentSpecReader` to confirm the artifact written there is the same pack at the
+      same version. `LoopServiceTest.aLoopPublishRecordsTheCandidateAtItsVersion` covers the service path, and
+      its refusal/failure tests now assert `never()` on the store.
 - [x] 2.5 Decide what `listPacks` means once a name has several rows — `store/ProcessStore.java:74` returns
       `findAll()`, which will list every version. Either collapse to the highest version per name (decision
       3's rule, applied in one place) or show versions as separate rows; pick one and say which the studio
@@ -145,7 +156,7 @@ schema the rest sits on.
       keep being replaced. Keep the line, and keep its comment saying why.
       ~~Remove the forced `boolean overwrite = true` from `LoopPublishPolicy.publish` and make the loop
       publish a new version instead of replacing.~~
-- [ ] 3.2a **Implement the version increment the ruling chose** (1.4), now placed by `design.md` decision 7
+- [x] 3.2a **Implement the version increment the ruling chose** (1.4), now placed by `design.md` decision 7
       **in the studio, on the loop's candidate, before it is published** — the builder gains no database and
       its `eval/RefinementLoop` must **not** bump. The loop refines in `studio/improve/Refiner.java:63`
       (`new AgentSpec(current.manifest(), current.goal(), steps, current.types())`), reached from
@@ -162,11 +173,31 @@ schema the rest sits on.
       `record AgentSpecManifest(name, version, defaultPlanner, defaultModel)`, with no `withVersion` — so the
       increment constructs `new AgentSpecManifest(name, bumped, planner, model)` and leaves the baseline
       object intact, because the loop's next baseline is what it reads.
-- [ ] 3.3 **Add the assertion that does not exist today, and make it pin the value decision 7 chose.** No
+      Done 2026-11-19. `studio/improve/Refiner` now builds its candidate as
+      `new AgentSpec(nextVersion(current.manifest()), …)`; `nextVersion` copies the record, bumping only the
+      version, and `nextPatch` treats a null or blank declaration as `PackEntity.DEFAULT_VERSION`, increments
+      the last dot-separated segment numerically, and returns a non-numeric declaration unchanged rather than
+      throwing. Placing the bump in the refiner, not the publisher, is what makes the approval queue, the gate
+      and the store agree on one version. The builder's `eval/RefinementLoop` was left alone and is now pinned:
+      `RefinementLoopTest.aRefinedPackKeepsTheVersionItWasGiven` refines a pack through the real loop, asserts
+      one refinement happened, and asserts the result still names `test-spec` at `1.0.0`.
+- [x] 3.3 **Add the assertion that does not exist today, and make it pin the value decision 7 chose.** No
       test in the repo pins the loop's `overwrite`: the loop tests inject a `Publisher` lambda that ignores
       the argument it is handed, so changing the flag breaks nothing either way. After 2.4 lands, add a test
       that a loop publish leaves a versioned row, and verify it by mutating two things in turn — flipping
       `overwrite` to `false` and the save-out to a no-op — watching the tests fail for the right reason.
+      Done 2026-11-19, with the mutation pair changed to match decision 7: flipping `overwrite` proves nothing
+      now that keeping it `true` is the ruling, so the two mutations run were the **save-out** and the
+      **increment** — the two behaviours this change actually adds. Removing
+      `packStore.savePackWhenConfigured(...)` failed exactly the two predicted tests
+      (`ImprovementLoopTest.aLoopPublishLeavesARowAtTheCandidateVersion`,
+      `LoopServiceTest.aLoopPublishRecordsTheCandidateAtItsVersion`) and nothing else. Replacing
+      `prefix + (patch + 1)` with `prefix + patch` failed three
+      (`RefinerTest.candidateIsOnePatchAboveThePackItImproves`,
+      `RefinerTest.candidateOfAPackDeclaringNoVersionStartsAboveTheStoredDefault`, and the loop test above) —
+      the third is the one that matters, because it shows a lost bump reaches the stored row rather than being
+      caught only by a unit test on the bump itself. Both mutations reverted; the module is green at 159 tests.
+      The pre-existing fact this task opened remains true: no test pins `overwrite`, by design.
 - [ ] 3.4 Keep `CollisionException`'s message reachable for a human at the CLI: `smith build` without
       `--overwrite` still refuses a same-named folder, and `BuildController`/`ComposeController` still
       surface the refusal. Verify the existing CLI and controller tests pass untouched — that behaviour is

@@ -73,6 +73,21 @@ public class ProcessStore {
 	}
 
 	/**
+	 * Saves the pack when a database is bound, and records nothing when none is. This is
+	 * the entry point for a caller that must not fail because storage was never
+	 * configured — the improvement loop's publish, which has already written its artifact
+	 * by the time it gets here, and the studio that stays usable with no storage.
+	 * @param pack the agent spec to save.
+	 * @return the saved pack's listing record, or {@code null} when no database is bound.
+	 */
+	public PackRecord savePackWhenConfigured(AgentSpec pack) {
+		if (!this.storage.isBound()) {
+			return null;
+		}
+		return savePack(pack);
+	}
+
+	/**
 	 * The saved packs, most recently saved first. A name held at several versions is
 	 * listed once, by its highest version, so the listing agrees with what
 	 * {@link #loadPack(String)} returns for that name (decision 3 of

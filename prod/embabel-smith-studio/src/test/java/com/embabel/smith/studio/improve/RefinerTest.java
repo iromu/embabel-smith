@@ -6,6 +6,7 @@
 package com.embabel.smith.studio.improve;
 
 import com.embabel.smith.common.model.AgentSpec;
+import com.embabel.smith.common.model.AgentSpecManifest;
 import com.embabel.smith.runtime.trace.TraceRecord;
 import org.junit.jupiter.api.Test;
 
@@ -65,6 +66,64 @@ class RefinerTest {
 		assertThat(refinement.changed()).isFalse();
 		assertThat(refinement.changedSteps()).isEmpty();
 		assertThat(refinement.candidate()).isSameAs(pack);
+	}
+
+	// ---- The candidate's version (change: publish-keeps-versions, task 3.2a) ----
+
+	private static final List<TraceRecord> S2_FAILED = List
+		.of(TestFixtures.failedTrace("r1", "extract", "input", TestFixtures.step("s2", "failed", "bad output")));
+
+	/**
+	 * The pack under test, at a chosen version and with the optional manifest fields set.
+	 */
+	private static AgentSpec packAtVersion(String version) {
+		AgentSpec base = TestFixtures.pack("extract", "s2");
+		return new AgentSpec(new AgentSpecManifest("extract", version, "GOAP", "gpt-4o"), base.goal(), base.steps(),
+				base.types());
+	}
+
+	private static Refiner.Refinement refine(AgentSpec pack) {
+		return new Refiner((current, feedback) -> current + " [revised]").refine(pack, S2_FAILED);
+	}
+
+	@Test
+	void candidateIsOnePatchAboveThePackItImproves() {
+		AgentSpec pack = packAtVersion("1.2.3");
+
+		Refiner.Refinement refinement = refine(pack);
+
+		assertThat(refinement.candidate().version()).isEqualTo("1.2.4");
+		// The baseline object is untouched: the loop reads it again as the next pass's
+		// baseline.
+		assertThat(pack.version()).isEqualTo("1.2.3");
+	}
+
+	@Test
+	void candidateCarriesTheManifestFieldsTheBumpDidNotChange() {
+		AgentSpec pack = packAtVersion("1.2.3");
+
+		AgentSpecManifest candidate = refine(pack).candidate().manifest();
+
+		// The manifest is a record with no withVersion, so a replacement that forgot
+		// these
+		// would drop them silently rather than fail.
+		assertThat(candidate.name()).isEqualTo("extract");
+		assertThat(candidate.defaultPlanner()).isEqualTo("GOAP");
+		assertThat(candidate.defaultModel()).isEqualTo("gpt-4o");
+	}
+
+	@Test
+	void candidateOfAPackDeclaringNoVersionStartsAboveTheStoredDefault() {
+		assertThat(refine(packAtVersion(null)).candidate().version()).isEqualTo("1.0.1");
+		assertThat(refine(packAtVersion("  ")).candidate().version()).isEqualTo("1.0.1");
+	}
+
+	@Test
+	void candidateOfANonNumericVersionKeepsTheVersionItDeclares() {
+		// Inventing a numeric segment would rewrite a version the artifact states; the
+		// outcome is then the store's same-version update, which is the honest answer.
+		assertThat(refine(packAtVersion("1.0.0-rc1")).candidate().version()).isEqualTo("1.0.0-rc1");
+		assertThat(refine(packAtVersion("v3")).candidate().version()).isEqualTo("v3");
 	}
 
 }
