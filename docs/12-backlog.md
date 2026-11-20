@@ -208,8 +208,9 @@ no longer wraps `PocOnlyPane.vue`.
   dependency, and the root POM's `dependencyManagement` names it. The gate requests the seven checks
   the evaluator runs in-JVM — six block the build, `pii` reports as an advisory — and does not request
   the three that need an external scanner. It is integrated into the skill build gate rather than
-  exposed as a CLI or left unused: the deliberate-dormancy ruling `skillevaluator-dormant` recorded was
-  reversed by the human and that change is superseded, and a CLI entry point remains unimplemented. It
+  exposed as a CLI or left unused: the deliberate-dormancy ruling once recorded for it was reversed by
+  the human, and the change folder that held that ruling was deleted on 2026-11-20 once its two
+  surviving tasks had landed; a CLI entry point remains unimplemented. It
   is named in `README.md` and in `docs/05-architecture.md`; it has no `.wiki/` page of its own yet.
   Check: `grep -rn skillevaluator prod/*/pom.xml pom.xml docs/`.
 - **Open — an enabled scanner can print an install hint naming a third-party release URL.**
