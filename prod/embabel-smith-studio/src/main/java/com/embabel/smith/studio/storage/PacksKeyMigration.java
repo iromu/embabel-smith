@@ -43,9 +43,12 @@ import org.slf4j.LoggerFactory;
  *
  * <p>
  * Postgres and H2 take the same path: the migration runs against whatever database the
- * binding opened, identifiers are read from metadata and issued unquoted because that is
- * how Hibernate created them, and the DDL used is the subset both speak. A database with
- * no {@code packs} table is left alone — Hibernate creates the new shape there.
+ * binding opened, and the DDL used is the subset both speak. Table and column names are
+ * read from metadata and issued unquoted, because that is how Hibernate created them and
+ * folding them again lands on the same name. A constraint name is quoted instead, because
+ * a name the database generated for itself does not necessarily follow the connection's
+ * folding rules. A database with no {@code packs} table is left alone — Hibernate creates
+ * the new shape there.
  *
  * @author Ivan Rodriguez
  */
@@ -161,7 +164,11 @@ public final class PacksKeyMigration {
 		execute(connection, "ALTER TABLE " + table + " ALTER COLUMN " + VERSION + " SET NOT NULL");
 		String constraint = primaryKeyConstraintName(connection.getMetaData(), connection.getCatalog(), table);
 		if (constraint != null) {
-			execute(connection, "ALTER TABLE " + table + " DROP CONSTRAINT " + constraint);
+			// Quoted with the name metadata reports, which is the name the database
+			// stores. Unquoted, a case-folding connection would fold this statement's
+			// identifier and miss the constraint it came from — H2 names a generated
+			// primary key upper case even when it stores table names lower case.
+			execute(connection, "ALTER TABLE " + table + " DROP CONSTRAINT \"" + constraint + "\"");
 		}
 		execute(connection, "ALTER TABLE " + table + " ADD CONSTRAINT " + NEW_KEY_CONSTRAINT + " PRIMARY KEY (" + NAME
 				+ ", " + VERSION + ")");

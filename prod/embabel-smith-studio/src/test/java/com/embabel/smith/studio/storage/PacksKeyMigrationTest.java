@@ -100,6 +100,34 @@ class PacksKeyMigrationTest {
 		}
 	}
 
+	/**
+	 * The same re-key against a database that stores identifiers the way Postgres does —
+	 * unquoted names lower case — which is the case the migration's unquoted DDL has to
+	 * survive. H2 in PostgreSQL mode is not Postgres: it covers the identifier casing the
+	 * DDL is issued in, not the Postgres-only constraint forms, which remain unexecuted
+	 * here.
+	 */
+	@Test
+	void aNameKeyedTableIsRebuiltWhenIdentifiersAreStoredLowerCase() throws Exception {
+		String url = memUrl("MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;");
+		createNameKeyedTable(url);
+
+		StorageContext context = bind(url);
+		try {
+			assertThat(primaryKeyColumns(url)).containsExactly("name", "version");
+			assertThat(primaryKeys(url)).containsExactlyInAnyOrder("alpha|2.3.0", "beta|1.0.0");
+
+			ProcessStore store = new ProcessStore(context);
+			assertThat(store.loadPack("alpha").version()).isEqualTo("2.3.0");
+
+			store.savePack(spec("alpha", "3.0.0"));
+			assertThat(primaryKeys(url)).containsExactlyInAnyOrder("alpha|2.3.0", "alpha|3.0.0", "beta|1.0.0");
+		}
+		finally {
+			context.shutdown();
+		}
+	}
+
 	private StorageContext bind(String url) {
 		StorageContext context = new StorageContext(new StorageSettingsService(root),
 				new JsonlTraceStore(root.resolve("runs.jsonl")), null, null, null);
@@ -143,21 +171,34 @@ class PacksKeyMigrationTest {
 	}
 
 	/**
-	 * The primary-key columns in key order, read through JDBC metadata. H2 stores the
-	 * unquoted table name upper case and does not treat {@code %} as a wildcard here, so
-	 * the stored name is passed rather than a pattern.
+	 * The primary-key columns in key order, read through JDBC metadata. The table is
+	 * looked up by the name the database actually stores it under — H2 keeps an unquoted
+	 * identifier upper case, PostgreSQL mode lower-cases it, and {@code %} is not a
+	 * wildcard here — which is the lookup the migration itself performs.
 	 */
 	private static List<String> primaryKeyColumns(String url) throws SQLException {
 		TreeMap<Integer, String> byPosition = new TreeMap<>();
-		try (Connection connection = DriverManager.getConnection(url, "sa", "");
-				ResultSet keys = connection.getMetaData().getPrimaryKeys(connection.getCatalog(), null, "PACKS")) {
-			while (keys.next()) {
-				if ("packs".equalsIgnoreCase(keys.getString("TABLE_NAME"))) {
+		try (Connection connection = DriverManager.getConnection(url, "sa", "")) {
+			try (ResultSet keys = connection.getMetaData()
+				.getPrimaryKeys(connection.getCatalog(), null, storedPackTable(connection))) {
+				while (keys.next()) {
 					byPosition.put(keys.getInt("KEY_SEQ"), keys.getString("COLUMN_NAME").toLowerCase(Locale.ROOT));
 				}
 			}
 		}
 		return new ArrayList<>(byPosition.values());
+	}
+
+	private static String storedPackTable(Connection connection) throws SQLException {
+		try (ResultSet tables = connection.getMetaData()
+			.getTables(connection.getCatalog(), null, "%", new String[] { "TABLE" })) {
+			while (tables.next()) {
+				if ("packs".equalsIgnoreCase(tables.getString("TABLE_NAME"))) {
+					return tables.getString("TABLE_NAME");
+				}
+			}
+		}
+		throw new IllegalStateException("the database has no packs table to check");
 	}
 
 	/** Every stored row as {@code name|version}. */
@@ -174,7 +215,12 @@ class PacksKeyMigrationTest {
 	}
 
 	private static String memUrl() {
-		return "jdbc:h2:mem:migration-" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE";
+		return memUrl("");
+	}
+
+	private static String memUrl(String options) {
+		return "jdbc:h2:mem:migration-" + UUID.randomUUID() + ";" + options
+				+ "DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE";
 	}
 
 }
