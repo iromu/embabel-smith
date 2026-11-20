@@ -74,15 +74,42 @@
       as `spec_context` on a representative line; documented in `corpus/traces/README.md`, not smoothed
       over. Two decoy lines mention the trust tier *without* the prefix, which makes them defects under
       the product's `startsWith` rule — that is where a keyword policy loses recall.
-- [ ] 2.4 Record the baseline score of the unmodified process against the frozen task set and verify it leaves measurable headroom; if it does not, stop and record that the outer loop cannot run
-- [ ] 2.5 Measure the repeat-to-repeat noise floor by scoring the same unchanged candidate at least three times, and verify the floor is written to `evidence/noise-floor.json` before any prompt is tuned
+- [x] 2.4 Record the baseline score of the unmodified process against the frozen task set and verify it leaves measurable headroom; if it does not, stop and record that the outer loop cannot run
+      **Done, measured live** — `evidence/baseline.json`, 6 model calls (one pass over the six frozen prompts,
+      nothing in front of them), read off `ModelCallMeter` rather than counted by hand. **Headroom is
+      `true`**: 2 of 6 frozen tasks fail the gate arm, so the stop-and-record path was not taken and the
+      outer loop has somewhere to move. The headline is the divergence, not the number. The gate arm —
+      the product's own `EvalScorer` substring test — scores **0.667** and fails `b27-t02`, `b27-t03`;
+      the human label that honours each task's `anyOf`/`forbid` scores **0.333** and additionally fails
+      `b27-t05`, `b27-t06`. `divergingTaskIds` names those two, and they are exactly the tasks the
+      substring scorer narrows, which is the named gap in this change rather than a surprise. The human
+      label lands on the README's authored 2/6, but by a different route than that table predicted:
+      `b27-t01` (the security-scan prior) *passed* and `b27-t05` (never push) *failed*, so the aggregate
+      agrees with the design intent while two of its six per-task predictions do not. Recorded as the
+      known gap and never as a pass mark, per the ruling that the loop must optimise the scorer the
+      product actually has.
+- [x] 2.5 Measure the repeat-to-repeat noise floor by scoring the same unchanged candidate at least three times, and verify the floor is written to `evidence/noise-floor.json` before any prompt is tuned
+      **Done, measured live** — `evidence/noise-floor.json`, 18 calls, budget declared before the first
+      call. Read "the same unchanged candidate" as the unmodified process, which is what exists at this
+      point: there is no candidate yet, and the only thing that can move between repeats is what the live
+      model answered to the same prompts. **`gateFloor` is 0.0**, and `humanLabelFloor` is 0.0 beside it;
+      all three gate scores were 0.667 and no task flipped between repeats. The floor is reported as zero
+      and **not raised for safety** — inflating a measured zero into a comfortable threshold would be the
+      same softening the change exists to prevent. Consequence for 7.4, stated in the artifact so the gate
+      cannot inherit it silently: the floor does no work on this endpoint, so the strict comparison
+      reduces to "strictly better", and one flipped task is the whole delta at six tasks.
+      `Improvement.accepted()` is `delta() > floor`, verified strict, so a zero floor degrades to that and
+      cannot admit an unchanged candidate. The unit is enforced too — `gateFloor` is the only threshold
+      because 7.4's delta is a difference of that same score; `humanLabelFloor` is recorded and never
+      gates.
 - [x] 2.6 Write `src/main/resources/evidence/MUTABILITY.md` naming the mutable set and the fixed set for the run, and verify every later group's classes cite it rather than restating it
       **Done** (5.5 KB) — the D1 boundary verbatim, seven mutable surfaces and eleven fixed ones, each
       fixed item carrying *why*, plus a "what counts as a mutation" section that settles the two cases the
       boundary would otherwise be argued about: constructing a fixed class with generation-chosen
       arguments is configuration and allowed, and generating a script that runs under a fixed engine is
-      allowed. `noise-floor` is listed as fixed while pointing at a file 2.5 has not produced yet, so the
-      launcher prints that it is missing and that a run may not start without it.
+      allowed. `noise-floor` is listed as fixed while pointing at a file 2.5 had not produced when this
+      page was written; 2.5 has since measured it, so the fixed entry now names a real artifact, and a
+      run that loses it still refuses to start.
       **The verification's second half is a standing obligation, not a completed one:** only the launcher
       exists to cite it. Each later section's classes must reference this file rather than restate it, and
       that is checked as each section lands, not here.
@@ -141,10 +168,14 @@
       path it looked for. `OuterLoopRefusalTest`, 3 tests, including one that isolates the cause — a working
       referee built against a temp resources directory that simply lacks the artifacts, so the refusal is
       caused by absence and not by the referee being unable to run — and one that a noise floor without a
-      baseline still refuses and names only the baseline. **Path caveat to keep:** presence is checked, not
-      content, and task 2.4 has not yet named the file its measured baseline will be written to.
-      `evidence/baseline.json` is the path this referee chose; when 2.4 lands it either writes there or this
-      constant changes with it.
+      baseline still refuses and names only the baseline. **Caveat that still stands:** presence is checked,
+      not content. **Path caveat, now settled:** `evidence/baseline.json` is the path this referee chose,
+      and when 2.4 landed it wrote exactly there, so the constant needed no change.
+      **Absence caveat, since corrected:** the first of those three tests originally pointed at the real
+      resources directory and asserted the artifacts were missing there, which meant it passed only while
+      the measurement it guards had not been committed — and 2.4 and 2.5 broke it precisely by succeeding.
+      All three now build their own resources tree and decide for themselves whether the two artifacts are
+      inside it.
 
 **Cost accepted for the seams above.** poc-27's pom now depends on `embabel-smith-studio`,
 `embabel-smith-builder`, `smith-common` and `jackson-databind`, all version-less and resolved from the root
@@ -316,11 +347,15 @@ version again (`git diff --quiet` clean).
       0.2 floor and is improvement against 0.05; the same variant is refused by the product's own gate at
       stage `baseline` and never reaches the approval queue, with a control where only the floor changes
       and it is gated and held. **But every floor in these tests is `injected`, not `measured`** — the
-      loop is not permitted to run before `evidence/noise-floor.json` exists, and task 2.5 has not
-      produced it. The distinction is carried honestly in the type (`measured()` vs `injected()`, with the
-      provenance printed in the run report), so this verifies the *mechanism* of floor-gating, not a
-      measured threshold. It also cannot be quoted as a unit-mixing risk resolved: the floor and the delta
-      must come from the same scorer, which §2.5's ruling now enforces in the evidence schema.
+      distinction is carried honestly in the type (`measured()` vs `injected()`, with the provenance
+      printed in the run report), so this verifies the *mechanism* of floor-gating, not a measured
+      threshold. **Update from 2.5, which has since produced the file: the measured floor is 0.0, so
+      neither injected value is representative.** These tests still prove the mechanism distinguishes
+      floors, but on this endpoint no floor will ever do that work — a real run's comparison is
+      strictly-better, and a reader who takes 0.2 as the operating threshold is reading a fixture. It
+      also cannot be quoted as a unit-mixing risk resolved: the floor and the delta must come from the
+      same scorer, which §2.5's ruling now enforces in the evidence schema and the artifact's
+      `gateFloor`-is-the-only-threshold note restates.
 - [x] 7.5 Compare archive selection against greedy selection over the identical generations and verify both curves are reported
       **Done, and the divergence is the point.** Over identical hand-built generations where the eventual
       winner descends from a *discarded* variant, archive selection reaches 0.9 while greedy stalls at
@@ -430,10 +465,13 @@ them rather than fixed by me.
 - **`Referee.assertOuterLoopMayStart()` checks presence, not content** (verified in
   `referee/Referee.java:141-153`: it only calls `Files.isRegularFile`). A `baseline.json` recording
   `headroom: false` sitting next to a `noise-floor.json` would therefore let the outer loop start,
-  which is the exact case task 2.4's stop-and-record path exists to prevent. It does not bite today —
-  the baseline writer refuses to write the floor when there is no headroom, so the guard's absence
-  check catches it by accident of write order. **Task 10's launcher must read `headroom` and the
-  verdict from `baseline.json`, not just its existence.** Decided not to widen the guard now: it is
+  which is the exact case task 2.4's stop-and-record path exists to prevent. It did not bite when this was
+  written and it does not bite now, for a different reason: 2.4 has recorded
+  `src/main/resources/evidence/baseline.json` and that file carries `headroom: true`, so the pairing the
+  guard would miss is not present in the checkout. The weakness is unchanged — a future run that recorded
+  `headroom: false` beside a floor would still be waved through. **Task 10's launcher must read `headroom`
+  and the verdict from `baseline.json`, not just its existence**, which is now a concrete instruction
+  against a real file rather than a hypothetical one. Decided not to widen the guard now: it is
   §3's tested class, and the honest fix belongs with whoever wires 10.2.
 - **`Baseline` and `NoiseFloor` each exist twice** — `selfimprove/baseline/` (the artifact shapes) and
   `selfimprove/outerloop/` (the run's reference values carrying measured-vs-injected provenance).

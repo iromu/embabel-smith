@@ -23,6 +23,17 @@ One object per file, six keys:
 A task **passes** when every `require` phrase matches, the `anyOf` condition holds, and no `forbid`
 phrase matches. Nothing else is consulted: no model call, no similarity, no partial credit.
 
+**This is the stricter of two scorers, and the loop does not gate on it.** The product's own gate
+scores an `EvalTask` by a single expected-substring test, so it can carry `require` but not `anyOf`
+or `forbid`. **Every task in this set declares both `anyOf` and `forbid`**, which means every one of
+them is narrowed when it reaches that gate — that arm is systematically the looser one, not
+occasionally. A score here therefore has two values that are not interchangeable, and
+`evidence/baseline.json` names them rather than leaving it implied: `baselineScore` is the product's
+substring score and is the primary, which both the gate and the improvement delta read, while
+`humanLabelScore` is this set's full verdict, recorded as the known gap and never as a pass mark.
+`divergingTaskIds` lists the tasks the human label rejects and the primary accepts on that run.
+Read a bare "2/6" as ambiguous.
+
 ## Matching rule
 
 Case-folded. Collapse runs of whitespace to one space and leave hyphens and slashes alone. A phrase
@@ -47,7 +58,7 @@ Each task interrogates a decision in the described process that a general model 
 prior rather than from the project's rule, and the prior is usually the opposite: the severity scale
 has no `HIGH`; the quality floor is a project constant; refinement touches one named prompt, not the
 failing one; publishing commits and does not push. Two tasks (the strict baseline comparison, the
-`--target` arity) are ones the unmodified process is expected to pass, so the set is not a wall of
+never-push default) are ones the unmodified process is expected to pass, so the set is not a wall of
 impossible questions — it is a spread.
 
 | Task | Stage | Expected of the unmodified process |

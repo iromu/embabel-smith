@@ -1,0 +1,14 @@
+{
+  "taskIds" : [ "b27-t01", "b27-t02", "b27-t03", "b27-t04", "b27-t05", "b27-t06" ],
+  "narrowedTaskIds" : [ "b27-t01", "b27-t02", "b27-t03", "b27-t04", "b27-t05", "b27-t06" ],
+  "primaryBaselineIs" : "the product's own substring score — EvalScorer, the scorer GateChain calls inside reeval. The gate and task 7.4's delta read this field.",
+  "baselineScore" : 0.6666666666666666,
+  "baselineFailingTaskIds" : [ "b27-t02", "b27-t03" ],
+  "humanLabelIs" : "the human label — each task file's own recorded verdict, honouring the anyOf/forbid clauses the substring scorer cannot express. Recorded as the known gap, not as the pass mark: the loop is gated by the primary field by design.",
+  "humanLabelScore" : 0.3333333333333333,
+  "humanLabelFailingTaskIds" : [ "b27-t02", "b27-t03", "b27-t05", "b27-t06" ],
+  "divergingTaskIds" : [ "b27-t05", "b27-t06" ],
+  "modelCalls" : 6,
+  "headroom" : true,
+  "verdict" : "2 of 6 frozen tasks fail the primary baseline, so the outer loop has room to move. Expected baseline was 2/6 — the figure benchmark/tasks/README.md records as design intent, which this measurement replaces. DIVERGENCE — the two scorers disagree on this run: 2 task(s) pass the primary baseline and fail the human label ([b27-t05, b27-t06]). The primary baseline is the weaker of the two there, and it is the one the loop is gated by, by the ruling that the loop must optimise the scorer the product actually has. The human label scored 0.3333333333333333 against the primary 0.6666666666666666."
+}

@@ -1,0 +1,11 @@
+{
+  "measures" : "answer variance across repeats, not scorer variance: both scorers are deterministic, so the only thing that can move between repeats is what the live model answered to the same prompts. A floor of 0.0 means every repeat scored identically and is reported as 0.0, not raised for safety; task 7.4 must then know that a delta of any size clears a floor of zero and that repeat-to-repeat agreement here is the only evidence against noise it has.",
+  "primaryFloorIs" : "gateFloor — the spread of the product's own substring score, the scorer GateChain calls. It is the only threshold: task 7.4's delta is a difference of that same score, so comparing it to a spread of any other score would be a unit mismatch. humanLabelFloor is recorded beside it and is never a threshold.",
+  "repeats" : 3,
+  "gateFloor" : 0.0,
+  "gateScores" : [ 0.6666666666666666, 0.6666666666666666, 0.6666666666666666 ],
+  "gateFlippingTaskIds" : [ ],
+  "humanLabelFloor" : 0.0,
+  "humanLabelScores" : [ 0.3333333333333333, 0.3333333333333333, 0.3333333333333333 ],
+  "humanLabelFlippingTaskIds" : [ ]
+}
