@@ -66,9 +66,11 @@ public class SelfImproveApp implements CommandLineRunner {
 	}
 
 	/**
-	 * Runs after Spring has started. The generations that would run here are the referee,
-	 * the outer loop and the archive, which are later tasks of this change; until they
-	 * exist there is nothing to spend a model call on.
+	 * Runs after Spring has started. The referee is not started here: it is a process of
+	 * its own ({@code referee.RefereeProcess}), started by hand, because the code that
+	 * mutates must not hold the thing that scores it. What would run here is the paid
+	 * outer loop and the archive, which are later tasks of this change; until they exist
+	 * there is nothing to spend a model call on.
 	 * @param args the command-line arguments
 	 */
 	@Override
@@ -76,7 +78,8 @@ public class SelfImproveApp implements CommandLineRunner {
 		section("5. The paid outer loop");
 		System.out.println("Spring started against " + System.getenv("OPENAI_CUSTOM_BASE_URL") + " / "
 				+ System.getenv("EMBABEL_MODELS_DEFAULT_LLM"));
-		System.out.println("No generation runs yet: the referee and the outer loop are later tasks of this change.");
+		System.out.println("The referee is a separate hand-started process and this launcher never starts it. No");
+		System.out.println("generation runs yet: the outer loop and the archive are later tasks of this change.");
 	}
 
 	private static void engine() {

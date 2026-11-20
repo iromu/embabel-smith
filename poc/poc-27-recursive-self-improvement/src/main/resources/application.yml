@@ -1,0 +1,16 @@
+# This module's own configuration, and it exists because of the referee's dependency.
+#
+# embabel-smith-studio ships an application.yml at the root of its jar. Spring reads
+# classpath:/application.yml as a single resource — the first match on the classpath — so the
+# moment this module depends on the studio, the studio's file would silently become this POC's
+# configuration unless this module has one of its own. That file sets
+# spring.main.web-application-type: SERVLET, spring.profiles.default: local, a placeholder model
+# and placeholder provider keys; the first of those would turn this POC's command-line launcher
+# into a servlet application trying to bind port 8080, and the rest would replace the POC's own
+# "no endpoint configured" behaviour with the studio's inert placeholders.
+#
+# So: this file shadows it, and only the one line the studio actually forces is stated. Nothing
+# else is copied across — the model endpoint stays env-driven exactly as POC 26 leaves it.
+spring:
+  main:
+    web-application-type: none

@@ -89,10 +89,71 @@
 
 ## 3. The referee
 
-- [ ] 3.1 Build the referee as a separately started process that constructs the gate over the frozen task set through its existing injectable seams, and verify scoring one known-good and one known-bad candidate returns the expected verdicts offline
-- [ ] 3.2 Enforce that the referee loads no skill folder and opens no script context, and verify a test asserts the referee's own classpath and context carry neither
-- [ ] 3.3 Make the task set read-only to the loop and verify a candidate that emits proposed evaluation tasks is excluded from scoring and the exclusion is recorded
-- [ ] 3.4 Refuse to start the outer loop when no baseline is recorded and verify the refusal names the missing artifact
+- [x] 3.1 Build the referee as a separately started process that constructs the gate over the frozen task set through its existing injectable seams, and verify scoring one known-good and one known-bad candidate returns the expected verdicts offline
+      **Done.** `selfimprove/referee/` — `Referee`, `RefereeProcess` (a `main` started by hand; the
+      launcher's own javadoc says the referee is a separate process it never starts), `Candidate`,
+      `RefereeReport`, `FrozenTaskSet`, `FrozenTask`. **No prod file is changed to build it**: the seam is
+      `GateChain`'s two-argument constructor taking the eval task list and the `InvokerFactory`, which
+      `docs/10-self-improvement.md` already records as injected collaborators. The eval scorer is built
+      *inside* `GateChain` and is not injectable, and that is kept as the referee's tenure rather than fixed —
+      an improver that could reach the scorer would optimise its scorer. Offline evidence is
+      `FrozenGateVerdictsTest`, 6 tests: a known-good candidate clears both scorers; a known-bad candidate is
+      rejected at the baseline and names the tasks it missed; the frozen set scores the priors where
+      `benchmark/tasks/README.md` says they belong; each candidate is asked each prompt exactly once across
+      both scorers; no task can be passed by echoing its own question; and the gate cannot carry a `forbid`
+      condition, which is why the report keeps two scores instead of one. The once-only test exists because
+      the gate re-runs the pack during re-eval — without the `RecordedInvokerFactory` wrap the referee would
+      pay for the same calls twice and could report two different scores for one answer set because the model
+      answered differently the second time. Verified: **`Tests run: 18, Failures: 0`** for the module, **0**
+      Checkstyle violations, poc-27 at `[11/11]` of the `-am` reactor.
+- [x] 3.2 Enforce that the referee loads no skill folder and opens no script context, and verify a test asserts the referee's own classpath and context carry neither
+      **Done, with the limit stated where it belongs rather than at the end.** Two mechanisms, not one claim.
+      `Referee.start(resourcesDir, skillFolder, factory)` throws when a skill folder is supplied, naming the
+      `referee-process` row of `evidence/MUTABILITY.md` as the fixed artifact it is honouring; and
+      `RefereeIsolationTest` walks the object graph that constructor produces (`ObjectGraphWalk`) and fails if
+      a script engine or script context is reachable in it. **The walk flags by type as well as by name, and
+      the control case is the reason:** a deliberately neutrally-named `Watchmaker` stub implementing
+      `SkillScriptExecutionEngine` is caught by the `instanceof` and would have slipped past a name-only check
+      — the first draft of this test asserted only that a walked name contained `skills.script`, and the
+      concrete engine's name does not (`skillscripts`), so it was passing for the wrong reason. **The limit,
+      kept in the class javadoc:** isolation is by process boundary and by construction, **not by absent
+      jars**. Both loops are in this one Maven module, so poc-26's engine classes are on the shared classpath
+      and a "no Graal classes here" claim would be false; jar-level isolation would need a second module,
+      which this plan did not ask for. A lambda is invisible to a field walk, so the fourth test reads the
+      source text of the whole package instead — a static call is the one thing the walk cannot see. That test
+      failed on its first run for a self-defeating reason worth recording: four Javadoc comments named the
+      scorer, one of them inside the assertion's own message, so the test was asserting the scorer's absence
+      while spelling it out.
+- [x] 3.3 Make the task set read-only to the loop and verify a candidate that emits proposed evaluation tasks is excluded from scoring and the exclusion is recorded
+      **Done.** `FrozenTaskSet` has no writer — nothing in the class can add, remove or edit a task, which is
+      what makes read-only a property of the code rather than a rule to remember — and `Candidate` takes an
+      optional proposed-tasks directory that `Referee.score` drops by identifier and reports as
+      `excludedProposedTaskIds()`, so the exclusion is evidence in the record rather than an assumption.
+      `TaskSetReadOnlyToLoopTest`, 4 tests: two proposals authored to be trivially passable are excluded by
+      name, never put to the candidate (the recording factory proves those prompts never reached it), and the
+      denominator stays the frozen six so the free points cannot move the score; a candidate that proposes
+      nothing records no exclusion; a proposal that is not even JSON is *still* recorded, because a proposal
+      is excluded rather than validated and must not become a scoring failure or a crash; and scoring twice
+      leaves the tasks directory identical to the snapshot taken before.
+- [x] 3.4 Refuse to start the outer loop when no baseline is recorded and verify the refusal names the missing artifact
+      **Done.** `Referee.assertOuterLoopMayStart()` refuses while `evidence/baseline.json` or
+      `evidence/noise-floor.json` is absent, and the message names every missing artifact together with the
+      path it looked for. `OuterLoopRefusalTest`, 3 tests, including one that isolates the cause — a working
+      referee built against a temp resources directory that simply lacks the artifacts, so the refusal is
+      caused by absence and not by the referee being unable to run — and one that a noise floor without a
+      baseline still refuses and names only the baseline. **Path caveat to keep:** presence is checked, not
+      content, and task 2.4 has not yet named the file its measured baseline will be written to.
+      `evidence/baseline.json` is the path this referee chose; when 2.4 lands it either writes there or this
+      constant changes with it.
+
+**Cost accepted for the seams above.** poc-27's pom now depends on `embabel-smith-studio`,
+`embabel-smith-builder`, `smith-common` and `jackson-databind`, all version-less and resolved from the root
+pom's management. The studio is where `GateChain` lives, so the dependency is the seam, not a convenience —
+but it means every `-am` build of poc-27 pays for the studio's `frontend-maven-plugin` npm build, visible in
+the run above as 26.994 s of the 11-module reactor. The module also carries its own
+`src/main/resources/application.yml` setting `spring.main.web-application-type: none`, because the studio
+jar ships a config that binds `${SERVER_PORT:8080}`, and 8080 is held on this machine by an unrelated
+service.
 
 ## 4. Inner loop — the improver as a generated script
 
