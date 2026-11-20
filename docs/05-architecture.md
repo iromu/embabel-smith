@@ -180,7 +180,7 @@ endpoint and no secrets, so a failure there reproduces with the command above. T
 first is that these guarantees no longer depend on someone's local hooks: a style violation or a broken
 test-compile in any module of the default reactor fails a check on the change itself. The second is
 that its scope is this page's scope and no wider — the default reactor, so not `poc/`, and the live
-group excluded, so the four paths below stay unproven by CI exactly as they are by a local run. The
+group excluded, so the paths below stay unproven by CI exactly as they are by a local run. The
 exclusion is the pom's `test.excludedGroups`, not the workflow: `make test` sources the endpoint env
 when that file exists, and a CI runner simply has no such file.
 
@@ -204,16 +204,19 @@ condition says "can it run here". An opted-in run on a laptop with no endpoint i
 not a wall of failures. Removing the env condition is what turns that into failures; removing the tag
 is what makes `make test` depend on a model agreeing.
 
-The four tests this covers today are the builder's `LiveBuildIntegrationTest`, the runtime's
-`LiveRunIntegrationTest` and the studio's `improve/RestIntegrationTest` and
-`improve/LiveLoopIntegrationTest` — and that is the whole list. Check it against the tree rather than
-against this page: `grep -rn '@Tag("live")' prod/*/src/test` prints exactly those four files. The
-builder's example suites are *not* in it; they were removed on 2026-11-17, and building against a live
-model is now a set of hand-started scripts under `examples/` that `make test-live` does not run (see
-[`08-builder.md`](08-builder.md)).
+The live tests are the builder's `LiveBuildIntegrationTest`, the runtime's `LiveRunIntegrationTest`,
+the a2a launcher's `SmithA2aLiveTest`, and the studio's `improve/RestIntegrationTest` and
+`improve/LiveLoopIntegrationTest` — and that is the whole list. **It is deliberately stated without a
+count**: a fifth joined it when the a2a launcher landed, and a page that says "exactly these four"
+silently becomes false the moment someone adds a test, which is what happened here. Check the list
+against the tree rather than against this page:
+`grep -rln '@Tag("live")' prod/*/src/test` prints the files named above, and when the two disagree the
+grep is right. The builder's example suites are *not* in it; they were removed on 2026-11-17, and
+building against a live model is now a set of hand-started scripts under `examples/` that
+`make test-live` does not run (see [`08-builder.md`](08-builder.md)).
 
-**What the default run therefore does not prove.** A green `make test` is not full coverage, and these
-four are the only execution of the four things below — everywhere else they are exercised against a
+**What the default run therefore does not prove.** A green `make test` is not full coverage, and the
+tests above are the only execution of the things below — everywhere else they are exercised against a
 substituted generator, caller, platform or publisher:
 
 - the builder's pipeline running on real model output all the way to a **published** pack. The offline
@@ -228,7 +231,11 @@ substituted generator, caller, platform or publisher:
 - the studio's three production REST surfaces (run a goal, build a pack, one loop iteration) driven
   with the **real model-backed cores wired**. Offline, the controller tests substitute those cores;
 - the improvement loop's full iteration — real refine, real re-eval, publishing an improved pack —
-  rather than the queue and gate mechanics the offline `ImprovementLoopTest` drives with fakes.
+  rather than the queue and gate mechanics the offline `ImprovementLoopTest` drives with fakes;
+- the a2a endpoint answering a real task: a `message/send` that runs the goal and returns a completed
+  task carrying the output as an artifact, and the streaming form closing with a terminal
+  `completed` status update. Offline, `RunBackedA2ARequestHandlerTest` stubs the run service, so it
+  proves the handler drives the runner correctly — never that a goal actually runs behind it.
 
 The affordable response is the cheap live test [`08-builder.md`](08-builder.md) already names: a small
 blueprint with a known expected spec and skill, which can be asserted rather than merely recorded.

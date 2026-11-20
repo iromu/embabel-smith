@@ -240,13 +240,14 @@ no longer wraps `PocOnlyPane.vue`.
 
 ## Test coverage
 
-- **Closed — nothing recorded that the default test run leaves unproven.** The four endpoint-gated
-  integration tests (`LiveBuildIntegrationTest`, `LiveRunIntegrationTest`, `LiveLoopIntegrationTest`,
-  `RestIntegrationTest`) are now tagged `@Tag("live")` *as well as* env-gated, and the group is
+- **Closed — nothing recorded that the default test run leaves unproven.** The endpoint-gated
+  integration tests (`LiveBuildIntegrationTest`, `LiveRunIntegrationTest`, `SmithA2aLiveTest`,
+  `LiveLoopIntegrationTest`, `RestIntegrationTest`) are now tagged `@Tag("live")` *as well as* env-gated, and the group is
   excluded by default through `test.excludedGroups`, with `make test-live` the single opt-in — that
   machinery shipped on 2026-11-17. What was missing was the consequence, and it is now stated in
-  [`05-architecture.md`](05-architecture.md) §"The live group is opt-in": the four paths these tests
-  alone exercise — a build publishing a pack the model really produced, a successful run, the studio's
+  [`05-architecture.md`](05-architecture.md) §"The live group is opt-in": the paths these tests
+  alone exercise — a build publishing a pack the model really produced, a successful run, the a2a
+  endpoint answering a real task, the studio's
   REST surfaces with model-backed cores, one full loop iteration — and that a green default run
   evidences none of them. That page names its list by a grep so it cannot rot silently; the builder's
   example suites it used to list were removed on 2026-11-17 and are not part of `make test-live`.
@@ -255,9 +256,12 @@ no longer wraps `PocOnlyPane.vue`.
   proves:** `.github/workflows/offline-verification.yml` now runs `make build`, `make test` and
   `make lint` on every pull request and every push to the default branch, with no endpoint and no
   secrets, on the default reactor. So a green CI badge is the same evidence as a green local `make test`
-  and nothing more — the four paths above are still outside it, as is the `poc/` reactor. Read it as
+  and nothing more — the paths above are still outside it, as is the `poc/` reactor. Read it as
   "nobody had to remember to run it", never as "the publish, run and loop paths were verified". Check:
-  `grep -rn '@Tag("live")' prod/*/src/test` returns exactly those four files, `grep -n 'does not prove'
+  `grep -rln '@Tag("live")' prod/*/src/test` prints the files named in this item — and it is written
+  without an expected count on purpose, because this item said "exactly those four files" until the a2a
+  launcher added a fifth, which is the rot the check was supposed to catch and did not, because the
+  check itself went stale with the claim. `grep -n 'does not prove'
   docs/05-architecture.md` finds the statement, and `grep -n 'make test'
   .github/workflows/offline-verification.yml` finds the target that runs them.
 

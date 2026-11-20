@@ -308,7 +308,7 @@ left out is part of both its report and the index it writes. The fetch is the pa
 have to pay for twice: a repository download yields the same corpus as the clone (measured identical on
 the example repository), so iterating on an example means pointing the script at an archive.
 
-`make test-live` still runs the four endpoint-gated integration tests that carry `@Tag("live")`; the
+`make test-live` still runs the endpoint-gated integration tests that carry `@Tag("live")`; the
 examples are not part of it. The live test worth adding next is the cheap one — a small blueprint
 with a known expected spec and skill, which can be asserted rather than merely recorded.
 
