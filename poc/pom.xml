@@ -46,6 +46,7 @@
         <module>poc-24-generation-approaches</module>
         <module>poc-25-skill-generation</module>
         <module>poc-26-graaljs-skill-scripts</module>
+        <module>poc-27-recursive-self-improvement</module>
     </modules>
 
     <dependencyManagement>
@@ -115,6 +116,12 @@
             <dependency>
                 <groupId>org.iromu.embabel.smith</groupId>
                 <artifactId>poc-16-remote-action</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <!-- POC 27 runs its generated improvement policies through POC 26's in-JVM script engine. -->
+            <dependency>
+                <groupId>org.iromu.embabel.smith</groupId>
+                <artifactId>poc-26-graaljs-skill-scripts</artifactId>
                 <version>${project.version}</version>
             </dependency>
         </dependencies>

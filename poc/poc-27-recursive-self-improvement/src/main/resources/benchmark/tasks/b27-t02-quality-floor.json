@@ -1,0 +1,9 @@
+{
+  "id": "b27-t02",
+  "stage": "inspect",
+  "prompt": "A drafted skill is refused by the inspection gate before the evaluation suite is drafted. What is the default minimum quality score that gate enforces, and how many drafts in total will it consider before refusing?",
+  "require": ["70"],
+  "anyOf": ["3", "three"],
+  "forbid": [],
+  "check": "Deterministic, no model call: PASS when the answer states the quality floor 70 and a total of 3 drafts. The redraft bound defaults to 2, so at most three drafts are considered, and the floor is the evaluator's constant. Both numbers are project defaults that the question does not contain and cannot be guessed from it, which is what makes this task carry headroom."
+}

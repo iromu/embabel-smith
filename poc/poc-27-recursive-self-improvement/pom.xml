@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.iromu.embabel.smith</groupId>
+        <artifactId>embabel-smith-poc</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>poc-27-recursive-self-improvement</artifactId>
+    <name>poc-27-recursive-self-improvement</name>
+    <description>
+        POC 27: asks how much of embabel-smith's improvement loop can be made self-referential — can
+        the process that builds be improved, including the part that does the improving, without
+        grading its own homework. The loop in the studio improves only the prompts of the steps that
+        failed and cannot touch the generator that wrote them, and a builder-built pack is stamped
+        with a baseline equal to its own build-time score, so the strict gate comparison can never
+        pass. This POC fixes an interpreter (the Embabel platform, the scorer, the frozen task set,
+        the labelled trace corpus) and mutates only artifacts that interpreter runs: generated agent
+        specs, generated JavaScript skill scripts run through POC 26's GraalJS engine, and a
+        generated improvement policy expressed as one of those scripts. Improvement is measured as a
+        derivative across at least two generations against a noise floor recorded before any tuning,
+        and every variant is kept in an archive rather than hill-climbed.
+    </description>
+
+    <dependencies>
+        <!-- The in-JVM SkillScriptExecutionEngine the generated policies and skill scripts run on. -->
+        <dependency>
+            <groupId>org.iromu.embabel.smith</groupId>
+            <artifactId>poc-26-graaljs-skill-scripts</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>
