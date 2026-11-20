@@ -243,9 +243,52 @@ service.
 
 ## 6. Skill scripts that run
 
-- [ ] 6.1 Generate a skill with a `scripts/` folder from a process step and verify `SkillMdValidator` accepts the frontmatter and the folder contains at least one `.js` file
-- [ ] 6.2 Execute the generated script inside the candidate's own context through the engine and verify a successful run credits the skill and a script that exits with an error withholds credit and attributes the failure to the skill
-- [ ] 6.3 Verify the candidate-side script context keeps `poc-26`'s hardening (no host class lookup, no IO, no process or thread creation) by asserting a probing script is denied
+- [x] 6.1 Generate a skill with a `scripts/` folder from a process step and verify `SkillMdValidator` accepts the frontmatter and the folder contains at least one `.js` file
+      **Done, and the skill half is reuse while the script half is not.** `StepSkillGenerator` runs the
+      product's own `SkillGenerator` on the step's declaration — a test proves the first system prompt is the
+      one `SkillPrompts.generateSkill()` produces — then makes a second call on the same `SpecPromptCaller`
+      seam for the script. The assumption that the builder's `skill` target already produces this is **false**:
+      no `scripts/` writer exists anywhere in `prod/embabel-smith-builder/src/main` or
+      `prod/embabel-smith-studio/src/main`, so this folder is new surface rather than a discovered feature.
+      One of the four tests is a control showing `SkillMdValidator` really does reject a blank description
+      rather than accepting everything. A fifth pins the on-disk layout to the four-argument
+      `SkillScript(skillName, fileName, language, basePath)` that Embabel itself uses, so the generated folder
+      is addressable the way a real skill script is.
+- [x] 6.2 Execute the generated script inside the candidate's own context through the engine and verify a successful run credits the skill and a script that exits with an error withholds credit and attributes the failure to the skill
+      **Done, with one semantic finding worth keeping.** "Exits with an error" is **not** a `Failure`: a
+      script calling `process.exit(2)` comes back as `Success` carrying exit code 2, so credit withheld on the
+      result type alone would silently credit a script that failed. `SkillCredit` therefore withholds on
+      `Failure`, on `Denied` and on a non-zero exit code. The sharpest of the five tests gives the *same*
+      script two different stdins and gets credit on one, a withheld code 3 on the other — so credit tracks
+      what the script did with its input, not whether a script exists. A skill whose `scripts/` folder is
+      empty runs nothing and earns nothing, and a thrown `TypeError` keeps its message in the attribution.
+- [x] 6.3 Verify the candidate-side script context keeps `poc-26`'s hardening (no host class lookup, no IO, no process or thread creation) by asserting a probing script is denied
+      **Done by probing through the door the generated scripts actually use, not by reading the engine's
+      config.** `Java.type('java.lang.Runtime')`, `ProcessBuilder`, `Thread` and `java.io.File` are each
+      refused, an unstaged `readFile` is refused with "was not staged", `process.env` is empty, and every
+      refusal is confirmed by a marker file that never appears — the escape is checked in the filesystem and
+      not only in the returned error. Two controls keep this from passing by being blind: a benign script
+      through the same door is still credited, and the ledger carries the engine's raw refusal text unchanged
+      rather than a paraphrase. `poc-26` pins the "not allowed" wording only for `java.lang.Runtime`; the
+      wording for the other three was written without having been run, and this run is what confirms it.
+
+**Section 6 verification.** Fourteen offline tests (`StepSkillGenerationTest` 4, `ScriptCreditTest` 5,
+`CandidateSandboxHardeningTest` 5) → 0 failures, 0 errors, 0 skipped, 0 Checkstyle violations, BUILD SUCCESS,
+with upstream green around it (common 39, specsource 29, skillevaluator 942, runtime 82, builder 241,
+studio 162, poc-26 31). The module total rose 70 → 84. The two `@Tag("live")` tests — the generated skill
+clearing the frontmatter gate on a real model answer, and that script being accepted by the engine — are
+group-excluded and appear zero times in the log, so **no model was called** and 6.1 and 6.2 are verified
+against a canned `SpecPromptCaller`, not against a real generation. That is the same gap §5 recorded at 10.2:
+`Ai` bean resolution in this module is still unproven.
+
+The exit-code rule was **mutation-checked**, because it is the one claim in this section that a test
+could carry decoratively: `success.getExitCode() != 0` was widened to `< 0`, which leaves the
+successful path correct and makes a non-zero exit earn credit anyway, and exactly two tests failed —
+`aScriptThatExitsWithAnErrorWithholdsCreditAndNamesTheSkill` and
+`creditFollowsWhatTheScriptDidWithTheInputItWasGiven`. An earlier, cruder mutation (`!= -1`) was
+rejected as evidence because it also broke the credit path, so it failed two *different* tests and
+proved only that some assertion watches something. The file is byte-identical to the committed
+version again (`git diff --quiet` clean).
 
 ## 7. Outer loop — generations and the archive
 
