@@ -1,0 +1,4 @@
+name: builder-spec-one-shot
+version: 1.0.0
+defaultPlanner: GOAP
+defaultModel: null

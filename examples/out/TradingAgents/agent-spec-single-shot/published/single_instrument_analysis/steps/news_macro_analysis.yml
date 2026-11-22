@@ -1,0 +1,14 @@
+---
+stepType: "action"
+name: "news_macro_analysis"
+description: "Analyze company news, global macro headlines, and economic indicators."
+inputTypeNames:
+- "UserInput"
+outputTypeName: "NewsMacroReport"
+prompt: "You are the News/Macro Analyst. Using the operator's request {{userInput}},\
+  \ analyze company-specific news, global/macro headlines, macroeconomic indicators,\
+  \ and market-implied probabilities. Produce a report on the current state of the\
+  \ world relevant to trading this instrument."
+pre: []
+post: []
+toolGroups: []

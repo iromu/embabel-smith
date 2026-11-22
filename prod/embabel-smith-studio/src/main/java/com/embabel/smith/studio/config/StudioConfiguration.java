@@ -6,8 +6,6 @@
 package com.embabel.smith.studio.config;
 
 import java.io.IOException;
-import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -18,6 +16,9 @@ import com.embabel.agent.core.AgentPlatform;
 import com.embabel.common.ai.model.LlmOptions;
 import com.embabel.smith.builder.BuildOptions;
 import com.embabel.smith.builder.BuilderService;
+import com.embabel.smith.builder.blueprint.BlueprintLoader;
+import com.embabel.smith.builder.blueprint.BusinessProcessDiscovery;
+import com.embabel.smith.builder.blueprint.ProcessExtractor;
 import com.embabel.smith.builder.core.AgentSpecGenerator;
 import com.embabel.smith.builder.core.AgentSpecGenerators;
 import com.embabel.smith.builder.core.AiSpecPromptCaller;
@@ -31,6 +32,9 @@ import com.embabel.smith.builder.eval.EvalTask;
 import com.embabel.smith.builder.eval.InvokerFactory;
 import com.embabel.smith.builder.eval.PromptRewriter;
 import com.embabel.smith.builder.eval.RefinementLoop;
+import com.embabel.smith.builder.improve.ImprovementLoop;
+import com.embabel.smith.builder.improve.LoopPublishPolicy;
+import com.embabel.smith.builder.improve.LoopPushDisabledException;
 import com.embabel.smith.builder.publish.FolderPublisher;
 import com.embabel.smith.builder.publish.GitPublisher;
 import com.embabel.smith.builder.publish.PublishTarget;
@@ -43,11 +47,7 @@ import com.embabel.smith.runtime.core.TrustTier;
 import com.embabel.smith.runtime.trace.JsonlTraceStore;
 import com.embabel.smith.specsource.GitSpecSource;
 import com.embabel.smith.specsource.SpecSource;
-import com.embabel.smith.studio.discover.BusinessProcessDiscovery;
-import com.embabel.smith.studio.generate.BlueprintLoader;
 import com.embabel.smith.studio.generate.FlowValidator;
-import com.embabel.smith.studio.generate.ProcessExtractor;
-import com.embabel.smith.studio.improve.ImprovementLoop;
 import com.embabel.smith.studio.loop.LoopSchedulerState;
 import com.embabel.smith.studio.rest.BuildController;
 import com.embabel.smith.studio.rest.EvalController;
@@ -61,6 +61,7 @@ import com.embabel.smith.studio.rest.dto.SimulateResponse;
 import com.embabel.smith.studio.storage.StorageContext;
 import com.embabel.smith.studio.storage.StorageSettingsService;
 import com.embabel.smith.studio.store.ProcessStore;
+import com.embabel.smith.studio.store.ProcessStoreCandidateStore;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -79,6 +80,13 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @Configuration
 @EnableScheduling
 public class StudioConfiguration {
+
+	/**
+	 * The studio setting that names the improve source the loop publishes to. It is
+	 * refused rather than defaulted when empty, so an unconfigured loop never writes
+	 * improvements to a directory the operating system is free to discard.
+	 */
+	private static final String IMPROVE_SOURCE_SETTING = "smith.studio.improve-source";
 
 	/**
 	 * The endpoint the studio reports and gates model-backed actions on: whichever of the
@@ -106,7 +114,7 @@ public class StudioConfiguration {
 
 	/**
 	 * The JSONL file trace store — the default
-	 * {@link com.embabel.smith.runtime.trace.TraceStore} backend.
+	 * {@link com.embabel.smith.common.trace.TraceStore} backend.
 	 * @param traceDir the configured trace directory, or empty for the default.
 	 * @return the JSONL file trace store.
 	 */
@@ -256,14 +264,14 @@ public class StudioConfiguration {
 	}
 
 	/**
-	 * The model-based process extraction: the discovery prompt plus the model caller the
-	 * workspace shares with generation.
+	 * The model-based process extraction: the builder's discovery prompt plus the model
+	 * caller the workspace shares with generation.
 	 * @param specPromptCaller the model caller to run the discovery prompt through.
 	 * @return the model-based process extraction.
 	 */
 	@Bean
 	public ProcessExtractor processExtractor(SpecPromptCaller specPromptCaller) {
-		return new ProcessExtractor(specPromptCaller, loadPrompt("business_process_discovery.jinja"));
+		return new ProcessExtractor(specPromptCaller);
 	}
 
 	/**
@@ -275,23 +283,6 @@ public class StudioConfiguration {
 	@Bean
 	public ExtractController.ExtractFn extractFn(ProcessExtractor extractor) {
 		return extractor::extract;
-	}
-
-	/**
-	 * Reads a prompt template from the classpath {@code prompts/} directory.
-	 * @param name the prompt template name.
-	 * @return the prompt template text.
-	 */
-	private static String loadPrompt(String name) {
-		try (InputStream in = StudioConfiguration.class.getResourceAsStream("/prompts/" + name)) {
-			if (in == null) {
-				throw new IllegalStateException("prompt resource not found: /prompts/" + name);
-			}
-			return new String(in.readAllBytes(), StandardCharsets.UTF_8);
-		}
-		catch (IOException ex) {
-			throw new IllegalStateException("Failed to load prompt " + name + ": " + ex.getMessage(), ex);
-		}
 	}
 
 	/**
@@ -370,17 +361,34 @@ public class StudioConfiguration {
 		return Sources.parse(uri, cacheRoot(cacheDir));
 	}
 
+	/**
+	 * The publisher the improvement loop writes an approved candidate to: the configured
+	 * improve source. With no source configured there is no durable destination, so the
+	 * publisher refuses the publish and names the setting to change — the same way
+	 * {@link LoopPublishPolicy} refuses a git source with pushing off — and the candidate
+	 * stays pending.
+	 * @param improveSource the improve source the loop watches; not consulted here, the
+	 * URI decides the destination.
+	 * @param improveSourceUri the configured improve source URI, or empty.
+	 * @param sources the comma-separated configured sources.
+	 * @param cacheDir the configured source cache directory.
+	 * @return the loop's publisher.
+	 */
 	@Bean
 	public Publisher loopPublisher(SpecSource improveSource,
 			@Value("${smith.studio.improve-source:}") String improveSourceUri,
 			@Value("${smith.studio.sources:}") String sources,
 			@Value("${smith.studio.source-cache-dir:}") String cacheDir) {
-		String uri = improveSourceUri;
+		String uri = improveSourceUri(improveSourceUri, sources);
 		if (uri == null || uri.isBlank()) {
-			uri = firstSource(sources);
-		}
-		if (uri == null || uri.isBlank()) {
-			return new FolderPublisher(PublishTarget.parse("folder:" + Path.of(System.getProperty("java.io.tmpdir"))));
+			// Nothing is published, and nothing is written: the destination is a
+			// decision, not a default.
+			return (unit, overwrite, push) -> {
+				throw new LoopPushDisabledException("Candidate for '" + unit.name()
+						+ "' was not published: no improve source is configured, so the loop has no durable "
+						+ "destination to write it to. Set " + IMPROVE_SOURCE_SETTING
+						+ " to a folder: or git: destination. The candidate stays pending.");
+			};
 		}
 		return publisherFor(uri, cacheRoot(cacheDir));
 	}
@@ -388,13 +396,35 @@ public class StudioConfiguration {
 	@Bean
 	public ImprovementLoop improvementLoop(SpecSource improveSource, StorageContext storageContext,
 			PromptRewriter promptRewriter, AgentPlatform platform, Publisher loopPublisher,
+			LoopPublishPolicy loopPublishPolicy,
 			@Value("${smith.studio.loop.auto-publish:false}") boolean autoPublish) {
 		InvokerFactory invokerFactory = new AgentSpecInvokerFactory(platform);
 		// Always hold: auto-publish is applied at the LoopService layer so the toggle is
 		// live. The
 		// loop reads traces through the selected backend (JSONL file or database).
 		return new ImprovementLoop(improveSource, storageContext.traceStore(), promptRewriter, invokerFactory,
-				defaultEvalTasks(), loopPublisher, false);
+				defaultEvalTasks(), loopPublisher, loopPublishPolicy, false);
+	}
+
+	/**
+	 * The loop's publish policy: whether an approved candidate is pushed to the improve
+	 * source's remote, and whether a publish may be attempted at all. Not runtime-
+	 * toggleable — pushing is the credential-and-intent decision. The policy also records
+	 * each published candidate in the durable store, which is where the version the
+	 * destination folder replaced survives.
+	 * @param push the configured value of {@code smith.studio.loop.push}.
+	 * @param improveSourceUri the configured improve source URI, or empty for the
+	 * default.
+	 * @param sources the comma-separated configured sources.
+	 * @param packStore the store a published candidate is recorded in.
+	 * @return the loop's publish policy.
+	 */
+	@Bean
+	public LoopPublishPolicy loopPublishPolicy(@Value("${smith.studio.loop.push:false}") boolean push,
+			@Value("${smith.studio.improve-source:}") String improveSourceUri,
+			@Value("${smith.studio.sources:}") String sources, ProcessStore packStore) {
+		return new LoopPublishPolicy(push, improveSourceUri(improveSourceUri, sources),
+				new ProcessStoreCandidateStore(packStore));
 	}
 
 	@Bean
@@ -413,6 +443,17 @@ public class StudioConfiguration {
 
 	private static List<EvalTask> defaultEvalTasks() {
 		return EvalTask.smokeDefault();
+	}
+
+	/**
+	 * The URI the loop publishes to: the explicit improve source, else the first
+	 * configured source — the same resolution the {@code loopPublisher} bean uses.
+	 * @param improveSourceUri the configured improve source URI, or empty.
+	 * @param sources the comma-separated configured sources.
+	 * @return the improve-source URI, possibly null or blank when none is configured.
+	 */
+	private static String improveSourceUri(String improveSourceUri, String sources) {
+		return (improveSourceUri != null && !improveSourceUri.isBlank()) ? improveSourceUri : firstSource(sources);
 	}
 
 	private static String firstSource(String sources) {

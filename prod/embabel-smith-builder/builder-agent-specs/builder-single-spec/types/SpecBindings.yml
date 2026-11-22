@@ -1,0 +1,11 @@
+name: SpecBindings
+description: "The step-to-step wiring by type name, and whether the goal is reachable"
+ownProperties:
+  - name: handoffs
+    type: string
+    description: "One line per step: the types it consumes and the type it produces, plus the goal's producer"
+  - name: gaps
+    type: string
+    description: "Unresolved inputs, undeclared types and orphan outputs; 'none' when the graph is sound"
+parents: []
+creationPermitted: true

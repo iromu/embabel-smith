@@ -74,8 +74,8 @@ public class RuntimeCore {
 	 * all goals and actions deployed together so the planner can route across packs.
 	 * @param source the resolved spec source to ingest
 	 * @return the ingested packs with their deployed agent
-	 * @throws IllegalStateException when the source has no packs or two packs export the
-	 * same goal name
+	 * @throws IllegalStateException when the source has no packs left once retired packs
+	 * are excluded, or two packs export the same goal name
 	 */
 	public IngestedSource ingest(ResolvedSpecSource source) {
 		return ingest(source, null);
@@ -89,22 +89,38 @@ public class RuntimeCore {
 	 * @param model the LLM every action step should use, or empty to leave each step on
 	 * the model its own YAML names
 	 * @return the ingested packs with their deployed agent
-	 * @throws IllegalStateException when the source has no packs or two packs export the
-	 * same goal name
+	 * @throws IllegalStateException when the source has no packs left once retired packs
+	 * are excluded, or two packs export the same goal name
 	 */
 	public IngestedSource ingest(ResolvedSpecSource source, String model) {
 		List<AgentSpec> packs = new ArrayList<>();
+		List<IngestedSource.ExcludedPack> excluded = new ArrayList<>();
+		List<ResolvedSpec> deployed = new ArrayList<>();
 		for (ResolvedSpec resolved : source.packs()) {
+			AgentSpec pack;
 			try {
-				packs.add(this.reader.read(resolved.root()));
+				pack = this.reader.read(resolved.root());
 			}
 			catch (IOException ex) {
 				throw new IllegalStateException("Failed to read agent spec '" + resolved.name() + "' from source '"
 						+ source.origin().uri() + "': " + ex.getMessage(), ex);
 			}
+			// A pack the lifecycle state machine retired is out of the library, so it is
+			// not
+			// deployed at all: left in the platform its actions stay plannable from a
+			// live
+			// pack's goal. No sidecar is no state recorded, which stays runnable.
+			if (LifecycleSidecar.retired(resolved.root())) {
+				excluded.add(new IngestedSource.ExcludedPack(pack.name(), pack.goal().name()));
+			}
+			else {
+				packs.add(pack);
+				deployed.add(resolved);
+			}
 		}
 		if (packs.isEmpty()) {
-			throw new IllegalStateException("spec source '" + source.origin().uri() + "' contains no agent specs");
+			throw new IllegalStateException(
+					"spec source '" + source.origin().uri() + "' contains no agent specs" + retiredNote(excluded));
 		}
 		checkGoalNameCollisions(packs);
 
@@ -113,7 +129,7 @@ public class RuntimeCore {
 
 		Path stepsDir;
 		try {
-			stepsDir = this.assembler.assemble(source.packs().stream().map(ResolvedSpec::root).toList(),
+			stepsDir = this.assembler.assemble(deployed.stream().map(ResolvedSpec::root).toList(),
 					Files.createTempDirectory("smith-steps-"), model);
 		}
 		catch (IOException ex) {
@@ -128,7 +144,7 @@ public class RuntimeCore {
 		Agent agent = builder.deploy()
 			.createAgent("smith-spec-agent-" + suffix, "spec", "agent specs from " + source.origin().uri());
 		this.platform.deploy(agent);
-		return new IngestedSource(source, packs, agent);
+		return new IngestedSource(source, packs, excluded, agent);
 	}
 
 	/**
@@ -148,11 +164,14 @@ public class RuntimeCore {
 	 * @return the run outcome
 	 * @throws GoalNotFoundException when no pack exports the goal (error lists available
 	 * goals)
+	 * @throws LifecycleBlockedException when the goal was exported only by a pack retired
+	 * out of the library
 	 * @throws TrustTierBlockedException when a pack declares tool groups the tier does
 	 * not allow
 	 */
 	public RunOutcome run(IngestedSource ingested, String goalName, String input, String plannerOverride,
 			TrustTier tier) {
+		checkLifecycle(ingested, goalName);
 		AgentSpec goalPack = ingested.packForGoal(goalName);
 		checkTier(ingested.packs(), tier);
 		PlannerType planner = this.plannerResolver.resolve(plannerOverride, goalPack);
@@ -194,6 +213,21 @@ public class RuntimeCore {
 		return types;
 	}
 
+	/**
+	 * The goal a retirement took away, named as the policy block it is rather than left
+	 * to read as a goal nobody ever exported. A goal no pack exported still falls through
+	 * to {@link GoalNotFoundException}, and a live pack that exports the goal wins.
+	 * @param ingested the ingested packs with their exclusions
+	 * @param goalName the goal the run asked for
+	 */
+	private void checkLifecycle(IngestedSource ingested, String goalName) {
+		if (!ingested.goalNames().contains(goalName)) {
+			ingested.excludedPackForGoal(goalName).ifPresent((excluded) -> {
+				throw new LifecycleBlockedException(excluded.name(), goalName);
+			});
+		}
+	}
+
 	private void checkGoalNameCollisions(List<AgentSpec> packs) {
 		Map<String, List<String>> goalToPacks = new LinkedHashMap<>();
 		for (AgentSpec pack : packs) {
@@ -206,6 +240,17 @@ public class RuntimeCore {
 								+ entry.getValue() + "; a source cannot ingest them unambiguously");
 			}
 		}
+	}
+
+	/**
+	 * Names the packs an ingest excluded as retired, so the report that says nothing was
+	 * deployed also says which packs it left out.
+	 * @param excluded the packs left out of the source
+	 * @return the exclusion note, or empty when nothing was excluded
+	 */
+	private static String retiredNote(List<IngestedSource.ExcludedPack> excluded) {
+		return excluded.isEmpty() ? ""
+				: " (excluded as retired: " + excluded.stream().map(IngestedSource.ExcludedPack::name).toList() + ")";
 	}
 
 	private void checkTier(List<AgentSpec> packs, TrustTier tier) {

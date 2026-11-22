@@ -2,7 +2,7 @@
 
 A **GOAP-based Embabel agent builder** — a general-purpose builder agent that emits deployable,
 no-code *agent specs* (declarative YAML step definitions), plus the fixed no-code runtime that
-ingests them. Greenfield POC multi-module project on **Embabel 1.5.4 / Java 21**.
+ingests them. Product code and POC evidence in one repository, on **Embabel 1.5.4 / Java 21**.
 
 The core idea: a builder *agent* turns a natural-language description into an **agent spec** (a
 pure-data YAML directory of Embabel step definitions — goals and actions), validates it before
@@ -14,9 +14,19 @@ for the design.
 
 ## Modules
 
+`smith-common` and the six `prod/` modules below are the **default reactor** — the shipped product.
+The `poc-*` rows after them are **frozen evidence**: built only with `-Ppoc`, never depended on by the
+product. See [`docs/05-architecture.md`](docs/05-architecture.md) for the module map and why.
+
 | Module | Purpose |
 | --- | --- |
 | `smith-common` | The shared agent-spec format: data model, YAML I/O, validation, sample specs. Framework-free, fully offline-testable. |
+| `embabel-smith-specsource` | Spec sources: the `folder:` / `git:` grammar, pack discovery, the git cache and ref pinning, content hashes, and the publish rules. The one piece shared by more than one product module — the runtime reads it, the builder publishes into it, the studio browses it — and it holds no Embabel agent code, so it stays offline-testable. |
+| `embabel-smith-runtime` | Ingests packs with **zero compilation** and runs a GOAP plan over an exported goal: multi-pack chaining through shared types, trust tiers, the lifecycle gate on retired packs, the trace record every run emits, and the remote-action bridge client. `smith run`. |
+| `embabel-smith-runtime-a2a` | The runtime's A2A surface: `message/send`, `message/stream`, `tasks/get`, `tasks/cancel` and the agent card over protocol 0.3 — **five** operations, listing tasks not among them. An A2A run is the same run `smith run` makes: same trust-tier gate, same planner selection, same trace record, and no model call of the module's own. The only prod module that gains a servlet engine **from a dependency** rather than declaring one, so it is a deliberate network surface — an explicit non-default port, no authentication and no TLS, i.e. a local development endpoint. `make run-a2a`. |
+| `embabel-smith-builder` | The builder: generation techniques (single-shot by default), validate-before-write, eval and refinement bounds, the skill and process targets, retrieval ranking with lifecycle curation, and the security gate on what is allowed to publish. `smith build`. |
+| `embabel-smith-skillevaluator` | Tier 1 static skill validator (`Tier1Runner`): schema, license, hygiene, version, quality score, script lint, Python syntax, code risk, and the security family (secrets, PII, Unicode smuggling). A port of a Python `tier1` validator, so it runs with no model call. **Consumed by the builder's `skill` target** as the `inspect` gate: six binary-free checks block a build (`schema`, `version`, `quality`, `unicode`, `lint`, `license`) and `pii` runs as an advisory, while `security`, `secrets` and `code-integrity` are not requested on a default build because each needs an external scanner — so a default skill build runs no SkillSpector, Gitleaks, Bandit or Semgrep, and this module is not the builder's security gate. See [`docs/08-builder.md`](docs/08-builder.md). Carries an upstream attribution; see [`NOTICE`](NOTICE). |
+| `embabel-smith-studio` | The browser UI over a thin REST layer: the process workspace, retrieval and remote panes, the self-improvement loop with its approval queue, and hot-swappable Postgres storage. |
 | `poc-1-no-code-runtime` | **POC 1 (keystone).** Fixed launcher that ingests an agent spec via `YmlStepSpecRepository` + `StepSpecAgentScopeBuilder.deploy()` and runs a GOAP plan over the exported goal. |
 | `poc-2-nl-compile` | **POC 2.** Natural-language → draft via `NaturalLanguageCompiler.compileAgent`; reports the draft's goal-shape quality (the `DraftQuality` classifier — doc 02 caveat #2). |
 | `poc-3-builder-agent` | **POC 3.** The builder as a code-backed `@Agent` (GOAP): `compileFromDescription → validateDraft → writeAgentSpec`; logs the draft quality before and after `normalizeGoalOutput`. |
@@ -39,6 +49,7 @@ for the design.
 | `poc-20-semantic-embedding` | **POC 20.** The real semantic `EmbeddingService` doc 03 §2.1 calls for: a genuine dense sentence-encoder (`all-MiniLM-L6-v2` BERT via ONNX Runtime + the HuggingFace tokenizer, mean-pooled + L2-normalised) behind POC 12's `SpecScorer` seam, on POC 12's 200+ same-typed shadowing scenario. It retrieves cleanly at the distinct scale (100% at 191) and, under shadowing, beats the lexical (17%) and dense feature-hashing (0%) stand-ins (33%) — but does not fully cure the near-duplicate collapse, confirming curation (POC 18) is the real fix. A **local-model-gated** benchmark (one-time ONNX download; offline tests use a stub embedder). |
 | `poc-23-remote-embedding-scale` | **POC 23.** Spec selection at scale with a **remote** `EmbeddingService`: the real `nomic-embed-text-v2` OpenAI-compatible `POST /embeddings` endpoint (a llama.cpp server, proxied by LiteLLM) behind POC 12's `SpecScorer` seam. On POC 12/20's identical 200+ same-typed shadowing library it retrieves cleanly at the distinct scale (100% at 191) and, under shadowing, ties lexical (17%) and beats dense (0%) — an honest data point that the specific embedding model matters. On a generated library to **1000** specs, Precision@1 holds at 100% while steady-state per-query retrieval (cosine over cached vectors, no model call) stays 0.48 ms → 1.27 ms; the one-time embedding index is paid once and amortised, vs *n* model calls per query for a per-candidate selector. An **endpoint-gated** benchmark (offline tests use a stub transport / a local `HttpServer`). |
 | `poc-26-graaljs-skill-scripts` | **POC 26.** Agent Skill scripts that actually run. Embabel 1.5.4 has the script SPI (`SkillScriptExecutionEngine`, `Skills.withScriptExecutionEngine`) and an `activate`/`readResource` skill surface, but its only JavaScript runner spawns an external `node`, and its default engine logs *"script execution is not yet supported"* — the gap the [Agent Skills reference](https://hub.embabel.com/reference/agent_skills) documents. This POC supplies the missing **in-JVM** engine by embedding **GraalJS on a plain JDK** ([RunOnJDK.md](https://github.com/oracle/graaljs/blob/master/docs/user/RunOnJDK.md): two Maven dependencies, no GraalVM, no `node`), hardened to `HostAccess.EXPLICIT` with no host-class lookup, no IO, no environment, no threads or processes, under a statement limit and a wall-clock watchdog, and gives the script a CLI-shaped surface (`args`, `stdin`, `process.argv`/`exit`, `readFile`, `writeFile`→artifacts). The skill's `scripts/*.js` then becomes a callable agent tool — `[activate, listResources, readResource]` → `[…, invoice-totalling_compute_totals]` — and the scripts are written against **ECMAScript 2026**, measured by executing each feature as a real script (**14/14** probes: `Math.sumPrecise`, `Iterator.concat`, `Array.fromAsync`, `Error.isError`, `Map.getOrInsert(Computed)`, `Uint8Array` base64/hex, `JSON.rawJSON`, …). Benchmarked against the shipped external-`node` engine on identical work, with the interpreter-only cost reported honestly. 31 offline tests; the tool-loop demo where the model calls the script is **endpoint-gated**. |
+| `poc-27-recursive-self-improvement` | **POC 27.** Can the builder improve the process that builds, including the part that does the improving — **verdict: not proven**. The product's loop improves one thing, the prompts of the failed steps, and cannot touch the generator that wrote them; this POC makes the improver self-referential inside a boundary it cannot edit — a checked-in `MUTABILITY.md` of seven mutable surfaces (generator prompts, decomposition, JS skill scripts run through POC 26's GraalJS engine, process shape, the detection and refinement policy, the improver pack itself …) against eleven fixed ones (the `AgentPlatform` and no-code runtime, `EvalScorer`, the frozen task set, the labelled corpus, the generation archive) — with the referee a separate hand-started JVM that loads no skill folder and opens no Graal `Context`, so a candidate can never generate the code that grades it. Measured before any prompt was tuned, on a frozen 6-task benchmark scored two ways: **0.667** on the product's substring gate arm (failing `b27-t02`, `b27-t03`) against **0.333** on a human-label arm (failing `b27-t02`, `b27-t03`, `b27-t05`, `b27-t06`) — the arms diverge on `b27-t05` and `b27-t06`, the gate arm is the looser one and the one that decides, and `headroom: true`. Noise floor **measured 0.0** over 3 repeats / 18 calls with no task flipping, and passed through at 0.0 rather than raised. The inner loop costs **0 model calls** and converged after 4 of 12 generations by patience with its own seed as the best variant — hand-written and seed policies both 1.0/1.0 held-out, every mutation strictly worse (recall 0.875 tuning / 0.8 held-out) — because the 26-line labelled corpus is **saturated**, which is the finding rather than a caveat. The outer loop, the only half with headroom, **never ran validly** — and the cause was the POC's own prompt, not the endpoint: its `detect` step was then built from `prompt.render()` with **no `{{userInput…}}` placeholder anywhere**, so the six frozen tasks sent six byte-identical requests and no score could have separated two candidates — repaired 2026-11-21, the step now interpolates `{{userInput.content}}`. Each attempt declared **60 calls before the first one**; the binding error first blamed (`MismatchedInputException` through `BackgroundMessage["parts"]`) is a separate real trap, since upstream's `compile_action.jinja:16-18` tells the NL compiler to emit `BackgroundMessage` as an action output while nothing upstream ever executes one, and `examples/out/` proves the safe shape is a declared domain type. **No test in the repo could have caught the prompt bug** then — every multi-task test injects a constant-returning invoker, and the spec validator accepted an input-blind pack at the time — which made it a product gap, not a POC one. That gap is since closed: the validator rejects a step whose prompt interpolates none of its declared inputs (`PROMPT_IGNORES_DECLARED_INPUT`, 2026-11-21). The outer loop is **unmeasured, not blocked**; what survives from the log is that a real call costs minutes. `prod/` untouched throughout; 123 offline tests, the baseline / noise-floor / outer-loop launchers **endpoint-gated**. |
 
 Sample agent spec: [`agent-specs/explainer`](agent-specs/explainer)
 (`UserInput → extractTopic → TopicBrief → writeExplainer → BackgroundMessage`). Composition samples:
@@ -63,8 +74,8 @@ Full index: [`docs/index.md`](docs/index.md).
 | [`docs/10-self-improvement.md`](docs/10-self-improvement.md) | Detect → refine → gate → publish, gate ordering, strict-baseline rationale, what is advisory in v1. |
 | [`docs/11-spec-selection-pocs.md`](docs/11-spec-selection-pocs.md) | Shared benchmark methodology and gating for POCs 17, 19 and 23, plus the caveats that must travel with their numbers. |
 | [`docs/12-backlog.md`](docs/12-backlog.md) | Every known open or deliberately-accepted gap, each with the reason and the check that confirms it is still open. |
-| [`docs/03-embabel-spec-agent-builder-design.md`](docs/03-embabel-spec-agent-builder-design.md) | The spec-first design synthesis the product implements. |
-| [`docs/04-poc-run-results.md`](docs/04-poc-run-results.md) | POC evidence read against the hypothesis; §7 holds the authoritative shared results. |
+| [`docs/03-embabel-spec-agent-builder-design.md`](docs/03-embabel-spec-agent-builder-design.md) | The spec-first design synthesis the product grew from — design history. Where it names files or modules, `agent-spec-format.md` and `05-architecture.md` outrank it. |
+| [`docs/04-poc-run-results.md`](docs/04-poc-run-results.md) | POC evidence read against the hypothesis; §7 holds the shared results for POCs 8–21, 23, 26 and 27 — the last two read from their own "Results" sections. POCs 22, 24 and 25 are covered only in their own READMEs. |
 | [`docs/research/`](docs/research/) | 01 — Embabel research and decisive evidence; 02 — the "skills, not agents" literature survey. |
 
 [`AGENTS.md`](AGENTS.md) records the working conventions; the POC READMEs under `poc/` are frozen
@@ -79,11 +90,54 @@ mvn -q verify
 Every module's offline tests are green without a model endpoint. Tests that exercise the model are
 **endpoint-gated** and are not run offline.
 
+Those guarantees are enforced without anyone remembering to run them:
+`.github/workflows/offline-verification.yml` runs `make build`, `make test` and `make lint` on every
+pull request and every push to the default branch, with no model endpoint and no secrets, on the
+default reactor only.
+
+The `make` entry points are `build`, `test`, `test-live`, `lint` and one launcher — `make run-a2a`,
+which starts the runtime's A2A development endpoint (`SERVER_PORT=`, `SMITH_A2A_SOURCE=`,
+`SMITH_A2A_TRUST_TIER=`, port 18090 by default). It is the only target that opens a port, and the
+endpoint it starts has **no authentication and no TLS**, so read
+[`docs/07-runtime.md`](docs/07-runtime.md) before running it anywhere but your own machine.
+
+### Live tests are opt-in by tag
+
+Every test that needs a real model endpoint carries `@Tag("live")`, and the root `pom.xml` excludes
+that group through the overridable `test.excludedGroups` property (default `live`). So a plain
+`mvn test` runs no live test whether or not an endpoint happens to be configured — and
+`make test` still exports the endpoint env, it just no longer decides whether live tests run.
+
+`make test-live` is the one supported way to opt in: it sources `~/.config/env/llm.env`, exports the
+endpoint variables, and runs the live group. The equivalent by hand is the flag pair below, and the
+pair matters — **`mvn test -Dgroups=live` alone selects nothing**, because Surefire applies the
+selection and the default exclusion together and the exclusion still says "exclude `live`". Clearing
+the exclusion is the other half of opting in:
+
+```bash
+make test-live                                        # the documented entry point
+./mvnw test -Dtest.excludedGroups= -Dgroups=live      # the same thing, by hand
+```
+
+On a machine with no endpoint configured, an opted-in run reports the live tests **skipped** rather
+than failed: each of them keeps `@EnabledIfEnvironmentVariable` alongside the tag. The tag answers
+"should this run by default", the env check answers "can it run here".
+
+The other side of that: because the group is excluded by default, a green `make test` proves nothing
+about the four things those tests alone exercise — a build publishing a pack the model really
+produced, a run that achieves its goal, the REST surfaces with the model-backed cores wired, and one
+loop iteration end to end. [`docs/05-architecture.md`](docs/05-architecture.md) says what rests on
+them.
+
+The 27 POC modules are **not** in the default reactor — they sit behind the `poc` Maven profile, so
+the commands above cover `smith-common` and `prod/` only. Add `-Ppoc` (or `POC=1` to a `make`
+target) to build or test them too.
+
 To run a POC launcher, install the modules once (so `smith-common` and sibling modules resolve from
 the local repo), then run a single module by `-pl`:
 
 ```bash
-mvn install -DskipTests          # one-time (re-run after changes)
+mvn -Ppoc install -DskipTests    # one-time (re-run after changes)
 ```
 
 ## Model endpoint (env-driven, design D4)
@@ -126,6 +180,11 @@ before.
 
 Each command runs the POC's launcher for a single module (deps resolve from the local repo after
 `mvn install`). The endpoint-gated ones need the env vars above.
+
+**Add `-Ppoc` to every command below.** The POC reactor is off by default (see
+[Build & test](#build--test-offline)), and Maven can only select a module that is in the reactor, so
+`mvn -pl poc/…` without the profile fails with *"Could not find the selected project in the
+reactor"*.
 
 Per-run inputs are **OS environment variables**, not `-D` Maven properties: `spring-boot:run`
 forks the app with the module dir as its working directory and does **not** forward `-D` system

@@ -7,6 +7,7 @@ package com.embabel.smith.studio.storage;
 
 import java.sql.Connection;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Properties;
 
@@ -63,10 +64,10 @@ public final class StorageBinding {
 	}
 
 	/**
-	 * Builds and verifies a binding for the endpoint. A test query runs before anything
-	 * is returned; if the endpoint is unreachable (or the schema cannot be created) the
-	 * partially built resources are torn down and an exception is thrown so the caller
-	 * keeps its previous binding.
+	 * Builds and verifies a binding for the endpoint. A test query and the packs key
+	 * migration run before anything is returned; if the endpoint is unreachable (or the
+	 * schema cannot be created) the partially built resources are torn down and an
+	 * exception is thrown so the caller keeps its previous binding.
 	 * @param settings the database endpoint to bind.
 	 * @return the verified binding.
 	 */
@@ -79,6 +80,7 @@ public final class StorageBinding {
 		ds.setPoolName("smith-studio-storage");
 		try {
 			verifyConnectivity(ds);
+			migratePacksKey(ds);
 		}
 		catch (RuntimeException ex) {
 			ds.close();
@@ -123,6 +125,23 @@ public final class StorageBinding {
 		}
 		catch (Exception ex) {
 			throw new IllegalStateException("Cannot connect to the storage database: " + ex.getMessage(), ex);
+		}
+	}
+
+	/**
+	 * Puts an existing packs table onto the current key before Hibernate sees it (change:
+	 * publish-keeps-versions). It has to happen here rather than after the factory is
+	 * built: {@code hbm2ddl.auto = update} would add the missing key column as NOT NULL
+	 * to a table that still has rows, which is exactly the case the migration exists to
+	 * handle.
+	 * @param ds the pool of the database being bound.
+	 */
+	private static void migratePacksKey(HikariDataSource ds) {
+		try (Connection c = ds.getConnection()) {
+			PacksKeyMigration.migrateIfNameKeyed(c);
+		}
+		catch (SQLException ex) {
+			throw new IllegalStateException("Cannot re-key the packs table: " + ex.getMessage(), ex);
 		}
 	}
 

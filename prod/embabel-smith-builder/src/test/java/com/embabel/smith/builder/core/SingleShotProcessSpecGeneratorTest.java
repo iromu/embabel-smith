@@ -56,6 +56,19 @@ class SingleShotProcessSpecGeneratorTest {
 	private final ProcessValidator validator = new ProcessValidator();
 
 	@Test
+	void theDescriptionArrivesInsideDocumentTags() {
+		String[] seen = new String[1];
+		SingleShotProcessSpecGenerator generator = new SingleShotProcessSpecGenerator((system, user) -> {
+			seen[0] = user;
+			return MULTI_JSON;
+		}, "the multi-agent prompt");
+
+		generator.generateProcess("run the research debate and decide");
+
+		assertThat(seen[0]).contains("<document>\nrun the research debate and decide\n</document>");
+	}
+
+	@Test
 	void parsesTheAnswerIntoAnOrderedListOfPacks() {
 		ProcessDraft draft = generator(MULTI_JSON).generateProcess("a business process");
 

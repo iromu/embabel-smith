@@ -5,17 +5,17 @@ status: "active"
 language: "default"
 source_paths:
   - "poc/poc-3-builder-agent/src/main/java/com/embabel/smith/builder/BuilderAgent.java"
-  - "openspec/changes/archive/2026-11-06-embabel-agent-builder/design.md"
+  - "docs/08-builder.md"
   - "poc/poc-3-builder-agent/src/test/java/com/embabel/smith/builder/BuilderAgentTest.java"
-updated_at: "2026-11-14"
+updated_at: "2026-11-22"
 ---
 
 # Validate-before-write (D5)
 
 The single invariant that makes "generate with no code" safe: **the builder must never write a
-draft that fails validation.** This is design decision D5 in
-`openspec/changes/archive/2026-11-06-embabel-agent-builder/design.md` — archived; the requirements it
-introduced now live under `openspec/specs/`.
+draft that fails validation.** This was design decision D5 in the builder's design doc, since
+consolidated into `docs/`: the durable statement is `docs/08-builder.md`, with
+`docs/03-embabel-spec-agent-builder-design.md` for the thesis.
 
 ## Why it is load-bearing
 

@@ -1,0 +1,28 @@
+stepType: action
+name: enumerateStages
+description: "Turn the scoped process into the ordered list of action steps the spec will carry"
+inputTypeNames:
+  - ProcessScope
+outputTypeName: StagePlan
+pre: []
+post: []
+cost: null
+value: null
+canRerun: null
+nullable: null
+toolGroups: []
+prompt: |
+  Turn the scoped process below into the ordered list of action steps its agent spec will carry.
+  - Each step is one distinct role or stage of the process. Its output is the artifact it produces;
+    its inputs are the artifacts it consumes.
+  - Distinct roles are distinct steps; roles that run in parallel are separate steps that share the
+    same input type.
+  - Keep the flow faithful to the described workflow: one step per meaningful stage, in the order
+    the process runs, with the decision points and hand-offs made explicit.
+  - Stay in business terms throughout (no code, no APIs, no infrastructure).
+  For each step give, on one line: its snake_case name; the PascalCase artifact it produces; the
+  PascalCase artifacts it consumes, comma-separated or "none"; and one line of what it does in
+  business terms.
+  Process to model: {{processScope.primaryProcess}}
+  Roles, in run order: {{processScope.roles}}
+  Final deliverable type: {{processScope.finalDeliverable}}

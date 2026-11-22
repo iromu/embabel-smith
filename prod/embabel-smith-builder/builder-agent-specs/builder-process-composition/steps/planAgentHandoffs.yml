@@ -1,0 +1,29 @@
+stepType: action
+name: planAgentHandoffs
+description: "Make the hand-offs between agents explicit as shared types and check each agent is self-contained"
+inputTypeNames:
+  - ProcessScope
+  - AgentSplit
+outputTypeName: HandoffPlan
+pre: []
+post: []
+cost: null
+value: null
+canRerun: null
+nullable: null
+toolGroups: []
+prompt: |
+  Plan how the agents below hand work to each other, and check each one stands on its own.
+  - Each agent is self-contained: its own goal must be produced by one of its own steps, and every
+    step input it uses is either produced by one of its own steps, produced by an EARLIER agent's
+    goal, or is the operator's request.
+  - Agents connect by type name: an earlier agent's goal output type, or a step output, must appear
+    as a later agent's step input type. That shared type is the hand-off.
+  - Reuse the SAME type name for the same data across agents; do not invent duplicate names for the
+    same artifact.
+  Report on one line per hand-off: the producing agent, the PascalCase shared type, the consuming
+  agent. Then list, per agent, the types it needs that nothing in the process produces. Then list
+  any agent whose goal nothing of its own steps produces; write "none" if there are none.
+  Process being composed: {{processScope.primaryProcess}}
+  Final deliverable type: {{processScope.finalDeliverable}}
+  Agents in run order, with their goals and needs: {{agentSplit.agents}}

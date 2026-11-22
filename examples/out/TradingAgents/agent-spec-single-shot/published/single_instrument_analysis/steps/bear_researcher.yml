@@ -1,0 +1,19 @@
+---
+stepType: "action"
+name: "bear_researcher"
+description: "Build the strongest evidence-based case AGAINST investing."
+inputTypeNames:
+- "TechnicalReport"
+- "SentimentReport"
+- "NewsMacroReport"
+- "FundamentalsReport"
+- "BullArgument"
+outputTypeName: "BearArgument"
+prompt: "You are the Bear Researcher. Review the analyst reports: Technical {{technicalReport}},\
+  \ Sentiment {{sentimentReport}}, News/Macro {{newsMacroReport}}, and Fundamentals\
+  \ {{fundamentalsReport}}. Also review the Bull's case: {{bullArgument}}. Build the\
+  \ strongest case AGAINST investing, highlighting risks, weaknesses, and negative\
+  \ indicators. Directly rebut the Bull's arguments."
+pre: []
+post: []
+toolGroups: []

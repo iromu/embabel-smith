@@ -41,8 +41,8 @@ final class RestTestFixtures {
 	 */
 	static AgentSpec packWithToolGroup(String name, String stepName, String toolGroup) {
 		ActionStepSpec step = new ActionStepSpec(ActionStepSpec.STEP_TYPE, stepName, "step " + stepName,
-				List.of("UserInput"), "BackgroundMessage", "perform " + stepName + " carefully", null, null, null, null,
-				null, null, List.of(toolGroup));
+				List.of("UserInput"), "BackgroundMessage", "perform " + stepName + " carefully {{userInput.content}}",
+				null, null, null, null, null, null, List.of(toolGroup));
 		return new AgentSpec(new AgentSpecManifest(name, "1.0.0"),
 				GoalStepSpec.exportedGoal(name, "goal " + name, "BackgroundMessage"), List.of(step), List.of());
 	}
@@ -51,7 +51,7 @@ final class RestTestFixtures {
 		List<ActionStepSpec> out = new ArrayList<>();
 		for (String step : stepNames) {
 			out.add(ActionStepSpec.action(step, "step " + step, List.of("UserInput"), "BackgroundMessage",
-					"perform " + step + " carefully"));
+					"perform " + step + " carefully {{userInput.content}}"));
 		}
 		return out;
 	}

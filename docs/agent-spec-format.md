@@ -153,7 +153,7 @@ packs, and the reader locates the manifest and then every immediate subdirectory
 
 ```
 <process>/
-  process.yml           ProcessSpecManifest — name, version, and the member pack names in run order
+  process.yml           ProcessSpecManifest — keys `process`, `version`, `agents` (member pack names in run order)
   <member-a>/           a complete agent spec, format unchanged
   <member-b>/           a complete agent spec
 ```
@@ -162,7 +162,9 @@ The manifest records the **run order explicitly**. Pack directories sort alphabe
 inferred from the filesystem would not be the order the model produced — a process whose members are
 named `analysis` and `zeta` would run backwards.
 
-`ProcessValidator` checks the hand-offs between members rather than re-checking each pack: input
-producer coverage, goal uniqueness across the members, and cycle detection. A process that fails is
+`ProcessValidator` checks the hand-offs between members that no single pack can see — input
+producer coverage process-wide, goal uniqueness across the members, connectivity from `UserInput` to
+the final goal, and cycle detection — and it *also* re-checks per-member basics (each member exports a
+goal, has steps, and produces its own goal output). A process that fails is
 never stored — a stored process is one someone could ingest. The builder's repair pass is
-reorder-only; see [`08-builder.md`](08-builder.md) §Process target.
+reorder-only; see [`08-builder.md`](08-builder.md) §Process output.

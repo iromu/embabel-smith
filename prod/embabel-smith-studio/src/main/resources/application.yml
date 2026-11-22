@@ -29,6 +29,7 @@ embabel:
   # matches the placeholder model below, so the two stay coherent when no real endpoint is set.
   models:
     default-llm: ${EMBABEL_MODELS_DEFAULT_LLM:studio-no-endpoint}
+    default-embedding-model: ${EMBABEL_MODELS_DEFAULT_EMBEDDING_MODEL:text-embedding-3-small}
   agent:
     platform:
       models:
@@ -57,6 +58,14 @@ smith:
     trace-dir: ${SMITH_STUDIO_TRACE_DIR:}
     # The git source cache root (defaults to ~/.smith/spec-sources).
     source-cache-dir: ${SMITH_STUDIO_SOURCE_CACHE_DIR:}
+    # The remote-action sidecars the Remote pane lists, as a comma-separated `name@url` list — the
+    # same shape `sources` uses. An entry with no `@` is reported as malformed, not guessed. The
+    # studio never starts one of these: a sidecar is a process the operator runs by hand, and an
+    # absent one is shown as unreachable with the URL that was probed.
+    remote-bridges: ${SMITH_STUDIO_REMOTE_BRIDGES:}
+    # The MCP endpoint the Remote pane reports. Reported only, never probed: the product is not an
+    # MCP client, so there is no honest reachability signal to show for it.
+    mcp-endpoint: ${SMITH_STUDIO_MCP_ENDPOINT:}
     loop:
       # The interval between scheduled loop iterations, in milliseconds (the schedule is off by
       # default and started from the UI).

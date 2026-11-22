@@ -1,0 +1,17 @@
+name: ProcessDecomposition
+description: "The process specification read into the stages, hand-offs and rules a skill author needs"
+ownProperties:
+  - name: stages
+    type: string
+    description: "The stages of the process, one per line in run order, each with the role that owns it"
+  - name: handoffs
+    type: string
+    description: "The artifact each stage hands to the next, and who receives it"
+  - name: decisionRules
+    type: string
+    description: "The decision points and the rule for each branch, one per line"
+  - name: escalations
+    type: string
+    description: "What escalates to whom and when, plus the hard constraints that must not be broken"
+parents: []
+creationPermitted: true

@@ -6,8 +6,11 @@
 package com.embabel.smith.studio.store;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import com.embabel.smith.common.model.AgentSpec;
 import com.embabel.smith.studio.storage.StorageBinding;
@@ -22,10 +25,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  * The durable store for generated agent specs and discovery history (change:
  * smith-studio-postgres-storage). Every operation delegates to the current
  * {@link StorageBinding}; the public API is unchanged from the former file-based store. A
- * saved pack is one row whose {@code content} is the {@link AgentSpec} serialized as
- * JSON. When no database is bound, mutating operations and loads report "storage not
- * configured" while the listing operations return an empty list, so the studio boots and
- * stays usable with no storage.
+ * saved pack is one row keyed by {@code (name, version)} whose {@code content} is the
+ * {@link AgentSpec} serialized as JSON, so each version of a pack is kept (change:
+ * publish-keeps-versions). A bare name means the pack's highest version — decision 3 of
+ * that change — and the comparison implementing that rule is here, in
+ * {@code compareVersions(String, String)}, not in a query. When no database is bound,
+ * mutating operations and loads report "storage not configured" while the listing
+ * operations return an empty list, so the studio boots and stays usable with no storage.
  *
  * @author Ivan Rodriguez
  */
@@ -43,7 +49,10 @@ public class ProcessStore {
 	// ---- Packs --------------------------------------------------------------
 
 	/**
-	 * Saves the pack to the database and returns its listing record.
+	 * Saves the pack at the version its artifact declares, as the row for that
+	 * {@code (name, version)}: republishing the same version updates it, a new version
+	 * adds a row. A pack declaring no version is stored at
+	 * {@link PackEntity#DEFAULT_VERSION}.
 	 * @param pack the agent spec to save.
 	 * @return the saved pack's listing record.
 	 */
@@ -53,6 +62,7 @@ public class ProcessStore {
 		return b.tx().execute((status) -> {
 			PackEntity e = new PackEntity();
 			e.setName(name);
+			e.setVersion(storedVersion(pack));
 			e.setGoal((pack.goal() == null) ? null : pack.goal().name());
 			e.setSteps(pack.steps().size());
 			e.setSavedAt(Instant.now());
@@ -63,7 +73,25 @@ public class ProcessStore {
 	}
 
 	/**
-	 * The saved packs, most recently saved first.
+	 * Saves the pack when a database is bound, and records nothing when none is. This is
+	 * the entry point for a caller that must not fail because storage was never
+	 * configured — the improvement loop's publish, which has already written its artifact
+	 * by the time it gets here, and the studio that stays usable with no storage.
+	 * @param pack the agent spec to save.
+	 * @return the saved pack's listing record, or {@code null} when no database is bound.
+	 */
+	public PackRecord savePackWhenConfigured(AgentSpec pack) {
+		if (!this.storage.isBound()) {
+			return null;
+		}
+		return savePack(pack);
+	}
+
+	/**
+	 * The saved packs, most recently saved first. A name held at several versions is
+	 * listed once, by its highest version, so the listing agrees with what
+	 * {@link #loadPack(String)} returns for that name (decision 3 of
+	 * publish-keeps-versions).
 	 * @return the saved packs.
 	 */
 	public List<PackRecord> listPacks() {
@@ -72,7 +100,7 @@ public class ProcessStore {
 			return List.of();
 		}
 		List<PackEntity> entities = b.tx().execute((status) -> b.packs().findAll());
-		return entities.stream()
+		return highestPerName(entities).stream()
 			.map((e) -> new PackRecord(e.getName(), e.getGoal(), e.getSteps(),
 					(e.getSavedAt() == null) ? "" : e.getSavedAt().toString()))
 			.sorted(Comparator.comparing(ProcessStore.PackRecord::savedAt).reversed())
@@ -80,17 +108,21 @@ public class ProcessStore {
 	}
 
 	/**
-	 * Loads a saved pack by name, or {@code null} when no such pack is stored.
+	 * Loads a saved pack by name, resolving the name to its highest version, or
+	 * {@code null} when no such pack is stored.
 	 * @param name the pack name to load.
 	 * @return the stored agent spec, or {@code null} when no such pack is stored.
 	 */
 	public AgentSpec loadPack(String name) {
 		StorageBinding b = this.storage.requireMain();
-		PackEntity e = b.tx().execute((status) -> b.packs().findById(name).orElse(null));
-		if (e == null) {
+		// No derived query: the ANTLR parser a finder would need is shadowed on this
+		// classpath (see PackRepository), so the rows are fetched and narrowed here.
+		List<PackEntity> rows = b.tx()
+			.execute((status) -> b.packs().findAll().stream().filter((row) -> name.equals(row.getName())).toList());
+		if (rows.isEmpty()) {
 			return null;
 		}
-		return fromJson(e.getContent());
+		return fromJson(highestPerName(rows).get(0).getContent());
 	}
 
 	// ---- Discovery history --------------------------------------------------
@@ -145,6 +177,91 @@ public class ProcessStore {
 	 */
 	private static String sanitize(String name) {
 		return name.replaceAll("[^A-Za-z0-9._-]", "_");
+	}
+
+	/**
+	 * The version a pack is stored at: the one its artifact declares, or the default when
+	 * it declares none.
+	 * @param pack the pack being stored.
+	 * @return the version to key the row on.
+	 */
+	private static String storedVersion(AgentSpec pack) {
+		String version = pack.version();
+		return (version == null || version.isBlank()) ? PackEntity.DEFAULT_VERSION : version;
+	}
+
+	/**
+	 * Narrows stored rows to one per pack name, keeping the highest version of each — the
+	 * rule behind decision 3 of publish-keeps-versions. Both name-keyed readers go
+	 * through here so the rule is not reinvented per reader.
+	 * @param rows the rows to narrow.
+	 * @return the highest-version row of each name, in first-seen order.
+	 */
+	private static List<PackEntity> highestPerName(List<PackEntity> rows) {
+		Map<String, PackEntity> highest = new LinkedHashMap<>();
+		for (PackEntity row : rows) {
+			highest.merge(row.getName(), row, ProcessStore::keepHighest);
+		}
+		return new ArrayList<>(highest.values());
+	}
+
+	private static PackEntity keepHighest(PackEntity kept, PackEntity candidate) {
+		return (compareVersions(kept.getVersion(), candidate.getVersion()) >= 0) ? kept : candidate;
+	}
+
+	/**
+	 * Compares two stored versions segment by segment, numerically where a segment parses
+	 * as an integer. This is the one place the "a name means its highest version" rule
+	 * lives, and it has to be Java rather than an {@code ORDER BY version DESC}:
+	 * lexicographic order puts {@code 1.9} above {@code 1.10}, and a derived ordering
+	 * query is unavailable on this classpath (see
+	 * {@link com.embabel.smith.studio.storage.repository.PackRepository}).
+	 * @param one the version to place.
+	 * @param other the version to place it against.
+	 * @return a negative, zero or positive value as {@code one} is lower, equal or higher
+	 * than {@code other}.
+	 */
+	private static int compareVersions(String one, String other) {
+		String[] left = versionSegments(one);
+		String[] right = versionSegments(other);
+		int segments = Math.max(left.length, right.length);
+		for (int index = 0; index < segments; index++) {
+			String leftSegment = (index < left.length) ? left[index] : null;
+			String rightSegment = (index < right.length) ? right[index] : null;
+			int comparison = compareVersionSegments(leftSegment, rightSegment);
+			if (comparison != 0) {
+				return comparison;
+			}
+		}
+		return 0;
+	}
+
+	private static String[] versionSegments(String version) {
+		return (version == null || version.isBlank()) ? new String[0] : version.trim().split("\\.");
+	}
+
+	private static int compareVersionSegments(String one, String other) {
+		if (one == null) {
+			return (other != null) ? -1 : 0;
+		}
+		if (other == null) {
+			return 1;
+		}
+		Long oneNumber = asNumber(one);
+		Long otherNumber = asNumber(other);
+		if ((oneNumber != null) && (otherNumber != null)) {
+			return oneNumber.compareTo(otherNumber);
+		}
+		return one.compareTo(other);
+	}
+
+	private static Long asNumber(String segment) {
+		try {
+			return Long.valueOf(segment);
+		}
+		catch (NumberFormatException ex) {
+			return null;
+		}
 	}
 
 	private String toJson(AgentSpec pack) {

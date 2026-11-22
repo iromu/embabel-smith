@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
+
 import org.iromu.embabel.smith.skillevaluator.model.Severity;
 import org.iromu.embabel.smith.skillevaluator.model.ValidationResult;
 import org.iromu.embabel.smith.skillevaluator.util.ScanPaths;
@@ -17,6 +18,8 @@ import org.iromu.embabel.smith.skillevaluator.util.ScanPaths;
 /**
  * Abstract base for Tier 1 validators: manifest discovery plus the folder-or-single-skill
  * template method, ported from Python {@code validators/base.py}.
+ *
+ * @author Ivan Rodriguez
  */
 public abstract class ValidatorBase {
 
@@ -27,7 +30,11 @@ public abstract class ValidatorBase {
 	 */
 	private static final ThreadLocal<Boolean> CONTINUE_ON_FAILURE = ThreadLocal.withInitial(() -> Boolean.FALSE);
 
-	/** Opens a continue-on-failure scope for the current thread; close it when done. */
+	/**
+	 * Opens a continue-on-failure scope for the current thread; close it when done.
+	 * @param enabled whether folder validation should keep going past a CRITICAL finding
+	 * @return a handle that restores the previous setting when closed
+	 */
 	public static AutoCloseable continueOnFailureScope(boolean enabled) {
 		Boolean previous = CONTINUE_ON_FAILURE.get();
 		CONTINUE_ON_FAILURE.set(enabled);
@@ -42,12 +49,17 @@ public abstract class ValidatorBase {
 
 	public abstract String getDescription();
 
-	/** Validate a skill directory or a folder containing skills. */
+	/**
+	 * Validate a skill directory or a folder containing skills.
+	 * @param skillPath skill directory or folder to validate
+	 * @return this validator's findings, successes and metadata for that target
+	 */
 	public abstract ValidationResult validate(Path skillPath);
 
 	/**
 	 * CRITICAL checks that judge one skill's own content: they fail that skill but never
 	 * stop a folder scan early.
+	 * @return check names exempt from the folder stop-early rule, empty by default
 	 */
 	protected Set<String> failFastExemptChecks() {
 		return Set.of();
@@ -68,8 +80,16 @@ public abstract class ValidatorBase {
 	/**
 	 * Template method: run {@code singleSkillValidator} on a single skill, or on every
 	 * skill discovered under a folder, aggregating results.
+	 * @param skillPath skill directory or folder to validate
+	 * @param singleSkillValidator validator applied to each skill on its own
+	 * @param actionDescription verb phrase naming this validation in the folder-level
+	 * messages
+	 * @param noSkillsFallback treat the folder as one skill when it holds none instead of
+	 * reporting an error
 	 * @param continueOnFailure keep scanning past a CRITICAL finding instead of returning
 	 * early
+	 * @return the single skill's result, or the folder result aggregating every skill
+	 * scanned
 	 */
 	protected ValidationResult validateFolderOrSkill(Path skillPath,
 			Function<Path, ValidationResult> singleSkillValidator, String actionDescription, boolean noSkillsFallback,
@@ -100,14 +120,14 @@ public abstract class ValidatorBase {
 			if (skillResult.isPassed()) {
 				List<Map<String, Object>> checkDetails = skillResult.getSuccessDetails()
 					.stream()
-					.map(detail -> Map.<String, Object>of("name", detail.getCheckName(), "description",
+					.map((detail) -> Map.<String, Object>of("name", detail.getCheckName(), "description",
 							detail.getMessage(), "metadata", detail.getMetadata()))
 					.toList();
 				List<String> notes = skillResult.getSuccessDetails()
 					.stream()
-					.filter(d -> "skillspector_baseline".equals(d.getCheckName())
+					.filter((d) -> "skillspector_baseline".equals(d.getCheckName())
 							|| d.getMetadata().containsKey("suppressed_count"))
-					.map(d -> d.getMessage())
+					.map((d) -> d.getMessage())
 					.toList();
 				result.addSuccess(skillName,
 						"All checks passed" + (notes.isEmpty() ? "" : "; " + String.join("; ", notes)),
@@ -119,7 +139,7 @@ public abstract class ValidatorBase {
 
 			boolean stopEarly = skillResult.getFindings()
 				.stream()
-				.anyMatch(f -> f.getSeverity() == Severity.CRITICAL
+				.anyMatch((f) -> f.getSeverity() == Severity.CRITICAL
 						&& !failFastExemptChecks().contains(f.getCheckName()));
 			if (stopEarly && !(continueOnFailure || isContinueOnFailure())) {
 				return result;

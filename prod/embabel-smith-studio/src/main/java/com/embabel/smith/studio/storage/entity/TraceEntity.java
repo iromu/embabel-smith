@@ -19,7 +19,7 @@ import org.hibernate.type.SqlTypes;
 /**
  * A run trace record (change: smith-studio-postgres-storage) — the database mirror of the
  * JSONL trace record. The scalar fields of
- * {@link com.embabel.smith.runtime.trace.TraceRecord} are stored as columns; the per-step
+ * {@link com.embabel.smith.common.trace.TraceRecord} are stored as columns; the per-step
  * records are serialized as a JSON array in {@code steps_json} so the record shape is
  * unchanged by the backend. Column types are portable (long VARCHAR, BIGINT, TIMESTAMP);
  * the long text uses {@code SqlTypes.LONGVARCHAR} rather than {@code @Lob}, which would

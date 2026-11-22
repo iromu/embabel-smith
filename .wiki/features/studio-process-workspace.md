@@ -9,14 +9,14 @@ source_paths:
   - "prod/embabel-smith-studio/src/main/java/com/embabel/smith/studio/rest/SimulateController.java"
   - "prod/embabel-smith-studio/src/main/java/com/embabel/smith/studio/rest/DiscoverController.java"
   - "prod/embabel-smith-studio/src/main/java/com/embabel/smith/studio/rest/ExtractController.java"
-  - "prod/embabel-smith-studio/src/main/java/com/embabel/smith/studio/generate/BlueprintLoader.java"
+  - "prod/embabel-smith-builder/src/main/java/com/embabel/smith/builder/blueprint/BlueprintLoader.java"
   - "prod/embabel-smith-builder/src/main/java/com/embabel/smith/builder/core/SpecPromptCaller.java"
   - "prod/embabel-smith-studio/src/main/java/com/embabel/smith/studio/generate/FlowValidator.java"
-  - "prod/embabel-smith-studio/src/main/java/com/embabel/smith/studio/generate/ProcessExtractor.java"
-  - "prod/embabel-smith-studio/src/main/java/com/embabel/smith/studio/discover/BusinessProcessDiscovery.java"
-  - "prod/embabel-smith-studio/src/main/resources/prompts/business_process_discovery.jinja"
+  - "prod/embabel-smith-builder/src/main/java/com/embabel/smith/builder/blueprint/ProcessExtractor.java"
+  - "prod/embabel-smith-builder/src/main/java/com/embabel/smith/builder/blueprint/BusinessProcessDiscovery.java"
+  - "prod/embabel-smith-builder/src/main/resources/prompts/business_process_discovery.jinja"
   - "examples/blueprints"
-updated_at: "2026-11-15"
+updated_at: "2026-11-22"
 ---
 
 # The studio's process workspace
@@ -30,14 +30,16 @@ The stages: **Discover → Generate → Simulate → Publish**.
 
 ## Discover — find the processes in your documents
 
-`POST /api/discover` (`rest/DiscoverController.java:49`) runs
-`discover/BusinessProcessDiscovery.java` over a **docs path**, a **repo URL** (cloned), or pasted
-**text** — the three source modes the UI offers. It uses the
+`POST /api/discover` (`rest/DiscoverController.java:38`) runs
+`builder/blueprint/BusinessProcessDiscovery.java` over a **docs path** or a **repo URL** (cloned) —
+the UI's third source mode, pasted **text**, is carried into Generate as a blueprint rather than
+sent to Discover (`ProcessWorkspace.vue:515-520,700`). It uses the
 `prompts/business_process_discovery.jinja` prompt and returns the business processes it found. The
 controller is **offline-safe** and records each run to the discovery history best-effort, so a
 history-write failure never fails the request. History is readable at `GET /api/store/discoveries`.
 
-`POST /api/extract` (`rest/ExtractController.java:54`, `generate/ProcessExtractor.java`) is the
+`POST /api/extract` (`rest/ExtractController.java:43`,
+`builder/blueprint/ProcessExtractor.java`) is the
 adjacent step: run the same discovery prompt over the documents and pull the process *detail* out as
 markdown, which is the blueprint Generate consumes. It calls the model through the builder's
 `SpecPromptCaller` seam (`builder/core/AiSpecPromptCaller` in production) — the studio's own
@@ -46,24 +48,25 @@ and, like Generate, returns the structured `MODEL_NOT_CONFIGURED` error with no 
 
 ## Generate — documents to a GOAP flow
 
-`POST /api/generate` (`rest/GenerateController.java:55`) is **endpoint-gated**: without
+`POST /api/generate` (`rest/GenerateController.java:44`) is **endpoint-gated**: without
 `OPENAI_CUSTOM_*` it returns the structured `MODEL_NOT_CONFIGURED` error rather than failing
 ([[model-endpoint]]). It reaches the model through a narrow `GenerateFn` seam, so the controller is
 offline-testable.
 
-The pipeline: `generate/BlueprintLoader.java` reads the blueprint documents, the builder's generator
-for the chosen technique asks the model for the pack, and `generate/FlowValidator.java` checks the
-produced flow before the UI ever renders it (`config/StudioConfiguration.java` `generateFn`).
+The pipeline: `builder/blueprint/BlueprintLoader.java` reads the blueprint documents, the builder's
+generator for the chosen technique asks the model for the pack, and `generate/FlowValidator.java`
+checks the produced flow before the UI ever renders it (`config/StudioConfiguration.java`
+`generateFn`).
 
 **The technique selector matters.** The request carries `technique`, and the UI offers
-*Single-shot* and *Embabel NL compiler* (`ProcessWorkspace.vue:494-498`). `StudioConfiguration`
+*Single-shot* and *Embabel NL compiler* (`ProcessWorkspace.vue:521-525`). `StudioConfiguration`
 dispatches over the builder's `Map<GenerationTechnique, AgentSpecGenerator>`, built with
 `AgentSpecGenerators.production(ai, platform)`. The studio owns **no** generator of its own. The two
 techniques are what POC 24 measured head to head; see [[generation-approaches]].
 
 ## Simulate and Publish
 
-`POST /api/simulate` (`rest/SimulateController.java:49`, a `SimulateFn` seam) dry-runs the flow so
+`POST /api/simulate` (`rest/SimulateController.java:38`, a `SimulateFn` seam) dry-runs the flow so
 you see the plan before committing it. `Publish` sends the pack to a chosen source
 (`folder:` or `git:`) through the builder's publishers — the same `builder.publish.*` classes the CLI
 uses ([[smith-builder]], [[spec-sources]]). Saving a pack to the durable store goes through
@@ -71,10 +74,10 @@ uses ([[smith-builder]], [[spec-sources]]). Saving a pack to the durable store g
 
 ## Where the sample blueprints live
 
-`examples/blueprints/` holds three worked examples the workspace is designed against: **Aurora**
-and **Sentinel** (each a single `system_specification.md`) and **TradingAgents** (a multi-document
-set: overview, actors, rules, states, workflows, exceptions). Feed one of these directories to
-Discover as a docs path.
+`examples/blueprints/` holds five worked examples the workspace is designed against: **Aurora**
+and **Sentinel** (each a single `system_specification.md`) and **TradingAgents**,
+**agentic-software-factory** and **deer-flow** (each a multi-document set: overview, actors, rules,
+states, workflows, exceptions). Feed one of these directories to Discover as a docs path.
 
 **Tests:** `GenerateControllerTest`, `ProcessExtractorTest`, `StudioConfigurationGenerateFnTest`,
 plus the front-end Vitest suite. Related: [[studio-compose-editor]], [[smith-studio-web]].

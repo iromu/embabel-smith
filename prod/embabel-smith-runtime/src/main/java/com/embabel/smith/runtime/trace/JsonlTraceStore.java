@@ -15,6 +15,9 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 
+import com.embabel.smith.common.trace.TraceRecord;
+import com.embabel.smith.common.trace.TraceStore;
+
 /**
  * The file-based trace store: one JSON object per line, one line per run, append-only.
  *

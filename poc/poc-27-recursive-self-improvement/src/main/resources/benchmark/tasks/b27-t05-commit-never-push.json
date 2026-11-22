@@ -1,0 +1,9 @@
+{
+  "id": "b27-t05",
+  "stage": "publish",
+  "prompt": "A build finished and published a pack to a `git:` source. As part of publishing, does the process push the commit to the remote?",
+  "require": ["no"],
+  "anyOf": ["--push", "never pushes", "does not push"],
+  "forbid": ["yes"],
+  "check": "Deterministic, no model call: PASS when the answer says no and names the condition under which a push happens — publishing commits, and pushing takes an explicit `--push` because it is a shared-state action needing credentials and intent. A yes fails. An unattended loop must not be able to write to a shared remote."
+}

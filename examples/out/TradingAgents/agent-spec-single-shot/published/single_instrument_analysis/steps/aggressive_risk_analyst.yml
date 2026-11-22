@@ -1,0 +1,20 @@
+---
+stepType: "action"
+name: "aggressive_risk_analyst"
+description: "Challenge the proposal from an aggressive, high-reward stance."
+inputTypeNames:
+- "TransactionProposal"
+- "TechnicalReport"
+- "SentimentReport"
+- "NewsMacroReport"
+- "FundamentalsReport"
+- "UserInput"
+outputTypeName: "AggressiveRiskView"
+prompt: "You are the Aggressive Risk Analyst. Review the Transaction Proposal {{transactionProposal}}\
+  \ and supporting reports: Technical {{technicalReport}}, Sentiment {{sentimentReport}},\
+  \ News/Macro {{newsMacroReport}}, Fundamentals {{fundamentalsReport}}, and Holdings\
+  \ {{userInput}}. Champion the high-reward path and push to act on the upside, challenging\
+  \ conservative views."
+pre: []
+post: []
+toolGroups: []

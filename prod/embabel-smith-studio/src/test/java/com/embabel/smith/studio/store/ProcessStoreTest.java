@@ -19,6 +19,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -27,7 +32,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Offline tests for the database-backed store (change: smith-studio-postgres-storage): a
  * save → list → load round-trip, multiple packs, and the discovery history, against an
- * in-memory H2 binding.
+ * in-memory H2 binding. The versioning tests are change: publish-keeps-versions — the
+ * store keys packs by {@code (name, version)}, so a republish keeps the version it
+ * replaces.
  */
 class ProcessStoreTest {
 
@@ -35,6 +42,8 @@ class ProcessStoreTest {
 	Path root;
 
 	private StorageContext context;
+
+	private String url;
 
 	@AfterEach
 	void cleanup() {
@@ -48,18 +57,22 @@ class ProcessStoreTest {
 		StorageSettingsService settingsService = new StorageSettingsService(root);
 		context = new StorageContext(settingsService, new JsonlTraceStore(root.resolve("runs.jsonl")), null, null,
 				null);
-		String url = "jdbc:h2:mem:" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE";
+		url = "jdbc:h2:mem:" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE";
 		context.bind(new StorageSettings(new StorageSettings.DbSettings(url, "sa", ""),
 				new StorageSettings.TraceSettings(StorageSettings.TRACE_JSONL, null, null, null)));
 		return new ProcessStore(context);
 	}
 
 	private AgentSpec pack(String name, String goal) {
+		return pack(name, goal, "1.0.0");
+	}
+
+	private AgentSpec pack(String name, String goal, String version) {
 		ActionStepSpec step = ActionStepSpec.action(name + "_step", "a step", List.of("UserInput"), name + "_Out",
 				"Produce {{userInput}} into the result.");
 		GoalStepSpec goalSpec = GoalStepSpec.exportedGoal(goal, "the goal", name + "_Out");
 		DynamicTypeDef type = new DynamicTypeDef(name + "_Out", "an output", null, null, null);
-		return new AgentSpec(new AgentSpecManifest(name, "1.0.0"), goalSpec, List.of(step), List.of(type));
+		return new AgentSpec(new AgentSpecManifest(name, version), goalSpec, List.of(step), List.of(type));
 	}
 
 	@Test
@@ -100,6 +113,65 @@ class ProcessStoreTest {
 	}
 
 	@Test
+	void twoVersionsOfOneNameAreStoredAsTwoRows() throws Exception {
+		ProcessStore store = boundStore();
+		store.savePack(pack("alpha", "alpha_goal", "1.0.0"));
+		store.savePack(pack("alpha", "alpha_v2_goal", "1.1.0"));
+
+		// Two rows, both readable. Keyed by name alone — the mapping before this change —
+		// the second save is an update of the one row, so this is 1 row and the 1.0.0
+		// content is gone.
+		assertThat(versionsOf("alpha")).containsExactlyInAnyOrder("1.0.0", "1.1.0");
+
+		// A bare name resolves to the highest version.
+		AgentSpec loaded = store.loadPack("alpha");
+		assertThat(loaded.version()).isEqualTo("1.1.0");
+		assertThat(loaded.goal().name()).isEqualTo("alpha_v2_goal");
+
+		// The listing shows the name once, not once per version.
+		assertThat(store.listPacks()).extracting(ProcessStore.PackRecord::name).containsExactly("alpha");
+	}
+
+	@Test
+	void republishOfTheSameVersionUpdatesThatRow() throws Exception {
+		ProcessStore store = boundStore();
+		store.savePack(pack("alpha", "alpha_goal", "1.0.0"));
+		store.savePack(pack("alpha", "alpha_improved_goal", "1.0.0"));
+
+		assertThat(versionsOf("alpha")).containsExactly("1.0.0");
+		assertThat(store.loadPack("alpha").goal().name()).isEqualTo("alpha_improved_goal");
+
+		// A new version of the same name adds a row instead of replacing anything.
+		store.savePack(pack("alpha", "alpha_next_goal", "1.1.0"));
+		assertThat(versionsOf("alpha")).containsExactlyInAnyOrder("1.0.0", "1.1.0");
+		assertThat(store.loadPack("alpha").goal().name()).isEqualTo("alpha_next_goal");
+	}
+
+	@Test
+	void highestVersionComparesNumericallyNotLexically() throws Exception {
+		ProcessStore store = boundStore();
+		// The higher version is saved first, so this also fails for an implementation
+		// that
+		// simply keeps the most recently saved row, and lexicographic order would rank
+		// the
+		// 1.9.0 above the 1.10.0.
+		store.savePack(pack("alpha", "alpha_release_goal", "1.10.0"));
+		store.savePack(pack("alpha", "alpha_older_goal", "1.9.0"));
+
+		assertThat(store.loadPack("alpha").version()).isEqualTo("1.10.0");
+		assertThat(store.listPacks()).extracting(ProcessStore.PackRecord::goal).containsExactly("alpha_release_goal");
+	}
+
+	@Test
+	void packDeclaringNoVersionIsStoredAtTheDefault() throws Exception {
+		ProcessStore store = boundStore();
+		store.savePack(pack("gamma", "gamma_goal", null));
+
+		assertThat(versionsOf("gamma")).containsExactly("1.0.0");
+		assertThat(store.loadPack("gamma")).isNotNull();
+	}
+
+	@Test
 	void discoveryHistoryAppendsAndReturnsMostRecentFirst() {
 		ProcessStore store = boundStore();
 		store.recordDiscovery("folder", "/docs/a", 3);
@@ -118,6 +190,19 @@ class ProcessStoreTest {
 		ProcessStore store = boundStore();
 		assertThat(store.listPacks()).isEmpty();
 		assertThat(store.discoveries()).isEmpty();
+	}
+
+	/** The versions stored for one pack name, read straight off the table. */
+	private List<String> versionsOf(String name) throws Exception {
+		List<String> versions = new ArrayList<>();
+		try (Connection connection = DriverManager.getConnection(url, "sa", "");
+				Statement statement = connection.createStatement();
+				ResultSet rows = statement.executeQuery("SELECT version FROM packs WHERE name = '" + name + "'")) {
+			while (rows.next()) {
+				versions.add(rows.getString(1));
+			}
+		}
+		return versions;
 	}
 
 }

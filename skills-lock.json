@@ -1,35 +1,40 @@
 {
-  "version": 1,
+  "version": 2,
   "skills": {
     "ai-meta-comment-review": {
       "source": "iromu/awesome-qwen",
       "sourceType": "github",
       "skillPath": "skills/ai-meta-comment-review/SKILL.md",
-      "computedHash": "b1d1533bae2bc6dcf103ef987acd26e47301b1cccb7d37b240585b3c07eb4b77"
+      "computedHash": "22837e6b4e3841aa18e75883005dc2c1ad9b70ae82cffe86dc34eefe6b59cd7e",
+      "commit": "a251aac4056dc7c72690e4b443627811d7812d45"
     },
     "code-review": {
       "source": "iromu/awesome-qwen",
       "sourceType": "github",
       "skillPath": "skills/code-review/SKILL.md",
-      "computedHash": "bb7158fff1ff2a98ad3f1ab638f60db7efaf21dbcfed51cc63a317000f902615"
+      "computedHash": "069be03b48b68edf6ce35d61002b8df13dd7775297900b92131a0620a4876726",
+      "commit": "a251aac4056dc7c72690e4b443627811d7812d45"
     },
     "embabel-agent": {
       "source": "iromu/awesome-qwen",
       "sourceType": "github",
       "skillPath": "skills/embabel-agent/SKILL.md",
-      "computedHash": "511b95b4d05b2ccda9d83bca1218ddbf71c8ffe61cbd4014272dacdd481b000d"
+      "computedHash": "b093f8834fe00b45abad946f96aebaab6e6b1daaee1ada1635f865ce7e48cb84",
+      "commit": "a251aac4056dc7c72690e4b443627811d7812d45"
     },
     "embabel-worlds-realm-spec": {
       "source": "iromu/awesome-qwen",
       "sourceType": "github",
       "skillPath": "skills/embabel-worlds-realm-spec/SKILL.md",
-      "computedHash": "bf3cd3d32f98b0aff3534be476c0bf65387153b02d6262f7366bcb94e8f7a32a"
+      "computedHash": "6c6faf2e743e7ab70e001f7a5791c062eff9d5dffa806a37c248771764d9ca75",
+      "commit": "a251aac4056dc7c72690e4b443627811d7812d45"
     },
     "git-wiki": {
       "source": "yysun/awesome-agent-world",
       "sourceType": "github",
       "skillPath": "skills/git-wiki/SKILL.md",
-      "computedHash": "7a0c766675ee104158a9957ed185731411446b5b2e00ef475581b7b8aa9a6349"
+      "computedHash": "c52115d6214f8068390214c7a33e058a82ab34caad1862f26331793b33537e23",
+      "commit": "36a6ba80c0610d9785f5f3d456e69f66f2ff3d27"
     }
   }
 }

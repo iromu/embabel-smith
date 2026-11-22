@@ -10,11 +10,13 @@ import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.embabel.smith.builder.improve.ImprovementLoop;
+import com.embabel.smith.builder.improve.LoopPublishPolicy;
+import com.embabel.smith.builder.improve.LoopPushDisabledException;
+import com.embabel.smith.builder.improve.PendingCandidate;
 import com.embabel.smith.builder.publish.PublishResult;
 import com.embabel.smith.builder.publish.Publisher;
 import com.embabel.smith.common.config.ModelEndpointConfig;
-import com.embabel.smith.studio.improve.ImprovementLoop;
-import com.embabel.smith.studio.improve.PendingCandidate;
 import com.embabel.smith.studio.rest.dto.ApproveResponse;
 import com.embabel.smith.studio.rest.dto.IterationInfo;
 import com.embabel.smith.studio.rest.dto.LoopStatus;
@@ -35,10 +37,20 @@ import org.springframework.stereotype.Service;
  * never sit pending. This keeps the change-05 loop untouched while making the toggle
  * effective at runtime.
  *
+ * <p>
+ * Publishing obeys {@link LoopPublishPolicy}: pushing is off by default, and a publish
+ * that could not persist (a {@code git:} improve source with pushing off) is refused with
+ * the setting named, leaving the candidate pending.
+ *
  * @author Ivan Rodriguez
  */
 @Service
 public class LoopService {
+
+	/**
+	 * The iteration error code when a publish was refused because pushing is disabled.
+	 */
+	static final String PUSH_DISABLED = "PUSH_DISABLED";
 
 	private final ImprovementLoop loop;
 
@@ -46,13 +58,16 @@ public class LoopService {
 
 	private final Publisher publisher;
 
+	private final LoopPublishPolicy publishPolicy;
+
 	private final ModelEndpointConfig endpoint;
 
 	public LoopService(ImprovementLoop loop, LoopSchedulerState state, Publisher publisher,
-			ModelEndpointConfig endpoint) {
+			LoopPublishPolicy publishPolicy, ModelEndpointConfig endpoint) {
 		this.loop = loop;
 		this.state = state;
 		this.publisher = publisher;
+		this.publishPolicy = publishPolicy;
 		this.endpoint = endpoint;
 	}
 
@@ -82,11 +97,17 @@ public class LoopService {
 		List<PendingCandidate> produced = this.loop.runOnce(model);
 		List<String> published = new ArrayList<>();
 		List<String> queued = new ArrayList<>();
+		String refusal = null;
 		if (this.state.autoPublish()) {
 			for (PendingCandidate candidate : produced) {
 				try {
 					this.loop.queue().approve(candidate.id(), this::publish);
 					published.add(candidate.spec());
+				}
+				catch (LoopPushDisabledException ex) {
+					// Nothing was written: report why, and leave the candidate pending.
+					queued.add(candidate.spec());
+					refusal = ex.getMessage();
 				}
 				catch (RuntimeException ex) {
 					queued.add(candidate.spec()); // publish failed; leave it pending for
@@ -99,7 +120,8 @@ public class LoopService {
 				queued.add(candidate.spec());
 			}
 		}
-		return new IterationInfo(true, produced.size(), published, queued, this.state.autoPublish(), null, null);
+		return new IterationInfo(true, produced.size(), published, queued, this.state.autoPublish(),
+				(refusal != null) ? PUSH_DISABLED : null, refusal);
 	}
 
 	/**
@@ -147,14 +169,18 @@ public class LoopService {
 	}
 
 	/**
-	 * Approves (publishes) a pending candidate.
+	 * Approves (publishes) a pending candidate. A publish that the policy refuses is
+	 * reported through the failure channel and the candidate stays pending.
 	 * @param id the pending candidate id to approve.
 	 * @return the approval outcome.
 	 */
 	public ApproveResponse approve(String id) {
 		try {
 			PublishResult result = this.loop.queue().approve(id, this::publish);
-			return new ApproveResponse(true, result.location().toString(), null);
+			return new ApproveResponse(true, result.location(), null);
+		}
+		catch (LoopPushDisabledException ex) {
+			return new ApproveResponse(false, null, ex.getMessage());
 		}
 		catch (IllegalArgumentException ex) {
 			return new ApproveResponse(false, null, "No pending candidate with id " + id);
@@ -177,15 +203,14 @@ public class LoopService {
 	}
 
 	/**
-	 * Publishes a candidate through the shared publisher (the loop's write path).
-	 * push=true: an approved/auto-published candidate must persist into the spec source,
-	 * so a git source is pushed (the folder publisher ignores the flag).
+	 * Publishes a candidate through the shared publisher under the loop's publish policy
+	 * (push is configured, never forced; a publish that could not persist is refused).
 	 * @param candidate the candidate to publish.
 	 * @return the publish result.
 	 */
 	private PublishResult publish(PendingCandidate candidate) {
 		try {
-			return this.publisher.publish(candidate.candidate(), candidate.proposedLifecycle(), true, true);
+			return this.publishPolicy.publish(this.publisher, candidate);
 		}
 		catch (IOException ex) {
 			throw new UncheckedIOException("cannot publish candidate for " + candidate.spec(), ex);

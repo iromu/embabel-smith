@@ -11,6 +11,8 @@ import java.util.regex.Pattern;
 /**
  * {@code metadata.author} value classification, ported from
  * {@code validators/schema.py:author_value_problem}.
+ *
+ * @author Ivan Rodriguez
  */
 final class SchemaAuthor {
 
@@ -69,6 +71,9 @@ final class SchemaAuthor {
 	 * category C: that also covers the joiners real names need (U+200C/U+200D) and every
 	 * unassigned code point, which would make the verdict depend on the platform's
 	 * Unicode data rather than on the value.
+	 * @param author the {@code metadata.author} value to classify
+	 * @return a lowercase clause saying why the value is malformed or unsafe, or
+	 * {@code null} when it is usable
 	 */
 	static String authorValueProblem(String author) {
 		int length = author.codePointCount(0, author.length());
@@ -100,6 +105,8 @@ final class SchemaAuthor {
 	/**
 	 * Unicode general categories never usable in an author value: C0/C1 controls,
 	 * surrogates, private use.
+	 * @param codePoint code point to classify
+	 * @return {@code true} for a control, surrogate or private-use code point
 	 */
 	private static boolean isUnsafeCategory(int codePoint) {
 		int type = Character.getType(codePoint);
@@ -108,6 +115,8 @@ final class SchemaAuthor {
 
 	/**
 	 * Python's per-character {@code isalnum()}: any Unicode letter (L*) or number (N*).
+	 * @param value text to scan code point by code point
+	 * @return {@code true} when some code point is a Unicode letter or number
 	 */
 	private static boolean hasLetterOrDigit(String value) {
 		for (int i = 0; i < value.length();) {
@@ -125,6 +134,10 @@ final class SchemaAuthor {
 	/**
 	 * First {@code maxCodePoints} code points, mirroring Python's {@code value[:n]}
 	 * slicing.
+	 * @param value text to cut; {@code null} passes through
+	 * @param maxCodePoints how many leading code points to keep, counted as Python counts
+	 * them rather than in UTF-16 units
+	 * @return {@code value} unchanged when it fits, else its leading code points
 	 */
 	static String truncate(String value, int maxCodePoints) {
 		if (value == null) {

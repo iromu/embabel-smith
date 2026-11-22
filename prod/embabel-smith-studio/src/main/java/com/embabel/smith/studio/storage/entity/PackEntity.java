@@ -7,9 +7,11 @@ package com.embabel.smith.studio.storage.entity;
 
 import java.time.Instant;
 
+import com.embabel.smith.builder.publish.PackVersion;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
+import jakarta.persistence.IdClass;
 import jakarta.persistence.Table;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
@@ -17,26 +19,42 @@ import org.hibernate.type.SqlTypes;
 /**
  * A saved agent spec (change: smith-studio-postgres-storage). The spec is stored as a
  * single serialized blob in {@code content} (the
- * {@link com.embabel.smith.common.model.AgentSpec} as JSON); {@code name} is the primary
- * key, and {@code goal}/{@code steps}/{@code savedAt} are denormalized so the pack
- * listing does not have to parse every stored spec.
+ * {@link com.embabel.smith.common.model.AgentSpec} as JSON); {@code (name, version)} is
+ * the primary key, so every version of a pack is its own row (change:
+ * publish-keeps-versions), and {@code goal}/{@code steps}/{@code savedAt} are
+ * denormalized so the pack listing does not have to parse every stored spec.
  *
  * <p>
  * Column types are portable (long VARCHAR, TIMESTAMP) so the same model drives both the
  * in-memory H2 test profile and the Postgres development database. The long text uses
  * {@code SqlTypes.LONGVARCHAR} rather than {@code @Lob}: a CLOB maps to Postgres'
  * {@code oid} large-object type (a separate, non-portable object), whereas LONGVARCHAR is
- * an inline, queryable column on both databases.
+ * an inline, queryable column on both databases. The key column is a plain VARCHAR for
+ * the same reason, and {@code hbm2ddl.auto = update} will not re-key a table that already
+ * exists — see {@link com.embabel.smith.studio.storage.PacksKeyMigration}.
  *
  * @author Ivan Rodriguez
  */
 @Entity
 @Table(name = "packs")
+@IdClass(PackEntityId.class)
 public class PackEntity {
+
+	/**
+	 * The version stored for an artifact that declares none ({@code design.md} decision 2
+	 * of publish-keeps-versions): refusing such a pack would make
+	 * {@code smith build --target
+	 * skill} unpublishable, because a SKILL.md carries no version the builder reads.
+	 */
+	public static final String DEFAULT_VERSION = PackVersion.DEFAULT;
 
 	@Id
 	@Column(name = "name")
 	private String name;
+
+	@Id
+	@Column(name = "version")
+	private String version;
 
 	@Column(name = "goal")
 	private String goal;
@@ -57,6 +75,14 @@ public class PackEntity {
 
 	public void setName(String name) {
 		this.name = name;
+	}
+
+	public String getVersion() {
+		return this.version;
+	}
+
+	public void setVersion(String version) {
+		this.version = version;
 	}
 
 	public String getGoal() {

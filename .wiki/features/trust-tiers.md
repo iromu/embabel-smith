@@ -9,7 +9,7 @@ source_paths:
   - "poc/poc-10-trust-tiers/src/main/java/com/embabel/smith/trust/InputSanitizerGuardRail.java"
   - "poc/poc-10-trust-tiers/src/main/java/com/embabel/smith/trust/TrustRunner.java"
   - "poc/poc-21-agent-spec-security/src/main/java/com/embabel/smith/security/SpecSecurityScanner.java"
-updated_at: "2026-11-04"
+updated_at: "2026-11-22"
 ---
 
 # Trust tiers and guardrails (POC 10)
@@ -59,6 +59,37 @@ missed, but a *novel* rephrasing outside the pattern set can still slip through.
 before surfacing. Seven offline tests pin the matcher (classic marker, obfuscated spacing,
 punctuation, other phrases, clean pass). The live run is in `docs/04-poc-run-results.md` §5. See
 [[runtime-adapter]] for the `shell` group this policy gates.
+
+## What the tier does not bound
+
+In `prod/` the tier model is two-valued — `standard` (default) or `high`, chosen by
+`smith run --trust-tier` — and it bounds *names*, not capabilities. `core/TrustTierPolicy` collects the
+tool-group strings a pack's steps declare and keeps the ones the granted tier does not allow
+(`tier.allows(group)`); it resolves a name against nothing. So an unbacked name — a typo included — has
+to be absent from the allowlist to be refused, and the permissive tier allows `*`, which means a pack can
+land at the maximally privileged tier while reaching no extra capability whatsoever.
+
+Nothing in Embabel 1.5.4 maps a declared group to a service by itself: `@LlmTool` carries no group member,
+the platform's `@ToolGroup` annotation is referenced by no other class in the shipped jars, and the
+resolver's registry is the `ToolGroup` beans Spring can see. Those beans are repo work, and the tree now has
+two of them: POC 7's `shell` group, built by reflection in `ShellToolGroupFactory`, and since 2026-11-22 the
+builder's `validate` group in `prod/embabel-smith-builder/src/main/java/com/embabel/smith/builder/tools/ValidationToolGroup.java`,
+built by the same recipe. So a step's `toolGroups:` line resolves where a group is registered and resolves
+to nothing where none is, and either way it remains exactly what the security scanner reads
+([[spec-security-scanning]]). The builder's two drafting steps — `builder-spec-one-shot/steps/draftAgentSpec.yml`
+and `builder-single-spec/steps/assembleAgentSpec.yml` — declare `validate`, and the validator is now
+*offered* to them (`starting tool loop [validatePack]`), where the same run previously logged
+`starting tool loop []` behind an unresolved-role warning. It is *called* on the `--flow pack` path and not
+called on the test-seam deploy, so `called=0` is a fact about that seam rather than about packs. What a call
+bought turned on the tool's argument: until `99f9cc0` that was a directory no drafting step could name, so
+the counts recorded then — 2, 3 and 116 calls across three inputs — belong to that argument, not to the
+current one, which takes the spec the step is about to return (`docs/12-backlog.md`). A misspelled name
+still resolves to nothing with
+only that warning, because `AgentSpecValidator` does not inspect `toolGroups` at all. What the registration
+moved is reach, not the tier: `validate` is in none of the allowlists, so both declaring packs still read
+`T4_PLATFORM` through T4's `*`, and the tier test is untouched ([[smith-builder]]). The containment argument
+therefore rests on the scorer-out guard rather than on the tier — and no longer on reach living wholly
+outside the mutable packs.
 
 ## The install-time complement (POC 21)
 

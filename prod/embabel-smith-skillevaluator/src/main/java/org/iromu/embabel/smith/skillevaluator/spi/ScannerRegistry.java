@@ -11,6 +11,8 @@ import java.util.ServiceLoader;
 /**
  * Discovers {@link SecretsScanner} / {@link SecurityScanner} engines: first a
  * {@link ServiceLoader}-registered implementation, else the built-in default.
+ *
+ * @author Ivan Rodriguez
  */
 public final class ScannerRegistry {
 

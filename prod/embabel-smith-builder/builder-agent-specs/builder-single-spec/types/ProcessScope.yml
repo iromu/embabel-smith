@@ -1,0 +1,17 @@
+name: ProcessScope
+description: "The slice of the described process this agent spec will model"
+ownProperties:
+  - name: primaryProcess
+    type: string
+    description: "The core end-to-end process chosen for modelling, in one paragraph"
+  - name: finalDeliverable
+    type: string
+    description: "PascalCase name of the type of the final deliverable the process produces"
+  - name: roles
+    type: string
+    description: "The roles that act in the process, one per line, in the order the process runs"
+  - name: packName
+    type: string
+    description: "snake_case name chosen for the agent spec"
+parents: []
+creationPermitted: true

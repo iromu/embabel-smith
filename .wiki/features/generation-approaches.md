@@ -13,7 +13,8 @@ source_paths:
   - "poc/poc-24-generation-approaches/src/main/java/com/embabel/smith/gencmp/ProcessValidator.java"
   - "poc/poc-24-generation-approaches/src/main/java/com/embabel/smith/gencmp/ComparisonReport.java"
   - "poc/poc-24-generation-approaches/src/main/java/com/embabel/smith/gencmp/OpenAiLlmCaller.java"
-updated_at: "2026-11-15"
+  - "examples/blueprints"
+updated_at: "2026-11-22"
 ---
 
 # Generation approaches (POC 24)
@@ -26,9 +27,11 @@ Two ways to turn a business-process blueprint into a multi-agent GOAP flow. Whic
 | **single-shot** | one coordinated LLM call emits the *whole* process as JSON | `gencmp/SingleShotGenerator.java` |
 | **embabel** | Embabel's production NL compiler compiles **each agent independently** | `gencmp/EmbabelGenerator.java` |
 
-Both are driven by `GenerationComparisonApp` over the blueprints in `examples/blueprints/`
-(Aurora, Sentinel, TradingAgents), in two modes — `flat` (one agent) and `multi` (a decomposed
-team) — and the report lands in `results/comparison.md`.
+Both are driven by `GenerationComparisonApp` over the blueprints in `examples/blueprints/`, in two
+modes — `flat` (one agent) and `multi` (a decomposed team) — and the report lands in
+`results/comparison.md`. The directory now holds five corpora (Aurora, Sentinel, TradingAgents,
+agentic-software-factory, deer-flow); the committed run covers the first three, which are the
+`cmp.blueprints` default (`GenerationComparisonApp.java:65`).
 
 ## What each side actually does
 
@@ -37,7 +40,7 @@ model's output into the POC-local `ProcessSpec` (process name + its agents). Bec
 the whole process at once, it is *able* to make sibling agents agree on shared type names.
 
 **embabel** calls `DefaultNaturalLanguageCompiler` (`com.embabel.agent.spec.compile`, built with
-`LlmOptions.withDefaultLlm()` and a `StepSpecContext` from the platform, `EmbabelGenerator.java:103`)
+`LlmOptions.withDefaultLlm()` and a `StepSpecContext` from the platform, `EmbabelGenerator.java:95-97`)
 once per agent, and `CompilationResultToAgentSpec` maps each `AgentCompilationResult` back into the
 project's own `AgentSpec` ([[agent-spec-model]]). The compiler never sees the sibling agents.
 
@@ -93,7 +96,7 @@ mvn -pl poc/poc-24-generation-approaches spring-boot:run \
 **Endpoint-gated** via `smith-common`'s `ModelEndpointConfig.configError()`, which checks
 `OPENAI_CUSTOM_BASE_URL` / `_API_KEY` / `_MODELS` only; `EMBABEL_MODELS_DEFAULT_LLM` is read but not
 gated ([[model-endpoint]]). `OpenAiLlmCaller` uses `max_tokens` 12000, temperature 0.2, 300 s timeout
-(`:41-43,66-67`). Offline tests cover `SingleShotGenerator` and `ProcessValidator` only —
+(`:30-32,55-56,67`). Offline tests cover `SingleShotGenerator` and `ProcessValidator` only —
 `EmbabelGenerator`, `ComparisonReport`, and `OpenAiLlmCaller` are untested. See
 [[what-the-pocs-prove]].
 

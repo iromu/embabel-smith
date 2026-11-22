@@ -7,7 +7,7 @@ package com.embabel.smith.studio.rest.dto;
 
 import java.util.List;
 
-import com.embabel.smith.runtime.trace.TraceRecord;
+import com.embabel.smith.common.trace.TraceRecord;
 
 /**
  * One run's trace record (the Traces pane): run time, source ref, success/failure, the

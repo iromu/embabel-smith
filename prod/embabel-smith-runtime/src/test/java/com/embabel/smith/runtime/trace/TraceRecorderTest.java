@@ -6,6 +6,7 @@
 package com.embabel.smith.runtime.trace;
 
 import com.embabel.agent.core.AgentPlatform;
+import com.embabel.smith.common.trace.TraceRecord;
 import com.embabel.smith.runtime.TestPacks;
 import com.embabel.smith.runtime.core.IngestedSource;
 import com.embabel.smith.runtime.core.RunOutcome;

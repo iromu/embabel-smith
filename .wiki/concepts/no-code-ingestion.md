@@ -7,7 +7,7 @@ source_paths:
   - "poc/poc-1-no-code-runtime/src/main/java/com/embabel/smith/runtime/SpecRunner.java"
   - "poc/poc-1-no-code-runtime/src/main/java/com/embabel/smith/runtime/StepSpecAssembler.java"
   - "poc/poc-1-no-code-runtime/src/main/java/com/embabel/smith/runtime/AgentSpecTypeMapper.java"
-updated_at: "2026-11-01"
+updated_at: "2026-11-22"
 ---
 
 # No-code ingestion
@@ -50,7 +50,7 @@ See [[agent-spec-format]] for the on-disk shape and [[agent-spec-model]] for the
 ## Why this is the keystone
 
 POC 1 (`poc-1-no-code-runtime`) is built first and verifies the ingest/deploy/run path before
-anything else (see the rollout order in
-`openspec/changes/embabel-agent-builder/design.md`). If an agent spec can be ingested and run with
+anything else (see the roadmap in
+`docs/03-embabel-spec-agent-builder-design.md`). If an agent spec can be ingested and run with
 no compilation, the builder's job reduces to *emitting valid YAML* — which is exactly what
 [[builder-pipeline]] does. The full run path is in [[runtime-run]].

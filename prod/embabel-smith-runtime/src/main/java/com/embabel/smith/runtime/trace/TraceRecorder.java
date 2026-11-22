@@ -18,6 +18,8 @@ import com.embabel.agent.core.AgentProcessStatusCode;
 import com.embabel.agent.spec.model.BackgroundMessage;
 import com.embabel.smith.common.model.ActionStepSpec;
 import com.embabel.smith.common.model.AgentSpec;
+import com.embabel.smith.common.trace.TraceRecord;
+import com.embabel.smith.common.trace.TraceStore;
 import com.embabel.smith.runtime.core.IngestedSource;
 import com.embabel.smith.runtime.core.RunOutcome;
 import com.embabel.smith.runtime.core.TrustTier;

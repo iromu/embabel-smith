@@ -1,0 +1,170 @@
+name: Native image
+
+# Compiles the builder into a standalone binary — prod/embabel-smith-builder/target/smith —
+# on a GitHub runner and smoke-tests it, through `make native`: the same command a developer
+# runs (docs/08-builder.md, "As a native binary"). A green run means the `native` profile
+# still produces a working executable image off a clean checkout, with no developer machine
+# and no sdkman in the loop.
+#
+# SCOPE — what a green run does NOT cover:
+#   * Only the builder's image. A module is untouched by `-Pnative` until it declares the two
+#     plugins itself, so this says nothing about any other shipped module.
+#   * No model endpoint and no secrets. The smoke test boots the image and lets picocli fail
+#     on a missing argument; it never reaches a model call. Nothing here proves a build
+#     against a live endpoint still works — that stays a hand-run script.
+#   * Linux only. The artifact is named for the runner's architecture — x86-64 on
+#     ubuntu-latest today — and nothing else.
+#   * The test suite does not run. offline-verification.yml already gates compile, tests and
+#     lint on every PR, and `make native` passes -DskipTests because process-aot rewrites
+#     the module's classes and the suite is not native-aware.
+#
+# The image is large (a few hundred MB) because Embabel's provider catalogues, the bundled
+# prompts and Kotlin reflection metadata are all reachable from the CLI's entry point.
+on:
+  pull_request:
+    # Deliberately wide: any change that can reach the image. A PR that touches none of
+    # these cannot change the binary, so it does not pay for a 4-core native compile.
+    paths:
+      - '.github/workflows/native-image.yml'
+      - 'Makefile'
+      - '**/pom.xml'
+      - '**/*.java'
+      - '**/src/main/resources/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-image-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Names the graalvm/graalvm-ce-builds release tag jdk-<version>, the GraalVM line the native
+  # wiring is tuned against — not a graal-<version> component release. The hints that 0.11.x of
+  # the buildtools plugin writes (root pom's native-maven-plugin.version) are in the form this
+  # JDK's image reads. Bump it here and the sdkman channel in scripts/native.sh together.
+  GRAAL_VERSION: '25.0.2'
+
+jobs:
+  native-image:
+    runs-on: ubuntu-latest
+    # A native compile of this dependency set is long on 4 cores; well under the 6h runner
+    # ceiling, and far enough above a normal run that a timeout means something hung.
+    timeout-minutes: 75
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Add swap
+        # The analysis peaks past the runner's 16 GB on an image this size, and the cgroup
+        # answers with an OOM kill that reads as a compiler crash. Swap turns the peak into a
+        # slow step instead of a failure. Best-effort: a runner that forbids swapon should
+        # still get to try the build, so this reports rather than fails.
+        run: |
+          if sudo fallocate -l 6G /swapfile \
+             && sudo chmod 600 /swapfile \
+             && sudo mkswap /swapfile \
+             && sudo swapon /swapfile; then
+            echo "swap: added 6G" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::warning::could not add swap -- the native compile runs on RAM alone"
+            echo "swap: unavailable" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          free -h
+
+      - name: Install GraalVM
+        # No setup-graal action resolves on this host, so the JDK comes straight from the
+        # GraalVM Community builds release. Native Image ships inside it -- there is no
+        # component to install on top. Checksummed because the archive is the toolchain.
+        run: |
+          case "$(uname -m)" in
+            x86_64) arch=x64 ;;
+            aarch64) arch=aarch64 ;;
+            *) echo "unsupported architecture: $(uname -m)"; exit 1 ;;
+          esac
+          name=graalvm-community-jdk-${GRAAL_VERSION}_linux-${arch}_bin.tar.gz
+          url=https://github.com/graalvm/graalvm-ce-builds/releases/download/jdk-${GRAAL_VERSION}/$name
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/graalvm.tar.gz" "$url"
+          expected=$(curl -fsSL "$url.sha256" | awk '{print $1}')
+          echo "$expected  $RUNNER_TEMP/graalvm.tar.gz" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/graalvm"
+          tar -xzf "$RUNNER_TEMP/graalvm.tar.gz" -C "$RUNNER_TEMP/graalvm" --strip-components=1
+          # The unpack root is the JDK home, and it is stated here rather than recovered from
+          # PATH: bin/native-image is a symlink into lib/svm/bin, so resolving it to its real
+          # path and walking up two directories lands on <jdk>/lib/svm, which is not a JDK and
+          # mvnw rejects as JAVA_HOME.
+          echo "GRAALVM_HOME=$RUNNER_TEMP/graalvm" >> "$GITHUB_ENV"
+          echo "JAVA_HOME=$RUNNER_TEMP/graalvm" >> "$GITHUB_ENV"
+          echo "$RUNNER_TEMP/graalvm/bin" >> "$GITHUB_PATH"
+          echo "GRAAL_ARCH=$arch" >> "$GITHUB_ENV"
+
+      - name: The JDK Maven uses is the one carrying native-image
+        # GRAALVM_HOME is what the buildtools plugin looks for. Asserting both entry points
+        # here rather than letting Maven discover it: a distribution without Native Image in
+        # it would otherwise fail several minutes into the build instead of now.
+        run: |
+          test -x "$GRAALVM_HOME/bin/java"
+          test -x "$GRAALVM_HOME/bin/native-image"
+          case "$(command -v native-image)" in
+            "$GRAALVM_HOME"/bin/*) ;;
+            *) echo "native-image on PATH is not the installed JDK's: $(command -v native-image)"; exit 1 ;;
+          esac
+          native-image --version
+          java -version
+          echo "graalvm=$GRAALVM_HOME" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Cache the Maven repository
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-maven-
+
+      - name: Build the native binary
+        env:
+          # The launcher's default heap is a quarter of RAM, which is too small for an image
+          # of this reachability. Cap it explicitly so the JVM grows into the swap added
+          # above instead of being killed at the cgroup limit.
+          NATIVE_IMAGE_OPTIONS: -J-Xmx10g
+        run: make native
+
+      - name: Smoke-test the binary
+        # picocli declares no help option on this command, so usage exits 2 by design — a
+        # crash would exit 1, 137 or 139. What is being proven is that the image starts its
+        # AOT-processed context with no JVM and no API keys, finds the resources Embabel
+        # opens by name, and parses arguments.
+        env:
+          SMITH_BIN: prod/embabel-smith-builder/target/smith
+        run: |
+          file "$SMITH_BIN"
+          size=$(du -h "$SMITH_BIN" | cut -f1)
+          platform=$(file -b "$SMITH_BIN" | cut -d, -f1-3)
+          {
+            echo "- Binary: \`$SMITH_BIN\` ($size)"
+            echo "- Platform: $platform"
+          } >> "$GITHUB_STEP_SUMMARY"
+          rc=0
+          out=$("$SMITH_BIN" 2>&1) || rc=$?
+          printf '%s\n' "$out" | tail -12
+          if ! printf '%s\n' "$out" | grep -q 'Usage: smith'; then
+            # The banner is the proof the CLI got as far as parsing arguments. Without it the
+            # context died on the way there, and that cause sits in the middle of the log —
+            # a bean named in the first line, "Caused by" three lines above the end. So the
+            # whole transcript goes out on a failure, and nothing on a pass.
+            printf '%s\n' "$out"
+            echo "no usage banner (exit $rc)"
+            exit 1
+          fi
+          test "$rc" -le 2 || { echo "unexpected exit code $rc"; exit 1; }
+          echo "smoke: exit=$rc, usage banner present" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: smith-linux-${{ env.GRAAL_ARCH }}
+          path: prod/embabel-smith-builder/target/smith
+          compression-level: 0
+          retention-days: 7
+          if-no-files-found: error

@@ -8,28 +8,35 @@ source_paths:
   - "poc/pom.xml"
   - "prod/pom.xml"
   - "docs/04-poc-run-results.md"
-  - "openspec/changes/archive/2026-11-06-embabel-agent-builder/design.md"
-updated_at: "2026-11-14"
+  - "docs/05-architecture.md"
+updated_at: "2026-11-21"
 ---
 
 # Architecture and module map
 
 Embabel Smith is a Maven **multi-module** project (design D1). The parent POM (`pom.xml`)
 centralizes the Embabel version (1.5.4), the `repo.embabel.com` repository, the Spring Boot BOM,
-and the test dependencies. There are two top-level trees: the POCs under a `poc/` aggregator
+and the test dependencies. There are two trees: the POCs under a `poc/` aggregator
 (`poc/pom.xml`) — each independently buildable and runnable, so a failure isolates to one claim —
-and the product under a `prod/` aggregator (`prod/pom.xml`) — the four product modules that
-extract proven POC logic (see [[product-phase]]).
+and the product under a `prod/` aggregator (`prod/pom.xml`) — **six** product modules that extract
+proven POC logic (see [[product-phase]]).
+
+One asymmetry matters day to day: **the POCs are not in the default reactor.** The root POM's default
+`<modules>` are `smith-common` and `prod`; `poc` sits inside a profile, so an ordinary `mvn` or `make`
+run never builds or tests a POC — they build with `-Ppoc` (or `make … POC=1`), and `-pl poc/...` needs
+the same flag. The POCs are frozen evidence, so keeping them out of the default build is deliberate.
 
 ```
-embabel-smith/            parent POM (pom packaging)
+embabel-smith/            parent POM (pom packaging; default reactor = smith-common + prod)
 ├── smith-common/         the agent spec FORMAT owner — shared by everyone
 ├── prod/                 aggregator for the product modules (extract, never depend on POCs)
 │   ├── embabel-smith-specsource    folder:/git: spec sources + content hash (change 02)
 │   ├── embabel-smith-runtime        the runtime product: smith run CLI + JSONL trace (change 03)
+│   ├── embabel-smith-runtime-a2a    the runtime's A2A launcher, on a non-default port ([[a2a-endpoint]])
 │   ├── embabel-smith-builder        the builder product: smith build CLI + pipeline (change 04)
-│   └── embabel-smith-studio         the self-improving studio (empty skeleton, changes 05–06)
-└── poc/                  aggregator for the POC modules
+│   ├── embabel-smith-skillevaluator Tier 1 static skill checks; the builder's inspect gate is its only prod consumer
+│   └── embabel-smith-studio         the self-improving studio (changes 05–06; the loop engine now lives in the builder)
+└── poc/                  aggregator for the POC modules — built only with -Ppoc
     ├── poc-1-no-code-runtime          POC 1 — keystone: ingest a pack, run a plan
     ├── poc-2-nl-compile               POC 2 — description → draft
     ├── poc-3-builder-agent            POC 3 — the builder @Agent
@@ -55,7 +62,8 @@ embabel-smith/            parent POM (pom packaging)
     ├── poc-23-remote-embedding-scale  POC 23 — remote embedding selection at scale (to 1000 specs)
     ├── poc-24-generation-approaches   POC 24 — single-shot vs the Embabel NL compiler
     ├── poc-25-skill-generation        POC 25 — blueprint → Agent Skills, with/without-skill eval
-    └── poc-26-graaljs-skill-scripts   POC 26 — Agent Skill scripts run in-JVM on GraalJS
+    ├── poc-26-graaljs-skill-scripts   POC 26 — Agent Skill scripts run in-JVM on GraalJS
+    └── poc-27-recursive-self-improvement  POC 27 — can the builder improve its own building process?
 ```
 
 ## The dependency shape
@@ -89,12 +97,14 @@ canvas), small-LLM selection ([[shadowing-remedies]]), the real semantic `Embedd
 builder UI (POC 22, a Vue 3 + Quasar SPA over the POC 15 REST surface), and remote embedding
 selection at scale (POC 23, [[shadowing-remedies]]).
 
-POCs 24–26 step outside the spec-format envelope and probe the **generation** and **portable-unit**
-questions that the product's authoring workspace now rests on: which generator produces a usable
-multi-agent flow ([[generation-approaches]]), whether the portable unit can be an Anthropic
-`SKILL.md` instead of a YAML spec ([[skill-generation]]), and whether a skill's own JavaScript can
+POCs 24–27 step outside the spec-format envelope and probe the **generation**, **portable-unit** and
+**self-improvement** questions that the product's authoring workspace now rests on: which generator
+produces a usable multi-agent flow ([[generation-approaches]]), whether the portable unit can be an
+Anthropic `SKILL.md` instead of a YAML spec ([[skill-generation]]), whether a skill's own JavaScript can
 execute inside the agent's JVM without breaking the no-compilation rule
-([[skill-scripts-graaljs]]). See [[what-the-pocs-prove]] for the per-POC verdicts.
+([[skill-scripts-graaljs]]), and whether the builder can improve the process it builds with — the
+verdict there is *not proven*, and it is the newest module ([[what-the-pocs-prove]]). See
+[[what-the-pocs-prove]] for the per-POC verdicts.
 
 **The product modules** (`prod/`) are a *second* set of consumers of the same format, but with a
 harder rule: they depend on `smith-common` and Embabel directly, **never** on a `poc-*` artifact

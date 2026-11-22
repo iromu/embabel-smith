@@ -1,0 +1,5 @@
+stepType: goal
+name: skillBriefsDrafted
+description: "Per-stage skill briefs have been written for the process decomposition, as JSON text for Java to parse"
+outputTypeName: SkillBriefs
+export: true

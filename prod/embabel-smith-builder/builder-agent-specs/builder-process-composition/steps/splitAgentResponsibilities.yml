@@ -1,0 +1,30 @@
+stepType: action
+name: splitAgentResponsibilities
+description: "Decide the agents of the process, one coherent responsibility each, in run order"
+inputTypeNames:
+  - ProcessScope
+outputTypeName: AgentSplit
+pre: []
+post: []
+cost: null
+value: null
+canRerun: null
+nullable: null
+toolGroups: []
+prompt: |
+  Divide the scoped process below into agents.
+  - Use a single agent only when the process is small and one role owns the whole flow. When the
+    process has clearly separate responsibilities — for example a research phase, a debate or
+    decision phase, and an execution phase — split them into separate agents.
+  - Each agent owns one coherent responsibility; do not split a single responsibility across two
+    agents.
+  - Order the agents in the order the process runs. The first agent's first step or steps take the
+    operator's request (the UserInput type) as their input; the last agent's goal is the process's
+    final deliverable.
+  - Give every agent a distinct goal name: no two agents may share a goal name.
+  For each agent give, on one line: its snake_case name; the responsibility it owns; its distinct
+  snake_case goal name; the PascalCase type its goal produces; and the PascalCase artifacts it
+  needs from the process.
+  Process being composed: {{processScope.primaryProcess}}
+  Responsibilities, in run order: {{processScope.responsibilities}}
+  Final deliverable type: {{processScope.finalDeliverable}}

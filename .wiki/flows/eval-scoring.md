@@ -8,7 +8,7 @@ source_paths:
   - "poc/poc-5-eval/src/main/java/com/embabel/smith/eval/SpecEvalScorer.java"
   - "poc/poc-5-eval/src/main/java/com/embabel/smith/eval/AgentInvocationSpecInvoker.java"
   - "poc/poc-5-eval/src/main/java/com/embabel/smith/eval/PromptRewriteLoop.java"
-updated_at: "2026-11-01"
+updated_at: "2026-11-22"
 ---
 
 # Eval and scoring (POC 5)
@@ -66,6 +66,6 @@ a **stable, repeatable signal**. See [[what-the-pocs-prove]].
 ## What is primary
 
 The **score** is the primary deliverable; the rewrite loop is demoted to a stretch goal if it
-proves too costly (see the D6 rationale in
-`openspec/changes/embabel-agent-builder/design.md`). Offline tests: `GoalSpecEvaluatorTest`,
+proves too costly (see the rationale in
+`docs/03-embabel-spec-agent-builder-design.md`). Offline tests: `GoalSpecEvaluatorTest`,
 `SpecEvalScorerTest`, `PromptRewriteLoopTest`, `ScoreStabilityTest`.

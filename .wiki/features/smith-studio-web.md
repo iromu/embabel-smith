@@ -17,9 +17,19 @@ source_paths:
   - "prod/embabel-smith-studio/src/main/java/com/embabel/smith/studio/rest/BuildController.java"
   - "prod/embabel-smith-studio/src/main/java/com/embabel/smith/studio/rest/StatusController.java"
   - "prod/embabel-smith-studio/src/main/java/com/embabel/smith/studio/config/SpaWebConfig.java"
+  - "prod/embabel-smith-studio/src/main/java/com/embabel/smith/studio/rest/RetrieveController.java"
+  - "prod/embabel-smith-studio/src/main/java/com/embabel/smith/studio/rest/RemoteController.java"
+  - "prod/embabel-smith-studio/src/main/java/com/embabel/smith/studio/rest/dto/RetrieveResponse.java"
+  - "prod/embabel-smith-builder/src/main/java/com/embabel/smith/builder/retrieval/SpecScorer.java"
+  - "prod/embabel-smith-builder/src/main/java/com/embabel/smith/builder/retrieval/LexicalScorer.java"
+  - "prod/embabel-smith-builder/src/main/java/com/embabel/smith/builder/retrieval/SpecRanker.java"
+  - "prod/embabel-smith-builder/src/main/java/com/embabel/smith/builder/retrieval/RetrievalCuration.java"
+  - "prod/embabel-smith-builder/src/main/java/com/embabel/smith/builder/retrieval/SpecEntries.java"
+  - "prod/embabel-smith-builder/src/main/java/com/embabel/smith/builder/retrieval/SpecEntry.java"
+  - "prod/embabel-smith-studio/frontend/src/panes/ScalePane.vue"
   - "prod/embabel-smith-studio/frontend/src/router.ts"
   - "prod/embabel-smith-studio/README.md"
-updated_at: "2026-11-15"
+updated_at: "2026-11-22"
 ---
 
 # The smith studio web product
@@ -53,18 +63,65 @@ for Generate ([[studio-process-workspace]]). The studio's raw chat-completions c
 a source-level test fails the build if anything under `src/main/java` reintroduces a direct endpoint
 call ([[model-calls-go-through-ai]]).
 
+## Retrieve and Remote: two panes whose logic lives elsewhere
+
+Both were POC-only capabilities that are now wired, and neither pane holds any of its own logic —
+which is the point of listing them next to the cores.
+
+**Retrieve** (`/retrieve`, `POST /api/retrieve`). `rest/RetrieveController` lists a source's packs,
+reads each into a lightweight index entry (`retrieval/SpecEntries.of`), ranks them against the task
+query, and only then returns the top-k. Before that it curates the ranking with each pack's recorded
+lifecycle state, applying the two rules POC 18 measured (`builder/retrieval/RetrievalCuration.java`):
+a `retired` pack is **dropped** (only retirement removes a pack from the library), and a `degraded`
+pack's score is **halved** — after which the list is re-ordered, because a halved score can sink below
+a pack that had ranked under it. A pack with no `lifecycle.yml` sidecar reports `UNKNOWN` and is
+surfaced with its score unchanged; a pack that cannot be read contributes no entry rather than failing
+the query, so an empty source is an empty result and not a fault. See [[spec-lifecycle]] for where
+that state comes from and [[retrieval-shadowing]] for the POC this was copied from.
+
+Scoring sits behind a one-method seam — `builder/retrieval/SpecScorer` is a `@FunctionalInterface`
+with a single `score(query, entry)` — and `LexicalScorer` (cosine over term-frequency vectors of
+`name + description`) is the one implementation that ships. The controller names that scorer as
+`"lexical"` on every successful response, so swapping in a denser scorer is a wiring change rather
+than a contract change; the structured-error response carries no scorer value at all
+(`dto/RetrieveResponse.java` — the field is documented as null on failure). Ranking (`SpecRanker`),
+entry-shaping and the curation arithmetic all live in the **builder's** `retrieval/` package; the
+controller contributes the source read and the DTO shaping and none of the arithmetic.
+
+**Remote** (`/remote`, `GET /api/remote/bridges` + `POST /api/remote/execute`). The controller reads
+the `smith.studio.remote-bridges` configuration, probes each configured sidecar, and runs one action a
+request names — every line of the wire protocol is the runtime's `remote/` package
+([[smith-runtime]]). Three studio-side rules are load-bearing:
+
+- **A request names a bridge; it never supplies an address.** The controller matches on the
+  *configured* name only, and a name configuration does not define is refused before anything is
+  contacted — `RemoteControllerTest` proves that by asserting the stub sidecar's request count is
+  zero on the refusal path. Without the rule the pane is an open proxy: anyone who can reach it could
+  point this host at any URL.
+- **An unreachable sidecar is a state inside a `2xx`**, never a failed request — one sidecar being
+  down is not a fault in this application.
+- **Nothing gets started, nothing else gets invoked.** No sidecar process is ever spawned (a
+  browser-reachable tool that launches processes is a remote-code-execution surface, and spawning
+  would make Docker a product dependency), and the configured MCP endpoint is displayed as configured
+  but never probed — this product is not an MCP client, so a reachable badge on it would lie. The
+  product also does not *plan* over a remote action; the three reasons are on [[smith-runtime]].
+
+That last split is enforced, not stylistic: the module-wide `NoDirectModelRequestTest` fails the build
+if any studio production source imports `java.net.http.`, which is why neither controller talks to
+anything itself.
+
 ## The front end
 
 Evolved from POC 22's SPA (Vue 3.5 + Quasar 2.17 + Vite + TypeScript under
 `prod/embabel-smith-studio/frontend/`; `npm run build` runs `vue-tsc --noEmit` then emits into
 `src/main/resources/static`, which is gitignored and served from the classpath — Maven drives the
 build via `frontend-maven-plugin`, pinning node in `frontend/.nvmrc`). The app is **dark by
-construction**: `main.ts:17-21` removes `body--light` and adds `body--dark`, with the palette in
+construction**: `main.ts:25-26` removes `body--light` and adds `body--dark`, with the palette in
 `quasar-variables.sass` injected ahead of Quasar's own. Shared chrome lives in
 `components/PageHeader.vue`, `SectionCard.vue`, and `EmptyState.vue`.
 
 Fifteen routes over fourteen panes (`frontend/src/router.ts` — `/` and `/process` are the same
-pane), of which **eleven are backed** and three are stubs:
+pane), of which **thirteen are backed** and one is a stub:
 
 - **Process** (`/`, aliased `/process`) — the home wizard: discover, generate, simulate, publish.
   This is the landing page, not a dashboard. See [[studio-process-workspace]].
@@ -77,15 +134,19 @@ pane), of which **eleven are backed** and three are stubs:
 - **Storage** — point the studio at its Postgres database (endpoint/user/password) and pick the
   trace backend; save validates the connection and rebinds live, keeping the old binding on failure
   ([[smith-studio-storage]]).
-- **Three POC-only panes** (Retrieve, Scale, Remote) — each an 11-line wrapper around
-  `PocOnlyPane.vue`, carried as disabled reference stubs because the production cores have no such
-  feature.
+- **Retrieve** — ranks a source's stored packs against a task by lexical score with lifecycle
+  curation, offline, through `POST /api/retrieve` (`rest/RetrieveController.java`).
+- **Remote** — lists the sidecars this installation configured, whether each answers, and the output
+  of running one of its actions, over `GET /api/remote/bridges` and `POST /api/remote/execute`
+  (`rest/RemoteController.java`).
+- **Scale** — the one POC-only pane: a wrapper around `PocOnlyPane.vue` (POC 12), carried as a
+  disabled reference stub because the production core has no such feature.
 
 Two small endpoints feed the chrome rather than a pane: `GET /api/status`
-(`rest/StatusController.java:42`) reports model-endpoint readiness as a header chip and drawer badge
-(`App.vue:94-101,186`), and `GET /api/goals?source=` (`rest/SourceController.java:68`) lists exported
-goals so the Run pane can pick one and auto-select it when exactly one exists
-(`panes/RunPane.vue:102-118`).
+(`rest/StatusController.java:31`) reports model-endpoint readiness as a header chip and drawer badge
+(`App.vue:75-80,97-106,190`), and `GET /api/goals?source=` (`rest/SourceController.java:57`) lists
+the exported goals so the Run pane can pick one and auto-select it when exactly one exists
+(`panes/RunPane.vue:115-133`).
 
 Pure logic (trace-table filtering, candidate evidence formatting, loop state, the compose graph
 model) lives in non-`.vue` modules (`traces/model.ts`, `improve/model.ts`, `compose/model.ts`); there
@@ -95,7 +156,7 @@ checked by `vue-tsc --noEmit` + Vitest.
 ## Serving an SPA from Spring
 
 The router uses HTML5 history mode, so a deep link like `/improve` arrives at Spring with no
-controller behind it. `config/SpaWebConfig.java:44-58` forwards unknown paths to the SPA shell — with
+controller behind it. `config/SpaWebConfig.java:29-46` forwards unknown paths to the SPA shell — with
 `api/` deliberately **excluded**, so a mistyped endpoint still returns a real 404 instead of the
 index page. Separately, `SmithStudioApplication.main` forces `spring.main.web-application-type=SERVLET`
 as a *system property*; the reason is non-obvious enough that it is documented on the storage page
@@ -122,7 +183,8 @@ lifecycle, loop status, candidate review) work. Model-backed actions (run, build
 that re-evaluate) return a structured `MODEL_NOT_CONFIGURED` error the UI renders as a banner
 ([[model-endpoint]]).
 
-**Tests:** controller tests (`Run/Build/Source/Trace/Improve/Eval/Security/Trust ControllerTest`)
+**Tests:** controller tests
+(`Run/Build/Source/Trace/Improve/Eval/Security/Trust/Retrieve/Remote ControllerTest`)
 with faked cores, `LoopSchedulerTest` (fresh-start quiet / start / stop), `ModelNotConfiguredTest`
 (full app boots without an endpoint, and the model-backed run, build and extract endpoints each
 return the structured error — `ExtractController` was the last one without such a test),

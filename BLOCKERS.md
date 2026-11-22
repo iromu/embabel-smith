@@ -1,90 +1,85 @@
-# Blockers & Work Log — Studio "Author a Process" UI
+# Blockers
 
-Autonomous build (2026-11-11). Goal: a working home-screen workspace in
-`prod/embabel-smith-studio` that generates an agentic (GOAP) process from business
-documents, renders it as an editable flow, can simulate a run, and publishes a spec.
-Test input: `/home/wantez/source/github/TauricResearch/TradingAgents/docs/business`.
+Things that are actually blocking, re-verified against this tree on 2026-11-22. Each names the check
+that shows it, so a reader can re-run it instead of trusting this page. History and reasoning live in
+[`docs/12-backlog.md`](docs/12-backlog.md) and in memory, not here.
 
-## Status: WORKING — generate + simulate verified end-to-end (2026-11-11)
+## 1. The wiki is corrected locally; the published site is not
 
-The home-screen workspace generates a GOAP process from the TradingAgents docs,
-renders it as a clean editable flow, simulates a run (full per-step trace), and can
-publish a pack. Verified live on port 18099 with a Playwright E2E and direct curl.
-Remaining: OpenSpec "capture" of the design, and optional model-based discovery
-(extraction via `business_process_discovery.jinja`) — see Plan items 9–10.
+Blocks the publish half of `builder-executes-its-own-packs` 5.3 and `poc27-improves-builder-agentspecs`
+9.3. Locally the wiki is clean — 45 pages, 0 broken links, 0 dead `source_paths` — but the site at
+https://iromu.github.io/embabel-smith/ still says the improvement loop lives in the studio while the
+repo says it lives in the builder.
 
-## Design (decided with the user)
-- **One spec** — the whole process is a single agent spec (goal + steps + types).
-  "Specs" = the steps; "tools" deferred (no-code format has no LLM-tool concept;
-  "tool" already means trust-tier group).
-- **Home screen** — the author-a-process workspace replaces the 13-pane POC sidebar
-  as the landing page; the old panes are demoted to a secondary "Operations" nav.
-- **Model proposes the split** — the model decides the step decomposition.
-- **Discovery ingestion** — a second blueprint source: point at a repo URL / zip /
-  local docs dir; `business_process_discovery.jinja` extracts the business process;
-  an auto/manual toggle controls whether generation runs straight after.
+This needs a human, and "push `poc/iteration-2`" is not sufficient: `wiki-pages.yml` fires on a push to
+`main` that touches `.wiki/**`, plus manual dispatch. Origin's HEAD is `main`, and this branch's wiki
+commits are not on it, so a branch push deploys nothing. Either merge the wiki pages to `main` and push,
+or run the workflow by hand.
 
-## Plan
-1. [x] Backend: `/api/generate` (blueprint/path -> AgentSpec JSON), generation prompt
-2. [x] Spike generation against the TradingAgents docs; iterate on the prompt for a nice flow
-3. [x] Backend: `/api/simulate` (spec + input -> per-step trace) via AgentSpecRunService
-4. [x] Backend: `/api/discover` (path/url -> docs + process inventory)
-5. [x] Frontend: ProcessWorkspace home page (blueprint input, progress, flow graph, specs, simulate, publish)
-6. [x] Frontend: types.ts + client.ts for the new endpoints; router + App nav
-7. [x] Build SPA, run app, Playwright the pipeline, verify the flow (programmatically — see Blockers), iterate
-8. [x] DB (docker) — NOT needed for v1; specs/docs are ephemeral per run (see note below)
-9. [x] OpenSpec: capture the design — change `07-smith-studio-process-workspace`
-10. [ ] Optional: model-based discovery — run `business_process_discovery.jinja` against a raw
-    codebase/docs dir to extract the process (currently `/api/discover` only loads existing docs)
+Check: `sed -n '9,20p' .github/workflows/wiki-pages.yml` for the trigger, and
+`git ls-remote --symref origin HEAD` for the default branch.
 
-## Blockers (things I could not resolve on my own)
-- **DB not needed for v1** — generated specs and loaded docs are per-run and ephemeral
-  (simulate writes to a throwaway temp dir, cleaned after). No durable store is required
-  until we add "save my generated processes" / history. Flag if you want that.
+## 2. A2A protocol 1.0 waits on an upstream release
 
-_(The earlier "vision unavailable" blocker was resolved mid-session when vision became available;
-the UI was then visually verified and polished — see the Log.)_
+The reused library speaks 0.3: the served card reports `protocolVersion: 0.3.0`, dispatch keys off the
+0.3 method names, and discovery is at `/a2a/.well-known/agent.json`, not the current specification's
+`/.well-known/agent-card.json` — a 1.0 client will not find this endpoint. Reaching 1.0 means
+`io.github.a2asdk` 1.0.0 leaving Alpha, or hand-writing the binding, which the reuse ruling already
+rejected. Not work this repo can do.
 
-## Log
-- 2026-11-11 recon: model endpoint live (Qwen-instruct @ spark.local:4000, 262K ctx).
-  Tooling: node 24, maven 3.9, java 25, docker running. ComposePane is a reusable
-  Vue Flow graph editor. AgentSpec is Jackson-serializable to the frontend ComposePack shape.
-  RuntimeCore.ingest is isolated per call (platform.plus + unique-suffix agent) -> safe for simulate.
-- Generation SPIKE (via /tmp/gen_spike.py, mirrors ProcessFlowGenerator): the model produced a
-  clean 9-step GOAP flow from the TradingAgents docs — 4 parallel analyst steps (UserInput ->
-  TechnicalReport/SentimentReport/NewsMacroReport/FundamentalsReport) -> research_debate ->
-  investment_plan -> transaction_proposal -> risk_debate -> portfolio_manager_decision -> FinalDecision.
-  Goal reachable, no dangling inputs, 9 types. Single call, ~20K tokens, ~40s. Generation quality is good.
-- Built the backend (`/api/generate`, `/api/simulate`, `/api/discover` + DTOs + StudioConfiguration
-  beans) and the frontend home workspace (ProcessWorkspace, router `/`, App nav "Studio" group,
-  types.ts/client.ts). Typechecks and builds; Playwright E2E confirmed home loads, docs load (8),
-  and generate renders 9 nodes.
-- **Simulate bug found + fixed.** First simulate returned "spec source 'folder:...' contains no
-  agent specs". Root cause: the model emits *snake_case* prompt vars (`{{ user_input }}`,
-  `{{ technical_report }}`), but the runtime contract (AgentSpecValidator) binds the *decapitalized
-  camelCase* input-type name (`{{ userInput }}`, `{{ technicalReport }}`). So every step failed
-  `PROMPT_UNDECLARED_INPUT`, the spec failed `AgentSpecValidator`, and `FolderSpecSource` excluded
-  it -> empty spec set. **Fix:** added `ProcessFlowGenerator.canonicalizePromptVars` — a post-parse
-  normalizer that rewrites each `{{var}}` to the canonical decapitalized form of its matching input
-  type (robust to any casing/underscore form), plus strengthened rule 7 of `process_to_flow.jinja`.
-  Verified by a new offline test (`ProcessFlowGeneratorTest`: the real model answer normalises to a
-  spec that passes on-disk validation and is discoverable by `FolderSpecSource`).
-- **Simulate now works end-to-end.** curl `/api/simulate` on a fresh generated spec: success=true,
-  all 9 steps completed (per-step durations), real `FinalDecision` output (rating/summary/thesis).
-  App log shows the full GOAP data dictionary + per-step LLM outputs. Playwright E2E re-run: generate
-  -> 10 nodes / 16 edges in a clean layered layout -> simulate "succeeded" with 10 step rows.
-- **Vision became available; visually verified and polished the flow.** Viewed the live screenshots
-  and found two issues, both fixed:
-  1. *Goal clipped off-screen.* The canvas was a fixed 530px-wide box with no fit-to-view, so the
-     7-column flow (~1625px wide) overflowed and the goal + 4 steps were cut off to the right.
-     **Fix:** made the canvas full-width, added a dot-grid background, a highlighted goal node, a
-     "Fit view" button, native zoom/pan, and an automatic `fitView` after generation. Because Vue Flow
-     measures node dimensions asynchronously, the auto-fit polls the flow's nodes until every one is
-     measured before fitting (`fitWhenMeasured`). Verified: all 10 nodes on-screen, goal visible,
-     0 overlaps, 16 edges.
-  2. *Analysts stacked from the top, leaving empty space below.* **Fix:** `packToNodes` now centers
-     each layer's rows on a common vertical midline, so the 4 analysts fan out symmetrically and the
-     whole flow sits centered in the canvas.
-  Re-ran the full E2E (load docs → generate → simulate): still green — 10 nodes / 16 edges,
-  simulate "succeeded" with 10 step rows and teal-highlighted completed nodes. Frontend suite:
-  36/36 pass; `vue-tsc --noEmit` clean.
+Check: `grep -rn 'embabel-agent-starter-a2a' prod/*/pom.xml` returns the one module, and
+`prod/embabel-smith-runtime-a2a/README.md` carries the `Non-goal: protocol 1.0` line against the
+discovery-path deviation.
+
+## 3. `/scale` is a decision, not a task
+
+`ScalePane.vue` still renders `PocOnlyPane.vue`. What POC 12 and POC 23 present there is a measurement,
+not a capability a user invokes, so wiring the pane means inventing a feature to hang under the name —
+which is the failure mode the backlog entry warns against. It stays a stub until someone says what the
+pane should do.
+
+Check: `grep -rln PocOnlyPane prod/embabel-smith-studio/frontend/src` prints `panes/ScalePane.vue` only.
+
+## 4. Whether the product should ever print a third-party install hint
+
+`SkillspectorSecurityScanner` tells users to `uv tool install` from an NVIDIA release URL; the other
+binary-backed scanners carry their own (`gitleaks`, Bandit, Semgrep). On the default path none of those
+strings is reachable — the builder requests the binary-free checks only — and `--full-inspection` is the
+single route that can surface one. The four tools are already sanctioned as-is, so what is left is a
+supply-chain judgement about the *hint text*, which belongs to the human.
+
+Check: `grep -n 'BINARY_FREE_CHECKS = '
+prod/embabel-smith-builder/src/main/java/com/embabel/smith/builder/skill/SkillInspector.java` and the
+`fullInspection` parameter on `SkillInspector.inspect`.
+
+---
+
+## Decided, so nobody reopens them
+
+- **Sidecars are never spawned from the browser.** Reported, never started: a browser-reachable tool
+  that launches host processes is a remote-code-execution surface.
+- **POC 27 ships its `not proven` verdict as its result.** Its task 10.2 was never an endpoint blocker —
+  the candidate prompt never contained the eval input, so six "different" tasks sent six identical
+  requests.
+- **`publish-keeps-versions` 3.2 is withdrawn** by its own design decision 7 (keep the `--overwrite`
+  flag), and `builder-live-example-tests` 3.1 is struck through. Two of the unchecked boxes in
+  `openspec/changes/` are therefore not pending work.
+
+## Cleared while this page was being written (2026-11-22)
+
+- **`docs/08-builder.md` is no longer held.** It carried 19 uncommitted lines — the `### As a native
+  binary` section — from the session doing the native-image work, which is what kept
+  `builder-executes-its-own-packs` 5.2 and `poc27-improves-builder-agentspecs` 9.2's third clause open.
+  That work landed as `a4200e2` and reached this branch through the merge of `origin/poc/iteration-2`, so
+  `grep -c 'As a native binary' docs/08-builder.md` prints 1. The two tasks are ordinary work now, not
+  blocked: 9.2's third clause (add the builder packs to that page) is open to whoever takes it, and 5.2's
+  own note already says there is no new default to write.
+- **The native reflection entry for `ToolGroupMetadata$Companion` exists** — `builder-native-hints`
+  registers it with `allDeclaredMethods`, and its comment names the exact startup failure the note
+  predicted: the factory's JVM name contains a hyphen, so no source line names it and a tracing run
+  alone would come back empty.
+- **The studio frontend typechecks.** `npx vue-tsc --noEmit` exits 0 with no output at this HEAD, so the
+  two `compose.model.test.ts` errors that gated POC 27's task 10.1 are gone, and the frontend half of
+  `builder-owns-improvement-loop` 6.2 describes shipped code.
+- **`builder-owns-improvement-loop` has no unchecked task left**, including 6.1 and 6.2, both settled by
+  command rather than claim.

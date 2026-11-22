@@ -28,6 +28,9 @@
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
         <spring-boot.version>4.1.1</spring-boot.version>
+        <!-- Spring AI arrives transitively through Embabel 1.5.4; this is the line it brings,
+             kept here because the builder names one of its artifacts explicitly. -->
+        <spring-ai.version>2.0.1</spring-ai.version>
         <jackson.version>2.19.0</jackson.version>
         <picocli.version>4.7.7</picocli.version>
         <!-- GraalJS embedded engine (POC 26). The "js" artifact is a POM that pulls the
@@ -41,15 +44,65 @@
         <maven-surefire-plugin.version>3.2.5</maven-surefire-plugin.version>
         <maven-failsafe-plugin.version>3.2.5</maven-failsafe-plugin.version>
         <maven-enforcer-plugin.version>3.6.3</maven-enforcer-plugin.version>
+        <!-- 1.1.x writes the new reachability-metadata schema, which GraalVM for JDK 25
+             cannot read (no lib/svm/schemas in that distribution); 0.11.x hands the
+             community hints to native-image in the form this JDK understands. -->
+        <native-maven-plugin.version>0.11.5</native-maven-plugin.version>
         <checkstyle.version>12.3.1</checkstyle.version>
         <io.spring.javaformat.version>0.0.48</io.spring.javaformat.version>
+
+        <!-- JUnit tags excluded from the default test run. Tests that need a live model endpoint
+             carry @Tag("live"), so `mvn test` is green with no endpoint configured. Override with
+             -Dtest.excludedGroups= to opt in; `make test-live` is the supported form, because
+             -Dgroups=live alone selects nothing (the exclusion still applies). -->
+        <test.excludedGroups>live</test.excludedGroups>
     </properties>
 
     <modules>
         <module>smith-common</module>
-        <module>poc</module>
         <module>prod</module>
     </modules>
+
+    <profiles>
+        <!-- The POCs are frozen evidence, not shipped code: they are slow to build (large model
+             downloads) and their interesting tests are endpoint-gated. Keep them out of the
+             default reactor — build them with -Ppoc. -->
+        <profile>
+            <id>poc</id>
+            <modules>
+                <module>poc</module>
+            </modules>
+        </profile>
+
+        <!-- GraalVM native images. A shipped module opts in by declaring both plugins WITH
+             their executions (see prod/embabel-smith-builder); the shared defaults live here
+             so a second module need not repeat them. A module that declares neither is
+             untouched by -Pnative. -->
+        <profile>
+            <id>native</id>
+            <build>
+                <pluginManagement>
+                    <plugins>
+                        <plugin>
+                            <groupId>org.graalvm.buildtools</groupId>
+                            <artifactId>native-maven-plugin</artifactId>
+                            <configuration>
+                                <!-- Third-party reachability hints from the GraalVM
+                                     metadata repository (Netty, Jackson, SnakeYAML, ...). -->
+                                <metadataRepository>
+                                    <enabled>true</enabled>
+                                </metadataRepository>
+                                <buildArgs>
+                                    <buildArg>--no-fallback</buildArg>
+                                    <buildArg>-H:+ReportExceptionStackTraces</buildArg>
+                                </buildArgs>
+                            </configuration>
+                        </plugin>
+                    </plugins>
+                </pluginManagement>
+            </build>
+        </profile>
+    </profiles>
 
     <repositories>
         <!-- Embabel release binaries (also mirrored on Maven Central). -->
@@ -121,6 +174,14 @@
                 <artifactId>embabel-agent-starter-mcpserver</artifactId>
                 <version>${embabel-agent.version}</version>
             </dependency>
+            <!-- A2A server (protocol 0.3): the Embabel A2A starter, declared only by
+                 embabel-smith-runtime-a2a. It brings spring-boot-starter-web, so a module
+                 that declares it gains a servlet engine. -->
+            <dependency>
+                <groupId>com.embabel.agent</groupId>
+                <artifactId>embabel-agent-starter-a2a</artifactId>
+                <version>${embabel-agent.version}</version>
+            </dependency>
             <!-- Agent Skills (Agent Skills spec + the SkillScriptExecutionEngine SPI, POC 26). -->
             <dependency>
                 <groupId>com.embabel.agent</groupId>
@@ -183,7 +244,17 @@
             </dependency>
             <dependency>
                 <groupId>org.iromu.embabel.smith</groupId>
+                <artifactId>embabel-smith-skillevaluator</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.iromu.embabel.smith</groupId>
                 <artifactId>embabel-smith-runtime</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.iromu.embabel.smith</groupId>
+                <artifactId>embabel-smith-runtime-a2a</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
@@ -194,73 +265,6 @@
             <dependency>
                 <groupId>org.iromu.embabel.smith</groupId>
                 <artifactId>embabel-smith-studio</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.iromu.embabel.smith</groupId>
-                <artifactId>poc-1-no-code-runtime</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.iromu.embabel.smith</groupId>
-                <artifactId>poc-2-nl-compile</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.iromu.embabel.smith</groupId>
-                <artifactId>poc-8-retrieval</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.iromu.embabel.smith</groupId>
-                <artifactId>poc-9-quality-refinement</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.iromu.embabel.smith</groupId>
-                <artifactId>poc-12-semantic-retrieval</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.iromu.embabel.smith</groupId>
-                <artifactId>poc-14-composer</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.iromu.embabel.smith</groupId>
-                <artifactId>poc-17-gliner-retrieval</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.iromu.embabel.smith</groupId>
-                <artifactId>poc-18-agent-spec-lifecycle</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.iromu.embabel.smith</groupId>
-                <artifactId>poc-20-semantic-embedding</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <!-- POC 21 reuses POC 10's trust tiers for its recommended-load-tier computation. -->
-            <dependency>
-                <groupId>org.iromu.embabel.smith</groupId>
-                <artifactId>poc-10-trust-tiers</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.iromu.embabel.smith</groupId>
-                <artifactId>poc-21-agent-spec-security</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <!-- Remote transports (POC 22 Remote pane): the RestAction sidecar and the MCP server. -->
-            <dependency>
-                <groupId>org.iromu.embabel.smith</groupId>
-                <artifactId>poc-13-remote-mcp</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.iromu.embabel.smith</groupId>
-                <artifactId>poc-16-remote-action</artifactId>
                 <version>${project.version}</version>
             </dependency>
 
@@ -331,6 +335,11 @@
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-surefire-plugin</artifactId>
                     <version>${maven-surefire-plugin.version}</version>
+                    <!-- Declared here rather than per module so a new module cannot forget the
+                         policy: the live group is off unless a run asks for it. -->
+                    <configuration>
+                        <excludedGroups>${test.excludedGroups}</excludedGroups>
+                    </configuration>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
@@ -341,6 +350,11 @@
                     <groupId>org.springframework.boot</groupId>
                     <artifactId>spring-boot-maven-plugin</artifactId>
                     <version>${spring-boot.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.graalvm.buildtools</groupId>
+                    <artifactId>native-maven-plugin</artifactId>
+                    <version>${native-maven-plugin.version}</version>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
@@ -398,4 +412,5 @@
             </plugin>
         </plugins>
     </build>
+
 </project>

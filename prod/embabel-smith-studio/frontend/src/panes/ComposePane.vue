@@ -39,21 +39,23 @@
             <div class="compose-canvas">
               <VueFlow
                 v-model:nodes="nodes"
-                v-model:edges="edges"
+                :edges="renderedEdges"
                 :is-valid-connection="onValidConnection"
                 :nodes-draggable="true"
                 :delete-key-code="null"
                 @connect="onConnect"
                 @node-click="onNodeClick"
+                @pane-click="clearFocus"
               >
                 <template #node-step="props">
-                  <div class="compose-node compose-node--step">
+                  <div class="compose-node compose-node--step" :style="stepBoxStyle(props.id)">
                     <Handle
-                      v-for="t in (props.data as ComposeStep).inputTypeNames"
+                      v-for="(t, i) in (props.data as ComposeStep).inputTypeNames"
                       :key="'in-' + t"
                       type="target"
-                      :position="Position.Top"
+                      :position="Position.Left"
                       :id="'in:' + t"
+                      :style="handleSlot(i, (props.data as ComposeStep).inputTypeNames)"
                     />
                     <div class="compose-node__body">
                       <div class="compose-node__title">{{ (props.data as ComposeStep).name }}</div>
@@ -61,7 +63,7 @@
                     </div>
                     <Handle
                       type="source"
-                      :position="Position.Bottom"
+                      :position="Position.Right"
                       :id="'out:' + (props.data as ComposeStep).outputTypeName"
                     />
                   </div>
@@ -70,7 +72,7 @@
                   <div class="compose-node compose-node--goal">
                     <Handle
                       type="target"
-                      :position="Position.Top"
+                      :position="Position.Left"
                       :id="'in:' + (props.data as ComposeGoal).outputTypeName"
                     />
                     <div class="compose-node__body">
@@ -261,6 +263,8 @@ import type { ComposeResponse, SourceInfo } from '../api/types'
 import {
   assemblePack,
   isValidConnection,
+  nodeEdgeColors,
+  styleEdges,
   validateFlow,
   type ComposeGoal,
   type ComposeStep,
@@ -338,6 +342,33 @@ function removeNode(node: any) {
 
 function onNodeClick({ node }: { node: any }) {
   selected.value = node
+}
+
+function clearFocus() {
+  selected.value = null
+}
+
+// ---- Edge coloring ----
+// The focused step's in-edges are green and its out-edges red; with nothing focused every edge
+// carries its producer's identity color, so a step's fan-out is traceable by eye.
+const focusedId = computed<string | null>(() => selected.value?.id ?? null)
+const edgeColors = computed(() => nodeEdgeColors(nodes.value))
+const renderedEdges = computed(() => styleEdges(edges.value, nodes.value, focusedId.value))
+
+/**
+ * The step box's border carries the color of the lines leaving it, which is what keys the edge
+ * colors. A custom property rather than a border, so the box's own class rules still pick the edge.
+ */
+function stepBoxStyle(id: string): Record<string, string> {
+  return { '--step-color': edgeColors.value[id] }
+}
+
+/**
+ * Spreads the handles one side of a step is carrying down that side. Vue Flow parks every handle on
+ * an edge at the same midpoint, so on a step with several inputs only one of them could be grabbed.
+ */
+function handleSlot(index: number, types: readonly string[]): Record<string, string> {
+  return { top: `${(((index + 1) * 100) / (types.length + 1)).toFixed(2)}%` }
 }
 
 // ---- Type-checked edges ----
@@ -452,6 +483,10 @@ void loadSources()
   color: var(--text-strong, #e2e8f0);
   font-size: 13px;
   cursor: pointer;
+}
+.compose-node--step {
+  /* The box is outlined in the color of the edges it produces, so those edges are traceable. */
+  border-color: var(--step-color, var(--border, #2b3a4f));
 }
 .compose-node--goal {
   border-color: var(--nav-active, #4f46e5);

@@ -20,6 +20,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
 import org.iromu.embabel.smith.skillevaluator.model.ValidationResult;
 import org.iromu.embabel.smith.skillevaluator.util.Constants;
 import org.iromu.embabel.smith.skillevaluator.util.ScanPaths;
@@ -29,9 +30,10 @@ import org.yaml.snakeyaml.constructor.SafeConstructor;
 
 /**
  * Validates code integrity: dead links, dependencies, and test-file presence.
- *
  * <p>
  * Port of {@code validators/hygiene.py}.
+ *
+ * @author Ivan Rodriguez
  */
 public class HygieneValidator extends ValidatorBase {
 
@@ -93,8 +95,8 @@ public class HygieneValidator extends ValidatorBase {
 			try {
 				content = Files.readString(mdFile, StandardCharsets.UTF_8);
 			}
-			catch (IOException | RuntimeException e) {
-				result.addWarning("Could not read " + mdFile + ": " + e);
+			catch (IOException | RuntimeException ex) {
+				result.addWarning("Could not read " + mdFile + ": " + ex);
 				continue;
 			}
 
@@ -105,7 +107,7 @@ public class HygieneValidator extends ValidatorBase {
 				try {
 					localPath = normalizedLocalPath(linkHref, true, true);
 				}
-				catch (IllegalArgumentException e) {
+				catch (IllegalArgumentException ex) {
 					if (seenInvalid.contains(linkHref)) {
 						continue;
 					}
@@ -123,7 +125,7 @@ public class HygieneValidator extends ValidatorBase {
 				try {
 					exists = Files.exists(target);
 				}
-				catch (RuntimeException e) {
+				catch (RuntimeException ex) {
 					exists = false;
 				}
 				if (!exists) {
@@ -143,6 +145,9 @@ public class HygieneValidator extends ValidatorBase {
 	/**
 	 * Keep untrusted link diagnostics bounded and on one physical line (Python
 	 * {@code _link_display}).
+	 * @param value the file name or link destination shown to a user
+	 * @return the first 160 code points of its ASCII repr, suffixed {@code ...} when
+	 * either the value or its repr was longer
 	 */
 	static String linkDisplay(String value) {
 		int total = value.codePointCount(0, value.length());
@@ -156,6 +161,9 @@ public class HygieneValidator extends ValidatorBase {
 	/**
 	 * ASCII repr of a string without its surrounding quotes, mirroring Python
 	 * {@code ascii()}.
+	 * @param value the text to escape
+	 * @return printable ASCII kept as-is, every other code point replaced by its numeric
+	 * escape
 	 */
 	private static String asciiRepr(String value) {
 		StringBuilder sb = new StringBuilder();
@@ -204,6 +212,14 @@ public class HygieneValidator extends ValidatorBase {
 
 	/**
 	 * Normalize a local destination (Python {@code normalized_local_path}).
+	 * @param href the raw link destination
+	 * @param allowDirectory whether a destination ending in {@code /}, {@code /.} or
+	 * {@code /..} still counts as a path
+	 * @param rejectAnchors whether an absolute or drive-relative result is an error
+	 * rather than a skip
+	 * @return the normalized relative path, or {@code null} when the destination is an
+	 * explicit URL, carries a netloc, is root-relative, or is a directory that
+	 * {@code allowDirectory} rejects
 	 * @throws IllegalArgumentException when {@code rejectAnchors} is set and
 	 * normalization produced an absolute or drive-relative path
 	 */
@@ -288,6 +304,8 @@ public class HygieneValidator extends ValidatorBase {
 
 	/**
 	 * {@code PureWindowsPath(...).anchor} check: drive ("C:"), root ("/") or UNC ("//").
+	 * @param normalized the normalized path to classify
+	 * @return {@code true} when it starts with a drive letter, a slash or a backslash
 	 */
 	private static boolean hasWindowsAnchor(String normalized) {
 		if (normalized.length() >= 2 && Character.isLetter(normalized.charAt(0)) && normalized.charAt(1) == ':') {
@@ -296,7 +314,13 @@ public class HygieneValidator extends ValidatorBase {
 		return normalized.startsWith("/") || normalized.startsWith("\\") || normalized.startsWith("//");
 	}
 
-	/** Port of {@code posixpath.normpath}. */
+	/**
+	 * Port of {@code posixpath.normpath}.
+	 * @param path the slash-separated path to collapse
+	 * @return the path without {@code .}, empty and cancelled {@code ..} components;
+	 * {@code .} for an empty relative path, {@code /} for an empty absolute one and
+	 * {@code //} for an absolute path that opened with exactly two slashes
+	 */
 	static String posixNormpath(String path) {
 		boolean absolute = path.startsWith("/");
 		int leadingSlashes = 0;
@@ -328,7 +352,7 @@ public class HygieneValidator extends ValidatorBase {
 			prefix = "";
 		}
 		else {
-			prefix = leadingSlashes == 2 ? "//" : "/";
+			prefix = (leadingSlashes == 2) ? "//" : "/";
 		}
 		return prefix + String.join("/", parts);
 	}
@@ -336,6 +360,9 @@ public class HygieneValidator extends ValidatorBase {
 	/**
 	 * Percent-decode as Python {@code unquote}: raw bytes collected, then UTF-8 decoded
 	 * with replacement.
+	 * @param value the percent-encoded destination
+	 * @return the decoded text, where malformed UTF-8 becomes U+FFFD rather than Python's
+	 * distinct surrogate escapes
 	 */
 	static String percentDecode(String value) {
 		java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
@@ -390,15 +417,20 @@ public class HygieneValidator extends ValidatorBase {
 		return result;
 	}
 
-	/** Audit a single requirements.txt for banned/unpinned packages. */
+	/**
+	 * Audit a single requirements.txt for banned/unpinned packages.
+	 * @param reqFile the requirements file to read
+	 * @return an error per banned package and a warning per unpinned requirement, or the
+	 * pass and audit messages when the file is clean
+	 */
 	ValidationResult checkRequirementsFile(Path reqFile) {
 		ValidationResult result = new ValidationResult();
 		String text;
 		try {
 			text = Files.readString(reqFile, StandardCharsets.UTF_8);
 		}
-		catch (IOException | RuntimeException e) {
-			result.addWarning("Could not read " + reqFile + ": " + e);
+		catch (IOException | RuntimeException ex) {
+			result.addWarning("Could not read " + reqFile + ": " + ex);
 			return result;
 		}
 
@@ -432,7 +464,7 @@ public class HygieneValidator extends ValidatorBase {
 			// references before the marker so an "@" inside a marker value cannot hide
 			// an otherwise unpinned requirement.
 			int semi = logicalLine.indexOf(';');
-			String requirementPart = semi >= 0 ? logicalLine.substring(0, semi) : logicalLine;
+			String requirementPart = (semi >= 0) ? logicalLine.substring(0, semi) : logicalLine;
 			int at = requirementPart.indexOf('@');
 			boolean isDirectReference = at >= 0 && !requirementPart.substring(at + 1).strip().isEmpty();
 
@@ -454,14 +486,19 @@ public class HygieneValidator extends ValidatorBase {
 	// Static test discovery
 	// ------------------------------------------------------------------
 
-	/** Discover conventional Python test filenames without reading or executing them. */
+	/**
+	 * Discover conventional Python test filenames without reading or executing them.
+	 * @param skillPath the skill folder to walk for {@code .py} files
+	 * @return the discovery result carrying the candidate count and the not-executed
+	 * flags, plus a warning when no candidate matched
+	 */
 	ValidationResult checkTestPresence(Path skillPath) {
 		ValidationResult result = new ValidationResult();
 		Path skillRoot;
 		try {
 			skillRoot = skillPath.toRealPath();
 		}
-		catch (IOException e) {
+		catch (IOException ex) {
 			skillRoot = skillPath.toAbsolutePath().normalize();
 		}
 
@@ -474,7 +511,7 @@ public class HygieneValidator extends ValidatorBase {
 			try {
 				resolved = candidate.toRealPath();
 			}
-			catch (IOException e) {
+			catch (IOException ex) {
 				continue;
 			}
 			if (!Files.isRegularFile(resolved) || !resolved.startsWith(skillRoot)) {
@@ -513,6 +550,9 @@ public class HygieneValidator extends ValidatorBase {
 	/**
 	 * Case-sensitive fnmatch: supports *, ? and [...] character classes (Python
 	 * {@code fnmatchcase}).
+	 * @param name the filename to test
+	 * @param pattern the glob pattern the whole name must match
+	 * @return {@code true} when {@code name} matches {@code pattern}
 	 */
 	static boolean fnmatchcase(String name, String pattern) {
 		int n = name.length();
@@ -589,7 +629,13 @@ public class HygieneValidator extends ValidatorBase {
 		return negate != matched;
 	}
 
-	/** Index just past the closing {@code ]} of a bracket class, or -1 when malformed. */
+	/**
+	 * Index just past the closing {@code ]} of a bracket class, or -1 when malformed.
+	 * @param pattern the glob pattern being walked
+	 * @param start index of the class's opening {@code [}
+	 * @return the index one past its closing {@code ]}, or -1 when the class is never
+	 * closed
+	 */
 	private static int classEnd(String pattern, int start) {
 		int i = start + 1;
 		if (i < pattern.length() && pattern.charAt(i) == '!') {
@@ -661,7 +707,7 @@ public class HygieneValidator extends ValidatorBase {
 				Matcher m = LINK_DEFINITION.matcher(line);
 				if (m.matches()) {
 					String label = normalizeLabel(m.group(1));
-					String dest = m.group(2) != null ? m.group(2) : m.group(3);
+					String dest = (m.group(2) != null) ? m.group(2) : m.group(3);
 					if (label != null && !label.isEmpty() && dest != null) {
 						definitions.putIfAbsent(label, unescapeMarkdown(dest));
 					}
@@ -677,8 +723,8 @@ public class HygieneValidator extends ValidatorBase {
 			scanInlineAndReferenceLinks(doc, definitions, includeImages, targets);
 			Matcher anchors = ANCHOR_HREF.matcher(doc);
 			while (anchors.find()) {
-				String href = anchors.group(1) != null ? anchors.group(1)
-						: anchors.group(2) != null ? anchors.group(2) : anchors.group(3);
+				String href = (anchors.group(1) != null) ? anchors.group(1)
+						: (anchors.group(2) != null) ? anchors.group(2) : anchors.group(3);
 				targets.add(unescapeHtml(href));
 			}
 			return targets;
@@ -711,6 +757,7 @@ public class HygieneValidator extends ValidatorBase {
 		/**
 		 * Blank fenced code blocks (including the fence lines), from fence-open to
 		 * fence-close.
+		 * @param text the document characters, blanked in place except for newlines
 		 */
 		private static void blankFencedCode(char[] text) {
 			String s = new String(text);
@@ -730,7 +777,7 @@ public class HygieneValidator extends ValidatorBase {
 				}
 				char marker = (char) open[2];
 				int length = open[1];
-				int scan = lineEnd < s.length() ? lineEnd + 1 : s.length();
+				int scan = (lineEnd < s.length()) ? lineEnd + 1 : s.length();
 				int closeLineEnd = -1;
 				while (scan <= s.length()) {
 					int next = s.indexOf('\n', scan);
@@ -750,8 +797,8 @@ public class HygieneValidator extends ValidatorBase {
 					}
 					scan = next + 1;
 				}
-				int end = closeLineEnd >= 0 ? closeLineEnd : s.length();
-				blank(text, lineStart, end < s.length() ? end + 1 : end);
+				int end = (closeLineEnd >= 0) ? closeLineEnd : s.length();
+				blank(text, lineStart, (end < s.length()) ? end + 1 : end);
 				if (closeLineEnd < 0) {
 					return;
 				}
@@ -762,6 +809,9 @@ public class HygieneValidator extends ValidatorBase {
 		/**
 		 * For a fence candidate line: {indent, runLength, markerChar}, or null when not a
 		 * fence.
+		 * @param line the candidate line
+		 * @return the indent, marker run and marker character for a run of three or more
+		 * backticks or tildes, else {@code null}
 		 */
 		private static int[] fenceRun(String line) {
 			int indent = 0;
@@ -803,7 +853,7 @@ public class HygieneValidator extends ValidatorBase {
 					return;
 				}
 				int end = s.indexOf("-->", start + 4);
-				int stop = end < 0 ? s.length() : end + 3;
+				int stop = (end < 0) ? s.length() : end + 3;
 				blank(text, start, stop);
 				pos = stop;
 			}
@@ -824,14 +874,18 @@ public class HygieneValidator extends ValidatorBase {
 						break;
 					}
 					int gt = lower.indexOf('>', end);
-					blank(text, start, gt < 0 ? text.length : gt + 1);
-					pos = gt < 0 ? text.length : gt + 1;
+					blank(text, start, (gt < 0) ? text.length : gt + 1);
+					pos = (gt < 0) ? text.length : gt + 1;
 				}
 			}
 		}
 
 		/**
 		 * Match {@code prefix} only when followed by a tag-name delimiter (or line end).
+		 * @param haystack the lowercased document to search
+		 * @param prefix the tag opening to look for, e.g. {@code <script}
+		 * @param from index to resume searching from
+		 * @return the index of the match, or -1 when no occurrence is delimited
 		 */
 		private static int indexOfTag(String haystack, String prefix, int from) {
 			int pos = from;
@@ -1042,9 +1096,9 @@ public class HygieneValidator extends ValidatorBase {
 			while (m.find()) {
 				sb.append(out, last, m.start());
 				String num = m.group(1);
-				int cp = num.charAt(0) == 'x' || num.charAt(0) == 'X' ? Integer.parseUnsignedInt(num.substring(1), 16)
+				int cp = (num.charAt(0) == 'x' || num.charAt(0) == 'X') ? Integer.parseUnsignedInt(num.substring(1), 16)
 						: Integer.parseUnsignedInt(num);
-				sb.append(cp > 0 && cp <= 0x10FFFF ? new String(Character.toChars(cp)) : m.group());
+				sb.append((cp > 0 && cp <= 0x10FFFF) ? new String(Character.toChars(cp)) : m.group());
 				last = m.end();
 			}
 			sb.append(out.substring(last));

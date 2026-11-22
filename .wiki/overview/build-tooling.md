@@ -12,7 +12,8 @@ source_paths:
   - "checkstyle-header.txt"
   - "checkstyle-suppressions.xml"
   - "docker/docker-compose-infra.yml"
-updated_at: "2026-11-15"
+  - ".github/workflows/offline-verification.yml"
+updated_at: "2026-11-22"
 ---
 
 # Build and contribution tooling
@@ -27,14 +28,21 @@ with the same Maven version.
 
 | Target | What it runs |
 | --- | --- |
-| `build` | `mvn -q compile -DskipTests` |
-| `test` | `mvn test`, **after sourcing the model-endpoint env** |
-| `test-module` | `mvn test -pl $(MODULE) -am` |
-| `lint` / `checkstyle` | `mvn checkstyle:check` (both are aliases) |
-| `checkstyle-module` | `mvn checkstyle:check -pl $(MODULE)` |
-| `module` | `mvn $(GOAL) -pl $(MODULE) -am -DskipTests` |
-| `install` / `clean` | `mvn install -DskipTests` / `mvn clean` |
+| `build` | `$(MVN) $(POC_FLAG) -q compile -DskipTests` |
+| `test` | `$(MVN) $(POC_FLAG) test`, **after sourcing the model-endpoint env** |
+| `test-live` | `$(MVN) $(POC_FLAG) test -Dtest.excludedGroups= -Dgroups=live` — the only opt-in to the `@Tag("live")` group; both flags are needed |
+| `test-module` | `$(MVN) $(POC_FLAG) test -pl $(MODULE) -am` |
+| `lint` / `checkstyle` | `$(MVN) $(POC_FLAG) checkstyle:check` (both are aliases) |
+| `checkstyle-module` | `$(MVN) $(POC_FLAG) checkstyle:check -pl $(MODULE)` |
+| `module` | `$(MVN) $(POC_FLAG) $(GOAL) -pl $(MODULE) -am -DskipTests` |
+| `run-a2a` | `$(MVN) -q -pl prod/embabel-smith-runtime-a2a spring-boot:run` — **the only target that opens a port** (18090, unauthenticated; see [[a2a-endpoint]]), and the only one that omits `$(POC_FLAG)` |
+| `install` / `clean` | `$(MVN) $(POC_FLAG) install -DskipTests` / `$(MVN) $(POC_FLAG) clean` |
 | `setup` | `./setup.sh` |
+
+`$(POC_FLAG)` is what makes the POC reactor reachable from a target instead of by accident: it expands
+to `-Ppoc` when you set `POC=1`, and also when `MODULE` names a `poc/...` path, so
+`make test-module MODULE=poc/poc-1-no-code-runtime` needs no extra flag (`Makefile:12`). With neither,
+the POCs are simply not in the run.
 
 `make help` lists them from the `## ` comments.
 
@@ -45,11 +53,33 @@ running and silently skipping — which is exactly what happens when you launch 
 inherit the shell environment. `make test` and `make test-module MODULE=poc/poc-1-no-code-runtime` are
 the reliable paths.
 
+## CI runs the same three targets
+
+`.github/workflows/offline-verification.yml` fires on a push to `main` and on every pull request. Its
+first step is a pin check rather than a build: it extracts `<java.version>` from `pom.xml` and fails
+unless it equals the workflow's `JAVA_VERSION` (`21`, matching `pom.xml:25`), so a Java bump that
+forgot the workflow fails visibly instead of building against a different JDK. Then
+`actions/setup-java` (temurin, with the Maven cache) and three steps — `make build`, `make test`,
+`make lint`. Nothing else: the workflow deliberately calls the Makefile so a red run reproduces with
+the command a developer runs.
+
+The workflow header states what a green run does **not** cover, and the claims are checkable: the
+**default reactor only** (`poc/` sits behind the `poc` profile and is not built); **no model endpoint
+and no secrets** — on a runner the env file `make test` sources does not exist, so nothing is
+exported, and the live group stays excluded through the root POM's `test.excludedGroups` default
+regardless; the `@Tag("live")` tests therefore do not run, and green says nothing about the paths only
+they exercise; **nothing is published or deployed**; and **no coverage threshold** is enforced. See
+[[getting-started]] for the offline/endpoint-gated split this encodes.
+
 ## Pre-commit hooks are opt-in per clone
 
 `make setup` runs `setup.sh`, which: installs `pre-commit` (pipx, else `pip3 install --user`, else it
 fails rather than half-installing), runs `pre-commit install`, installs the project skills from
-`skills-lock.json` via `npx skills update`, and installs the OpenSpec CLI if `openspec` is missing.
+`skills-lock.json` via `npx skills update`, installs the OpenSpec CLI if `openspec` is missing, and
+finally curls three rule files — `typescript-best-practices`, `python-conventions`,
+`jinja-llm-prompts` — out of `iromu/awesome-qwen` into `.qwen/rules/` (`setup.sh:55-63`). That last
+step is a plain `curl -fsSL` under `set -euo pipefail`: with no network it is the failure that ends an
+otherwise completed run.
 
 `.pre-commit-config.yaml` runs four things: **gitleaks** (secret scanning), `end-of-file-fixer`,
 `trailing-whitespace`, and a local hook `make-lint` that shells out to `make lint`.
@@ -62,12 +92,19 @@ install fails because `core.hooksPath` is set, it unsets it and retries.)
 
 The checkstyle plugin is bound to Maven's **`validate` phase** and `<inherited>true</inherited>`, so
 **every module build runs it** — a style violation fails the build before compilation
-(`pom.xml:343-374`). Two details that trip people up:
+(`pom.xml:380-412`). Two details that trip people up:
 
 - `includeTestSourceDirectory` is **false** — tests are not style-checked, main sources are.
 - The plugin is configured at plugin level, not just in an execution, specifically so the bare
   `mvn checkstyle:check` CLI goal uses the project config instead of the plugin's `sun_checks.xml`
   default.
+
+A sibling binding in the same block is easy to miss: `spring-javaformat-maven-plugin` is bound to
+**`process-sources`** with the **`apply`** goal (`pom.xml:367-379`). Any invocation that walks the
+lifecycle — `make build`, `make test`, `make install` — therefore **rewrites source formatting in
+place** before compiling, without reporting that it did. The check alone does not: `make lint` is a
+direct `checkstyle:check` goal, which runs no lifecycle phase and so only reports. A file that passes
+`make lint` can still come back from `make build` with different whitespace.
 
 `checkstyle.xml` delegates to Spring's `SpringChecks` (from `spring-javaformat-checkstyle`, Checkstyle
 12.3.1) with `headerFile=checkstyle-header.txt` and a copyright pattern of `20\d\d`. So every main

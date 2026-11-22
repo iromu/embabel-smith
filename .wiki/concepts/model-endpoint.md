@@ -6,17 +6,21 @@ language: "default"
 source_paths:
   - "smith-common/src/main/java/com/embabel/smith/common/config/ModelEndpointConfig.java"
   - "prod/embabel-smith-studio/src/main/java/com/embabel/smith/studio/rest/StatusController.java"
+  - "prod/embabel-smith-studio/src/main/java/com/embabel/smith/studio/config/StudioConfiguration.java"
+  - "docs/04-poc-run-results.md"
   - "poc/poc-1-no-code-runtime/src/main/resources/application.yml"
   - "poc/poc-1-no-code-runtime/src/main/java/com/embabel/smith/runtime/NoCodeRuntime.java"
-updated_at: "2026-11-15"
+updated_at: "2026-11-22"
 ---
 
 # Model endpoint and endpoint-gating
 
-No model endpoint is hardcoded anywhere. Every POC is pointed at an **OpenAI-compatible** endpoint
-(LiteLLM / OpenAI / Ollama) at run time via environment variables (design D4). This is what lets
-the project be scaffolded and built before any endpoint is fixed, and run against different
-backends without code changes.
+No model endpoint is hardcoded anywhere. A run is pointed at a model at run time via environment
+variables (design D4), and which backend it talks to is **detected** from the environment rather than
+configured. Three providers are supported, in first-match order: `openai-custom` (any OpenAI-compatible
+endpoint — LiteLLM, OpenRouter, Ollama), `openai`, and `anthropic`; `provider()` reports which one won,
+and `NONE` means nothing in the environment named one. This is what lets the project be scaffolded and
+built before any endpoint is fixed, and run against different backends without code changes.
 
 ## The four variables
 
@@ -31,12 +35,20 @@ These feed Embabel's `openai.custom` config, declared in each POC's `application
 `${OPENAI_CUSTOM_BASE_URL:}` etc. (the `:` means "empty default"). See
 `poc/poc-1-no-code-runtime/src/main/resources/application.yml`.
 
+The other two providers need no base URL and no model list: `OPENAI_API_KEY` or `ANTHROPIC_API_KEY`
+registers Embabel's bundled catalog for that vendor, and the model is then chosen with
+`EMBABEL_MODELS_DEFAULT_LLM` alone. `ModelEndpointConfig.detect(...)` takes the five values in that
+precedence order — anything set among the three `OPENAI_CUSTOM_*` variables wins, then `OPENAI_API_KEY`,
+then `ANTHROPIC_API_KEY` — so a machine holding more than one key uses the first of them.
+
 ## The "clear configuration error" contract
 
 `ModelEndpointConfig` (in `smith-common`) is shared by all POC launchers so the behaviour is
-consistent. `isConfigured()` requires all three of `baseUrl`, `apiKey`, and `models` to be
-non-blank. `configError()` returns `null` when fully configured, otherwise a **clear message
-naming the missing variables** — not an opaque model error.
+consistent. `isConfigured()` is `configError() == null`, and what it demands is **provider-relative**:
+each `Provider` carries its own `requiredEnvVars()`, so `openai-custom` needs `baseUrl` + `apiKey` +
+`models`, while `openai` and `anthropic` need their single key plus `EMBABEL_MODELS_DEFAULT_LLM`. When
+nothing at all is set, the message names all three routes rather than guessing one; otherwise it names
+the missing variables of the provider that won — a **clear message**, not an opaque model error.
 
 Every launcher checks this in `run()` before doing anything else:
 
@@ -61,6 +73,14 @@ selects (`EMBABEL_MODELS_DEFAULT_LLM` and the provider roles), which is also wha
 choices possible at all. The deleted raw callers used to do `models.split(",")[0]` themselves. See
 [[model-calls-go-through-ai]].
 
+The one place `prod/` does look at *which* provider won is `config/StudioConfiguration.java`, which
+builds the bean with `ModelEndpointConfig.detect(...)`, and `rest/ModelsController.java`, which behaves
+differently for `OPENAI_CUSTOM` (the model list comes from the endpoint's own variables) than for the
+catalog providers (it comes from Embabel's bundled catalog). Each `prod/` module's `application.yml`
+binds `OPENAI_API_KEY` and `ANTHROPIC_API_KEY` to a placeholder default (`sk-smith-no-endpoint`) —
+Embabel's provider starters refuse to boot without a key at all, so the placeholder is what lets a
+module start and fail at the gate instead of failing at context startup.
+
 The POC launchers are different: several of them still build their own OpenAI-compatible HTTP caller,
 because that raw arm is what some POCs are measuring (POC 24, POC 25). That is deliberate — the guard
 tests are `prod/`-only.
@@ -76,6 +96,8 @@ This is the project's central split:
   builder's `compileFromDescription`, the runtime's goal run, the NL-compile, the eval invocation,
   and the full build→run loop.
 
-The code is scaffolded and the offline halves are tested; the endpoint-gated halves are marked
-**(needs live endpoint)** in `openspec/changes/embabel-agent-builder/tasks.md` and are reported as
-gated, not assumed. See [[what-is-embabel-smith]] and [[getting-started]].
+The code is scaffolded and the offline halves are tested; the endpoint-gated halves are marked rather
+than assumed. In `prod/` the marker is the JUnit `live` tag — excluded by the build's default
+`test.excludedGroups`, selected only by `make test-live` — and in the POCs it is the launcher's endpoint
+check, which fails the run fast when the variables are missing. Which of them were actually run is
+recorded in `docs/04-poc-run-results.md`. See [[what-is-embabel-smith]] and [[getting-started]].

@@ -1,0 +1,11 @@
+name: StageShortlist
+description: "Which stages of the process warrant a skill, and which were left as plain prompting"
+ownProperties:
+  - name: chosen
+    type: string
+    description: "The stages that warrant a skill, one per line, each with the reason it qualifies"
+  - name: excluded
+    type: string
+    description: "The stages that do not, one per line, each with the reason it was left out"
+parents: []
+creationPermitted: true

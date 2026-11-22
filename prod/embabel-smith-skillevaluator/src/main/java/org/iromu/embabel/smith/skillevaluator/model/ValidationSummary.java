@@ -8,7 +8,11 @@ package org.iromu.embabel.smith.skillevaluator.model;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/** Summary statistics for a validation run. */
+/**
+ * Summary statistics for a validation run.
+ *
+ * @author Ivan Rodriguez
+ */
 public final class ValidationSummary {
 
 	private int filesScanned;
@@ -30,16 +34,17 @@ public final class ValidationSummary {
 	/**
 	 * Increment the per-severity counter for a finding. INFO is a no-op, matching
 	 * upstream.
+	 * @param severity the finding's level; {@code null} and INFO change nothing
 	 */
 	public void tallySeverity(Severity severity) {
 		if (severity == null) {
 			return;
 		}
 		switch (severity) {
-			case CRITICAL -> criticalCount++;
-			case HIGH -> highCount++;
-			case MEDIUM -> mediumCount++;
-			case LOW -> lowCount++;
+			case CRITICAL -> this.criticalCount++;
+			case HIGH -> this.highCount++;
+			case MEDIUM -> this.mediumCount++;
+			case LOW -> this.lowCount++;
 			case INFO -> {
 			}
 		}
@@ -47,83 +52,83 @@ public final class ValidationSummary {
 
 	/** Zero the error/warning totals and per-severity counters. */
 	public void resetFindingCounts() {
-		errors = 0;
-		warnings = 0;
-		criticalCount = 0;
-		highCount = 0;
-		mediumCount = 0;
-		lowCount = 0;
+		this.errors = 0;
+		this.warnings = 0;
+		this.criticalCount = 0;
+		this.highCount = 0;
+		this.mediumCount = 0;
+		this.lowCount = 0;
 	}
 
 	public void addFrom(ValidationSummary other) {
-		filesScanned += other.filesScanned;
-		checksPerformed += other.checksPerformed;
-		errors += other.errors;
-		warnings += other.warnings;
-		criticalCount += other.criticalCount;
-		highCount += other.highCount;
-		mediumCount += other.mediumCount;
-		lowCount += other.lowCount;
+		this.filesScanned += other.filesScanned;
+		this.checksPerformed += other.checksPerformed;
+		this.errors += other.errors;
+		this.warnings += other.warnings;
+		this.criticalCount += other.criticalCount;
+		this.highCount += other.highCount;
+		this.mediumCount += other.mediumCount;
+		this.lowCount += other.lowCount;
 	}
 
 	public int getFilesScanned() {
-		return filesScanned;
+		return this.filesScanned;
 	}
 
 	public void setFilesScanned(int value) {
-		filesScanned = value;
+		this.filesScanned = value;
 	}
 
 	public int getChecksPerformed() {
-		return checksPerformed;
+		return this.checksPerformed;
 	}
 
 	public void setChecksPerformed(int value) {
-		checksPerformed = value;
+		this.checksPerformed = value;
 	}
 
 	public int getErrors() {
-		return errors;
+		return this.errors;
 	}
 
 	public void setErrors(int value) {
-		errors = value;
+		this.errors = value;
 	}
 
 	public int getWarnings() {
-		return warnings;
+		return this.warnings;
 	}
 
 	public void setWarnings(int value) {
-		warnings = value;
+		this.warnings = value;
 	}
 
 	public int getCriticalCount() {
-		return criticalCount;
+		return this.criticalCount;
 	}
 
 	public int getHighCount() {
-		return highCount;
+		return this.highCount;
 	}
 
 	public int getMediumCount() {
-		return mediumCount;
+		return this.mediumCount;
 	}
 
 	public int getLowCount() {
-		return lowCount;
+		return this.lowCount;
 	}
 
 	public Map<String, Object> toMap() {
 		Map<String, Object> map = new LinkedHashMap<>();
-		map.put("files_scanned", filesScanned);
-		map.put("checks_performed", checksPerformed);
-		map.put("errors", errors);
-		map.put("warnings", warnings);
-		map.put("critical_count", criticalCount);
-		map.put("high_count", highCount);
-		map.put("medium_count", mediumCount);
-		map.put("low_count", lowCount);
+		map.put("files_scanned", this.filesScanned);
+		map.put("checks_performed", this.checksPerformed);
+		map.put("errors", this.errors);
+		map.put("warnings", this.warnings);
+		map.put("critical_count", this.criticalCount);
+		map.put("high_count", this.highCount);
+		map.put("medium_count", this.mediumCount);
+		map.put("low_count", this.lowCount);
 		return map;
 	}
 

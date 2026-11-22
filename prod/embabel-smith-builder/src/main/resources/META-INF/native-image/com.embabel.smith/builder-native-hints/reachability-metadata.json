@@ -1,0 +1,35 @@
+{
+  "comment": "Reachability gaps the Spring AOT pass cannot see, for the `smith` native binary. Embabel binds @ConfigurationProperties Kotlin data classes through kotlin-reflect (invisible to static analysis) and loads model catalogs and prompt templates as classpath resources by name. Add an entry here when the image reports a MissingReflectionRegistrationError or a resource that resolves on the JVM but not in the binary. Two entries are here for gaps the tracing agent cannot rediscover either. ToolGroupMetadata$Companion: ValidationToolGroup locates its factory by signature over getMethods(), and the factory's JVM name contains a hyphen, so no source line names it -- without this the scan comes back empty and validateToolGroup fails at context startup with 'No 5-arg ToolGroupMetadata factory found'. BuildCommand$FlowConverter: picocli instantiates an option's converter reflectively, and the traced hints carry TargetConverter and TechniqueConverter only because the runs that generated them passed --target and --technique and never --flow.",
+  "reflection": [
+    {
+      "type": "com.embabel.agent.spi.support.LlmDataBindingProperties",
+      "allDeclaredConstructors": true,
+      "allDeclaredMethods": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.embabel.agent.core.ToolGroupMetadata$Companion",
+      "allDeclaredMethods": true
+    },
+    {
+      "type": "com.embabel.smith.builder.cli.BuildCommand$FlowConverter",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    }
+  ],
+  "resources": [
+    {
+      "glob": "models/*.yml"
+    },
+    {
+      "glob": "models/**/*.yml"
+    },
+    {
+      "glob": "prompts/*.jinja"
+    }
+  ]
+}

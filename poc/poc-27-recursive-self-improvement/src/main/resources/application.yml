@@ -1,0 +1,37 @@
+# This module's own configuration, and it exists because of the referee's dependency.
+#
+# embabel-smith-builder ships an application.yml at the root of its jar. Spring reads
+# classpath:/application.yml as a single resource — the first match on the classpath — so the
+# moment this module depends on the builder, the builder's file would silently become this POC's
+# configuration unless this module has one of its own. That file carries
+# spring.main.web-application-type: none plus placeholder provider keys.
+#
+# The shadowed dependency used to be the studio, whose file forced SERVLET and a default profile;
+# that is where the web-application-type line below comes from. The improvement engine moved to
+# the builder (change: builder-owns-improvement-loop), so nothing on this module's runtime
+# classpath asks for a servlet any more — the line stays because it is what every Spring launcher
+# module here states, not because it cancels anything.
+#
+# The provider keys below are load-bearing for a reason independent of which jar is shadowed: the
+# provider starters arrive from the builder's pom, and a launcher that boots Embabel's platform
+# instantiates every provider config on the classpath and none of them boots on a blank key. The
+# environment is not enough: the local endpoint is OpenAI-compatible, so the operator sets
+# OPENAI_CUSTOM_* and no ANTHROPIC_API_KEY at all, and AnthropicModelsConfig then throws on
+# construction. Same convention as the prod modules: every provider the environment does not
+# configure is fed an inert but well-formed key, so the app boots whatever is set and only the
+# endpoint the operator configured is reachable. The model endpoint itself stays env-driven.
+embabel:
+  agent:
+    platform:
+      models:
+        openai:
+          api-key: ${OPENAI_API_KEY:sk-smith-no-endpoint}
+          custom:
+            api-key: ${OPENAI_CUSTOM_API_KEY:sk-smith-no-endpoint}
+            base-url: ${OPENAI_CUSTOM_BASE_URL:http://127.0.0.1:9/v1}
+            models: ${OPENAI_CUSTOM_MODELS:smith-no-endpoint}
+        anthropic:
+          api-key: ${ANTHROPIC_API_KEY:sk-smith-no-endpoint}
+spring:
+  main:
+    web-application-type: none

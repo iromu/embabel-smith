@@ -9,6 +9,7 @@ import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.regex.Pattern;
+
 import org.iromu.embabel.smith.skillevaluator.model.Finding;
 import org.iromu.embabel.smith.skillevaluator.model.Severity;
 import org.iromu.embabel.smith.skillevaluator.model.ValidationResult;
@@ -16,10 +17,11 @@ import org.iromu.embabel.smith.skillevaluator.util.Frontmatter;
 
 /**
  * Semantic version validation for skills. Port of {@code validators/version.py}.
- *
  * <p>
  * The previous-version bound is supplied via the {@code previousVersion} constructor
  * argument or the {@value #PREVIOUS_VERSION_ENV} environment variable.
+ *
+ * @author Ivan Rodriguez
  */
 public class VersionValidator extends ValidatorBase {
 
@@ -40,20 +42,25 @@ public class VersionValidator extends ValidatorBase {
 	private final String previousVersion;
 
 	/**
+	 * Validate against an explicitly supplied previous-version bound.
 	 * @param previousVersion the bound to require a strict bump against; {@code null}
 	 * falls back to {@value #PREVIOUS_VERSION_ENV}
 	 */
 	public VersionValidator(String previousVersion) {
-		this.previousVersion = previousVersion != null ? previousVersion : System.getenv(PREVIOUS_VERSION_ENV);
+		this.previousVersion = (previousVersion != null) ? previousVersion : System.getenv(PREVIOUS_VERSION_ENV);
 	}
 
 	public VersionValidator() {
 		this(null);
 	}
 
-	/** The bound this validator will compare against, or {@code null} when unset. */
+	/**
+	 * The bound this validator will compare against, or {@code null} when unset.
+	 * @return the constructor's bound when one was given, else the environment variable's
+	 * value
+	 */
 	public String getPreviousVersion() {
-		return previousVersion;
+		return this.previousVersion;
 	}
 
 	@Override
@@ -84,6 +91,9 @@ public class VersionValidator extends ValidatorBase {
 	 * values like {@code "1.0"} or {@code 1} that would now produce HIGH findings.
 	 * Scoping extraction to {@code metadata.version} keeps the label itself optional and
 	 * avoids breaking those skills when the validator runs by default.
+	 * @param frontmatter the parsed frontmatter of one skill
+	 * @return the trimmed {@code metadata.version} label, empty when the skill carries
+	 * none or it renders as blank
 	 */
 	private static String extractVersion(Map<String, Object> frontmatter) {
 		Object metadata = frontmatter.get("metadata");
@@ -104,6 +114,9 @@ public class VersionValidator extends ValidatorBase {
 	 * Render a YAML scalar the way Python's {@code str()} would for the values a
 	 * frontmatter can carry. Numbers keep their plain form, so an unquoted {@code 1.0}
 	 * still stringifies without a patch component and fails strict semver.
+	 * @param value the scalar as the YAML parser constructed it
+	 * @return {@code True} or {@code False} for a boolean, plain decimal text for a
+	 * number, {@code String.valueOf} for anything else
 	 */
 	private static String pythonStr(Object value) {
 		if (value instanceof Boolean bool) {
@@ -121,7 +134,12 @@ public class VersionValidator extends ValidatorBase {
 		return String.valueOf(value);
 	}
 
-	/** Parse a prevalidated version without allowing conversion failures to escape. */
+	/**
+	 * Parse a prevalidated version without allowing conversion failures to escape.
+	 * @param version version text expected to hold three components
+	 * @return the {@code (major, minor, patch)} triple, or {@code null} when the text is
+	 * not three integers once stripped of surrounding whitespace
+	 */
 	private static int[] versionTuple(String version) {
 		String[] parts = version.split("\\.", -1);
 		if (parts.length != 3) {
@@ -131,7 +149,7 @@ public class VersionValidator extends ValidatorBase {
 			return new int[] { Integer.parseInt(parts[0].strip()), Integer.parseInt(parts[1].strip()),
 					Integer.parseInt(parts[2].strip()) };
 		}
-		catch (NumberFormatException e) {
+		catch (NumberFormatException ex) {
 			return null;
 		}
 	}
@@ -142,14 +160,17 @@ public class VersionValidator extends ValidatorBase {
 
 	/**
 	 * Validate the optional previous version bound.
+	 * @param current the skill's own version label, possibly empty
+	 * @param manifest file the findings are attributed to
+	 * @param result collects the findings raised against the bound
 	 * @return {@code true} when validation can continue
 	 */
 	private boolean validatePreviousVersion(String current, Path manifest, ValidationResult result) {
-		if (previousVersion == null || previousVersion.isEmpty()) {
+		if (this.previousVersion == null || this.previousVersion.isEmpty()) {
 			return true;
 		}
 
-		String previous = previousVersion.strip();
+		String previous = this.previousVersion.strip();
 		if (!matchesSemver(previous)) {
 			result.addFinding(new Finding("VERSION", Severity.HIGH, "previous_version_semver",
 					"Previous version '" + previous + "' is not strict semantic version x.y.z", manifest.toString(),
@@ -167,8 +188,8 @@ public class VersionValidator extends ValidatorBase {
 		int[] currentTuple = versionTuple(current);
 		int[] previousTuple = versionTuple(previous);
 		if (currentTuple == null || previousTuple == null) {
-			String checkName = currentTuple == null ? "version_semver" : "previous_version_semver";
-			String invalidValue = currentTuple == null ? current : previous;
+			String checkName = (currentTuple != null) ? "previous_version_semver" : "version_semver";
+			String invalidValue = (currentTuple != null) ? previous : current;
 			result.addFinding(new Finding("VERSION", Severity.HIGH, checkName,
 					"Version '" + invalidValue + "' could not be parsed as strict semantic version x.y.z",
 					manifest.toString(), null, null,
@@ -188,7 +209,13 @@ public class VersionValidator extends ValidatorBase {
 		return true;
 	}
 
-	/** Python tuple comparison: lexicographic over (major, minor, patch). */
+	/**
+	 * Python tuple comparison: lexicographic over (major, minor, patch).
+	 * @param left first tuple
+	 * @param right second tuple, of the same length
+	 * @return negative, zero or positive as {@code left} is below, equal to or above
+	 * {@code right}
+	 */
 	private static int compareTuples(int[] left, int[] right) {
 		for (int i = 0; i < left.length; i++) {
 			int cmp = Integer.compare(left[i], right[i]);
@@ -199,7 +226,12 @@ public class VersionValidator extends ValidatorBase {
 		return 0;
 	}
 
-	/** Validate one skill's optional {@code metadata.version} label. */
+	/**
+	 * Validate one skill's optional {@code metadata.version} label.
+	 * @param skillPath the skill file or directory to validate
+	 * @return the version findings for that skill, merged with any frontmatter parse
+	 * errors
+	 */
 	private ValidationResult validateSingleSkill(Path skillPath) {
 		ValidationResult result = new ValidationResult();
 		result.setValidatorName(getName());
@@ -223,7 +255,7 @@ public class VersionValidator extends ValidatorBase {
 				return result;
 			}
 			Map<String, Object> metadata = new LinkedHashMap<>();
-			metadata.put("previous_version", previousVersion);
+			metadata.put("previous_version", this.previousVersion);
 			result.addSuccess("version_optional",
 					"No semantic version label present; resource will use commit-hash history", metadata);
 			return result;
@@ -245,7 +277,7 @@ public class VersionValidator extends ValidatorBase {
 
 		Map<String, Object> metadata = new LinkedHashMap<>();
 		metadata.put("version", current);
-		metadata.put("previous_version", previousVersion);
+		metadata.put("previous_version", this.previousVersion);
 		result.addSuccess("version_semver", "Valid semantic version: " + current, metadata);
 		return result;
 	}

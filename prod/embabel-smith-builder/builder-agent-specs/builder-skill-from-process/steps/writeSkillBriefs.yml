@@ -1,0 +1,40 @@
+stepType: action
+name: writeSkillBriefs
+description: "Write the per-stage skill briefs as one JSON document; Java parses this text into the briefs it hands to the skill builder"
+inputTypeNames:
+  - ProcessDecomposition
+  - StageShortlist
+outputTypeName: SkillBriefs
+pre: []
+post: []
+cost: null
+value: null
+canRerun: null
+nullable: null
+toolGroups: []
+prompt: |
+  Write one skill brief per shortlisted stage of the process below. Stay faithful to the process:
+  do not invent stages, roles or rules that are not in it, and do not cover parts of the process
+  outside a brief's own stage.
+  Each brief has:
+  - stage: the stage it covers, named as the process names it.
+  - skillName: a short snake_case name for the skill.
+  - description: one to two sentences saying what the skill does AND when to use it, the triggering
+    context. Be specific, and include the key terms an agent would see in a task about this stage,
+    so the skill triggers on the right situations.
+  - body: markdown instructions that teach the procedure:
+    * the stage's workflow as a clear step sequence;
+    * the decision points and the rule for each branch (what to do when X);
+    * the escalation and exception rules (what escalates to whom, and when);
+    * a "## Gotchas" section listing the counter-intuitive rules and hard constraints;
+    * imperative instructions, and for the tricky rules explain WHY, not just WHAT.
+  Keep each body under 300 lines, and cover only the stage the brief names.
+  Output ONLY one JSON object: {"briefs": [{"stage": "...", "skillName": "...", "description": "...",
+  "body": "..."}]} with one entry per shortlisted stage. No markdown fences, no commentary before or
+  after.
+  Stages, in run order, with their owners: {{processDecomposition.stages}}
+  Artifacts handed between stages: {{processDecomposition.handoffs}}
+  Decision points and branch rules: {{processDecomposition.decisionRules}}
+  Escalations and hard constraints: {{processDecomposition.escalations}}
+  Stages that warrant a skill, with why: {{stageShortlist.chosen}}
+  Stages left out, with why: {{stageShortlist.excluded}}

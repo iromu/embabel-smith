@@ -9,8 +9,8 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.function.Supplier;
 
-import com.embabel.smith.runtime.trace.TraceRecord;
-import com.embabel.smith.runtime.trace.TraceStore;
+import com.embabel.smith.common.trace.TraceRecord;
+import com.embabel.smith.common.trace.TraceStore;
 import com.embabel.smith.studio.storage.entity.TraceEntity;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.type.CollectionType;

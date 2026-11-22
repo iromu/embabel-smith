@@ -1,0 +1,9 @@
+{
+  "id": "b27-t09",
+  "stage": "loop publish",
+  "prompt": "The improvement loop holds a candidate that passed every gate, and its source is a `git:` one. Pushing is left off, as it is by default. Does the loop publish that candidate?",
+  "require": ["no"],
+  "anyOf": ["refused", "temporary clone", "approval queue", "nothing is published"],
+  "forbid": ["yes"],
+  "check": "Deterministic, no model call: PASS when the answer says no and names what happens instead — a `git:` source with pushing off is refused rather than published, because the publisher would commit inside a temporary clone that its own `close()` deletes, so the candidate stays in the approval queue and the iteration records that it published nothing. A yes fails. The never-push rule the question hints at is the trap here rather than the answer: an answer that concludes it commits and simply skips the push describes exactly the outcome this setting exists to prevent, and what decides it — that a commit nobody can reach is not a publication — is not in the question."
+}

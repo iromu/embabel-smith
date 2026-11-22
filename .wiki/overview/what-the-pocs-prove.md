@@ -11,7 +11,8 @@ source_paths:
   - "poc/poc-24-generation-approaches/README.md"
   - "poc/poc-25-skill-generation/README.md"
   - "poc/poc-26-graaljs-skill-scripts/README.md"
-updated_at: "2026-11-14"
+  - "poc/poc-27-recursive-self-improvement/README.md"
+updated_at: "2026-11-22"
 ---
 
 # What the POCs prove (vs. the theory)
@@ -92,6 +93,7 @@ The POCs **prove the feasibility core** (the "70% already there") and confirm do
 | [[generation-approaches]] (24) | two ways to generate a multi-agent flow, measured on 3 blueprints: **single-shot 3/3 valid flat** vs the Embabel NL compiler's degenerate 1–5-step disconnected output; multi-agent single-shot reaches Aurora 8 agents / 7 shared types while the compiler is disconnected on **every** run | the compiler compiles each agent against only its own `StepSpecContext`, so cross-agent hand-off types never line up; single-shot can introduce cycles where parallel branches merge; **endpoint-gated**, and one README's "3/3 multi" claim has no committed artifact |
 | [[skill-generation]] (25) | a blueprint decomposes into a coherent **Agent Skill** set (Aurora 9, Sentinel 8, TradingAgents 16 roles), each a valid `SKILL.md` with its own eval suite; mean **+16.4%** with-skill lift over 27 measured skills, positive on 19, peaking at +75% on non-obvious domain rules | the portable unit here is a *description*, not an executable spec; decomposition is non-deterministic and the evals are model-drafted, so lifts are not comparable across runs until pinned; 6 of 33 skills were unscoreable (grader fragility); LLM-as-judge grading |
 | [[skill-scripts-graaljs]] (26) | Embabel's `SkillScriptExecutionEngine` SPI had no in-JVM JavaScript runner (default logs *"script execution is not yet supported"*, the shipped one spawns `node`) — one ~525-line GraalJS-on-a-plain-JDK engine makes a skill's `scripts/*.js` a callable agent tool, **14/14** ES2026 probes, script answering in 18 ms | interpreter-only is ~10× slower than Node on CPU-bound work (396 ms vs 38 ms); the 25 M-statement budget is a real ceiling; **hardened, not a security boundary** — untrusted scripts belong in the Docker/Podman engines |
+| POC 27 (recursive self-improvement) | a mutable/fixed boundary a self-referential loop can live inside — a checked-in artifact later classes cite and a launcher enforces, refusing a paid run on the artifact's *contents*, with the three scorer prompts held outside the editable packs by a boundary test; a frozen benchmark whose human-label arm caught the gate arm disagreeing with a human on **2 of 6** tasks; an inner loop that recurses for zero model calls; a spend ceiling declared from arithmetic before the first call; a distinctness guard that stops a candidate answering two different tasks with the same string; and an exclusion that drops a task the two arms disagree about from the deciding score, named by id so the smaller denominator stays visible | **verdict: not proven.** The inner loop's best variant was its own seed (every mutation scored worse; it converged by exhausting patience, so "recursive" decorates one round of hill-climbing), and the outer loop — the only half with measured headroom — never produced a single scored candidate: its candidates interpolated no `{{userInput…}}`, so all six eval tasks were one request. Unmeasured, not blocked. Nothing promoted into `prod/`. |
 
 ## Still open
 
@@ -116,10 +118,14 @@ product: `specsource`, the `smith run` runtime, the `smith build` builder, and t
 `studio` — all four shipped and archived, with the studio now a full web product
 ([[smith-studio-web]]) including Postgres storage ([[smith-studio-storage]]).
 
-**POCs 24–26 are the next wave, and they are open-ended by design.** They sit outside the C1–C18
+**POCs 24–27 are the next wave, and they are open-ended by design.** They sit outside the C1–C18
 claim set and probe what comes after the single-spec product: which generation mechanism actually
 produces a usable multi-agent flow ([[generation-approaches]]), whether the portable unit can be an
-Anthropic `SKILL.md` rather than a YAML spec ([[skill-generation]]), and whether a skill can carry
-executable JavaScript that runs inside the agent ([[skill-scripts-graaljs]]). Each feeds an
-unarchived OpenSpec change — `builder-process-target` and `builder-skill-target` — so these are
-directions under evaluation, not settled conclusions ([[product-phase]]).
+Anthropic `SKILL.md` rather than a YAML spec ([[skill-generation]]), whether a skill can carry
+executable JavaScript that runs inside the agent ([[skill-scripts-graaljs]]), and whether the builder
+can improve the process it builds with — POC 27's verdict on that last one is *not proven*. The
+changes that carried POCs 24 and 25 (`builder-process-target`, `builder-skill-target`) were archived
+and consolidated into `docs/`; the live OpenSpec work grown out of this wave is
+`builder-owns-improvement-loop`, `poc27-improves-builder-agentspecs` and
+`builder-executes-its-own-packs`, so these are directions still under evaluation, not settled
+conclusions ([[product-phase]]).

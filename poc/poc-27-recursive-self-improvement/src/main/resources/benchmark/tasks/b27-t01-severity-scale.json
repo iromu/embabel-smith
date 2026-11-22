@@ -1,0 +1,9 @@
+{
+  "id": "b27-t01",
+  "stage": "security scan",
+  "prompt": "The builder's static security scan reported a finding it rated `HIGH`. Can that rating block publication of the pack? Name the severities the scanner actually uses.",
+  "require": ["no"],
+  "anyOf": ["critical"],
+  "forbid": ["high severity", "severity high", "info, warning", "low, medium"],
+  "check": "Deterministic, no model call: PASS when the answer contains the word `no` and the word `critical`, and none of the forbidden phrases. The scanner's scale is INFO / WARN / CRITICAL and there is no HIGH, so an answer that treats HIGH as one of this scanner's levels is wrong however it is hedged. CRITICAL blocks publication; WARN forces review without blocking."
+}

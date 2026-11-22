@@ -1,0 +1,9 @@
+{
+  "id": "b27-t07",
+  "stage": "inspect",
+  "prompt": "The skill inspection reported a finding from its `pii` check at the highest severity that check can report. Does that finding stop the draft from being published?",
+  "require": ["no"],
+  "anyOf": ["advisory", "never blocks", "by check name", "not blocking"],
+  "forbid": ["yes"],
+  "check": "Deterministic, no model call: PASS when the answer says no and gives the reason — the `pii` check is advisory by check name rather than by severity, so nothing it reports can block, while the six checks that do block are `schema`, `version`, `quality`, `unicode`, `lint` and `license`. A yes fails. The question cannot be answered from its own wording: it supplies a severity as the axis to reason on, which is the wrong axis, and the rule that decides it — advisory by name, never by severity — is a project constant the question does not contain and a general prior cannot recover, since the likelier instinct is that a personal-data finding blocks whatever check raised it."
+}

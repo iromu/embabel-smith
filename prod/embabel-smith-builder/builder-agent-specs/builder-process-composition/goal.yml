@@ -1,0 +1,5 @@
+stepType: goal
+name: multiAgentProcessDrafted
+description: "A multi-agent process has been composed as JSON text, for Java to parse"
+outputTypeName: ProcessJson
+export: true

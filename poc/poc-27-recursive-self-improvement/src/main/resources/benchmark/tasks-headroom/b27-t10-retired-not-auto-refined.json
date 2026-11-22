@@ -1,0 +1,9 @@
+{
+  "id": "b27-t10",
+  "stage": "loop detect",
+  "prompt": "A pack's lifecycle state is `retired` and its traces from the last window are full of failures. Does the improvement loop queue that pack for automatic refinement?",
+  "require": ["no"],
+  "anyOf": ["excluded", "explicit rebuild", "revive", "by hand"],
+  "forbid": ["yes"],
+  "check": "Deterministic, no model call: PASS when the answer says no and gives the route back in — a retired pack is excluded from automatic refinement, and the documented way back is a human's explicit rebuild that republishes it. A yes fails. The question is built to pull the opposite answer: it offers failures as the evidence, and failures are what normally queues a pack, so the prior that a broken pack is the best candidate to improve has to be overridden by the project's rule that retirement is a decision a prompt rewrite cannot undo. The traces themselves say nothing about it — a run against a retired pack is blocked before it plans, so the line carries no executed step and no reason a detector could read the state from."
+}

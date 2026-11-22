@@ -1,0 +1,5 @@
+stepType: goal
+name: singleAgentSpecDrafted
+description: "A single-agent GOAP agent spec for the described process has been authored as JSON text, for Java to parse"
+outputTypeName: AgentSpecJson
+export: true

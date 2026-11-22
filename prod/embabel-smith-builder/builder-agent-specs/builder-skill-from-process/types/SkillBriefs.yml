@@ -1,0 +1,8 @@
+name: SkillBriefs
+description: "The per-stage skill briefs as JSON text, not as nested objects; Java parses this string into the briefs"
+ownProperties:
+  - name: json
+    type: string
+    description: "One JSON document with a briefs array: stage, skillName, description, body, as text"
+parents: []
+creationPermitted: true

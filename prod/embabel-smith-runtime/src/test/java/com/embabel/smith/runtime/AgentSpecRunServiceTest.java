@@ -6,6 +6,7 @@
 package com.embabel.smith.runtime;
 
 import com.embabel.agent.core.AgentPlatform;
+import com.embabel.smith.runtime.core.LifecycleSidecar;
 import com.embabel.smith.runtime.core.TrustTier;
 import com.embabel.smith.runtime.trace.JsonlTraceStore;
 import org.junit.jupiter.api.Test;
@@ -64,6 +65,28 @@ class AgentSpecRunServiceTest {
 			assertThat(record.success()).isFalse();
 			assertThat(record.pack()).isNull();
 			assertThat(record.steps()).isEmpty();
+		});
+	}
+
+	@Test
+	void aLifecycleBlockIsAFailedRunThatStillEmitsATraceRecord(@TempDir Path tmp) throws Exception {
+		JsonlTraceStore store = new JsonlTraceStore(tmp.resolve("traces/runs.jsonl"));
+		AgentSpecRunService service = new AgentSpecRunService(platform, store.file());
+		Path library = TestPacks.library(tmp, "extract", "explain");
+		Files.writeString(library.resolve("explain").resolve(LifecycleSidecar.FILE_NAME), "state: RETIRED\n");
+
+		AgentSpecRunService.RunResult result = service.run("folder:" + library, "explainDone", "input", null,
+				TrustTier.STANDARD);
+
+		assertThat(result.success()).isFalse();
+		assertThat(result.error()).startsWith("Run blocked by lifecycle state").contains("explain");
+		// The never-executed-run shape is unchanged: no steps, no pack, the reason in
+		// error.
+		assertThat(store.read().records()).satisfiesExactly(record -> {
+			assertThat(record.success()).isFalse();
+			assertThat(record.pack()).isNull();
+			assertThat(record.steps()).isEmpty();
+			assertThat(record.error()).startsWith("Run blocked by lifecycle state");
 		});
 	}
 

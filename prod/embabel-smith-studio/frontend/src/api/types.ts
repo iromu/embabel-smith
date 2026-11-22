@@ -362,6 +362,77 @@ export interface TrustResponse {
   declaredToolGroups: string[]
 }
 
+// ---- Retrieve (offline) ----------------------------------------------------
+export interface RetrieveRequest {
+  source: string
+  query: string
+  /** How many hits to return; omitted means the backend's default. */
+  k?: number | null
+}
+export interface RetrieveResult {
+  name: string
+  description: string
+  /** The curated score — below the scorer's own when the pack is degraded. */
+  score: number
+  outputType: string | null
+  /** The pack's recorded lifecycle state, or "UNKNOWN" when it has no lifecycle sidecar. */
+  lifecycleState: string
+}
+export interface RetrieveResponse {
+  error: string | null
+  /** The active scorer's name, so the pane can show which one ranked the hits. */
+  scorer: string | null
+  results: RetrieveResult[]
+}
+
+// ---- Remote bridges --------------------------------------------------------
+/** One action a sidecar advertised, named as the sidecar named it. */
+export interface ActionInfo {
+  name: string
+  description: string
+  /** What the action declares it consumes, so an unrunnable one explains what it wants. */
+  inputTypeNames: string[]
+  /** False when the action needs anything other than one `UserInput` — this pane has one text box. */
+  runnable: boolean
+}
+export interface BridgeInfo {
+  name: string
+  baseUrl: string
+  /** The catalog URL that was actually contacted. */
+  urlProbed: string
+  reachable: boolean
+  /** The failure, only when unreachable. */
+  reason: string | null
+  actions: ActionInfo[]
+}
+export interface BridgesResponse {
+  bridges: BridgeInfo[]
+  /** Configured entries that were not `name@url`; reported rather than guessed. */
+  malformedBridges: string[]
+  /** Reported only — the product is not an MCP client, so it never probes or invokes this. */
+  mcpEndpoint: string | null
+}
+export interface RemoteExecuteRequest {
+  bridge: string
+  action: string
+  input: string
+}
+export interface RemoteExecuteResponse {
+  /** Why the product refused to try; `urlProbed` is null beside it, proving nothing was contacted. */
+  error: string | null
+  bridge: string | null
+  action: string | null
+  urlProbed: string | null
+  /** The content the sidecar returned, null unless it ran the action. */
+  output: string | null
+  /** Why no process answered, null when one did. */
+  reason: string | null
+  /** The sidecar's own status when it declined. */
+  status: number | null
+  /** The sidecar's untouched body when it declined. */
+  sidecarBody: string | null
+}
+
 /**
  * True when a response is the structured "no model endpoint configured" error — the endpoint-gated
  * panes (Run, Build, Eval) render a dedicated banner for it rather than a generic failure.

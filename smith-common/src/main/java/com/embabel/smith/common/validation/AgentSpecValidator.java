@@ -39,6 +39,9 @@ import com.embabel.smith.common.model.GoalStepSpec;
  * action prompt is bound by one of that action's declared input types.</li>
  * <li><b>Type references resolve</b> — every input/output type name used by the goal or
  * any step is either framework-provided or declared in {@code types/}.</li>
+ * <li><b>Declared inputs reach the model</b> — an action that declares input types must
+ * interpolate at least one of them in its prompt, because a prompt is rendered as a
+ * literal template and a variable it never names is never sent.</li>
  * </ol>
  *
  * @author Ivan Rodriguez
@@ -109,6 +112,7 @@ public class AgentSpecValidator {
 		for (ActionStepSpec step : pack.steps()) {
 			checkTypeReferences(step, declaredTypes, issues);
 			checkPromptReferences(step, pack, issues);
+			checkDeclaredInputsReachPrompt(step, issues);
 		}
 		if (pack.goal() != null) {
 			checkGoalTypeReference(pack.goal(), declaredTypes, issues);
@@ -246,6 +250,37 @@ public class AgentSpecValidator {
 				}
 			}
 		}
+	}
+
+	/**
+	 * Rejects a step that cannot see its own input. A prompt is rendered as a literal
+	 * template, so an input type whose variable the prompt never names is only a
+	 * blackboard binding — it is never sent to the model, and the step answers every
+	 * distinct request with the same call. The check fires only when <em>none</em> of the
+	 * declared inputs is named, so a step that ignores one of several inputs, or declares
+	 * none at all, still validates.
+	 * @param step the step to inspect
+	 * @param issues the issues to add to when the step's prompt names none of its inputs
+	 */
+	private void checkDeclaredInputsReachPrompt(ActionStepSpec step, List<ValidationIssue> issues) {
+		if (step.inputTypeNames().isEmpty() || step.prompt() == null || step.prompt().isBlank()) {
+			// A step with no prompt is already reported by checkPromptReferences.
+			return;
+		}
+		Set<String> namedVars = new HashSet<>();
+		Matcher matcher = PROMPT_REF.matcher(step.prompt());
+		while (matcher.find()) {
+			namedVars.add(matcher.group(1));
+		}
+		for (String input : step.inputTypeNames()) {
+			if (namedVars.contains(decapitalize(shortName(input)))) {
+				return;
+			}
+		}
+		issues.add(ValidationIssue.of("PROMPT_IGNORES_DECLARED_INPUT",
+				"action '" + step.name() + "' declares input type(s) " + step.inputTypeNames()
+						+ " but its prompt interpolates none of them, so the input never reaches the model",
+				"steps/" + step.name() + ".yml"));
 	}
 
 	// --- helpers --------------------------------------------------------------

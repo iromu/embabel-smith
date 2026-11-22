@@ -1,0 +1,25 @@
+stepType: action
+name: declareIntermediateTypes
+description: "Name every intermediate type the step list produces, each with a one-line description"
+inputTypeNames:
+  - ProcessScope
+  - StagePlan
+outputTypeName: TypeCatalog
+pre: []
+post: []
+cost: null
+value: null
+canRerun: null
+nullable: null
+toolGroups: []
+prompt: |
+  List every intermediate type this agent spec needs.
+  - Include every artifact produced by a step that is not the operator's request, plus the final
+    deliverable type named below.
+  - Use PascalCase type names. One type per artifact: do not invent duplicate names for the same
+    artifact, and do not reuse one name for two different artifacts.
+  - Give each type a one-line description of what this data is, in business terms.
+  On one line per type: the PascalCase name, a colon, the one-line description.
+  Process being modelled: {{processScope.primaryProcess}}
+  Final deliverable type: {{processScope.finalDeliverable}}
+  Steps and the artifacts they produce and consume: {{stagePlan.steps}}

@@ -5,9 +5,9 @@
 
 package com.embabel.smith.studio.storage;
 
+import com.embabel.smith.common.trace.TraceRecord;
+import com.embabel.smith.common.trace.TraceStore;
 import com.embabel.smith.runtime.trace.JsonlTraceStore;
-import com.embabel.smith.runtime.trace.TraceRecord;
-import com.embabel.smith.runtime.trace.TraceStore;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;

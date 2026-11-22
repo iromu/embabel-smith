@@ -15,6 +15,7 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
+
 import org.iromu.embabel.smith.skillevaluator.model.Finding;
 import org.iromu.embabel.smith.skillevaluator.model.Severity;
 import org.iromu.embabel.smith.skillevaluator.model.ValidationResult;
@@ -23,11 +24,9 @@ import org.iromu.embabel.smith.skillevaluator.util.Constants;
 /**
  * Advisory lint for a skill's {@code scripts/} and {@code tools/} directories, ported
  * from {@code validators/script_lint.py}.
- *
  * <p>
  * Every finding is advisory: MEDIUM/LOW severities are reported as warnings and never
  * fail validation, keeping lint separate from the quality scores.
- *
  * <h2>AST rules re-implemented as line/regex heuristics</h2> Upstream parses each script
  * with {@code ast} and walks the tree. This port may neither embed a Python parser nor
  * shell out to one, so the three tree-derived rules run over {@link PythonSyntax} instead
@@ -60,7 +59,6 @@ import org.iromu.embabel.smith.skillevaluator.util.Constants;
  * interpolated inside an f-string are missed, because the string body is stripped.
  * Complex literals such as {@code 3j} are missed.</li>
  * </ul>
- *
  * <p>
  * Upstream also skips a file silently when {@code ast.parse} raises {@code SyntaxError}.
  * The comparable verdict here comes from the tokenizer-level checks in
@@ -68,10 +66,11 @@ import org.iromu.embabel.smith.skillevaluator.util.Constants;
  * unbalanced brackets), so code that tokenizes cleanly but is grammatically invalid — a
  * {@code try} with no {@code except}, a missing colon — is linted rather than skipped,
  * and can produce findings upstream never reaches.
- *
  * <p>
  * The remaining checks — shebang, input validation, unreadable file, Node scripts not
  * linted — are text checks upstream and port 1:1.
+ *
+ * @author Ivan Rodriguez
  */
 public class ScriptLintValidator extends ValidatorBase {
 
@@ -144,7 +143,7 @@ public class ScriptLintValidator extends ValidatorBase {
 
 		if (pyFiles.isEmpty()) {
 			boolean anyExecutableDir = Constants.EXECUTABLE_SKILL_DIRS.stream()
-				.anyMatch(dirname -> Files.isDirectory(skillPath.resolve(dirname)));
+				.anyMatch((dirname) -> Files.isDirectory(skillPath.resolve(dirname)));
 			if (!anyExecutableDir) {
 				result.addSuccess("lint", "No scripts/ or tools/ directory found");
 			}
@@ -171,7 +170,11 @@ public class ScriptLintValidator extends ValidatorBase {
 		return result;
 	}
 
-	/** Run every lint check on one Python script. */
+	/**
+	 * Run every lint check on one Python script.
+	 * @param script the script file to lint
+	 * @param result the result findings are appended to
+	 */
 	void lintScript(Path script, ValidationResult result) {
 		String content;
 		try {
@@ -179,9 +182,9 @@ public class ScriptLintValidator extends ValidatorBase {
 			// stripping a BOM, so the byte-order mark stays in the text it parses.
 			content = Files.readString(script);
 		}
-		catch (IOException | RuntimeException e) {
+		catch (IOException | RuntimeException ex) {
 			result.addFinding(new Finding("SCRIPT_LINT", Severity.MEDIUM, "read_error",
-					"Cannot read file: " + (e.getMessage() == null ? e.toString() : e.getMessage()),
+					"Cannot read file: " + ((ex.getMessage() == null) ? ex.toString() : ex.getMessage()),
 					String.valueOf(script)));
 			return;
 		}
@@ -227,7 +230,11 @@ public class ScriptLintValidator extends ValidatorBase {
 		}
 	}
 
-	/** Port of {@code _count_functions}: {@code def} / {@code async def} statements. */
+	/**
+	 * Port of {@code _count_functions}: {@code def} / {@code async def} statements.
+	 * @param model the parsed script
+	 * @return how many function definitions the script declares
+	 */
 	static int countFunctions(PythonSyntax.Model model) {
 		int count = 0;
 		for (PythonSyntax.CodeLine line : model.lines) {
@@ -242,6 +249,8 @@ public class ScriptLintValidator extends ValidatorBase {
 	/**
 	 * Port of {@code _calculate_nesting_depth}: the deepest chain of control-flow
 	 * statements, derived from the indentation stack instead of the AST.
+	 * @param model the parsed script
+	 * @return the deepest nesting level reached by any control-flow statement
 	 */
 	static int nestingDepth(PythonSyntax.Model model) {
 		int maxDepth = 0;
@@ -281,7 +290,12 @@ public class ScriptLintValidator extends ValidatorBase {
 		return maxDepth;
 	}
 
-	/** Whether this line opens one of the counted control-flow blocks. */
+	/**
+	 * Whether this line opens one of the counted control-flow blocks.
+	 * @param line the code line to classify
+	 * @param first its first word
+	 * @return {@code true} when the line adds a nesting level
+	 */
 	private static boolean isControlOpener(PythonSyntax.CodeLine line, String first) {
 		if (NESTING_KEYWORDS.contains(first)) {
 			return true;
@@ -293,12 +307,21 @@ public class ScriptLintValidator extends ValidatorBase {
 		return isSibling(first);
 	}
 
-	/** Whether the keyword continues a sibling block rather than opening its own. */
+	/**
+	 * Whether the keyword continues a sibling block rather than opening its own.
+	 * @param first the line's first word
+	 * @return {@code true} for {@code else}, {@code except}, {@code finally} or
+	 * {@code elif}
+	 */
 	private static boolean isSibling(String first) {
 		return SIBLING_KEYWORDS.contains(first) || "elif".equals(first);
 	}
 
-	/** Port of {@code _has_magic_numbers}. */
+	/**
+	 * Port of {@code _has_magic_numbers}.
+	 * @param model the parsed script
+	 * @return {@code true} when a literal outside {@link #SAFE_CONSTANTS} appears
+	 */
 	static boolean hasMagicNumbers(PythonSyntax.Model model) {
 		for (PythonSyntax.CodeLine line : model.lines) {
 			Matcher matcher = NUMBER_LITERAL.matcher(line.code);
@@ -315,7 +338,11 @@ public class ScriptLintValidator extends ValidatorBase {
 		return false;
 	}
 
-	/** Parse an int/float literal the way Python's numeric constants compare. */
+	/**
+	 * Parse an int/float literal the way Python's numeric constants compare.
+	 * @param literal the matched numeric token, including any radix prefix or underscores
+	 * @return the value as a {@code double}, or {@code null} when it does not parse
+	 */
 	private static Double parseNumber(String literal) {
 		String text = literal.replace("_", "");
 		try {
@@ -331,18 +358,18 @@ public class ScriptLintValidator extends ValidatorBase {
 			}
 			return Double.valueOf(text);
 		}
-		catch (NumberFormatException e) {
+		catch (NumberFormatException ex) {
 			return null;
 		}
 	}
 
-	/** Port of {@code _has_input_validation}: substring probes on the raw content. */
+	/**
+	 * Port of {@code _has_input_validation}: substring probes on the raw content.
+	 * @param content the unprocessed script text
+	 * @return {@code true} when any input-validation idiom appears in the text
+	 */
 	static boolean hasInputValidation(String content) {
 		return INPUT_VALIDATION_PATTERNS.stream().anyMatch(content::contains);
-	}
-
-	/** One entry of the indentation stack used by {@link #nestingDepth}. */
-	private record Frame(int indent, int depth, boolean control) {
 	}
 
 	private ValidationResult newResult() {
@@ -354,6 +381,9 @@ public class ScriptLintValidator extends ValidatorBase {
 
 	/**
 	 * Files in {@code directory} whose name matches one of the {@code *.ext} patterns.
+	 * @param directory the directory to list
+	 * @param patterns the flat {@code *.ext} patterns to match
+	 * @return the matching entries sorted by path, or empty when the listing fails
 	 */
 	private static List<Path> glob(Path directory, List<String> patterns) {
 		List<Path> out = new ArrayList<>();
@@ -364,7 +394,7 @@ public class ScriptLintValidator extends ValidatorBase {
 				// dotfiles, and which yields directories too; reading one then raises and
 				// is reported as read_error. Neither entry is filtered out here to keep
 				// that.
-				if (patterns.stream().anyMatch(pattern -> matchesGlob(name, pattern))) {
+				if (patterns.stream().anyMatch((pattern) -> matchesGlob(name, pattern))) {
 					out.add(child);
 				}
 			}
@@ -379,12 +409,19 @@ public class ScriptLintValidator extends ValidatorBase {
 	/**
 	 * Supports the flat {@code *.ext} patterns in {@link Constants}; no recursive
 	 * {@code **}.
+	 * @param name the file name to test
+	 * @param pattern the glob pattern, matched like Python's {@code Path.glob}
+	 * @return {@code true} when {@code name} is matched by {@code pattern}
 	 */
 	private static boolean matchesGlob(String name, String pattern) {
 		if (!pattern.startsWith("*.")) {
 			return name.equals(pattern);
 		}
 		return name.length() > pattern.length() - 1 && name.endsWith(pattern.substring(1));
+	}
+
+	/** One entry of the indentation stack used by {@link #nestingDepth}. */
+	private record Frame(int indent, int depth, boolean control) {
 	}
 
 }

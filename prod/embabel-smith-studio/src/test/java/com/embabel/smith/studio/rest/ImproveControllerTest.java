@@ -5,10 +5,10 @@
 
 package com.embabel.smith.studio.rest;
 
+import com.embabel.smith.builder.improve.PendingCandidate;
 import com.embabel.smith.builder.lifecycle.LifecycleMetadata;
 import com.embabel.smith.builder.lifecycle.LifecycleState;
 import com.embabel.smith.common.model.AgentSpec;
-import com.embabel.smith.studio.improve.PendingCandidate;
 import com.embabel.smith.studio.loop.LoopService;
 import com.embabel.smith.studio.rest.dto.ApproveResponse;
 import com.embabel.smith.studio.rest.dto.AutoPublishRequest;

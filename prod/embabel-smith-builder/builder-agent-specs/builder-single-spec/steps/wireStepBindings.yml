@@ -1,0 +1,27 @@
+stepType: action
+name: wireStepBindings
+description: "Check the step list chains by type name and that the goal is reachable"
+inputTypeNames:
+  - StagePlan
+  - TypeCatalog
+outputTypeName: SpecBindings
+pre: []
+post: []
+cost: null
+value: null
+canRerun: null
+nullable: null
+toolGroups: []
+prompt: |
+  Wire the steps to each other by type name, and report the wiring.
+  - A step's output type must appear as the input type of a later step or of the goal.
+  - The first step or steps take the operator's request (the UserInput type) as their input.
+  - The goal's output type must be produced by at least one step, so the goal is reachable.
+  - Every input type used by any step must be produced by some step or be the operator's request.
+  Report on one line per step: the step name, the types it consumes, the type it produces. Then
+  report the goal's producer (which step produces the final deliverable type). Then report any
+  unresolved input, any type used but not declared, and any step that produces nothing any later
+  step or the goal consumes; write "none" if there are none.
+  Steps: {{stagePlan.steps}}
+  Declared types: {{typeCatalog.types}}
+  Final deliverable type: {{stagePlan.finalDeliverable}}

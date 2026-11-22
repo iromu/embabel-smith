@@ -7,6 +7,8 @@ import type { Component } from 'vue'
 
 import AutoImprovePane from '../panes/AutoImprovePane.vue'
 import ComposePane from '../panes/ComposePane.vue'
+import RetrievePane from '../panes/RetrievePane.vue'
+import RemotePane from '../panes/RemotePane.vue'
 import RunPane from '../panes/RunPane.vue'
 import SecurityPane from '../panes/SecurityPane.vue'
 import StoragePane from '../panes/StoragePane.vue'
@@ -33,6 +35,9 @@ vi.mock('../api/client', async (importOriginal) => {
     listModels: vi.fn(),
     run: vi.fn(),
     scan: vi.fn(),
+    retrieve: vi.fn(),
+    listBridges: vi.fn(),
+    executeRemote: vi.fn(),
     compose: vi.fn(),
     loopStatus: vi.fn(),
     listCandidates: vi.fn(),
@@ -49,6 +54,9 @@ const listGoals = api.listGoals as Mock
 const listModels = api.listModels as Mock
 const run = api.run as Mock
 const scan = api.scan as Mock
+const retrieve = api.retrieve as Mock
+const listBridges = api.listBridges as Mock
+const executeRemote = api.executeRemote as Mock
 const compose = api.compose as Mock
 const loopStatus = api.loopStatus as Mock
 const listCandidates = api.listCandidates as Mock
@@ -203,6 +211,308 @@ describe('SecurityPane', () => {
 
     expect(scan).toHaveBeenCalledWith({ source: 'folder:/s', spec: 'alpha' })
     expect(wrapper.find('[data-test="security-result"]').text()).toContain('SAFE')
+  })
+})
+
+describe('RetrievePane', () => {
+  it('ranks the curated hits, naming the scorer and each pack lifecycle state', async () => {
+    seedSources()
+    retrieve.mockResolvedValue({
+      error: null,
+      scorer: 'lexical',
+      results: [
+        {
+          name: 'alpha',
+          description: 'reconcile invoices',
+          score: 0.6,
+          outputType: 'Report',
+          lifecycleState: 'ACTIVE',
+        },
+        {
+          name: 'bravo',
+          description: 'reconcile invoices',
+          score: 0.3,
+          outputType: 'Report',
+          lifecycleState: 'DEGRADED',
+        },
+      ],
+    })
+    const wrapper = mountPane(RetrievePane)
+    await flushPromises()
+
+    await wrapper.find('[data-test="retrieve-query"]').setValue('reconcile invoices')
+    await wrapper.find('[data-test="retrieve-btn"]').trigger('click')
+    await flushPromises()
+
+    expect(retrieve).toHaveBeenCalledWith({ source: 'folder:/s', query: 'reconcile invoices' })
+    const table = wrapper.find('[data-test="retrieve-table"]')
+    expect(table.text()).toContain('alpha')
+    expect(table.text()).toContain('bravo')
+    // The de-ranked pack is shown with the state that halved it, so the user can see why
+    // it sank rather than guessing.
+    expect(table.text()).toContain('DEGRADED')
+    expect(wrapper.find('[data-test="retrieve-scorer"]').text()).toContain('lexical')
+  })
+
+  it('does not surface a retired pack the endpoint dropped', async () => {
+    // The source itself lists a retired pack, so if the pane ever rendered the pack list
+    // rather than the retrieval hits, the retired one would appear.
+    listSources.mockResolvedValue([{ uri: 'folder:/s', kind: 'folder' }])
+    listPacks.mockResolvedValue([
+      {
+        name: 'keeper',
+        contentHash: 'h',
+        lifecycleState: 'ACTIVE',
+        baselinePassRate: 0.9,
+        drift: false,
+        updatedAt: '2026-01-01T00:00:00Z',
+      },
+      {
+        name: 'retired-pack',
+        contentHash: 'h2',
+        lifecycleState: 'RETIRED',
+        baselinePassRate: 0.1,
+        drift: true,
+        updatedAt: '2026-01-01T00:00:00Z',
+      },
+    ])
+    // The endpoint applies the curation rules; the retired pack is not in what it returns.
+    retrieve.mockResolvedValue({
+      error: null,
+      scorer: 'lexical',
+      results: [
+        {
+          name: 'keeper',
+          description: 'summarise a thread',
+          score: 0.5,
+          outputType: 'Summary',
+          lifecycleState: 'ACTIVE',
+        },
+      ],
+    })
+    const wrapper = mountPane(RetrievePane)
+    await flushPromises()
+
+    await wrapper.find('[data-test="retrieve-query"]').setValue('summarise')
+    await wrapper.find('[data-test="retrieve-btn"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).not.toContain('retired-pack')
+    expect(wrapper.find('[data-test="retrieve-table"]').text()).toContain('keeper')
+    expect(wrapper.find('[data-test="retrieve-scorer"]').text()).toContain('1 match')
+  })
+
+  it('shows the no-match state when the source has nothing to rank', async () => {
+    seedSources()
+    retrieve.mockResolvedValue({ error: null, scorer: 'lexical', results: [] })
+    const wrapper = mountPane(RetrievePane)
+    await flushPromises()
+
+    await wrapper.find('[data-test="retrieve-query"]').setValue('teleport the moon')
+    await wrapper.find('[data-test="retrieve-btn"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="retrieve-none"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="retrieve-table"]').exists()).toBe(false)
+    // A search that came back empty must not leave a spinner running.
+    expect(wrapper.find('.q-spinner').exists()).toBe(false)
+    expect(wrapper.find('[data-test="retrieve-scorer"]').text()).toContain('0 match')
+  })
+
+  it('shows a source-resolution failure as a banner rather than a table', async () => {
+    seedSources()
+    retrieve.mockResolvedValue({
+      error: 'Retrieve failed: unsupported source scheme: nonsense',
+      scorer: null,
+      results: [],
+    })
+    const wrapper = mountPane(RetrievePane)
+    await flushPromises()
+
+    await wrapper.find('[data-test="retrieve-query"]').setValue('anything')
+    await wrapper.find('[data-test="retrieve-btn"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="retrieve-error"]').text()).toContain('unsupported source scheme')
+    expect(wrapper.find('[data-test="retrieve-results"]').exists()).toBe(false)
+  })
+})
+
+describe('RemotePane (sidecar bridges)', () => {
+  const digestBridge = {
+    name: 'digest',
+    baseUrl: 'http://127.0.0.1:18090',
+    urlProbed: 'http://127.0.0.1:18090/api/v1/actions',
+    reachable: true,
+    reason: null,
+    actions: [
+      {
+        name: 'remoteDigest',
+        description: 'Digest the input text on the sidecar',
+        inputTypeNames: ['com.embabel.agent.domain.io.UserInput'],
+        runnable: true,
+      },
+      {
+        name: 'compareBriefs',
+        description: 'Needs an input this pane has no field for',
+        inputTypeNames: ['com.embabel.agent.domain.io.UserInput', 'TopicBrief'],
+        runnable: false,
+      },
+    ],
+  }
+
+  it('shows a bridge that is not running as a state, naming the URL it probed, with nothing to start it', async () => {
+    listBridges.mockResolvedValue({
+      bridges: [
+        {
+          name: 'gone',
+          baseUrl: 'http://127.0.0.1:19999',
+          urlProbed: 'http://127.0.0.1:19999/api/v1/actions',
+          reachable: false,
+          reason: 'ConnectException',
+          actions: [],
+        },
+      ],
+      malformedBridges: [],
+      mcpEndpoint: null,
+    })
+    const wrapper = mountPane(RemotePane)
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="bridge-unreachable"]').exists()).toBe(true)
+    const reason = wrapper.find('[data-test="bridge-reason"]')
+    expect(reason.text()).toContain('ConnectException')
+    expect(reason.text()).toContain('http://127.0.0.1:19999/api/v1/actions')
+    // The pane reports a process it did not start; it must not offer to start one.
+    const labels = wrapper.findAllComponents({ name: 'QBtn' }).map((btn) => String(btn.props('label')).toLowerCase())
+    expect(labels.some((label) => label.includes('start'))).toBe(false)
+  })
+
+  it('labels the configured MCP endpoint as not invoked and shows no reachability for it', async () => {
+    listBridges.mockResolvedValue({
+      bridges: [digestBridge],
+      malformedBridges: [],
+      mcpEndpoint: 'http://127.0.0.1:8081/mcp',
+    })
+    const wrapper = mountPane(RemotePane)
+    await flushPromises()
+
+    const line = wrapper.find('[data-test="mcp-line"]')
+    expect(line.text()).toContain('http://127.0.0.1:8081/mcp')
+    expect(line.text()).toContain('not invoked')
+    // The bridge row above does carry a reachable badge; the MCP line must not borrow its signal.
+    expect(line.text()).not.toMatch(/reachab/i)
+    expect(wrapper.find('[data-test="bridge-reachable"]').exists()).toBe(true)
+  })
+
+  it('lists an action it cannot run with its declared inputs, and does not offer it in the picker', async () => {
+    listBridges.mockResolvedValue({ bridges: [digestBridge], malformedBridges: [], mcpEndpoint: null })
+    const wrapper = mountPane(RemotePane)
+    await flushPromises()
+
+    const rows = wrapper.findAll('[data-test="action-row"]')
+    expect(rows).toHaveLength(2)
+    expect(rows[1].text()).toContain('compareBriefs')
+    expect(rows[1].text()).toContain('TopicBrief')
+    expect(rows[1].find('[data-test="action-unrunnable"]').exists()).toBe(true)
+    expect(rows[0].find('[data-test="action-unrunnable"]').exists()).toBe(false)
+
+    await selectOption(wrapper, 'Bridge', 'digest')
+    const action = wrapper.findAllComponents({ name: 'QSelect' }).find((s) => s.props('label') === 'Action')
+    expect(action?.props('options')).toEqual(['remoteDigest'])
+  })
+
+  it('runs the advertised action and shows the output the sidecar produced', async () => {
+    listBridges.mockResolvedValue({ bridges: [digestBridge], malformedBridges: [], mcpEndpoint: null })
+    executeRemote.mockResolvedValue({
+      error: null,
+      bridge: 'digest',
+      action: 'remoteDigest',
+      urlProbed: 'http://127.0.0.1:18090/api/v1/actions/execute',
+      output: 'Digested on the sidecar: 2 words, 9 chars',
+      reason: null,
+      status: null,
+      sidecarBody: null,
+    })
+    const wrapper = mountPane(RemotePane)
+    await flushPromises()
+
+    await selectOption(wrapper, 'Bridge', 'digest')
+    await selectOption(wrapper, 'Action', 'remoteDigest')
+    await wrapper.find('[data-test="remote-input"]').setValue('two words')
+    await wrapper.find('[data-test="remote-run"]').trigger('click')
+    await flushPromises()
+
+    expect(executeRemote).toHaveBeenCalledWith({ bridge: 'digest', action: 'remoteDigest', input: 'two words' })
+    expect(wrapper.find('[data-test="remote-output"]').text()).toContain(
+      'Digested on the sidecar: 2 words, 9 chars',
+    )
+  })
+
+  it('says the bridge is not running when the execute call reports it unreachable', async () => {
+    listBridges.mockResolvedValue({ bridges: [digestBridge], malformedBridges: [], mcpEndpoint: null })
+    executeRemote.mockResolvedValue({
+      error: null,
+      bridge: 'digest',
+      action: 'remoteDigest',
+      urlProbed: 'http://127.0.0.1:18090/api/v1/actions/execute',
+      output: null,
+      reason: 'ConnectException',
+      status: null,
+      sidecarBody: null,
+    })
+    const wrapper = mountPane(RemotePane)
+    await flushPromises()
+
+    await selectOption(wrapper, 'Bridge', 'digest')
+    await selectOption(wrapper, 'Action', 'remoteDigest')
+    await wrapper.find('[data-test="remote-run"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="remote-unreachable"]').text()).toContain('ConnectException')
+    expect(wrapper.find('[data-test="remote-output"]').exists()).toBe(false)
+  })
+
+  it('shows the sidecar own refusal, status and body, instead of an empty output', async () => {
+    listBridges.mockResolvedValue({ bridges: [digestBridge], malformedBridges: [], mcpEndpoint: null })
+    executeRemote.mockResolvedValue({
+      error: null,
+      bridge: 'digest',
+      action: 'nope',
+      urlProbed: 'http://127.0.0.1:18090/api/v1/actions/execute',
+      output: null,
+      reason: null,
+      status: 400,
+      sidecarBody: '{"error":"unknown action: nope"}',
+    })
+    const wrapper = mountPane(RemotePane)
+    await flushPromises()
+
+    await selectOption(wrapper, 'Bridge', 'digest')
+    await selectOption(wrapper, 'Action', 'remoteDigest')
+    await wrapper.find('[data-test="remote-run"]').trigger('click')
+    await flushPromises()
+
+    // A refusal is the sidecar's answer, not ours: the status and its body are both shown.
+    const declined = wrapper.find('[data-test="remote-declined"]')
+    expect(declined.text()).toContain('400')
+    expect(declined.text()).toContain('unknown action: nope')
+    expect(wrapper.find('[data-test="remote-output"]').exists()).toBe(false)
+    // And it is not silently swallowed into the "nothing to show" state.
+    expect(wrapper.find('[data-test="remote-nothing"]').exists()).toBe(false)
+  })
+
+  it('shows a bridge the configuration could not express rather than dropping it', async () => {
+    listBridges.mockResolvedValue({
+      bridges: [],
+      malformedBridges: ['http://localhost:18090'],
+      mcpEndpoint: null,
+    })
+    const wrapper = mountPane(RemotePane)
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="malformed-entry"]').text()).toContain('http://localhost:18090')
+    expect(wrapper.find('[data-test="bridges-empty"]').exists()).toBe(false)
   })
 })
 

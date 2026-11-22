@@ -29,7 +29,10 @@ class RefinementLoopTest {
 	private static final String BACKGROUND_MESSAGE = SampleAgentSpecs.BACKGROUND_MESSAGE;
 
 	private static AgentSpec packWithPrompt(String prompt) {
-		ActionStepSpec say = ActionStepSpec.action("say", "Say it", List.of(USER_INPUT), BACKGROUND_MESSAGE, prompt);
+		// The step declares UserInput, so its prompt has to name it: a prompt that names
+		// no variable cannot reach the model, and the validator now rejects that.
+		ActionStepSpec say = ActionStepSpec.action("say", "Say it", List.of(USER_INPUT), BACKGROUND_MESSAGE,
+				"{{userInput.content}} " + prompt);
 		GoalStepSpec goal = GoalStepSpec.exportedGoal("done", "A single-step spec", BACKGROUND_MESSAGE);
 		return new AgentSpec(new AgentSpecManifest("test-spec", "1.0.0"), goal, List.of(say), List.of());
 	}
@@ -55,7 +58,7 @@ class RefinementLoopTest {
 
 		assertThat(outcome.passed()).isTrue();
 		assertThat(outcome.refinementCount()).isZero();
-		assertThat(outcome.pack().steps().get(0).prompt()).isEqualTo("do the thing");
+		assertThat(outcome.pack().steps().get(0).prompt()).isEqualTo("{{userInput.content}} do the thing");
 	}
 
 	@Test
@@ -67,7 +70,7 @@ class RefinementLoopTest {
 
 		assertThat(outcome.passed()).isTrue();
 		assertThat(outcome.refinementCount()).isEqualTo(1);
-		assertThat(outcome.pack().steps().get(0).prompt()).isEqualTo("fixed do the thing");
+		assertThat(outcome.pack().steps().get(0).prompt()).isEqualTo("{{userInput.content}} fixed do the thing");
 	}
 
 	@Test
@@ -82,6 +85,22 @@ class RefinementLoopTest {
 		assertThat(outcome.passed()).isFalse();
 		assertThat(outcome.refinementCount()).isEqualTo(2);
 		assertThat(outcome.score()).isZero();
+	}
+
+	@Test
+	void aRefinedPackKeepsTheVersionItWasGiven() {
+		// This refine is a prompt rewrite, not a release: it hands back the artifact it
+		// was
+		// given, version included. Bumping belongs to the studio's improvement loop, the
+		// only refinery that publishes (change: publish-keeps-versions, decision 2).
+		RefinementLoop loop = new RefinementLoop(markerInvoker(), markerRemover(),
+				List.of(new EvalTask("t", "in", "correct")), 1.0, 3);
+
+		RefinementOutcome outcome = loop.refine(packWithPrompt("FAIL_MARKER do the thing"));
+
+		assertThat(outcome.refinementCount()).isEqualTo(1);
+		assertThat(outcome.pack().name()).isEqualTo("test-spec");
+		assertThat(outcome.pack().version()).isEqualTo("1.0.0");
 	}
 
 	@Test

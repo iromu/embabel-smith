@@ -20,7 +20,11 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.stream.Stream;
 
-/** File-tree walking helpers shared by all Tier 1 validators. */
+/**
+ * File-tree walking helpers shared by all Tier 1 validators.
+ *
+ * @author Ivan Rodriguez
+ */
 public final class ScanPaths {
 
 	private ScanPaths() {
@@ -30,6 +34,9 @@ public final class ScanPaths {
 	 * Match an entry name against canonical names, exact spelling first and
 	 * case-insensitive second (the Python {@code matches_filesystem_name} alias rule,
 	 * simplified to casefold matching on the name alone).
+	 * @param path the file or directory whose basename is tested
+	 * @param canonicalNames names to match, exactly first and case-insensitively second
+	 * @return {@code true} when the basename matches a canonical name either way
 	 */
 	public static boolean matchesFilesystemName(Path path, Collection<String> canonicalNames) {
 		String name = path.getFileName().toString();
@@ -53,6 +60,13 @@ public final class ScanPaths {
 	 * the walk (never descended into), symlinked directories are not followed, and
 	 * excluded basenames are skipped case-insensitively. When {@code root} is a file
 	 * itself, returns it when its suffix and basename qualify.
+	 * @param root directory to walk, or a single file to test on its own
+	 * @param extensions suffixes a file name must end with, e.g. {@code .py}
+	 * @param excludedDirs directory basenames pruned from the walk and never descended
+	 * into
+	 * @param excludedFiles file basenames skipped even when their suffix matches
+	 * @return the matching files in walk order, empty when {@code root} is missing or
+	 * unreadable
 	 */
 	public static List<Path> iterScannableFiles(Path root, Set<String> extensions, Set<String> excludedDirs,
 			Set<String> excludedFiles) {
@@ -96,8 +110,8 @@ public final class ScanPaths {
 				}
 			});
 		}
-		catch (IOException e) {
-			throw new UncheckedIOException(e);
+		catch (IOException ex) {
+			throw new UncheckedIOException(ex);
 		}
 		return out;
 	}
@@ -109,20 +123,28 @@ public final class ScanPaths {
 	/**
 	 * Return a child path whose on-disk basename exactly matches {@code filename}, or
 	 * null.
+	 * @param directory the parent to list
+	 * @param filename the basename to match, case-sensitively
+	 * @return the first regular child file with that exact name, {@code null} when absent
+	 * or the directory cannot be listed
 	 */
 	public static Path findExactChild(Path directory, String filename) {
 		try (Stream<Path> children = Files.list(directory)) {
 			return children.filter(Files::isRegularFile)
-				.filter(child -> child.getFileName().toString().equals(filename))
+				.filter((child) -> child.getFileName().toString().equals(filename))
 				.findFirst()
 				.orElse(null);
 		}
-		catch (IOException e) {
+		catch (IOException ex) {
 			return null;
 		}
 	}
 
-	/** Locate the skill manifest, preferring canonical exact casing. */
+	/**
+	 * Locate the skill manifest, preferring canonical exact casing.
+	 * @param skillPath the skill directory to inspect
+	 * @return the first manifest variant that exists on disk, {@code null} when none does
+	 */
 	public static Path findSkillManifest(Path skillPath) {
 		for (String name : Constants.SKILL_MANIFEST_VARIANTS) {
 			Path manifest = findExactChild(skillPath, name);
@@ -140,10 +162,13 @@ public final class ScanPaths {
 	/**
 	 * Recursively find all skill directories containing SKILL.md/skill.md files, skipping
 	 * manifests beneath {@code SCAN_EXCLUDED_DIRS}. Sorted for stability.
+	 * @param rootPath folder to search recursively, or a single manifest file
+	 * @return the parent directory of every manifest found, deduplicated and sorted by
+	 * path
 	 */
 	public static List<Path> findAllSkills(Path rootPath) {
 		List<Path> out = iterScannableFiles(rootPath, Set.of(".md"), Constants.SCAN_EXCLUDED_DIRS, Set.of()).stream()
-			.filter(p -> {
+			.filter((p) -> {
 				String name = p.getFileName().toString();
 				return Constants.SKILL_MANIFEST_VARIANTS.contains(name);
 			})

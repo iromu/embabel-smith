@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
+
 import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.SafeConstructor;
@@ -24,17 +25,14 @@ import org.yaml.snakeyaml.nodes.SequenceNode;
 /**
  * YAML-level helpers for the schema check: repeated frontmatter keys, the
  * {@code metadata.id} contract, and Python-flavoured value rendering.
- *
  * <p>
  * Ports {@code _duplicate_frontmatter_keys}, {@code metadata_id_problem},
  * {@code _display_metadata_id} and the type-name rendering the Python messages get from
  * {@code type(value).__name__}.
+ *
+ * @author Ivan Rodriguez
  */
 final class SchemaYaml {
-
-	/** A repeated mapping key and the 1-based SKILL.md line it appears on. */
-	record DuplicateKey(String key, int line) {
-	}
 
 	/** {@code metadata.id} contract: an exact (unnormalized) lowercase ASCII slug. */
 	static final int METADATA_ID_MAX_LENGTH = 64;
@@ -54,6 +52,9 @@ final class SchemaYaml {
 	 * <p>
 	 * The {@code +2} line offset accounts for the opening {@code ---} line plus the
 	 * 0-based mark, matching the Python implementation.
+	 * @param frontmatterYaml the frontmatter text between the {@code ---} markers
+	 * @return each repeated key as a dotted path with the 1-based file line it appears
+	 * on, sorted by line; empty when the text does not parse
 	 */
 	static List<DuplicateKey> duplicateFrontmatterKeys(String frontmatterYaml) {
 		Node root;
@@ -66,7 +67,7 @@ final class SchemaYaml {
 			root = yaml.compose(new org.yaml.snakeyaml.reader.UnicodeReader(new java.io.ByteArrayInputStream(
 					frontmatterYaml.getBytes(java.nio.charset.StandardCharsets.UTF_8))));
 		}
-		catch (RuntimeException e) {
+		catch (RuntimeException ex) {
 			return List.of();
 		}
 		List<DuplicateKey> duplicates = new ArrayList<>();
@@ -109,6 +110,9 @@ final class SchemaYaml {
 
 	/**
 	 * Return why {@code value} breaks the {@code metadata.id} contract, or {@code null}.
+	 * @param value the {@code metadata.id} value as parsed
+	 * @return the clause describing how the value breaks the contract, or {@code null}
+	 * when it satisfies it
 	 */
 	static String metadataIdProblem(Object value) {
 		if (!(value instanceof String text)) {
@@ -132,6 +136,9 @@ final class SchemaYaml {
 	 * Render a bounded preview of a {@code metadata.id} value for a finding. A non-string
 	 * value is described by its type alone and never rendered: YAML accepts an alias
 	 * graph here, and stringifying it would expand it eagerly.
+	 * @param value the {@code metadata.id} value as parsed
+	 * @return the text, ellipsis-truncated past the display limit, or a
+	 * {@code <typename>} placeholder for a non-string
 	 */
 	static String displayMetadataId(Object value) {
 		if (!(value instanceof String text)) {
@@ -144,7 +151,13 @@ final class SchemaYaml {
 		return text;
 	}
 
-	/** The Python {@code type(value).__name__} for a value produced by a YAML parser. */
+	/**
+	 * The Python {@code type(value).__name__} for a value produced by a YAML parser.
+	 * @param value the parsed value to name
+	 * @return {@code NoneType}, {@code str}, {@code bool}, {@code int}, {@code float},
+	 * {@code list}, {@code dict}, {@code set} or {@code date} as the Java type maps to
+	 * Python, else the lowercased simple class name
+	 */
 	static String pythonTypeName(Object value) {
 		if (value == null) {
 			return "NoneType";
@@ -180,6 +193,9 @@ final class SchemaYaml {
 	/**
 	 * Renders a YAML mapping key the way {@code format_validation_location} does, so
 	 * boolean, null and date keys stay recognizable in a finding's field path.
+	 * @param key a mapping key as parsed, which YAML permits to be a non-string
+	 * @return {@code null}, {@code true}/{@code false} or the UTC date text for those
+	 * keys, anything else through {@code String.valueOf}
 	 */
 	static String renderKey(Object key) {
 		if (key == null) {
@@ -196,6 +212,16 @@ final class SchemaYaml {
 			return format.format(date);
 		}
 		return String.valueOf(key);
+	}
+
+	/**
+	 * A repeated mapping key and the 1-based SKILL.md line it appears on.
+	 *
+	 * @param key the repeated key as a dotted path from the document root
+	 * @param line the 1-based line of the file the repeat appears on
+	 * @author Ivan Rodriguez
+	 */
+	record DuplicateKey(String key, int line) {
 	}
 
 }

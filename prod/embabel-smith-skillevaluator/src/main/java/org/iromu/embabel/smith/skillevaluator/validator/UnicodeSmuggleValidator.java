@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+
 import org.iromu.embabel.smith.skillevaluator.model.Finding;
 import org.iromu.embabel.smith.skillevaluator.model.Severity;
 import org.iromu.embabel.smith.skillevaluator.model.ValidationResult;
@@ -30,10 +31,11 @@ import org.yaml.snakeyaml.constructor.SafeConstructor;
 /**
  * Detects invisible Unicode characters that may indicate ASCII smuggling, hidden data
  * encoding, or trojan source attacks.
- *
  * <p>
  * Port of {@code validators/unicode_smuggle.py}. Character categories and thresholds come
  * from {@code org/skillevaluator/config/unicode_smuggle_patterns.yaml} on the classpath.
+ *
+ * @author Ivan Rodriguez
  */
 public class UnicodeSmuggleValidator extends ValidatorBase {
 
@@ -101,55 +103,58 @@ public class UnicodeSmuggleValidator extends ValidatorBase {
 		return validateFolderOrSkill(skillPath, this::validateSingle, "Unicode scanning");
 	}
 
-	/** Lazy config load, mirroring the Python {@code config} property. */
+	/**
+	 * Lazy config load, mirroring the Python {@code config} property.
+	 * @return the parsed pattern config, with the lookup tables built on first call
+	 */
 	@SuppressWarnings("unchecked")
 	private Map<String, Object> getConfig() {
-		if (config == null) {
-			config = UnicodeSmuggleConfig.load();
+		if (this.config == null) {
+			this.config = UnicodeSmuggleConfig.load();
 			buildLookupTables();
 		}
-		return config;
+		return this.config;
 	}
 
 	@SuppressWarnings("unchecked")
 	private void buildLookupTables() {
-		Map<String, Object> categories = asMap(config.get("categories"));
-		charLookup = new LinkedHashMap<>();
+		Map<String, Object> categories = asMap(this.config.get("categories"));
+		this.charLookup = new LinkedHashMap<>();
 
 		// Explicit character maps
 		for (Map.Entry<String, Object> entry : categories.entrySet()) {
 			Map<String, Object> chars = asMap(asMap(entry.getValue()).get("characters"));
 			for (Map.Entry<String, Object> charEntry : chars.entrySet()) {
 				int codePoint = toCodePoint(charEntry.getKey());
-				charLookup.put(codePoint, new String[] { entry.getKey(), String.valueOf(charEntry.getValue()) });
+				this.charLookup.put(codePoint, new String[] { entry.getKey(), String.valueOf(charEntry.getValue()) });
 			}
 		}
 
 		// Range-based categories
 		Map<String, Object> tags = asMap(categories.get("unicode_tags"));
-		tagRange = new int[] { hexToInt(tags.getOrDefault("range_start", 0xE0000)),
+		this.tagRange = new int[] { hexToInt(tags.getOrDefault("range_start", 0xE0000)),
 				hexToInt(tags.getOrDefault("range_end", 0xE007F)) };
-		tagAsciiRange = new int[] { hexToInt(tags.getOrDefault("ascii_decodable_start", 0xE0020)),
+		this.tagAsciiRange = new int[] { hexToInt(tags.getOrDefault("ascii_decodable_start", 0xE0020)),
 				hexToInt(tags.getOrDefault("ascii_decodable_end", 0xE007E)) };
 
 		Map<String, Object> vs = asMap(categories.get("variation_selectors"));
-		vsBasicRange = new int[] { hexToInt(vs.getOrDefault("range_basic_start", 0xFE00)),
+		this.vsBasicRange = new int[] { hexToInt(vs.getOrDefault("range_basic_start", 0xFE00)),
 				hexToInt(vs.getOrDefault("range_basic_end", 0xFE0F)) };
-		vsSupplementRange = new int[] { hexToInt(vs.getOrDefault("range_supplement_start", 0xE0100)),
+		this.vsSupplementRange = new int[] { hexToInt(vs.getOrDefault("range_supplement_start", 0xE0100)),
 				hexToInt(vs.getOrDefault("range_supplement_end", 0xE01EF)) };
 
 		// Optional confusable spaces
-		if (includeSpaces) {
-			Map<String, Object> opt = asMap(asMap(config.get("optional_categories")).get("confusable_spaces"));
+		if (this.includeSpaces) {
+			Map<String, Object> opt = asMap(asMap(this.config.get("optional_categories")).get("confusable_spaces"));
 			Map<String, Object> chars = asMap(opt.get("characters"));
 			for (Map.Entry<String, Object> charEntry : chars.entrySet()) {
 				int codePoint = toCodePoint(charEntry.getKey());
-				charLookup.putIfAbsent(codePoint,
+				this.charLookup.putIfAbsent(codePoint,
 						new String[] { "confusable_spaces", String.valueOf(charEntry.getValue()) });
 			}
 		}
 
-		thresholds = asMap(config.get("thresholds"));
+		this.thresholds = asMap(this.config.get("thresholds"));
 	}
 
 	private static int hexToInt(Object value) {
@@ -176,7 +181,7 @@ public class UnicodeSmuggleValidator extends ValidatorBase {
 
 	@SuppressWarnings("unchecked")
 	private static Map<String, Object> asMap(Object value) {
-		return value instanceof Map<?, ?> m ? (Map<String, Object>) m : Map.of();
+		return (value instanceof Map<?, ?> m) ? (Map<String, Object>) m : Map.of();
 	}
 
 	private ValidationResult validateSingle(Path skillPath) {
@@ -197,7 +202,7 @@ public class UnicodeSmuggleValidator extends ValidatorBase {
 			try {
 				relativePath = skillPath.relativize(filePath).toString();
 			}
-			catch (IllegalArgumentException e) {
+			catch (IllegalArgumentException ex) {
 				relativePath = filePath.getFileName().toString();
 			}
 			for (Finding finding : scanFile(filePath, relativePath)) {
@@ -215,26 +220,6 @@ public class UnicodeSmuggleValidator extends ValidatorBase {
 		return result;
 	}
 
-	/** One classified invisible character with its codepoint column in the line. */
-	private static final class InvisibleChar {
-
-		final int col;
-
-		final int codePoint;
-
-		final String category;
-
-		final String name;
-
-		InvisibleChar(int col, int codePoint, String category, String name) {
-			this.col = col;
-			this.codePoint = codePoint;
-			this.category = category;
-			this.name = name;
-		}
-
-	}
-
 	private List<Finding> scanFile(Path filePath, String relativePath) {
 		if (isBinary(filePath)) {
 			return List.of();
@@ -245,7 +230,7 @@ public class UnicodeSmuggleValidator extends ValidatorBase {
 			// input.
 			content = new String(Files.readAllBytes(filePath), StandardCharsets.UTF_8);
 		}
-		catch (IOException e) {
+		catch (IOException ex) {
 			return List.of();
 		}
 
@@ -282,25 +267,29 @@ public class UnicodeSmuggleValidator extends ValidatorBase {
 	}
 
 	private String[] classifyChar(int codePoint) {
-		String[] known = charLookup.get(codePoint);
+		String[] known = this.charLookup.get(codePoint);
 		if (known != null) {
 			return known;
 		}
-		if (tagRange[0] <= codePoint && codePoint <= tagRange[1]) {
+		if (this.tagRange[0] <= codePoint && codePoint <= this.tagRange[1]) {
 			return new String[] { "unicode_tags", "UNICODE TAG" };
 		}
-		if (vsBasicRange[0] <= codePoint && codePoint <= vsBasicRange[1]) {
-			int vsNum = codePoint - vsBasicRange[0] + 1;
+		if (this.vsBasicRange[0] <= codePoint && codePoint <= this.vsBasicRange[1]) {
+			int vsNum = codePoint - this.vsBasicRange[0] + 1;
 			return new String[] { "variation_selectors", "VARIATION SELECTOR-" + vsNum };
 		}
-		if (vsSupplementRange[0] <= codePoint && codePoint <= vsSupplementRange[1]) {
-			int vsNum = codePoint - vsSupplementRange[0] + 17;
+		if (this.vsSupplementRange[0] <= codePoint && codePoint <= this.vsSupplementRange[1]) {
+			int vsNum = codePoint - this.vsSupplementRange[0] + 17;
 			return new String[] { "variation_selectors", "VARIATION SELECTOR-" + vsNum };
 		}
 		return null;
 	}
 
-	/** Group consecutive invisible characters by codepoint column position. */
+	/**
+	 * Group consecutive invisible characters by codepoint column position.
+	 * @param chars the invisible characters found on one line
+	 * @return groups of column-adjacent characters, each in column order
+	 */
 	private static List<List<InvisibleChar>> groupConsecutive(List<InvisibleChar> chars) {
 		if (chars.isEmpty()) {
 			return List.of();
@@ -458,18 +447,22 @@ public class UnicodeSmuggleValidator extends ValidatorBase {
 	}
 
 	private int threshold(String key, int defaultValue) {
-		Object value = thresholds.get(key);
-		return value instanceof Number n ? n.intValue() : defaultValue;
+		Object value = this.thresholds.get(key);
+		return (value instanceof Number n) ? n.intValue() : defaultValue;
 	}
 
-	/** Decode Unicode Tag characters to their ASCII equivalents; null when empty. */
+	/**
+	 * Decode Unicode Tag characters to their ASCII equivalents; null when empty.
+	 * @param tagChars the characters classified as {@code unicode_tags}
+	 * @return the decoded ASCII payload, or {@code null} when nothing decodes
+	 */
 	private String decodeTagPayload(List<InvisibleChar> tagChars) {
 		if (tagChars.isEmpty()) {
 			return null;
 		}
 		StringBuilder decoded = new StringBuilder();
-		int asciiStart = tagAsciiRange[0];
-		int asciiEnd = tagAsciiRange[1];
+		int asciiStart = this.tagAsciiRange[0];
+		int asciiEnd = this.tagAsciiRange[1];
 		for (InvisibleChar tc : tagChars) {
 			int code = tc.codePoint;
 			if (code >= asciiStart && code <= asciiEnd) {
@@ -486,7 +479,11 @@ public class UnicodeSmuggleValidator extends ValidatorBase {
 		return payload.isEmpty() ? null : payload;
 	}
 
-	/** Determine the primary (highest-risk) category from a set. */
+	/**
+	 * Determine the primary (highest-risk) category from a set.
+	 * @param categories the categories present in one run
+	 * @return the highest-priority one present, or {@code unknown} for an empty set
+	 */
 	private static String primaryCategory(Set<String> categories) {
 		List<String> priority = List.of("unicode_tags", "bidi_marks", "deprecated_format_controls",
 				"invisible_operators", "zero_width", "confusable_spaces", "variation_selectors");
@@ -498,7 +495,11 @@ public class UnicodeSmuggleValidator extends ValidatorBase {
 		return categories.isEmpty() ? "unknown" : categories.iterator().next();
 	}
 
-	/** Compact summary of character names in a group (first 4, then "(+N more)"). */
+	/**
+	 * Compact summary of character names in a group (first 4, then "(+N more)").
+	 * @param group the invisible characters in one consecutive run
+	 * @return their comma-separated names, truncated past four
+	 */
 	private static String summarizeCharNames(List<InvisibleChar> group) {
 		List<String> names = new ArrayList<>();
 		for (int i = 0; i < Math.min(4, group.size()); i++) {
@@ -511,13 +512,17 @@ public class UnicodeSmuggleValidator extends ValidatorBase {
 		return summary;
 	}
 
-	/** Truncate line content for display, replacing non-printable characters with ␣. */
+	/**
+	 * Truncate line content for display, replacing non-printable characters with ␣.
+	 * @param line the raw source line
+	 * @return the printable, stripped line, shortened to 120 code points with an ellipsis
+	 */
 	private static String safeLineContent(String line) {
 		StringBuilder visible = new StringBuilder();
 		int i = 0;
 		while (i < line.length()) {
 			int cp = line.codePointAt(i);
-			visible.append(isPrintable(cp) || cp == ' ' || cp == '\t' ? new String(Character.toChars(cp)) : "\u2423");
+			visible.append((isPrintable(cp) || cp == ' ' || cp == '\t') ? new String(Character.toChars(cp)) : "\u2423");
 			i += Character.charCount(cp);
 		}
 		String stripped = visible.toString().strip();
@@ -531,6 +536,8 @@ public class UnicodeSmuggleValidator extends ValidatorBase {
 	/**
 	 * Python {@code str.isprintable()}: false for Cc, Cf, Cs, Co, Cn, Zl, Zp, Zs (except
 	 * ASCII space).
+	 * @param cp the code point to test
+	 * @return {@code true} when the code point is printable
 	 */
 	private static boolean isPrintable(int cp) {
 		if (cp == ' ') {
@@ -542,7 +549,11 @@ public class UnicodeSmuggleValidator extends ValidatorBase {
 				&& type != Character.PARAGRAPH_SEPARATOR && type != Character.SPACE_SEPARATOR;
 	}
 
-	/** MIME-type and null-byte binary detection, port of Python {@code _is_binary}. */
+	/**
+	 * MIME-type and null-byte binary detection, port of Python {@code _is_binary}.
+	 * @param filePath the file to probe
+	 * @return {@code true} when the file is non-textual or cannot be read
+	 */
 	private static boolean isBinary(Path filePath) {
 		String fileName = filePath.getFileName().toString();
 		String mimeType = guessMimeType(fileName);
@@ -558,7 +569,7 @@ public class UnicodeSmuggleValidator extends ValidatorBase {
 				}
 			}
 		}
-		catch (IOException e) {
+		catch (IOException ex) {
 			return true;
 		}
 		return false;
@@ -567,6 +578,8 @@ public class UnicodeSmuggleValidator extends ValidatorBase {
 	/**
 	 * Mirrors Python {@code mimetypes.guess_type} on the filename extension
 	 * (case-insensitive).
+	 * @param fileName the file name to classify
+	 * @return the guessed MIME type, or {@code null} for an unknown extension
 	 */
 	private static String guessMimeType(String fileName) {
 		int dot = fileName.lastIndexOf('.');
@@ -574,6 +587,26 @@ public class UnicodeSmuggleValidator extends ValidatorBase {
 			return null;
 		}
 		return MIME_BY_EXTENSION.get(fileName.substring(dot + 1).toLowerCase(Locale.ROOT));
+	}
+
+	/** One classified invisible character with its codepoint column in the line. */
+	private static final class InvisibleChar {
+
+		final int col;
+
+		final int codePoint;
+
+		final String category;
+
+		final String name;
+
+		InvisibleChar(int col, int codePoint, String category, String name) {
+			this.col = col;
+			this.codePoint = codePoint;
+			this.category = category;
+			this.name = name;
+		}
+
 	}
 
 	/**
@@ -589,7 +622,7 @@ public class UnicodeSmuggleValidator extends ValidatorBase {
 		@SuppressWarnings("unchecked")
 		static Map<String, Object> load() {
 			ClassLoader loader = UnicodeSmuggleValidator.class.getClassLoader();
-			InputStream in = loader != null ? loader.getResourceAsStream(RESOURCE_PATH) : null;
+			InputStream in = (loader != null) ? loader.getResourceAsStream(RESOURCE_PATH) : null;
 			if (in == null) {
 				in = ClassLoader.getSystemResourceAsStream(RESOURCE_PATH);
 			}
@@ -603,8 +636,8 @@ public class UnicodeSmuggleValidator extends ValidatorBase {
 				}
 				return (Map<String, Object>) data;
 			}
-			catch (IOException e) {
-				throw new UncheckedIOException(e);
+			catch (IOException ex) {
+				throw new UncheckedIOException(ex);
 			}
 		}
 

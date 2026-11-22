@@ -7,7 +7,7 @@ package com.embabel.smith.studio.rest.dto;
 
 import java.util.List;
 
-import com.embabel.smith.studio.improve.PendingCandidate;
+import com.embabel.smith.builder.improve.PendingCandidate;
 
 /**
  * A pending candidate awaiting approval (the Auto-improve pane), with its evidence: the

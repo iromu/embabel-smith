@@ -1,14 +1,18 @@
 # Embabel Smith POC — Conclusions vs. the Theory
-*Run 2026-11-02, full re-runs 2026-11-03 ×2 + 2026-11-04 (Java 25 / GraalVM CE, target Java 21 · Spring Boot 4.1.1 · Embabel 1.5.4) · POC 1–21*
+*Run 2026-11-02, full re-runs 2026-11-03 ×2 + 2026-11-04 (Java 25 / GraalVM CE, target Java 21 · Spring Boot 4.1.1 · Embabel 1.5.4) · POC 1–21, plus POC 23 (§7.1), POC 26 (§7.4) and POC 27 (§7.5)*
 
 This page concludes the POC run **against the hypothesis laid out in docs 01–03**: what the POCs
-actually proved, what they did not, and which POCs are still missing. The run now covers **all
-twenty-one POCs** — the feasibility core (POC 1–5), spec composition (POC 6), and the spec-first
+actually proved, what they did not, and which POCs are still missing. The run it narrates covers the
+**twenty-one POCs built by 2026-11-04** — the feasibility core (POC 1–5), spec composition (POC 6),
+and the spec-first
 extensions POC 7–21 (runtime adapter, retrieval, eval-guided refinement, trust tiers, progressive
 disclosure, **semantic retrieval at scale**, **remote / MCP invocation**, the **spec Composer**, the
 **visual spec-chain editor**, the **remote-action bridge**, **GLiNER2 transformer spec
 classification**, **spec lifecycle / drift detection**, **small-LLM spec selection**, the
 **real semantic `EmbeddingService`**, and **install-time spec security / vulnerability scanning**).
+The suite has since grown to **27 modules**: POC 23, POC 26 and POC 27 contribute results here
+through §7.1, §7.4 and §7.5, while POC 22, POC 24 and POC 25 are **not covered on this page** — their
+measured results live in their own `README.md` files.
 The raw run evidence (the green loop, the offline baseline, the defects fixed) is kept in §5 as
 support. The full suite was **re-run twice on 2026-11-03 and again on 2026-11-04** (this page's
 latest evidence, the 2026-11-04 re-run) and every POC remains green with consistent numbers: the
@@ -127,7 +131,7 @@ The POCs were scoped to test the **feasibility core** of this, not the full spec
 | C7 | **Any OpenAI-compatible endpoint** works | doc01 §2.5 | all endpoint-gated | ✅ **Proven** |
 | C8 | **Specs compose** — GOAP chains multiple exported goals into a workflow | doc03 §2.2, doc02 §0 idea 2 | POC 6 (live) | ✅ **Proven** (two-spec GOAP chain) |
 | C9 | **LLM-authored specs are good** (or eval-guided refinement makes them good) | doc02 §5 caveat 2 | POC run (degenerate drafts) + **POC 9** | ⚠️ **Negative at source; proven fix** — raw drafts are weak, but eval-guided refinement lifts 0% → 100% |
-| C10 | **Spec selection at scale** — retrieval/routing as the library grows (spec shadowing) | doc03 §2.1, doc02 §5 caveat 1 | **POC 8** (lexical) + **POC 12** (200+ scale) + **POC 17** (GLiNER2 transformer) + **POC 19** (0.6B small LLM) + **POC 20** (real `EmbeddingService`) + **POC 23** (remote `EmbeddingService` + scaling) | ✅ **Proven at scale — and the shadowing tie is now broken** — clean (P@1 100%) at 191 distinct specs; POC 12 shows near-duplicate shadowing collapses P@1 for *both* lexical and dense retrievers; POC 17 shows a GLiNER2 transformer that *understands* meaning recovers it (strict **100%**, matching **83%**) where text-similarity cannot (lexical 33%/17%, dense 0%); POC 19 shows a 0.6B decision-tuned LLM (served in Docker, dev-services managed) also beats text similarity (strict **67%** free-form / **50%** its own decision format, matching **50%**/**0%**) but trails the transformer; **POC 20 shows a real semantic `EmbeddingService` (ONNX MiniLM, not a stand-in) retrieves cleanly at the distinct scale (100%) and, under shadowing, beats lexical (17%) and dense (0%) at 33% — but shares the near-duplicate ambiguity, so curation (POC 18) remains the real fix**; **POC 23 shows a *remote* `EmbeddingService` (nomic-embed-text-v2 over the OpenAI-compatible endpoint, not a bundled model) retrieves cleanly to 1000 specs (P@1 100%) with sub-millisecond-to-~1 ms per-query cost and zero per-query model calls — the selection mechanism of choice as the library scales** |
+| C10 | **Spec selection at scale** — retrieval/routing as the library grows (spec shadowing) | doc03 §2.1, doc02 §5 caveat 1 | **POC 8** (lexical) + **POC 12** (200+ scale) + **POC 17** (GLiNER2 transformer) + **POC 19** (0.6B small LLM) + **POC 20** (real `EmbeddingService`) + **POC 23** (remote `EmbeddingService` + scaling) | ✅ **Proven at scale — and the shadowing tie is now broken** — clean (P@1 100%) at 191 distinct specs; POC 12 shows near-duplicate shadowing collapses P@1 for *both* lexical and dense retrievers; POC 17 shows a GLiNER2 transformer that *understands* meaning recovers it (strict **100%**, matching **83%**) where text-similarity cannot (lexical 33%/17%, dense 0%); POC 19 shows a 0.6B decision-tuned LLM (served in Docker, dev-services managed) also beats text similarity (strict **67%** free-form / **50%** its own decision format, matching **50%**/**0%**) but trails the transformer; **POC 20 shows a real semantic `EmbeddingService` (ONNX MiniLM, not a stand-in) retrieves cleanly at the distinct scale (100%) and, under shadowing, beats lexical (17%) and dense (0%) at 33% — but shares the near-duplicate ambiguity, so curation (POC 18) remains the real fix**; **POC 23 shows a *remote* `EmbeddingService` (nomic-embed-text-v2 over the OpenAI-compatible endpoint, not a bundled model) retrieves cleanly to 1000 specs (P@1 100%) with sub-millisecond-to-~1.3 ms per-query cost and zero per-query model calls — the selection mechanism of choice as the library scales** |
 | C11 | **Specs invoke CLIs/scripts** — the "normal agent harness" (`toolGroups`/`remote`/MCP) | doc03 §2.3, §4.2 | **POC 7** (local CLI) + **POC 13** (remote/MCP) + **POC 26** (an Agent Skill's own `scripts/*.js`, in-JVM) | ✅ **Proven (all three halves)** — POC 7: a `shell` tool group ran a real command; POC 13: an exported goal published as an MCP tool and invoked over Streamable HTTP; POC 26: Embabel's script SPI was already there but had no in-JVM JavaScript runner (default logs *"script execution is not yet supported"*, the shipped one spawns `node`) — embedding GraalJS on a plain JDK closes it, the script becomes a callable tool, and its ECMAScript 2026 surface measures 14/14 |
 | C12 | **Security / trust tiers** (T1–T4, guardrails, allowlists) | doc02 §5 caveat 3, doc03 §2.1 | **POC 10** (live) | ✅ **Proven** — per-tier allowlist refused `shell` under T1; a global guardrail blocked a prompt-injection |
 | C13 | **Progressive disclosure** — load only what's needed; unbounded on-disk knowledge | doc02 §2, doc03 §1 | **POC 11** (stress) | ✅ **Proven** — plan context constant while a reference grows 3 KB → 313 KB (×100) |
@@ -442,10 +446,13 @@ is now built (POC 20)** — what remains is wiring it (and the other POCs) into 
 
 ## 5. Run evidence (support)
 
-- **Offline baseline:** `mvn test` green across all modules — **211 tests, 0 failures, 0 errors**
+- **Offline baseline, as of this run:** `mvn test` green across all modules — **211 tests, 0 failures,
+  0 errors**
   (re-run ×2 on 2026-11-03 + 2026-11-04, all green; +11 from POC 21's security scanner, +10 from
   POC 20, +3 from the POC 15 retrieval pane, +2 from the POC 15 author pane, +3 from the POC 15
-  eval/refinement pane, +12 from the POC 15 library curation).
+  eval/refinement pane, +12 from the POC 15 library curation). The count stops at POC 21; POCs 22–26
+  add more (POC 26 alone contributes 31 offline tests), so re-count it rather than reusing this
+  number.
   Coverage: format round-trip, validation,
   **draft-quality classifier (POC 2/3 caveat #2)**, builder normalization, writer idempotency,
   composition wiring, shell tool, lexical retrieval, **200+ scale retrieval (POC 12)**,
@@ -784,8 +791,9 @@ is now built (POC 20)** — what remains is wiring it (and the other POCs) into 
 
 ## 6. What other POCs to create
 
-All twenty-one POCs are now built. POC 1–5 (feasibility core), POC 6 (composition), and POC 7–21
-(the spec-first extensions) are complete and their run evidence is in §5:
+All twenty-one POCs of this run are built. POC 1–5 (feasibility core), POC 6 (composition), and POC 7–21
+(the spec-first extensions) are complete and their run evidence is in §5. Five more POCs (22–26) have
+been built since this run closed; see the note at the top of the page:
 
 1. **POC 6 — Spec composition.** ✅ **Built & proven:** `compose-extract` + `compose-explain`
    chained by GOAP through their shared `TopicBrief`; see §5.
@@ -886,7 +894,9 @@ drift (POC 18), the real semantic `EmbeddingService` (POC 20), and **install-tim
 Some hypothesis areas are tested by **multiple POCs with different techniques** on the same
 scenario. Their results are shared: each POC's `README.md` carries the same consolidated
 "Measured results (shared — …)" section, and this page is the consolidated read. Each POC's
-verdict against the hypothesis is in its `README.md` **"Conclusion"** section.
+verdict against the hypothesis is in its `README.md` **"Conclusion"** section. (§7.4's POC 26 and
+§7.5's POC 27 are the exceptions: each carries its numbers under a plain "Results" heading rather
+than the shared section, and its Conclusion is worded accordingly.)
 
 ### 7.1 Spec selection at scale (C10) — POC 8 / 12 / 17 / 19 / 20 / 23
 
@@ -946,7 +956,7 @@ the best: strict 100%), a fine-tuned 0.6B LLM, and a real embedding index — be
 but the near-duplicates are near-identical in *meaning* too, so none fully cures the collapse on its
 own (the remote nomic embedding ties lexical at 17% under shadowing — the specific embedding model
 matters). And the scaling result is unambiguous: a remote `EmbeddingService` retrieves cleanly to
-1000 specs with sub-millisecond-to-~1 ms per-query cost and **zero per-query model calls** — the
+1000 specs with sub-millisecond-to-~1.3 ms per-query cost and **zero per-query model calls** — the
 reason it is the selection mechanism of choice as the library outgrows per-candidate selectors. The
 real fix for shadowing is library **curation** (dedup / lifecycle — POC 18, applied in the POC 15
 retrieval pane). Raw run evidence: §5 (the POC 8 / 12 / 17 / 19 / 20 / 23 entries). Shared
@@ -1034,12 +1044,148 @@ deployment to a JVMCI-capable JVM), the statement budget is a real ceiling, no `
 a builder that captures stdout/stderr (so this is *hardened*, not a boundary against a determined
 guest — untrusted scripts belong in the Docker/Podman engines), and 31 offline tests pin all of it.
 
+### 7.5 Recursive self-improvement of the builder's own process — POC 27
+
+The claim sitting on top of POC 26: the product's loop improves one thing — the prompts of the steps
+that failed — and cannot touch the generator that wrote them. POC 27 asks how much of that loop can be
+made self-referential (generator prompts, decomposition, skill scripts, process shape, and the
+detection and refinement policies themselves) without the improver grading its own homework, and
+answers with **verdict: not proven**. The improver lives inside a boundary it cannot edit — a
+checked-in `MUTABILITY.md` of seven mutable surfaces plus the builder's own four packs against
+fifteen fixed ones (the `AgentPlatform` and no-code runtime, `EvalScorer`, the frozen task set, the
+labelled corpus, the generation archive, the three validators, the publishers) — and the referee is a
+separate hand-started JVM that loads no skill folder and opens no Graal `Context`, so a candidate can
+never generate the code that grades it.
+
+**What the improvement object is now.** Retargeted 2026-11-22: a candidate is no longer a pack the POC
+assembled in Java but `builder-single-spec`, one of the four packs under
+`prod/embabel-smith-builder/builder-agent-specs/` ([`08-builder.md`](08-builder.md)), read off disk,
+renamed to the variant id, with the generated policy **appended** to one step prompt —
+`scopeCoreProcess`, the pack's entry step, which is what preserves the `{{userInput.content}}`
+interpolation that §4 of its README found missing. The mutation operator is the POC's own
+`outerloop/BuilderPacks.withStepPrompt` — it replaces the prompt and passes every other field through,
+restating the discipline `builder/improve/Refiner.withPrompt` encodes rather than calling it, since that
+method is private — so the
+surface is drawn in code rather than in prose, and agent order and the `pre`/`post` condition names are
+off it by signature rather than by discipline. The generator's instructions are mutable *as pack text*
+and nothing more: `smith build` still reads those prompts off the classpath and calls the Java
+generators, so no candidate changes what the shipped builder does. What a candidate is **offered** did
+move, on 2026-11-22. `builder/tools/ValidationToolGroup` registers a `ToolGroup` bean whose role is
+`validate`, which is the role `builder-single-spec/steps/assembleAgentSpec.yml` declares, so a step's
+reach is now partly a pack declaration rather than wholly the driver's. Measured twice, because the two
+routes to the same deploy differ. On the test-seam deploy (`eval/AgentSpecInvokerFactory` driven directly)
+the tool loop starts as `starting tool loop [validatePack]` where it started as `starting tool loop []`
+(whose log carried `Could not resolve tool group with role='validate'` beside it), the goal completes in one
+model call, and `called=0`. On the pack-driven CLI path (`--flow pack`, which is not the default) the step
+*calls* it. What a call was worth turned on the tool's argument, and `99f9cc0` changed that argument. While
+it was a directory the step had nothing to point at — the draft is the model's own pending answer, not a
+file — so the counts taken before it (2, 3 and 116 calls across three blueprint inputs, 92 of the 93 results
+on one build's first pass the same `LAYOUT_MISSING_MANIFEST`) measure a tool the step could not aim, not the
+checks it ran. The argument is now `specJson`: the spec the step is about to return, run through the same
+in-memory `AgentSpecValidator.validate(AgentSpec)` overload `core/BuilderAgent.validateDraft` uses for the
+Java flow. Layout is the one check dropped, and `BuilderAgent.java:160` still re-validates the directory it
+wrote, so nothing is lost end-to-end. Measured on one pack-flow build since the change (`parcel-claims`):
+two calls, each carrying the model's own draft, the first returning a real `DANGLING_TYPE_REF` and the second
+`No findings: the agent spec is well-formed.`, and the build published. The other two blueprint inputs are
+being re-measured, so no new call count is claimed here ([`12-backlog.md`](12-backlog.md)). A candidate
+still cannot change its own reach:
+`improve/Refiner.withPrompt` copies the other twelve components, so a candidate's reach equals its parent
+pack's — what moved is that reach is decided in pack text at all, and a pack is what a candidate edits.
+
+Six hand-authored tasks with human-written expected outputs, scored live (6 model calls) two ways:
+
+| arm | score | failing tasks |
+| --- | --- | --- |
+| product substring gate (`EvalScorer`, the arm the gate uses) | **0.667** | `b27-t02`, `b27-t03` |
+| human label (recorded alongside as the named gap) | **0.333** | `b27-t02`, `b27-t03`, `b27-t05`, `b27-t06` |
+
+`headroom: true` — two of six fail the gate, so the task set is not what constrains the loop. **The
+finding is the divergence, not the score:** on `b27-t05` and `b27-t06` the substring arm says PASS and
+a human says FAIL, and the looser gate arm is the one that decides — a loop optimising it can raise its
+score on two tasks a reader would still call wrong. The noise floor was **measured at 0.0** (3 passes
+over an unchanged process, 18 calls, gate scores `[0.667, 0.667, 0.667]`, no task flipping) and passed
+through at 0.0 rather than raised, so the "delta inside the floor is no improvement" branch cannot fire
+and the protection reduces to the paired repeats plus the derivative test.
+
+| loop | cost | result |
+| --- | --- | --- |
+| **inner** — a generated ECMAScript detection policy run through POC 26's GraalJS engine against the frozen 26-line labelled corpus (16 tuning / 10 held-out) | **0 model calls**, read off the meter | converged after **4 of 12** generations, by patience; best variant was the seed (`b27-inner-seed`); hand-written and seed both **1.0 / 1.0** held-out, every mutation strictly worse (recall 0.875 tuning / 0.8 held-out) |
+| **outer** — candidate packs scored by the product's `GateChain` + `EvalScorer` | **60 calls declared before the first one** | **did not run** |
+
+The inner loop's flat derivative is the finding, not a caveat: the labelled corpus is **saturated** — a
+hand-written policy already scores 1.0/1.0 held-out, so the free half of the design has no room to
+demonstrate improvement — and with 10 held-out lines of which 5 are positive, one flipped case moves
+recall by 0.2, so the differences shown are one case wide. The outer loop, the only half with measured
+headroom, never produced a single scored candidate — and the cause was the POC's own prompt, not the
+endpoint. `PolicyImprover.candidate` builds the `detect` step from `prompt.render()`, and nothing in
+`PolicyPrompt.render()`, the seed prompt or the policy scripts contains a `{{userInput…}}` placeholder, so
+the six frozen tasks sent **six byte-identical requests** and no score could have distinguished two
+candidates. That also explains the model's reply (*"Policy b27-inner-seed loaded. Active triggers: …"* — it
+was shown only the policy) and the timings: task 1 took 20,449 ms while tasks 2–6 took 13–23 ms, a
+prompt-keyed cache hit at the endpoint. The binding error the first diagnosis blamed —
+`MismatchedInputException: Content part must contain 'text' or 'mimeType'` through
+`BackgroundMessage["parts"]` — is a **separate, real trap**: upstream's `compile_action.jinja:16-18` tells
+the NL compiler to emit `BackgroundMessage` as an action output while nothing upstream ever executes one,
+and its `List<ContentPart>` deserializer discriminates on the property name. `examples/out/` proves the
+safe shape is a declared domain type, and `DraftToAgentSpec.NON_RETURNABLE_OUTPUTS` includes
+`java.lang.String`, so a scalar-string goal inherits the same trap. No archive, no per-generation report,
+no held-candidate count: the outer loop is **unmeasured, not blocked**.
+
+**No test in the repository could have caught the prompt bug** then — every multi-task test injects a
+constant-returning invoker (`RefinementLoopTest.java:107`, `GateChainTest.java`), so identical answers
+across tasks are the fixture, and `AgentSpecValidator.defaultFrameworkTypes()` accepted an input-blind
+pack at the time, so it validated green and only failed live. That was a product-shaped gap, not a
+POC-only one, and it is since closed: the validator now rejects a step whose declared inputs appear
+nowhere in its prompt (`PROMPT_IGNORES_DECLARED_INPUT`, 2026-11-21), and the POC's own candidate prompt
+was repaired to interpolate `{{userInput.content}}` the same day. What does
+survive from the log: **a real call costs minutes, not seconds** — two 60 s timeouts on the one real
+completion, which puts a 60-call budget in hours.
+
+**Four measurement guards, each decided by a number, before a paid run.** *Headroom*: four task files
+the unmutated packs are expected to fail (`b27-t07`–`b27-t10`, one per stage, each carrying a `check`
+saying why its answer is not guessable from its question) live in `benchmark/tasks-headroom/`,
+**beside** the frozen six rather than inside them — the frozen set's file count is an input to the
+system, feeding `OuterLoopProcess.budget()`, and ten tasks declare 110 calls, which at 60 s each is
+6600 s against the 5400 s wall clock, so folding them in makes the launcher refuse with
+`OuterLoopRefused` before it spends anything. *Denominator*: the arms' disagreement is
+`{b27-t05, b27-t06}`, so those two are excluded from the deciding score — 4 tasks, deciding score 0.5
+where the gate arm alone reads 0.667 — an exclusion the record recomputes rather than one handed to it,
+with the launcher printing which mark it used. *Noise floor*: re-measured after the retarget over the
+unchanged seed, 3 repeats, and the primary floor unchanged at the 0.0 recorded above — what moved is the
+label arm, now `[0.167, 0.167, 0.167]` where a previous recording had 0.333, with zero within-run spread
+under either scorer, which is a difference between recordings and not noise inside one, and never a
+threshold the gate uses. *Distinct requests*: `DistinctAnswerGuard`
+wraps the metered invoker factory and trips on the second answer of the first candidate — two distinct
+prompts asked, two calls spent — refusing the run with a recorded reason; the comparison is
+byte-equality on whole answers, which is its stated limit.
+
+Two readings travel with any live number from here. One counted call now hides five model calls, because
+a counted `invoke` drives a five-step pack, so `Budget.costPerCandidate` under-states a live pass by the
+pack's step count; and a live pass over the frozen six grades **drafted spec text** against
+defect-answer `require`/`anyOf` lists, because a candidate now answers by drafting rather than by
+replying. Offline scoring is unaffected by both.
+
+Shared section: [`poc/poc-27-recursive-self-improvement`](../poc/poc-27-recursive-self-improvement/README.md).
+POC 27's numbers live under its README's "Results" heading, like POC 26's above, and its §5 carries the
+guards in detail. Honest limits — its README lists six: the corpus is saturated and the three lines
+added since have not been re-run through the inner loop; 29 corpus lines is still not a judge; the gate
+arm and a human disagree on 2 of 6 tasks, and those two now leave the deciding denominator rather than
+decide it; the outer loop is unmeasured, with the candidate-shape gaps closed but no live pass recorded;
+the prompt bug is a product gap that no `prod/` test covers; and `prod/` is untouched throughout, with
+rollback the module directory and two lines in `poc/pom.xml`. The module's last recorded offline count
+is 142 tests, run with no endpoint; the baseline, noise-floor and outer-loop launchers are
+**endpoint-gated**.
+
 ---
 
 ## 8. How to re-run
 
+**Every `mvn -pl poc/…` command below needs `-Ppoc`.** The POC reactor is off by default — it sits
+behind the `poc` profile in the root POM (see [`05-architecture.md`](05-architecture.md)) — and Maven
+can only select a module that is in the reactor.
+
 ```bash
-mvn install -DskipTests
+mvn -Ppoc install -DskipTests
 
 export OPENAI_CUSTOM_BASE_URL=<base-url>
 export OPENAI_CUSTOM_API_KEY=<key>

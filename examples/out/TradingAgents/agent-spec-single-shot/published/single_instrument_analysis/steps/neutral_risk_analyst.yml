@@ -1,0 +1,23 @@
+---
+stepType: "action"
+name: "neutral_risk_analyst"
+description: "Weigh both risk sides to argue for a balanced path."
+inputTypeNames:
+- "TransactionProposal"
+- "TechnicalReport"
+- "SentimentReport"
+- "NewsMacroReport"
+- "FundamentalsReport"
+- "UserInput"
+- "AggressiveRiskView"
+- "ConservativeRiskView"
+outputTypeName: "NeutralRiskView"
+prompt: "You are the Neutral Risk Analyst. Review the Transaction Proposal {{transactionProposal}}\
+  \ and supporting reports: Technical {{technicalReport}}, Sentiment {{sentimentReport}},\
+  \ News/Macro {{newsMacroReport}}, Fundamentals {{fundamentalsReport}}, and Holdings\
+  \ {{userInput}}. Also review the Aggressive view {{aggressiveRiskView}} and Conservative\
+  \ view {{conservativeRiskView}}. Weigh both sides and argue for the balanced, moderate-risk\
+  \ path."
+pre: []
+post: []
+toolGroups: []

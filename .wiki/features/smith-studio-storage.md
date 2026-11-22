@@ -6,14 +6,19 @@ language: "default"
 source_paths:
   - "prod/embabel-smith-studio/src/main/java/com/embabel/smith/studio/storage/StorageContext.java"
   - "prod/embabel-smith-studio/src/main/java/com/embabel/smith/studio/storage/StorageBinding.java"
+  - "prod/embabel-smith-studio/src/main/java/com/embabel/smith/studio/storage/PacksKeyMigration.java"
+  - "prod/embabel-smith-studio/src/main/java/com/embabel/smith/studio/storage/entity/PackEntity.java"
   - "prod/embabel-smith-studio/src/main/java/com/embabel/smith/studio/storage/StorageSettings.java"
   - "prod/embabel-smith-studio/src/main/java/com/embabel/smith/studio/storage/JpaTraceStore.java"
+  - "smith-common/src/main/java/com/embabel/smith/common/trace/TraceStore.java"
+  - "smith-common/src/main/java/com/embabel/smith/common/trace/TraceRecord.java"
+  - "prod/embabel-smith-runtime/src/main/java/com/embabel/smith/runtime/trace/JsonlTraceStore.java"
   - "prod/embabel-smith-studio/src/main/java/com/embabel/smith/studio/store/ProcessStore.java"
   - "prod/embabel-smith-studio/src/main/java/com/embabel/smith/studio/rest/StorageSettingsController.java"
   - "prod/embabel-smith-studio/src/main/java/com/embabel/smith/studio/rest/StoreController.java"
   - "prod/embabel-smith-studio/frontend/src/panes/StoragePane.vue"
   - "docker/docker-compose-infra.yml"
-updated_at: "2026-11-14"
+updated_at: "2026-11-22"
 ---
 
 # The smith studio's durable storage
@@ -51,9 +56,18 @@ separate trace DB that is unreachable keeps the previous trace backend rather th
 rebind.
 
 **Entities** (portable column types only — long text is `SqlTypes.LONGVARCHAR`, *not* `@Lob`, which
-would map to Postgres' non-portable `oid` large-object type): `packs` (name PK, denormalized
-goal/steps/saved_at, content = the `AgentSpec` as JSON), `discovery_history`, and `traces` (the
-scalar fields of a run trace; per-step records as a JSON array in `steps_json`).
+would map to Postgres' non-portable `oid` large-object type): `packs` (**`(name, version)` primary
+key**, so every version of a pack is its own row; denormalized goal/steps/saved_at, content = the
+`AgentSpec` as JSON; a bare name read back means that pack's highest version, compared in Java rather
+than in a query — see [[smith-studio]] and `docs/06-spec-sources.md`), `discovery_history`, and
+`traces` (the scalar fields of a run trace; per-step records as a JSON array in `steps_json`).
+
+`hbm2ddl.auto=update` adds tables and columns but never re-keys a primary key, so a studio deployed
+before the composite key would come up with a name-keyed table under an entity expecting two key
+columns. `storage/PacksKeyMigration` runs at bind time, **before** the entity-manager factory is
+built: it reads the key through JDBC metadata and, when it is not `(name, version)`, adds the column,
+backfills each row from the version its own stored `content` declares (default `1.0.0`), and replaces
+the key. Rows are never dropped.
 
 ## The Storage pane and settings
 
@@ -67,7 +81,7 @@ database they configure.
 
 ## The pack store API
 
-`StoreController` is the whole durable-pack surface, and all five routes go through `ProcessStore`:
+`StoreController` is the whole durable-pack surface, and all six routes go through `ProcessStore`:
 
 - `POST /api/store/packs` — save an assembled pack; `GET /api/store/packs` — list what is stored
   (name + goal + step summary); `GET /api/store/packs/{name}` — load one back as JSON.
@@ -84,12 +98,13 @@ The Process workspace ([[studio-process-workspace]]) exposes a per-pack **Downlo
 
 ## Pluggable trace backends
 
-The runtime module defines a `TraceStore` SPI (`append` / `read`); `JsonlTraceStore` is the default
-and the CLI `--trace-dir` is unchanged. The studio adds `JpaTraceStore` against a storage binding
-(same or separate database). `StorageContext` exposes a **delegating** `TraceStore` that forwards to
-the current backend, so the backend can switch **at runtime** — `jsonl` (default), `postgres-same`
-(the packs' database), or `postgres-separate` (an independent database) — without the record shape
-changing.
+The `TraceStore` SPI (`append` / `read`) and its `TraceRecord` live in `smith-common`
+(`common/trace/`), not in the runtime module; the implementations stayed there — `JsonlTraceStore` is
+the default and the CLI `--trace-dir` is unchanged. The studio adds `JpaTraceStore` against a storage
+binding (same or separate database). `StorageContext` exposes a **delegating** `TraceStore` that
+forwards to the current backend, so the backend can switch **at runtime** — `jsonl` (default),
+`postgres-same` (the packs' database), or `postgres-separate` (an independent database) — without the
+record shape changing.
 
 ## Development database and test profile
 

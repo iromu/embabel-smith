@@ -10,6 +10,7 @@ import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Pattern;
+
 import org.iromu.embabel.smith.skillevaluator.model.Severity;
 import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
@@ -18,7 +19,6 @@ import org.yaml.snakeyaml.constructor.SafeConstructor;
 /**
  * The severity and identity policy a validator applies, ported from the subset of
  * {@code validators/policy.py} that the schema check consumes.
- *
  * <p>
  * Deviation: upstream resolves the active policy from CLI flags and the
  * {@code SKILLEVALUATOR_PROFILE} environment variable and can overlay custom policy
@@ -26,6 +26,8 @@ import org.yaml.snakeyaml.constructor.SafeConstructor;
  * bundled {@code default} profile from the classpath (with the same in-memory fallback
  * the Python loader uses when the YAML is missing). Severity overrides therefore only
  * ever carry the default profile's values.
+ *
+ * @author Ivan Rodriguez
  */
 final class SchemaPolicy {
 
@@ -63,10 +65,12 @@ final class SchemaPolicy {
 	 * The default policy for both public and private repositories: the bundled
 	 * {@code default} profile, falling back to the in-memory default when the resource
 	 * cannot be read or parsed.
+	 * @return the loaded {@code default} profile, or the in-memory fallback when loading
+	 * it failed
 	 */
 	static SchemaPolicy defaultPolicy() {
 		SchemaPolicy loaded = loadProfile(DEFAULT_PROFILE_NAME);
-		return loaded != null ? loaded : fallback();
+		return (loaded != null) ? loaded : fallback();
 	}
 
 	private static SchemaPolicy fallback() {
@@ -80,7 +84,13 @@ final class SchemaPolicy {
 		return new SchemaPolicy(DEFAULT_PROFILE_NAME, null, overrides, DEFAULT_METADATA_ID_REQUIREMENT);
 	}
 
-	/** Load a bundled profile YAML, or {@code null} when it is absent or unreadable. */
+	/**
+	 * Load a bundled profile YAML, or {@code null} when it is absent or unreadable.
+	 * @param name profile name, looked up as {@code <name>.yaml} under the bundled
+	 * profiles directory
+	 * @return the parsed policy, or {@code null} when the resource is missing, is not a
+	 * mapping, or fails to load
+	 */
 	private static SchemaPolicy loadProfile(String name) {
 		try (InputStream in = SchemaPolicy.class
 			.getResourceAsStream("/org/skillevaluator/config/profiles/" + name + ".yaml")) {
@@ -94,7 +104,7 @@ final class SchemaPolicy {
 			}
 			return fromData(root, name);
 		}
-		catch (Exception e) {
+		catch (Exception ex) {
 			return null;
 		}
 	}
@@ -104,7 +114,7 @@ final class SchemaPolicy {
 		String profileName = String.valueOf(orDefault(data.get("profile"), fallbackProfile));
 
 		Object identityRaw = data.get("identity");
-		Map<String, Object> identity = identityRaw instanceof Map<?, ?> m ? (Map<String, Object>) m : Map.of();
+		Map<String, Object> identity = (identityRaw instanceof Map<?, ?> m) ? (Map<String, Object>) m : Map.of();
 
 		Pattern emailRegex = null;
 		Object emailValue = identity.get("author_email_regex");
@@ -118,7 +128,7 @@ final class SchemaPolicy {
 				emailRegex = null;
 			}
 		}
-		String requirement = identity.get("metadata_id_requirement") instanceof String s ? s : null;
+		String requirement = (identity.get("metadata_id_requirement") instanceof String s) ? s : null;
 
 		Map<String, Severity> overrides = new LinkedHashMap<>();
 		if (data.get("severity_overrides") instanceof Map<?, ?> rawOverrides) {
@@ -131,47 +141,58 @@ final class SchemaPolicy {
 			}
 		}
 		return new SchemaPolicy(profileName, emailRegex, overrides,
-				requirement != null ? requirement : DEFAULT_METADATA_ID_REQUIREMENT);
+				(requirement != null) ? requirement : DEFAULT_METADATA_ID_REQUIREMENT);
 	}
 
 	private static Object orDefault(Object value, Object fallbackValue) {
-		return value == null || String.valueOf(value).isEmpty() ? fallbackValue : value;
+		return (value == null || String.valueOf(value).isEmpty()) ? fallbackValue : value;
 	}
 
 	String getProfile() {
-		return profile;
+		return this.profile;
 	}
 
 	Pattern getAuthorEmailRegex() {
-		return authorEmailRegex;
+		return this.authorEmailRegex;
 	}
 
 	String getMetadataIdRequirement() {
-		return metadataIdRequirement;
+		return this.metadataIdRequirement;
 	}
 
 	/**
 	 * Return the severity for {@code CATEGORY.check_name} or {@code CATEGORY.*}, else
 	 * {@code default}.
+	 * @param category finding category, such as {@code SCHEMA}
+	 * @param checkName check identifier, such as {@code author_format}
+	 * @param defaultValue severity to use when the profile overrides neither the check
+	 * nor its category
+	 * @return the exact-check override, else the category wildcard override, else
+	 * {@code defaultValue}
 	 */
 	Severity severityFor(String category, String checkName, Severity defaultValue) {
-		Severity exact = severityOverrides.get(category + "." + checkName);
+		Severity exact = this.severityOverrides.get(category + "." + checkName);
 		if (exact != null) {
 			return exact;
 		}
-		Severity wildcard = severityOverrides.get(category + ".*");
-		return wildcard != null ? wildcard : defaultValue;
+		Severity wildcard = this.severityOverrides.get(category + ".*");
+		return (wildcard != null) ? wildcard : defaultValue;
 	}
 
-	/** Always true when no domain regex is configured; independent of the shape check. */
+	/**
+	 * Always true when no domain regex is configured; independent of the shape check.
+	 * @param author the author value to test against the configured domain regex
+	 * @return {@code true} when no domain regex is set, or it matches somewhere in the
+	 * value
+	 */
 	boolean isAuthorEmailAcceptable(String author) {
-		return authorEmailRegex == null || authorEmailRegex.matcher(author).find();
+		return this.authorEmailRegex == null || this.authorEmailRegex.matcher(author).find();
 	}
 
 	/** Profile name in lower case, for diagnostics only. */
 	@Override
 	public String toString() {
-		return "SchemaPolicy[" + profile.toLowerCase(Locale.ROOT) + "]";
+		return "SchemaPolicy[" + this.profile.toLowerCase(Locale.ROOT) + "]";
 	}
 
 }

@@ -9,8 +9,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-import com.embabel.smith.runtime.trace.TraceRecord;
-import com.embabel.smith.studio.improve.TraceWindowReader;
+import com.embabel.smith.builder.improve.TraceWindowReader;
+import com.embabel.smith.common.trace.TraceRecord;
 import com.embabel.smith.studio.rest.dto.TraceInfo;
 import com.embabel.smith.studio.storage.StorageContext;
 

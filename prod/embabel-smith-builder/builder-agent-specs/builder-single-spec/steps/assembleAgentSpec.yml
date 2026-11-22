@@ -1,0 +1,61 @@
+stepType: action
+name: assembleAgentSpec
+description: "Assemble the whole agent spec as one JSON document; Java parses this text into the spec it writes"
+inputTypeNames:
+  - ProcessScope
+  - StagePlan
+  - TypeCatalog
+  - SpecBindings
+outputTypeName: AgentSpecJson
+pre: []
+post: []
+cost: null
+value: null
+canRerun: null
+nullable: null
+toolGroups:
+  - validate
+prompt: |
+  Emit the agent spec for the process below as ONE JSON object and nothing else. Match these field
+  names exactly.
+  {
+    "manifest": { "name": "<snake_case_pack_name>", "version": "1.0.0" },
+    "goal": {
+      "stepType": "goal",
+      "name": "<goal_name>",
+      "description": "<what the finished run returns>",
+      "outputTypeName": "<FinalOutputType>",
+      "export": true
+    },
+    "steps": [
+      {
+        "stepType": "action",
+        "name": "<step_name>",
+        "description": "<what this step does, in business terms>",
+        "inputTypeNames": ["<TypeA>", "<TypeB>"],
+        "outputTypeName": "<TypeOut>",
+        "prompt": "<template that produces the output from the inputs>",
+        "toolGroups": []
+      }
+    ],
+    "types": [
+      { "name": "<Type>", "description": "<what this data is>" }
+    ]
+  }
+  Use the pack name, goal output type, steps, types and wiring decided below; keep the step order the
+  plan gave. Use PascalCase type names and snake_case step and goal names.
+  Each step's own prompt is a template that produces its output from its inputs. In it, reference
+  each input EXACTLY by its decapitalized type name: first letter lower-cased, with no underscores
+  and no spaces. So type `MarketReport` is referenced as `marketReport`, type `UserInput` as
+  `userInput`, and type `TechnicalReport` as `technicalReport`. Never write a snake_case variable
+  such as `market_report`. Keep each step's prompt in business terms.
+  The first step or steps take `UserInput` as their input. List in `types` every intermediate type —
+  every output type that is not `UserInput` — each with a one-line description.
+  Output ONLY the JSON object: no markdown fences, no commentary before or after.
+  Pack name: {{processScope.packName}}
+  Process being modelled: {{processScope.primaryProcess}}
+  Goal output type: {{processScope.finalDeliverable}}
+  Steps, in run order: {{stagePlan.steps}}
+  Types: {{typeCatalog.types}}
+  Wiring, goal producer and any unresolved gaps: {{specBindings.handoffs}}
+  Unresolved gaps: {{specBindings.gaps}}

@@ -1,0 +1,8 @@
+name: AgentSpecJson
+description: "The finished agent spec as JSON text, not as a nested object; Java parses this string into the spec"
+ownProperties:
+  - name: json
+    type: string
+    description: "One JSON document with manifest, goal, steps and types, as text"
+parents: []
+creationPermitted: true

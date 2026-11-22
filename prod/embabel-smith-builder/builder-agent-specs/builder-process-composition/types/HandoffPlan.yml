@@ -1,0 +1,11 @@
+name: HandoffPlan
+description: "The shared types that connect the agents, and any agent that is not self-contained"
+ownProperties:
+  - name: handoffs
+    type: string
+    description: "One line per hand-off: producing agent, shared PascalCase type, consuming agent"
+  - name: gaps
+    type: string
+    description: "Types an agent needs that nothing produces, and agents whose goal its own steps do not produce; 'none' when sound"
+parents: []
+creationPermitted: true

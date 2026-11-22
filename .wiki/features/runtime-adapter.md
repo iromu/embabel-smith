@@ -12,7 +12,11 @@ source_paths:
   - "poc/poc-13-remote-mcp/src/main/java/com/embabel/smith/remote/RemoteMcpServerApp.java"
   - "poc/poc-16-remote-action/src/main/java/com/embabel/smith/remote/RemoteActionSidecar.java"
   - "poc/poc-16-remote-action/src/main/java/com/embabel/smith/remote/RemoteActionApp.java"
-updated_at: "2026-11-02"
+  - "prod/embabel-smith-runtime/src/main/java/com/embabel/smith/runtime/remote/RemoteActionBridge.java"
+  - "prod/embabel-smith-runtime/src/main/java/com/embabel/smith/runtime/remote/RemoteBridges.java"
+  - "prod/embabel-smith-studio/src/main/java/com/embabel/smith/studio/rest/RemoteController.java"
+  - "docs/07-runtime.md"
+updated_at: "2026-11-22"
 ---
 
 # Runtime adapter: CLI + remote/MCP + remote-action invocation (POC 7, POC 13, POC 16)
@@ -109,3 +113,11 @@ chain `UserInput → remoteDigest → BackgroundMessage`. The whole plan is dete
 (the endpoint is only for platform boot). Live: the plan `remoteDigest` ran in `PT0.127S` and the
 sidecar produced the result. Four offline `RemoteActionSidecarTest` tests pin the three-endpoint
 contract. See `poc/poc-16-remote-action/README.md` and `docs/04-poc-run-results.md` §5.
+
+**In the product.** The POC's client is not what shipped. `runtime/remote/RemoteActionBridge` in
+[[smith-runtime]] is the product's client for the same three-endpoint contract — plain
+`java.net.http`, no remote library — and its only consumer is the studio's `rest/RemoteController`.
+It lists what a sidecar advertises and runs the action a person names; it does not plan over it.
+`embabel-agent-remote` is not a dependency of any `prod/` module, and the pack format has no step
+kind that can name a remote action, so the `RestAction` chaining described above stays POC-only
+(`docs/07-runtime.md` §"Remote action bridges").

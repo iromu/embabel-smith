@@ -5,6 +5,7 @@
 
 package com.embabel.smith.runtime.trace;
 
+import com.embabel.smith.common.trace.TraceRecord;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;

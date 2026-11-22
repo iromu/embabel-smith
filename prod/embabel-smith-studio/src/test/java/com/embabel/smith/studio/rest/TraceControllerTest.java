@@ -6,7 +6,7 @@
 package com.embabel.smith.studio.rest;
 
 import com.embabel.smith.runtime.trace.JsonlTraceStore;
-import com.embabel.smith.runtime.trace.TraceRecord;
+import com.embabel.smith.common.trace.TraceRecord;
 import com.embabel.smith.studio.rest.dto.TraceInfo;
 import com.embabel.smith.studio.storage.StorageContext;
 import com.embabel.smith.studio.storage.StorageSettingsService;

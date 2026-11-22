@@ -8,7 +8,7 @@ package com.embabel.smith.studio.rest;
 import com.embabel.smith.common.config.ModelEndpointConfig;
 import com.embabel.smith.runtime.AgentSpecRunService;
 import com.embabel.smith.runtime.core.TrustTier;
-import com.embabel.smith.runtime.trace.TraceRecord;
+import com.embabel.smith.common.trace.TraceRecord;
 import com.embabel.smith.studio.rest.dto.RunRequest;
 import com.embabel.smith.studio.rest.dto.RunResponse;
 import org.junit.jupiter.api.Test;

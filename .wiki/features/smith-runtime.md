@@ -6,18 +6,32 @@ language: "default"
 source_paths:
   - "prod/embabel-smith-runtime/src/main/java/com/embabel/smith/runtime/AgentSpecRunService.java"
   - "prod/embabel-smith-runtime/src/main/java/com/embabel/smith/runtime/core/RuntimeCore.java"
+  - "prod/embabel-smith-runtime/src/main/java/com/embabel/smith/runtime/core/LifecycleSidecar.java"
+  - "prod/embabel-smith-runtime/src/main/java/com/embabel/smith/runtime/core/LifecycleBlockedException.java"
   - "prod/embabel-smith-runtime/src/main/java/com/embabel/smith/runtime/cli/RunCommand.java"
   - "prod/embabel-smith-runtime/src/main/java/com/embabel/smith/runtime/trace/TraceRecorder.java"
   - "prod/embabel-smith-runtime/src/main/java/com/embabel/smith/runtime/trace/JsonlTraceStore.java"
+  - "prod/embabel-smith-runtime/src/main/java/com/embabel/smith/runtime/core/StepSpecAssembler.java"
+  - "prod/embabel-smith-runtime/src/main/java/com/embabel/smith/runtime/remote/RemoteActionBridge.java"
+  - "prod/embabel-smith-runtime/src/main/java/com/embabel/smith/runtime/remote/RemoteBridges.java"
+  - "prod/embabel-smith-runtime/src/main/java/com/embabel/smith/runtime/remote/RemoteBridge.java"
+  - "prod/embabel-smith-runtime/src/main/java/com/embabel/smith/runtime/remote/AdvertisedAction.java"
+  - "prod/embabel-smith-runtime/src/main/java/com/embabel/smith/runtime/remote/BridgeState.java"
+  - "prod/embabel-smith-runtime/src/main/java/com/embabel/smith/runtime/remote/ExecuteResult.java"
+  - "prod/embabel-smith-builder/src/main/java/com/embabel/smith/builder/eval/StepSpecAssembler.java"
+  - "prod/embabel-smith-studio/src/main/java/com/embabel/smith/studio/rest/RunController.java"
+  - "prod/embabel-smith-studio/src/main/java/com/embabel/smith/studio/rest/RemoteController.java"
+  - "docs/07-runtime.md"
   - "prod/embabel-smith-runtime/README.md"
-updated_at: "2026-11-09"
+updated_at: "2026-11-22"
 ---
 
 # The smith runtime product (`smith run`)
 
 `prod/embabel-smith-runtime` is the product's runtime: it ingests agent specs from a source
 (`folder:` or `git:` URI, see [[spec-sources]]), runs an exported goal over them, enforces trust
-tiers, and records every run as a JSONL trace. It extracts POC 1's no-code ingest + run and
+tiers and the lifecycle state, and records every run as a JSONL trace. It extracts POC 1's no-code
+ingest + run and
 generalizes it to **multi-pack** (POC 6), adding POC 10's trust tiers and a per-run trace.
 Everything executed is *data* (the pack YAML): ingestion deploys the packs' step specs onto the
 Embabel `AgentPlatform`, planning uses a non-model planner (default GOAP), and only the action
@@ -44,8 +58,9 @@ without it the CLI exits 1 with a clear configuration error naming the missing v
 
 ## Ingest + run
 
-`AgentSpecRunService` (a plain class — the CLI and the studio both embed it) owns the flow: parse +
-resolve the source, ingest, run, record. `RuntimeCore.ingest(source)` reads every pack, builds a
+`AgentSpecRunService` (a plain class — the CLI, the studio and the A2A endpoint all embed it) owns
+the flow: parse + resolve the source, ingest, run, record. `RuntimeCore.ingest(source)` reads every
+pack, builds a
 shared `DataDictionary` from the built-in I/O types plus every pack's intermediate types
 (deduplicated by name — the shared type is the cross-pack composition glue), assembles step specs,
 and deploys one agent. A source with no packs, or two packs exporting the same goal name, is an
@@ -57,6 +72,75 @@ Every run attempt emits a trace — including ones that fail *before* resolution
 source URI, ingestion error, ambiguous goal selection): the record carries the source URI with
 `pack` null. And a trace-write failure never changes the run's result — tracing observes, never
 intervenes (the record is simply dropped).
+
+## The lifecycle gate
+
+A pack whose `lifecycle.yml` says `retired` is **not ingested at all**: `RuntimeCore.ingest` skips it
+before deployment (`core/RuntimeCore.java:113`), because a retired pack left on the platform keeps its
+actions plannable from a live pack's goal. A pack with no `lifecycle.yml` has no recorded state, which
+stays runnable; a source whose packs are *all* retired reports an empty source.
+
+A run that asks for a goal exported only by a retired pack throws `LifecycleBlockedException`
+(`core/LifecycleBlockedException.java`), carrying the stable message prefix
+`Run blocked by lifecycle state` plus the pack's name. That type is deliberately **not** a
+`GoalNotFoundException`: retirement makes the goal genuinely absent, and a goal-not-found message would
+be indistinguishable from a typo — and the improvement loop reads failures by their message prefix, so
+it would classify a policy outcome as a spec defect and start refining prompts against it. The documented
+revival is an explicit rebuild, which republishes the pack and leaves `retired`; there is no runtime
+override. The block follows the trust-tier convention, and `AgentSpecRunService` catches the three
+together (`GoalNotFoundException`, `LifecycleBlockedException`, `TrustTierBlockedException`) as run
+failures rather than crashes.
+
+## Per-run model pinning
+
+`AgentSpecRunService.run(sourceUri, goal, input, plannerOverride, tier, model)` takes a sixth
+argument: the LLM every action step runs on. `RuntimeCore.ingest(source, model)` passes it to
+`StepSpecAssembler.assemble(packDirs, targetDir, model)`, which writes an `llm.model` key into each
+step as it copies that step into the flat staged step directory. The pin is a property of the *run*,
+not of the pack: the source pack on disk keeps exactly what it had, and a step that already declared
+an `llm` block keeps its other keys with only `model` replaced. A blank model leaves every step on the
+model its own YAML names, which is what both other doors do — `RunCommand` has no `--model` flag and
+the A2A handler calls the five-argument overload. The studio is the caller that pins:
+`rest/RunController` passes `request.model()`. The builder keeps its own copy of the assembler
+(`builder/eval/StepSpecAssembler.java`) with the same model argument.
+
+## The remote-action client
+
+`runtime/remote/` is the product's client for a remote-action sidecar — the three-endpoint contract
+POC 16 proved (`GET /api/v1/actions`, `GET /api/v1/types`, `POST /api/v1/actions/execute`) — written
+on plain `java.net.http.HttpClient`, so no remote library enters the product. It calls two of the
+three: the catalog call is the reachability probe and the execute call runs an action, while
+`GET /api/v1/types` is deliberately not fetched — the pane's one text box feeds only a `UserInput`,
+and `AdvertisedAction.singleUserInput` marks an action declaring anything else as not runnable.
+`probe()` decides reachability from the *response*: a 2xx whose body is not a JSON array is
+unreachable, and a sidecar that never answers is a returned `BridgeState` rather than a thrown
+exception, because an absent process is a state a pane has to display. Two settings behind that are
+fixed rather than configured: **3 seconds to connect and 10 for the request** (`CONNECT_TIMEOUT` /
+`REQUEST_TIMEOUT`) — the bridge list renders when a pane opens, so a timeout knob nobody asked for
+buys a UI that can hang on a host that accepts the socket and never answers. And when the failure
+carries no message (on this JVM `java.net.ConnectException` arrives with a null message all the way
+down the cause chain) the reason kept is the exception's **own name**, which is what lets a reader
+tell "refused the socket" apart from "answered with something that was not a catalog". `execute()` returns an
+`ExecuteResult` in one of three states — executed with the sidecar's `content`, refused carrying the
+sidecar's own status and untouched body, or unreachable. `RemoteBridges.parse` reads the operator's
+comma-separated `name@url` list and reports the entries it cannot parse instead of inventing a name
+or a host; `RemoteBridge`, `AdvertisedAction` and `BridgeState` are the shapes. The tests are
+offline, against a stub sidecar.
+
+Its only consumer is the studio's `rest/RemoteController`, which holds no HTTP of its own — the
+studio's `NoDirectModelRequestTest` fails the build when a studio production source imports
+`java.net.http.`, which is why the client lives in this module. That controller never starts a
+sidecar and never accepts an address from a request: a request names a configured bridge, and a name
+configuration does not define is refused before anything is contacted.
+
+**Planning over a remote action is not a product capability** (`docs/07-runtime.md` §"Remote action
+bridges"). The bridge can report that a sidecar offers an action, and it can run that action because a
+person named it; it cannot put a remote action into a GOAP plan. The pack format has no step kind that
+can name a remote action, so there is nothing for a planner to select; `embabel-agent-remote`, which
+supplies `RestAction`, is not a dependency of any `prod/` module and must not become one before that
+format decision; and remote actions would have to be registered into the platform the planner
+searches, which the ingest path never does. The bridge is a pane feature, and the planning half stays
+POC-only ([[runtime-adapter]]).
 
 ## The JSONL trace
 
@@ -78,6 +162,13 @@ The overall outcome comes from `getStatus()` / `getFailureInfo()` / `lastResult(
 (it implements `ConditionStep`) against the final `BlackboardWorldState` — a precondition is unmet
 when its key is not `TRUE`. See the module README's "Trace seam" section for the full spike
 findings.
+
+## A third door: the A2A endpoint
+
+`prod/embabel-smith-runtime-a2a` (`make run-a2a`) drives the same `AgentSpecRunService` over the
+A2A protocol, so an A2A run is the same run: same tier gate, same planner selection, one record in
+the same JSONL trace — which is also what its `tasks/get` reads. It is an unauthenticated local
+development surface on port 18090, serving five operations. See [[a2a-endpoint]].
 
 ## Tests
 

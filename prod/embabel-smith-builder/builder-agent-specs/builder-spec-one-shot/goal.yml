@@ -1,0 +1,5 @@
+stepType: goal
+name: agentSpecDraftedInOneCall
+description: "The agent spec for the described process has been authored as JSON text in one model call, for Java to parse"
+outputTypeName: AgentSpecJson
+export: true

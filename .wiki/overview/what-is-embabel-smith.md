@@ -8,13 +8,14 @@ source_paths:
   - "docs/03-embabel-spec-agent-builder-design.md"
   - "docs/04-poc-run-results.md"
   - "pom.xml"
-updated_at: "2026-11-03"
+  - ".github/workflows/offline-verification.yml"
+updated_at: "2026-11-22"
 ---
 
 # What is Embabel Smith?
 
-Embabel Smith is a **greenfield, multi-module Maven proof-of-concept** on **Embabel 1.5.3** and
-**Java 21**. It proves one idea end to end:
+Embabel Smith is a **multi-module Maven project** on **Embabel 1.5.4** and **Java 21** — POC evidence
+under `poc/`, a working product under `prod/` (see [[product-phase]]). It proves one idea end to end:
 
 > A *builder agent* turns a natural-language description into an **agent spec** (a directory of
 > pure YAML, no code), validates it before writing, and emits it. A separate **fixed no-code
@@ -87,12 +88,25 @@ Each POC is an independent module so a failure isolates to one claim (design D1)
 - **POC 20** — a real semantic `EmbeddingService` (an ONNX sentence-encoder) behind the
   `SpecScorer` seam.
 
+**Seven more since (POC 21–27)** moved past the spec-format envelope into generation, portable units
+and self-improvement: install-time skill security (21), the unified builder UI (22), remote embedding
+selection at 1000-spec scale (23), single-shot vs the Embabel NL compiler (24), blueprint → Agent
+Skills (25), GraalJS skill scripts (26), and whether the builder can improve its own building process
+(27 — verdict: *not proven*). [[what-the-pocs-prove]] carries all of them.
+
 The per-POC verdicts, caveats, and run evidence are distilled in [[what-the-pocs-prove]].
 
 ## Offline vs. endpoint-gated
 
-The whole project **builds and tests offline** (`mvn -q verify`). Only the steps that actually call
-a model are **endpoint-gated** and require a live OpenAI-compatible endpoint — see
-[[model-endpoint]]. POC 8 (retrieval) and POC 11 (progressive disclosure) are fully offline; the
-rest of the run paths are endpoint-gated. This split is what lets the repo verify all non-LLM logic
-in CI without any model.
+The whole project **builds and tests offline** (`make build` / `make test`, or bare `mvn verify`). Only
+the steps that actually call a model are **endpoint-gated** and require a live OpenAI-compatible
+endpoint — see [[model-endpoint]]. POC 8 (retrieval) and POC 11 (progressive disclosure) are fully
+offline; the rest of the run paths are endpoint-gated. This split is what lets CI verify all non-LLM
+logic without any model: `.github/workflows/offline-verification.yml` runs the Makefile targets
+(`make build`, `make test`, `make lint`), not a bare `mvn verify`, and `make test` still excludes the
+live group by tag.
+
+Two things that trip people up: the POCs sit **outside the default reactor** (they build with `-Ppoc`,
+so a plain `mvn verify` covers `smith-common` + `prod/` only), and the endpoint-gated tests are
+excluded by tag by default — `make test-live` is the opt-in, not `make test`. See
+[[getting-started]] and [[build-tooling]].

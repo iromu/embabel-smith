@@ -1,0 +1,14 @@
+name: StagePlan
+description: "The ordered action steps the agent spec will carry, one per role or stage of the process"
+ownProperties:
+  - name: steps
+    type: string
+    description: "One line per step, in run order: step name, artifact produced, artifacts consumed, what it does"
+  - name: finalDeliverable
+    type: string
+    description: "PascalCase name of the type the last meaningful step produces, which the goal returns"
+  - name: decisionPoints
+    type: string
+    description: "The decision points and hand-offs made explicit between steps, one per line"
+parents: []
+creationPermitted: true

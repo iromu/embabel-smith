@@ -7,8 +7,8 @@ package com.embabel.smith.studio.rest.dto;
 
 import java.util.List;
 
+import com.embabel.smith.common.trace.TraceRecord;
 import com.embabel.smith.runtime.AgentSpecRunService;
-import com.embabel.smith.runtime.trace.TraceRecord;
 
 /**
  * The simulate response: the run outcome plus the per-step trace, so the UI can show the

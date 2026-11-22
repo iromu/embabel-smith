@@ -5,6 +5,8 @@
 
 package com.embabel.smith.runtime.trace;
 
+import com.embabel.smith.common.trace.TraceRecord;
+import com.embabel.smith.common.trace.TraceStore;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 

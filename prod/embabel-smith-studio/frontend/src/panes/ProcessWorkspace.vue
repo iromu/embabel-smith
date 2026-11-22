@@ -157,20 +157,30 @@
       <!-- 3. Flow graph -->
       <SectionCard title="Flow graph" icon="account_tree">
         <template #actions>
-          <q-btn
-            v-if="nodes.length"
-            label="Fit view"
-            outline
-            icon="fit_screen"
-            @click="doFitView"
-            data-test="pw-fit"
-          />
+          <div class="row items-center q-gutter-sm">
+            <q-btn
+              v-if="nodes.length"
+              label="Fit view"
+              outline
+              icon="fit_screen"
+              @click="doFitView"
+              data-test="pw-fit"
+            />
+            <q-btn
+              v-if="nodes.length"
+              label="Rearrange view"
+              outline
+              icon="grid_view"
+              @click="doRearrange"
+              data-test="pw-rearrange"
+            />
+          </div>
         </template>
         <div data-test="pw-canvas">
           <div class="pw-canvas">
             <VueFlow
                 v-model:nodes="nodes"
-                v-model:edges="edges"
+                :edges="renderedEdges"
                 :is-valid-connection="onValidConnection"
                 :nodes-draggable="true"
                 :delete-key-code="null"
@@ -178,18 +188,21 @@
                 :max-zoom="2"
                 @connect="onConnect"
                 @node-click="onNodeClick"
+                @pane-click="clearFocus"
               >
                 <template #node-step="props">
                   <div
                     class="compose-node compose-node--step"
                     :class="{ 'compose-node--sim': simStatus((props.data as ComposeStep).name) }"
+                    :style="stepBoxStyle(props.id)"
                   >
                     <Handle
-                      v-for="t in (props.data as ComposeStep).inputTypeNames"
+                      v-for="(t, i) in (props.data as ComposeStep).inputTypeNames"
                       :key="'in-' + t"
                       type="target"
-                      :position="Position.Top"
+                      :position="Position.Left"
                       :id="'in:' + t"
+                      :style="handleSlot(i, (props.data as ComposeStep).inputTypeNames)"
                     />
                     <div class="compose-node__body">
                       <div class="compose-node__title">{{ (props.data as ComposeStep).name }}</div>
@@ -197,14 +210,14 @@
                     </div>
                     <Handle
                       type="source"
-                      :position="Position.Bottom"
+                      :position="Position.Right"
                       :id="'out:' + (props.data as ComposeStep).outputTypeName"
                     />
                   </div>
                 </template>
                 <template #node-goal="props">
                   <div class="compose-node compose-node--goal">
-                    <Handle type="target" :position="Position.Top" :id="'in:' + (props.data as ComposeGoal).outputTypeName" />
+                    <Handle type="target" :position="Position.Left" :id="'in:' + (props.data as ComposeGoal).outputTypeName" />
                     <div class="compose-node__body">
                       <div class="compose-node__title">{{ (props.data as ComposeGoal).name }}</div>
                       <div class="compose-node__meta">goal · {{ (props.data as ComposeGoal).outputTypeName }}</div>
@@ -487,7 +500,10 @@ import type {
 import {
   assemblePack,
   isValidConnection,
+  layoutFlow,
+  nodeEdgeColors,
   packToNodes,
+  styleEdges,
   type ComposeGoal,
   type ComposeStep,
 } from '../compose/model'
@@ -534,6 +550,18 @@ async function doFitView(): Promise<void> {
 }
 
 /**
+ * Re-runs the layered layout over the drawn flow, cutting the crossings that hand-dragging and
+ * simulation leave behind, then frames the result. The framing is what reads the canvas: fit-to-view
+ * measures the flow against the box it is shown in, so a flow the user zoomed out on is re-fitted to
+ * what they can see rather than stretched across it.
+ */
+function doRearrange(): void {
+  const positions = layoutFlow(nodes.value, edges.value)
+  nodes.value = nodes.value.map((n: any) => ({ ...n, position: positions[n.id] ?? n.position }))
+  void doFitView()
+}
+
+/**
  * Vue Flow measures node dimensions asynchronously after mount; fitting before that is a no-op.
  * Poll the flow's nodes until every one is measured, then fit (with a bounded fallback).
  */
@@ -568,6 +596,34 @@ const goalData = computed<ComposeGoal | null>(() =>
 function onNodeClick({ node }: { node: any }) {
   selected.value = node
 }
+
+function clearFocus() {
+  selected.value = null
+}
+
+// ---- Edge coloring ----
+// The focused step's in-edges are green and its out-edges red; with nothing focused every edge
+// carries its producer's identity color, so a step's fan-out is traceable by eye.
+const focusedId = computed<string | null>(() => selected.value?.id ?? null)
+const edgeColors = computed(() => nodeEdgeColors(nodes.value))
+const renderedEdges = computed(() => styleEdges(edges.value, nodes.value, focusedId.value))
+
+/**
+ * The step box's border carries the color of the lines leaving it, which is what keys the edge
+ * colors. A custom property rather than a border so the simulation highlight can still win.
+ */
+function stepBoxStyle(id: string): Record<string, string> {
+  return { '--step-color': edgeColors.value[id] }
+}
+
+/**
+ * Spreads the handles one side of a step is carrying down that side. Vue Flow parks every handle on
+ * an edge at the same midpoint, so on a step with several inputs only one of them could be grabbed.
+ */
+function handleSlot(index: number, types: readonly string[]): Record<string, string> {
+  return { top: `${(((index + 1) * 100) / (types.length + 1)).toFixed(2)}%` }
+}
+
 function onValidConnection(connection: Connection): boolean {
   return isValidConnection(connection.sourceHandle ?? null, connection.targetHandle ?? null)
 }
@@ -898,6 +954,11 @@ onMounted(async () => {
   color: var(--text-strong, #e2e8f0);
   font-size: 13px;
   cursor: pointer;
+}
+.compose-node--step {
+  /* The box is outlined in the color of the edges it produces, so those edges are traceable.
+     Declared before --sim so a simulated step's highlight still owns the border. */
+  border-color: var(--step-color, var(--border, #2b3a4f));
 }
 .compose-node--goal {
   border-color: var(--nav-active, #4f46e5);

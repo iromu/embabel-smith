@@ -1,0 +1,8 @@
+name: AgentSplit
+description: "The agents of the process, one coherent responsibility each, in run order"
+ownProperties:
+  - name: agents
+    type: string
+    description: "One line per agent, in run order: agent name, responsibility owned, goal name, goal output type, artifacts needed"
+parents: []
+creationPermitted: true

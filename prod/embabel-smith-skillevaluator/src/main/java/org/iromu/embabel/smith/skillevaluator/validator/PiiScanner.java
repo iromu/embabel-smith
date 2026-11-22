@@ -28,6 +28,7 @@ import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
+
 import org.iromu.embabel.smith.skillevaluator.model.Finding;
 import org.iromu.embabel.smith.skillevaluator.model.Severity;
 import org.iromu.embabel.smith.skillevaluator.model.ValidationResult;
@@ -45,12 +46,9 @@ import org.yaml.snakeyaml.constructor.SafeConstructor;
  * guards) plus {@code validators/pii_ownership.py}. It is the {@code pii} Tier 1 check:
  * display name {@code PII Scan}, description {@code Detect PII and local
  * identifiers} (upstream {@code tier1/commands.py}).
- *
- * <h2>What the check does</h2>
- *
- * Every scannable file of the skill is matched against the patterns in
- * {@code org/skillevaluator/config/pii_patterns.yaml} (copied byte-for-byte from
- * upstream's config dir) with per-category guards that drop the technical data those
+ * <h2>What the check does</h2> Every scannable file of the skill is matched against the
+ * patterns in {@code org/skillevaluator/config/pii_patterns.yaml} (copied byte-for-byte
+ * from upstream's config dir) with per-category guards that drop the technical data those
  * shapes also describe: version literals and CIDR-looking artifact names for IPv4,
  * Luhn/GUID/identifier rules for card numbers, scientific-notation exponents for phone
  * numbers, GeoJSON and geospatial cues for coordinate pairs, the Proton virtual profile
@@ -60,15 +58,12 @@ import org.yaml.snakeyaml.constructor.SafeConstructor;
  * Comment lines in the file's own syntax are skipped (see {@link PiiCommentLines}) and a
  * declared ownership contact is reported as {@code ownership_emails} rather than
  * {@code emails} (see {@link PiiOwnership}).
- *
  * <p>
  * Findings are then folded: repeated values produce one finding per
  * {@code (check, value)} carrying an occurrence list and the
  * {@code " — N occurrences (…)"} message suffix, so a doc-heavy skill that repeats one
  * address twenty times reads as one row.
- *
  * <h2>Documented deviations from upstream</h2>
- *
  * <ul>
  * <li><b>No waiver machinery and no LLM verification.</b> {@code pii_waiver_path},
  * {@code _with_pii_waivers} and {@code verify_llm} are out of scope for this port, so
@@ -115,6 +110,8 @@ import org.yaml.snakeyaml.constructor.SafeConstructor;
  * skill is scanned as LF text and no {@code line_content} carries a trailing carriage
  * return.</li>
  * </ul>
+ *
+ * @author Ivan Rodriguez
  */
 public class PiiScanner extends ValidatorBase {
 
@@ -317,6 +314,8 @@ public class PiiScanner extends ValidatorBase {
 	 * the home-path check instead of the environment. An empty collection disables
 	 * submitter detection entirely, which is how the upstream tests keep a result
 	 * independent of whoever runs it.
+	 * @param submitterUsernames identities whose {@code /home/<user>/} paths count as
+	 * PII; normalized to trimmed lowercase, and empty disables the home-path check
 	 */
 	public PiiScanner(Collection<String> submitterUsernames) {
 		this(System::getenv, normalizeUsernames(submitterUsernames));
@@ -326,6 +325,8 @@ public class PiiScanner extends ValidatorBase {
 	 * Test seam for the environment lookup. The JVM cannot change its own environment, so
 	 * the {@link Constants#HOME_PATH_SUBMITTER_ENV_VARS} read goes through this function
 	 * ({@code System::getenv} by default).
+	 * @param environment looks up one submitter-environment variable by name, returning
+	 * its identity or {@code null}
 	 */
 	public PiiScanner(Function<String, String> environment) {
 		this(environment, null);
@@ -359,7 +360,12 @@ public class PiiScanner extends ValidatorBase {
 
 	// ------------------------------------------------------------------ scan
 
-	/** Python {@code _scan_for_pii}. */
+	/**
+	 * Python {@code _scan_for_pii}.
+	 * @param skillPath folder or single skill file to scan
+	 * @return the scan result: one folded finding per {@code (check, value)}, or the
+	 * success and warning messages when nothing matched
+	 */
 	ValidationResult scanForPii(Path skillPath) {
 		ValidationResult result = new ValidationResult();
 		List<Path> files = ScanPaths.iterScannableFiles(skillPath, Constants.SCANNABLE_EXTENSIONS);
@@ -377,8 +383,8 @@ public class PiiScanner extends ValidatorBase {
 		// no-op; warn once per instance so operators can enable it via
 		// SKILLEVALUATOR_SUBMITTER (logged, not per matched line).
 		Set<String> protectedUsernames = protectedHomeUsernames(skillPath);
-		if (protectedUsernames.isEmpty() && !homeCheckDisabledWarned) {
-			homeCheckDisabledWarned = true;
+		if (protectedUsernames.isEmpty() && !this.homeCheckDisabledWarned) {
+			this.homeCheckDisabledWarned = true;
 			LOG.log(System.Logger.Level.WARNING,
 					"home-path PII check disabled: could not resolve author or submitter identity. "
 							+ "Set SKILLEVALUATOR_SUBMITTER (or add 'author' to SKILL.md) to enable it.");
@@ -391,10 +397,10 @@ public class PiiScanner extends ValidatorBase {
 			String relativePath = relativize(filePath, skillPath);
 			for (Candidate data : scanFileForPii(filePath, protectedUsernames, skillPath)) {
 				String value = data.matchedValue();
-				String key = value == null || value.isEmpty()
+				String key = (value == null || value.isEmpty())
 						? "p" + data.category() + "\u0000" + relativePath + "\u0000" + data.line()
 						: "v" + data.category() + "\u0000" + casefold(value);
-				groups.computeIfAbsent(key, ignored -> new Group(data, relativePath))
+				groups.computeIfAbsent(key, (ignored) -> new Group(data, relativePath))
 					.add(relativePath, data.line(), data.confidence());
 			}
 		}
@@ -411,16 +417,21 @@ public class PiiScanner extends ValidatorBase {
 		return result;
 	}
 
-	/** Python's per-group {@code Finding(...)} construction. */
+	/**
+	 * Python's per-group {@code Finding(...)} construction.
+	 * @param group one {@code (check, value)} group of occurrences
+	 * @return the finding to report: masked value and dropped line content for a
+	 * sensitive category, occurrence metadata and message suffix when the value repeats
+	 */
 	private Finding toFinding(Group group) {
 		Candidate first = group.first();
 		String severity = first.severity().toUpperCase(Locale.ROOT);
 		String value = first.matchedValue();
 		boolean hasValue = value != null && !value.isEmpty();
 		boolean sensitive = SENSITIVE_PII_CATEGORIES.contains(first.category());
-		String displayValue = sensitive && hasValue ? "[REDACTED]" : value;
+		String displayValue = (sensitive && hasValue) ? "[REDACTED]" : value;
 
-		String message = displayValue != null && !displayValue.isEmpty() ? first.description() + ": " + displayValue
+		String message = (displayValue != null && !displayValue.isEmpty()) ? first.description() + ": " + displayValue
 				: first.description();
 
 		Map<String, Object> metadata = new LinkedHashMap<>();
@@ -456,7 +467,12 @@ public class PiiScanner extends ValidatorBase {
 				first.line(), lineContent, first.suggestion(), metadata);
 	}
 
-	/** Python {@code _format_occurrences}: {@code a.md lines 3, 9; b.md line 12}. */
+	/**
+	 * Python {@code _format_occurrences}: {@code a.md lines 3, 9; b.md line 12}.
+	 * @param occurrences the places a value was seen, in discovery order
+	 * @return the occurrences grouped per file, joined with {@code "; "}, capped at 3
+	 * files and 10 lines each
+	 */
 	static String formatOccurrences(List<Occurrence> occurrences) {
 		return formatOccurrences(occurrences, 3, 10);
 	}
@@ -464,7 +480,7 @@ public class PiiScanner extends ValidatorBase {
 	static String formatOccurrences(List<Occurrence> occurrences, int maxFiles, int maxLines) {
 		Map<String, List<Integer>> byFile = new LinkedHashMap<>();
 		for (Occurrence occurrence : occurrences) {
-			byFile.computeIfAbsent(occurrence.file(), ignored -> new ArrayList<>()).add(occurrence.line());
+			byFile.computeIfAbsent(occurrence.file(), (ignored) -> new ArrayList<>()).add(occurrence.line());
 		}
 		List<String> parts = new ArrayList<>();
 		int index = 0;
@@ -485,14 +501,22 @@ public class PiiScanner extends ValidatorBase {
 			if (lines.size() > maxLines) {
 				shown.append(", …");
 			}
-			parts.add(entry.getKey() + (lines.size() == 1 ? " line " : " lines ") + shown);
+			parts.add(entry.getKey() + ((lines.size() == 1) ? " line " : " lines ") + shown);
 		}
 		return String.join("; ", parts);
 	}
 
 	// ----------------------------------------------------------- one file
 
-	/** Python {@code _scan_file_for_pii}. */
+	/**
+	 * Python {@code _scan_file_for_pii}.
+	 * @param filePath the file to scan
+	 * @param protectedUsernames identities whose home paths count as PII; {@code null} is
+	 * treated as none
+	 * @param skillRoot scanned root that decides whether this file is the manifest
+	 * declaring ownership contacts; {@code null} falls back to the file's parent
+	 * @return one candidate per matched line, empty for an unreadable file or no matches
+	 */
 	List<Candidate> scanFileForPii(Path filePath, Set<String> protectedUsernames, Path skillRoot) {
 		String content = readUtf8Lenient(filePath);
 		if (content == null) {
@@ -502,7 +526,7 @@ public class PiiScanner extends ValidatorBase {
 
 		List<String> lines = splitOnNewline(content);
 		Map<Integer, String> authorEmails = frontmatterAuthorEmails(filePath, lines);
-		Path root = skillRoot == null ? filePath.getParent() : skillRoot;
+		Path root = (skillRoot != null) ? skillRoot : filePath.getParent();
 		// Only the manifest sitting directly in the scanned directory may declare
 		// ownership contacts; a SKILL.md nested deeper in the tree is content.
 		boolean isRootManifest = root != null && (root.equals(filePath.getParent()) || root.equals(filePath));
@@ -513,7 +537,7 @@ public class PiiScanner extends ValidatorBase {
 		List<Candidate> findings = new ArrayList<>();
 		for (CompiledPattern compiled : compiledPatterns()) {
 			scanLinesForPattern(lines, compiled, filePath, findings,
-					protectedUsernames == null ? Set.of() : protectedUsernames, authorEmails, commentLines,
+					(protectedUsernames != null) ? protectedUsernames : Set.of(), authorEmails, commentLines,
 					ownershipSpans);
 		}
 		return findings;
@@ -522,6 +546,11 @@ public class PiiScanner extends ValidatorBase {
 	/**
 	 * Python {@code _frontmatter_author_emails}: frontmatter lines that echo the declared
 	 * author address.
+	 * @param filePath the file being scanned, only its name consulted for the manifest
+	 * test
+	 * @param lines the file split on newlines
+	 * @return line number to declared address for each frontmatter author line, empty
+	 * unless this is a manifest with a parseable author identity
 	 */
 	Map<Integer, String> frontmatterAuthorEmails(Path filePath, List<String> lines) {
 		Map<Integer, String> out = new LinkedHashMap<>();
@@ -541,7 +570,7 @@ public class PiiScanner extends ValidatorBase {
 			return out;
 		}
 		Matcher identity = AUTHOR_IDENTITY
-			.matcher(authorIdentity(filePath.getParent()) == null ? "" : authorIdentity(filePath.getParent()));
+			.matcher((authorIdentity(filePath.getParent()) == null) ? "" : authorIdentity(filePath.getParent()));
 		if (!identity.matches()) {
 			return out;
 		}
@@ -557,15 +586,23 @@ public class PiiScanner extends ValidatorBase {
 		return out;
 	}
 
-	/** Python {@code _is_frontmatter_delimiter} (BOM-prefixed openers included). */
+	/**
+	 * Python {@code _is_frontmatter_delimiter} (BOM-prefixed openers included).
+	 * @param line the line to test, stripped of a byte-order mark
+	 * @return {@code true} when the line is nothing but the {@code ---} delimiter
+	 */
 	static boolean isFrontmatterDelimiter(String line) {
 		return line.strip().replace("\uFEFF", "").strip().equals("---");
 	}
 
-	/** Python {@code _compile_pii_patterns}. */
+	/**
+	 * Python {@code _compile_pii_patterns}.
+	 * @return every config entry with a compilable pattern, global and per-pattern
+	 * exceptions merged, cached after the first call
+	 */
 	private List<CompiledPattern> compiledPatterns() {
-		if (compiledPatterns != null) {
-			return compiledPatterns;
+		if (this.compiledPatterns != null) {
+			return this.compiledPatterns;
 		}
 		Map<String, Object> patterns = piiPatterns();
 		List<String> globalExceptions = globalExceptions(patterns);
@@ -586,7 +623,7 @@ public class PiiScanner extends ValidatorBase {
 				try {
 					regex = Pattern.compile(String.valueOf(raw), PATTERN_FLAGS);
 				}
-				catch (PatternSyntaxException e) {
+				catch (PatternSyntaxException ex) {
 					continue;
 				}
 				List<String> exceptions = new ArrayList<>(globalExceptions);
@@ -598,16 +635,19 @@ public class PiiScanner extends ValidatorBase {
 				compiled.add(new CompiledPattern(entry.getKey(), regex, exceptions, asStringMap(definition)));
 			}
 		}
-		compiledPatterns = compiled;
+		this.compiledPatterns = compiled;
 		return compiled;
 	}
 
-	/** Python {@code pii_patterns} — lazily loaded {@code pii_patterns.yaml}. */
+	/**
+	 * Python {@code pii_patterns} — lazily loaded {@code pii_patterns.yaml}.
+	 * @return the parsed pattern config, loaded from the classpath on first use
+	 */
 	Map<String, Object> piiPatterns() {
-		if (piiPatterns == null) {
-			piiPatterns = PiiConfig.load();
+		if (this.piiPatterns == null) {
+			this.piiPatterns = PiiConfig.load();
 		}
-		return piiPatterns;
+		return this.piiPatterns;
 	}
 
 	@SuppressWarnings("unchecked")
@@ -622,7 +662,20 @@ public class PiiScanner extends ValidatorBase {
 		return out;
 	}
 
-	/** Python {@code _scan_lines_for_pattern}. */
+	/**
+	 * Python {@code _scan_lines_for_pattern}: one config entry over one file's lines,
+	 * skipping comments and applying the category's false-positive guards.
+	 * @param lines the file split on newlines
+	 * @param compiled the config entry to search for
+	 * @param filePath the file being scanned, for its name and GeoJSON cue scan
+	 * @param findings accumulator that receives each surviving match
+	 * @param protectedUsernames identities whose home paths count as PII
+	 * @param authorEmails line number to declared author address, blanked rather than
+	 * deleted so offsets stay intact
+	 * @param commentLines lines to skip, in the file's own comment syntax
+	 * @param ownershipSpans manifest line number to contact spans that reclassify an
+	 * email as {@code ownership_emails}
+	 */
 	private void scanLinesForPattern(List<String> lines, CompiledPattern compiled, Path filePath,
 			List<Candidate> findings, Set<String> protectedUsernames, Map<Integer, String> authorEmails,
 			Set<Integer> commentLines, Map<Integer, List<int[]>> ownershipSpans) {
@@ -668,7 +721,7 @@ public class PiiScanner extends ValidatorBase {
 			if (!exceptedCardDigits.isEmpty()) {
 				Set<String> digits = exceptedCardDigits;
 				matches = matches.stream()
-					.filter(match -> !digits.contains(CARD_SEPARATORS.matcher(match.value()).replaceAll("")))
+					.filter((match) -> !digits.contains(CARD_SEPARATORS.matcher(match.value()).replaceAll("")))
 					.toList();
 			}
 			if (matches.isEmpty() || containsAny(line, lineExceptions)) {
@@ -677,7 +730,7 @@ public class PiiScanner extends ValidatorBase {
 			if ("credit_cards".equals(category) || "phone_numbers".equals(category)) {
 				String numericCategory = category;
 				matches = matches.stream()
-					.filter(match -> !isNumericPiiFalsePositive(numericCategory, match, line))
+					.filter((match) -> !isNumericPiiFalsePositive(numericCategory, match, line))
 					.toList();
 			}
 			if ("gps_coordinates".equals(category)) {
@@ -701,20 +754,20 @@ public class PiiScanner extends ValidatorBase {
 				}
 			}
 			else if ("ip_addresses".equals(category)) {
-				matches = matches.stream().filter(match -> !isVersionLiteral(match, line)).toList();
+				matches = matches.stream().filter((match) -> !isVersionLiteral(match, line)).toList();
 			}
 			else if ("personal_paths".equals(category)) {
-				matches = matches.stream().filter(match -> !isProtonVirtualProfile(match, line)).toList();
+				matches = matches.stream().filter((match) -> !isProtonVirtualProfile(match, line)).toList();
 			}
 			else if ("home_paths".equals(category)) {
 				// /home/<root>/ is PII only when <root> is the author/submitter.
-				matches = matches.stream().filter(match -> isPersonalHomePath(match, protectedUsernames)).toList();
+				matches = matches.stream().filter((match) -> isPersonalHomePath(match, protectedUsernames)).toList();
 			}
 			else if ("credit_cards".equals(category)) {
 				// Check every candidate: a GUID or non-Luhn number must not hide a later
 				// card.
-				String previousLine = lineNum > 1 ? lines.get(lineNum - 2) : "";
-				matches = matches.stream().filter(match -> isCardNumberCandidate(match, line, previousLine)).toList();
+				String previousLine = (lineNum > 1) ? lines.get(lineNum - 2) : "";
+				matches = matches.stream().filter((match) -> isCardNumberCandidate(match, line, previousLine)).toList();
 			}
 			if (matches.isEmpty()) {
 				continue;
@@ -733,7 +786,7 @@ public class PiiScanner extends ValidatorBase {
 				List<int[]> spans = ownershipSpans.getOrDefault(lineNum, List.of());
 				for (Cand candidate : matches) {
 					String check = spans.stream()
-						.anyMatch(span -> span[0] == candidate.start() && span[1] == candidate.end())
+						.anyMatch((span) -> span[0] == candidate.start() && span[1] == candidate.end())
 								? "ownership_emails" : "emails";
 					candidates.putIfAbsent(check, candidate);
 				}
@@ -761,7 +814,13 @@ public class PiiScanner extends ValidatorBase {
 
 	// ------------------------------------------------------- false-positive guards
 
-	/** Python {@code _estimate_confidence}. */
+	/**
+	 * Python {@code _estimate_confidence}.
+	 * @param category the check being reported
+	 * @param line the matched line, searched for the technical hint words
+	 * @return {@code high} for an always-high category, otherwise {@code low} at two
+	 * hints, {@code medium} at one and {@code high} at none
+	 */
 	String estimateConfidence(String category, String line) {
 		if (HIGH_CONFIDENCE_CATEGORIES.contains(category)) {
 			return "high";
@@ -776,12 +835,17 @@ public class PiiScanner extends ValidatorBase {
 		if (hints >= 2) {
 			return "low";
 		}
-		return hints == 1 ? "medium" : "high";
+		return (hints == 1) ? "medium" : "high";
 	}
 
 	/**
 	 * Python {@code _is_personal_home_path}: anchored to the captured first component
 	 * after {@code /home/}.
+	 * @param match the home-path candidate, whose first capture group holds the user
+	 * component
+	 * @param protectedUsernames identities that count as personal
+	 * @return {@code true} when the captured component is one of them; a missing or empty
+	 * capture, or no protected identity, is never PII
 	 */
 	static boolean isPersonalHomePath(Cand match, Set<String> protectedUsernames) {
 		// Python bails when the pattern has no group or no group participated in the
@@ -797,12 +861,23 @@ public class PiiScanner extends ValidatorBase {
 		return protectedUsernames.contains(trimmed.toLowerCase(Locale.ROOT));
 	}
 
-	/** Python {@code _is_near_zero_gps}. */
+	/**
+	 * Python {@code _is_near_zero_gps}.
+	 * @param line the matched line
+	 * @return {@code true} when it holds a {@code 0.0, 0.0} pair, the null-island
+	 * position
+	 */
 	static boolean isNearZeroGps(String line) {
 		return GPS_ZERO_PATTERN.matcher(line).find();
 	}
 
-	/** Python {@code _is_proton_virtual_profile}. */
+	/**
+	 * Python {@code _is_proton_virtual_profile}.
+	 * @param match the personal-path candidate, expected to be {@code /users/steamuser/}
+	 * @param line the matched line, inspected for the preceding prefix
+	 * @return {@code true} when {@code pfx/drive_c} reaches the match at a boundary and
+	 * no {@code ..} segment follows it, so the Proton mount is not a traversal
+	 */
 	static boolean isProtonVirtualProfile(Cand match, String line) {
 		String value = match.value();
 		if (!isAscii(value) || !value.toLowerCase(Locale.ROOT).equals("/users/steamuser/")) {
@@ -821,7 +896,16 @@ public class PiiScanner extends ValidatorBase {
 		return !DOT_DOT_SEGMENT_PATTERN.matcher(line.substring(match.end())).find();
 	}
 
-	/** Python {@code _is_numeric_pii_false_positive}. */
+	/**
+	 * Python {@code _is_numeric_pii_false_positive}.
+	 * @param category the check being reported; only {@code credit_cards} and
+	 * {@code phone_numbers} have guards
+	 * @param match the candidate whose offsets anchor each context window
+	 * @param line the matched line, searched backwards for a label and around the match
+	 * for an exponent
+	 * @return {@code true} when the number is technical — a timestamp, hash or identifier
+	 * component for a card, a scientific-notation exponent for a phone number
+	 */
 	static boolean isNumericPiiFalsePositive(String category, Cand match, String line) {
 		if ("credit_cards".equals(category)) {
 			// A Luhn-valid timestamp or digest is not payment data. Only a label
@@ -862,14 +946,24 @@ public class PiiScanner extends ValidatorBase {
 		return false;
 	}
 
-	/** Python {@code _cue_text_variants}. */
+	/**
+	 * Python {@code _cue_text_variants}.
+	 * @param text the label or context to search for a cue
+	 * @return the text with underscores spaced, plus the camel-case split variant when
+	 * splitting changes it
+	 */
 	static List<String> cueTextVariants(String text) {
 		String spaced = text.replace('_', ' ');
 		String split = CAMEL_CASE_BOUNDARY.matcher(spaced).replaceAll(" ");
 		return split.equals(spaced) ? List.of(spaced) : List.of(spaced, split);
 	}
 
-	/** Python {@code _search_cue}. */
+	/**
+	 * Python {@code _search_cue}.
+	 * @param pattern the cue to look for
+	 * @param variants the spellings to try, underscores and camel case alike
+	 * @return {@code true} when any variant contains the cue
+	 */
 	private static boolean searchCue(Pattern pattern, List<String> variants) {
 		for (String variant : variants) {
 			if (pattern.matcher(variant).find()) {
@@ -879,11 +973,20 @@ public class PiiScanner extends ValidatorBase {
 		return false;
 	}
 
-	/** Python {@code _lacks_geospatial_context}. */
+	/**
+	 * Python {@code _lacks_geospatial_context}.
+	 * @param line the matched line holding the coordinate pair
+	 * @param context the file name plus the lines above it, searched for a far cue
+	 * @param pairStart offset where the pair starts, or {@code null} for the whole line
+	 * @param labelStart offset the preceding label begins at, the end of the previous
+	 * pair
+	 * @return {@code true} when no geospatial cue explains the pair, so it is a technical
+	 * coordinate and not PII
+	 */
 	static boolean lacksGeospatialContext(String line, String context, Integer pairStart, int labelStart) {
 		List<String> local = cueTextVariants(line);
 		// A technical label labels the pair only when it comes before it.
-		int labelEnd = pairStart == null ? line.length() : pairStart;
+		int labelEnd = (pairStart != null) ? pairStart : line.length();
 		String labelSegment = line.substring(labelStart, labelEnd);
 		int lastSeparator = Math.max(labelSegment.lastIndexOf(';'), labelSegment.lastIndexOf('|'));
 		String tail = labelSegment.substring(lastSeparator + 1);
@@ -924,6 +1027,9 @@ public class PiiScanner extends ValidatorBase {
 	/**
 	 * Python {@code _geojson_coordinate_lines}: 1-based lines inside a geometry's
 	 * coordinates array.
+	 * @param lines the file split on newlines, rejoined to scan its braces and arrays
+	 * @return the 1-based lines inside a GeoJSON geometry's coordinates, empty when the
+	 * text mentions no {@code coordinates} key
 	 */
 	static Set<Integer> geojsonCoordinateLines(List<String> lines) {
 		Set<Integer> numbers = new LinkedHashSet<>();
@@ -944,14 +1050,14 @@ public class PiiScanner extends ValidatorBase {
 		Matcher tokens = JSON_TOKEN_PATTERN.matcher(text);
 		while (tokens.find()) {
 			String bare = tokens.group(3);
-			String value = tokens.group(1) != null ? tokens.group(1) : tokens.group(2);
+			String value = (tokens.group(1) != null) ? tokens.group(1) : tokens.group(2);
 			if (value == null) {
 				value = bare;
 			}
 			String punct = tokens.group(4);
 			Frame top = stack.isEmpty() ? null : stack.get(stack.size() - 1);
 			if (value != null) {
-				Pattern typePattern = bare != null ? GEOJSON_BARE_GEOMETRY_TYPE : GEOJSON_GEOMETRY_TYPE;
+				Pattern typePattern = (bare != null) ? GEOJSON_BARE_GEOMETRY_TYPE : GEOJSON_GEOMETRY_TYPE;
 				if ("type".equals(key) && top != null && "{".equals(top.kind) && typePattern.matcher(value).matches()) {
 					top.geojson = true;
 				}
@@ -963,7 +1069,7 @@ public class PiiScanner extends ValidatorBase {
 				lastString = null;
 			}
 			else if ("{".equals(punct) || "[".equals(punct)) {
-				Frame owner = "[".equals(punct) && "coordinates".equals(key) && top != null && "{".equals(top.kind)
+				Frame owner = ("[".equals(punct) && "coordinates".equals(key) && top != null && "{".equals(top.kind))
 						? top : null;
 				stack.add(new Frame(punct, "{".equals(punct) && "geometry".equals(key), owner, tokens.start()));
 				key = null;
@@ -990,7 +1096,7 @@ public class PiiScanner extends ValidatorBase {
 		}
 
 		// Nested arrays yield nested spans; keep only the outermost of each group.
-		spans.sort((a, b) -> a[0] != b[0] ? Integer.compare(a[0], b[0]) : Integer.compare(a[1], b[1]));
+		spans.sort((a, b) -> (a[0] != b[0]) ? Integer.compare(a[0], b[0]) : Integer.compare(a[1], b[1]));
 		int keptEnd = -1;
 		for (int[] span : spans) {
 			if (span[1] <= keptEnd) {
@@ -1006,7 +1112,13 @@ public class PiiScanner extends ValidatorBase {
 		return numbers;
 	}
 
-	/** Python {@code bisect.bisect_right}: count of entries {@code <= value}. */
+	/**
+	 * Python {@code bisect.bisect_right}: count of entries {@code <= value}.
+	 * @param sorted ascending offsets, here the start offset of each line
+	 * @param value the offset to locate
+	 * @return the number of entries not exceeding {@code value}, which is the 1-based
+	 * line containing it
+	 */
 	private static int bisectRight(int[] sorted, int value) {
 		int low = 0;
 		int high = sorted.length;
@@ -1022,7 +1134,14 @@ public class PiiScanner extends ValidatorBase {
 		return low;
 	}
 
-	/** Python {@code _is_version_literal}. */
+	/**
+	 * Python {@code _is_version_literal}.
+	 * @param match the IPv4-shaped candidate
+	 * @param line the matched line, searched for artifact names, user-agent versions and
+	 * version labels
+	 * @return {@code true} when the number is a package version, a reduced user-agent
+	 * version, or the value of a version or tag label rather than an address
+	 */
 	static boolean isVersionLiteral(Cand match, String line) {
 		String prefix = line.substring(0, match.start());
 		if (URL_AUTHORITY_PREFIX_PATTERN.matcher(prefix).find()) {
@@ -1080,7 +1199,11 @@ public class PiiScanner extends ValidatorBase {
 				&& PACKAGE_VERSION_CALL_PATTERN.matcher(prefix).find();
 	}
 
-	/** Python {@code _passes_luhn}. */
+	/**
+	 * Python {@code _passes_luhn}.
+	 * @param digits the candidate with separators already removed
+	 * @return {@code true} when the checksum is a nonzero multiple of ten
+	 */
 	static boolean passesLuhn(String digits) {
 		int total = 0;
 		for (int i = 0; i < digits.length(); i++) {
@@ -1096,7 +1219,14 @@ public class PiiScanner extends ValidatorBase {
 		return total > 0 && total % 10 == 0;
 	}
 
-	/** Python {@code _is_card_number_candidate}. */
+	/**
+	 * Python {@code _is_card_number_candidate}.
+	 * @param match the credit-card candidate
+	 * @param line the matched line, searched for a GUID containing the match
+	 * @param previousLine the line above, whose tail joins the label window
+	 * @return {@code true} when the digits pass Luhn and either no GUID contains them or
+	 * a payment label precedes that GUID
+	 */
 	static boolean isCardNumberCandidate(Cand match, String line, String previousLine) {
 		String digits = CARD_SEPARATORS.matcher(match.value()).replaceAll("");
 		if (!passesLuhn(digits)) {
@@ -1119,7 +1249,7 @@ public class PiiScanner extends ValidatorBase {
 				&& line.charAt(guid.end()) == '}') {
 			valueStart -= 1;
 		}
-		String previousTail = previousLine.length() > 100 ? previousLine.substring(previousLine.length() - 100)
+		String previousTail = (previousLine.length() > 100) ? previousLine.substring(previousLine.length() - 100)
 				: previousLine;
 		String prefix = previousTail + "\n" + line.substring(Math.max(0, valueStart - 100), valueStart);
 		return PAYMENT_LABEL_PATTERN.matcher(prefix).find();
@@ -1127,7 +1257,12 @@ public class PiiScanner extends ValidatorBase {
 
 	// ------------------------------------------------------------- identity
 
-	/** Python {@code _normalize_usernames}. */
+	/**
+	 * Python {@code _normalize_usernames}.
+	 * @param values the identities as configured, in order; may be {@code null}
+	 * @return trimmed lowercase non-blank identities, duplicates dropped, empty for a
+	 * {@code null} input
+	 */
 	static Set<String> normalizeUsernames(Collection<String> values) {
 		Set<String> names = new LinkedHashSet<>();
 		if (values == null) {
@@ -1141,7 +1276,13 @@ public class PiiScanner extends ValidatorBase {
 		return names;
 	}
 
-	/** Python {@code _usernames_from_identity}. */
+	/**
+	 * Python {@code _usernames_from_identity}.
+	 * @param identity an author or submitter string, an email, a {@code Name <email>}
+	 * pair or a bare name; may be {@code null}
+	 * @return the email's local part plus the bare name when it has no space or angle
+	 * bracket, empty for nothing usable
+	 */
 	static Set<String> usernamesFromIdentity(String identity) {
 		Set<String> names = new LinkedHashSet<>();
 		if (identity == null || identity.isEmpty()) {
@@ -1158,29 +1299,39 @@ public class PiiScanner extends ValidatorBase {
 				&& !text.contains(" ")) {
 			names.add(text.toLowerCase(Locale.ROOT));
 		}
-		names.removeIf(name -> name.isEmpty());
+		names.removeIf((name) -> name.isEmpty());
 		return names;
 	}
 
-	/** Python {@code _submitter_usernames}. */
+	/**
+	 * Python {@code _submitter_usernames}.
+	 * @return the constructor override when set, else the identities read from the
+	 * submitter environment variables and the {@code user.name} property, cached after
+	 * the first call
+	 */
 	Set<String> submitterUsernames() {
-		if (submitterOverride != null) {
-			return submitterOverride;
+		if (this.submitterOverride != null) {
+			return this.submitterOverride;
 		}
-		if (submitterCache != null) {
-			return submitterCache;
+		if (this.submitterCache != null) {
+			return this.submitterCache;
 		}
 		Set<String> names = new LinkedHashSet<>();
 		for (String variable : Constants.HOME_PATH_SUBMITTER_ENV_VARS) {
-			names.addAll(usernamesFromIdentity(environment.apply(variable)));
+			names.addAll(usernamesFromIdentity(this.environment.apply(variable)));
 		}
 		// Upstream falls back to getpass.getuser(); the JVM's equivalent is user.name.
 		names.addAll(usernamesFromIdentity(System.getProperty("user.name")));
-		submitterCache = names;
+		this.submitterCache = names;
 		return names;
 	}
 
-	/** Python {@code _author_identity}. */
+	/**
+	 * Python {@code _author_identity}.
+	 * @param skillPath the skill directory holding the manifest; may be {@code null}
+	 * @return the declared {@code author} as a stripped string, from frontmatter or
+	 * {@code metadata}, or {@code null} when absent, unreadable or unparsable
+	 */
 	String authorIdentity(Path skillPath) {
 		if (skillPath == null || !Files.isDirectory(skillPath)) {
 			return null;
@@ -1201,12 +1352,21 @@ public class PiiScanner extends ValidatorBase {
 		return truthy(author) ? String.valueOf(author).strip() : null;
 	}
 
-	/** Python {@code _author_usernames}. */
+	/**
+	 * Python {@code _author_usernames}.
+	 * @param skillPath the skill directory whose manifest declares the author
+	 * @return the usernames derivable from that author, empty when none is declared
+	 */
 	Set<String> authorUsernames(Path skillPath) {
 		return usernamesFromIdentity(authorIdentity(skillPath));
 	}
 
-	/** Python {@code _protected_home_usernames}. */
+	/**
+	 * Python {@code _protected_home_usernames}.
+	 * @param skillPath the skill directory whose manifest may declare an author
+	 * @return submitter and author identities merged, the set a home path is tested
+	 * against
+	 */
 	Set<String> protectedHomeUsernames(Path skillPath) {
 		Set<String> names = new LinkedHashSet<>(submitterUsernames());
 		names.addAll(authorUsernames(skillPath));
@@ -1218,20 +1378,28 @@ public class PiiScanner extends ValidatorBase {
 	/**
 	 * Python {@code _reported_value}: the value a finding identifies, before display
 	 * redaction.
+	 * @param match the match a finding reports
+	 * @return the matched text, before any {@code [REDACTED]} display masking
 	 */
 	static String reportedValue(Cand match) {
 		return match.value();
 	}
 
-	/** Python {@code pii_evidence_sha256}. */
+	/**
+	 * Python {@code pii_evidence_sha256}.
+	 * @param category the check that matched, mixed in so the same value under two checks
+	 * digests differently
+	 * @param value the matched value, case-folded before hashing
+	 * @return the lowercase hex SHA-256 digest identifying the value for a waiver
+	 */
 	static String evidenceSha256(String category, String value) {
 		try {
 			MessageDigest digest = MessageDigest.getInstance("SHA-256");
 			byte[] hash = digest.digest((category + "\u0000" + casefold(value)).getBytes(StandardCharsets.UTF_8));
 			return HexFormat.of().formatHex(hash);
 		}
-		catch (NoSuchAlgorithmException e) {
-			throw new IllegalStateException("SHA-256 unavailable", e);
+		catch (NoSuchAlgorithmException ex) {
+			throw new IllegalStateException("SHA-256 unavailable", ex);
 		}
 	}
 
@@ -1249,12 +1417,18 @@ public class PiiScanner extends ValidatorBase {
 	 * <p>
 	 * Not covered: Cherokee, where Java folds <em>farther</em> than Python does (into a
 	 * different code-point block). See the class javadoc bullet.
+	 * @param value the string to fold
+	 * @return the case-folded string, the key values are grouped and digested under
 	 */
 	static String casefold(String value) {
 		return applyFullFolds(applyFullFolds(value).toLowerCase(Locale.ROOT));
 	}
 
-	/** Replace each character {@link #fullFold} recognizes with its full-fold value. */
+	/**
+	 * Replace each character {@link #fullFold} recognizes with its full-fold value.
+	 * @param value the string to fold one pass over
+	 * @return the folded string, or {@code value} itself when no character needed folding
+	 */
 	private static String applyFullFolds(String value) {
 		StringBuilder folded = null;
 		for (int i = 0; i < value.length(); i++) {
@@ -1270,13 +1444,16 @@ public class PiiScanner extends ValidatorBase {
 			}
 			folded.append(full);
 		}
-		return folded == null ? value : folded.toString();
+		return (folded != null) ? folded.toString() : value;
 	}
 
 	/**
 	 * The full fold of a character, or null when Java's lowercase mapping already matches
 	 * Python's {@code casefold()}. Values are the full-fold mappings from Unicode's
 	 * {@code CaseFolding.txt} (status F); each one is stable under {@code toLowerCase}.
+	 * @param c the character to fold
+	 * @return its multichar or divergent fold, or {@code null} when plain lowercasing
+	 * already agrees with Python
 	 */
 	private static String fullFold(char c) {
 		return switch (c) {
@@ -1409,13 +1586,19 @@ public class PiiScanner extends ValidatorBase {
 		};
 	}
 
-	/** All non-overlapping matches of {@code regex} in {@code text}. */
+	/**
+	 * All non-overlapping matches of {@code regex} in {@code text}.
+	 * @param regex the pattern to search with
+	 * @param text the line to search
+	 * @return each match with its offsets, its text and its first capture group when the
+	 * pattern has one, empty when nothing matches
+	 */
 	static List<Cand> allMatches(Pattern regex, String text) {
 		List<Cand> out = new ArrayList<>();
 		Matcher matcher = regex.matcher(text);
 		while (matcher.find()) {
 			out.add(new Cand(matcher.start(), matcher.end(), matcher.group(),
-					matcher.groupCount() >= 1 ? matcher.group(1) : null));
+					(matcher.groupCount() >= 1) ? matcher.group(1) : null));
 		}
 		return out;
 	}
@@ -1426,6 +1609,11 @@ public class PiiScanner extends ValidatorBase {
 	 * slice one character wider so a leading lookbehind still sees the character before
 	 * {@code pos}, which is what Python does; the extra character can only start a match
 	 * at {@code from - 1}, which the {@code find(skip)} bound rejects.
+	 * @param pattern the pattern to search for
+	 * @param text the line being searched
+	 * @param from offset the match must start at or after
+	 * @param to offset the match must end at or before, clamped to the text
+	 * @return the first match in the window, or {@code null} when there is none
 	 */
 	static Cand searchWithin(Pattern pattern, String text, int from, int to) {
 		int left = Math.max(0, from - 1);
@@ -1433,13 +1621,18 @@ public class PiiScanner extends ValidatorBase {
 		Matcher matcher = pattern.matcher(text.substring(left, Math.min(to, text.length())));
 		if (matcher.find(skip)) {
 			return new Cand(matcher.start() + left, matcher.end() + left, matcher.group(),
-					matcher.groupCount() >= 1 ? matcher.group(1) : null);
+					(matcher.groupCount() >= 1) ? matcher.group(1) : null);
 		}
 		return null;
 	}
 
 	/**
 	 * Python {@code pattern.finditer(text, pos, endpos)}; same one-character window rule.
+	 * @param pattern the pattern to search for
+	 * @param text the line being searched
+	 * @param from offset matches must start at or after
+	 * @param to offset matches must end at or before, clamped to the text
+	 * @return every non-overlapping match in the window, empty when there are none
 	 */
 	static List<Cand> findAllWithin(Pattern pattern, String text, int from, int to) {
 		List<Cand> out = new ArrayList<>();
@@ -1451,7 +1644,7 @@ public class PiiScanner extends ValidatorBase {
 		}
 		do {
 			out.add(new Cand(matcher.start() + left, matcher.end() + left, matcher.group(),
-					matcher.groupCount() >= 1 ? matcher.group(1) : null));
+					(matcher.groupCount() >= 1) ? matcher.group(1) : null));
 		}
 		while (matcher.find());
 		return out;
@@ -1459,6 +1652,10 @@ public class PiiScanner extends ValidatorBase {
 
 	/**
 	 * Python {@code re.sub(re.escape(value), spaces, line, count=1, flags=IGNORECASE)}.
+	 * @param line the line to scan
+	 * @param value the literal to blank, matched case-insensitively
+	 * @return the line with the first occurrence replaced by spaces of the same length,
+	 * so later offsets hold; unchanged when the value is absent
 	 */
 	static String blankFirstOccurrence(String line, String value) {
 		Matcher matcher = Pattern.compile(Pattern.quote(value), PATTERN_FLAGS).matcher(line);
@@ -1469,7 +1666,12 @@ public class PiiScanner extends ValidatorBase {
 				+ line.substring(matcher.end());
 	}
 
-	/** Python {@code any(exc in line for exc in exceptions)}. */
+	/**
+	 * Python {@code any(exc in line for exc in exceptions)}.
+	 * @param line the matched line
+	 * @param exceptions substrings that exclude this line from the check
+	 * @return {@code true} when the line contains any exception
+	 */
 	private static boolean containsAny(String line, List<String> exceptions) {
 		for (String exception : exceptions) {
 			if (line.contains(exception)) {
@@ -1479,12 +1681,17 @@ public class PiiScanner extends ValidatorBase {
 		return false;
 	}
 
-	/** Python {@code max(confidences, key=rank.get(c, 1))}: the first strongest wins. */
+	/**
+	 * Python {@code max(confidences, key=rank.get(c, 1))}: the first strongest wins.
+	 * @param confidences the values across a value's occurrences, unknown labels ranked
+	 * as {@code medium}
+	 * @return the strongest of them, or {@code "low"} for an empty list
+	 */
 	static String strongestConfidence(List<String> confidences) {
 		String best = "low";
 		int bestRank = -1;
 		for (String confidence : confidences) {
-			int rank = switch (confidence == null ? "" : confidence) {
+			int rank = switch ((confidence != null) ? confidence : "") {
 				case "low" -> 0;
 				case "high" -> 2;
 				default -> 1;
@@ -1498,16 +1705,22 @@ public class PiiScanner extends ValidatorBase {
 	}
 
 	private static boolean isErrorSeverity(String severity) {
-		String upper = severity == null ? "" : severity.toUpperCase(Locale.ROOT);
+		String upper = (severity != null) ? severity.toUpperCase(Locale.ROOT) : "";
 		return upper.equals("CRITICAL") || upper.equals("HIGH");
 	}
 
-	/** Python {@code str(file_path.relative_to(root))}, falling back to the basename. */
+	/**
+	 * Python {@code str(file_path.relative_to(root))}, falling back to the basename.
+	 * @param file the scanned file
+	 * @param root the scanned root it is reported against
+	 * @return the path relative to the root, or just the file's name when the two share
+	 * no root
+	 */
 	static String relativize(Path file, Path root) {
 		try {
 			return root.relativize(file).toString();
 		}
-		catch (IllegalArgumentException e) {
+		catch (IllegalArgumentException ex) {
 			return file.getFileName().toString();
 		}
 	}
@@ -1515,6 +1728,8 @@ public class PiiScanner extends ValidatorBase {
 	/**
 	 * Python {@code content.split("\n")} — trailing empty field kept, {@code \r}
 	 * preserved.
+	 * @param content the file text
+	 * @return the lines, a trailing newline producing a final empty entry
 	 */
 	static List<String> splitOnNewline(String content) {
 		return List.of(content.split("\n", -1));
@@ -1526,6 +1741,9 @@ public class PiiScanner extends ValidatorBase {
 	 * the newline translation, because {@code Path.read_text} opens in universal newline
 	 * mode and hands Python a string with no carriage returns at all. Without it a CRLF
 	 * file's {@code line_content} would end in {@code \r}.
+	 * @param path the file to read
+	 * @return its text without a byte-order mark and with newlines unified, or
+	 * {@code null} when it cannot be read
 	 */
 	static String readUtf8Lenient(Path path) {
 		try {
@@ -1541,7 +1759,7 @@ public class PiiScanner extends ValidatorBase {
 			String text = decoder.decode(java.nio.ByteBuffer.wrap(bytes, offset, bytes.length - offset)).toString();
 			return text.replace("\r\n", "\n").replace('\r', '\n');
 		}
-		catch (IOException e) {
+		catch (IOException ex) {
 			return null;
 		}
 	}
@@ -1575,11 +1793,11 @@ public class PiiScanner extends ValidatorBase {
 	}
 
 	private static String stringOr(Object value, String fallback) {
-		return value == null ? fallback : String.valueOf(value);
+		return (value != null) ? String.valueOf(value) : fallback;
 	}
 
 	private static String optionalString(Object value) {
-		return value == null ? null : String.valueOf(value);
+		return (value != null) ? String.valueOf(value) : null;
 	}
 
 	@SuppressWarnings("unchecked")
@@ -1594,20 +1812,58 @@ public class PiiScanner extends ValidatorBase {
 	/**
 	 * One compiled config entry: Python's
 	 * {@code (category, regex, exceptions, pattern_def)}.
+	 *
+	 * @param category the config key the pattern is listed under, also the reported
+	 * category
+	 * @param regex the compiled pattern
+	 * @param exceptions substrings that exclude a line from this check
+	 * @param definition the raw config entry, source of severity, description and
+	 * suggestion
+	 * @author Ivan Rodriguez
 	 */
 	record CompiledPattern(String category, Pattern regex, List<String> exceptions, Map<String, Object> definition) {
 	}
 
-	/** A candidate match with the offsets and text the guards need. */
+	/**
+	 * A candidate match with the offsets and text the guards need.
+	 *
+	 * @param start offset where the match begins in the scanned text
+	 * @param end offset just past the match
+	 * @param value the matched text
+	 * @param group the first capturing group, or {@code null} when the pattern has none
+	 * or it did not participate
+	 * @author Ivan Rodriguez
+	 */
 	record Cand(int start, int end, String value, String group) {
 	}
 
-	/** Python's per-line {@code finding_data} dict. */
+	/**
+	 * Python's per-line {@code finding_data} dict.
+	 *
+	 * @param file the scanned file's name
+	 * @param line 1-based line number of the match
+	 * @param lineContent the whole source line the match came from
+	 * @param severity the config entry's severity, {@code medium} when it has none
+	 * @param description the config entry's description, or the ownership-contact wording
+	 * @param suggestion remediation hint from the config entry, {@code null} when it has
+	 * none
+	 * @param category the check to report, {@code ownership_emails} for a declared
+	 * contact
+	 * @param confidence {@code low}, {@code medium} or {@code high}
+	 * @param matchedValue the matched text, which drives grouping and the evidence digest
+	 * @author Ivan Rodriguez
+	 */
 	record Candidate(String file, int line, String lineContent, String severity, String description, String suggestion,
 			String category, String confidence, String matchedValue) {
 	}
 
-	/** One {@code (file, line)} place a value was seen. */
+	/**
+	 * One {@code (file, line)} place a value was seen.
+	 *
+	 * @param file path relative to the scanned root
+	 * @param line 1-based line number it was seen on
+	 * @author Ivan Rodriguez
+	 */
 	record Occurrence(String file, int line) {
 	}
 
@@ -1631,24 +1887,24 @@ public class PiiScanner extends ValidatorBase {
 		}
 
 		void add(String file, int line, String confidence) {
-			occurrences.add(new Occurrence(file, line));
-			confidences.add(confidence);
+			this.occurrences.add(new Occurrence(file, line));
+			this.confidences.add(confidence);
 		}
 
 		Candidate first() {
-			return first;
+			return this.first;
 		}
 
 		String firstFile() {
-			return firstFile;
+			return this.firstFile;
 		}
 
 		List<Occurrence> occurrences() {
-			return occurrences;
+			return this.occurrences;
 		}
 
 		List<String> confidences() {
-			return confidences;
+			return this.confidences;
 		}
 
 	}
@@ -1688,7 +1944,7 @@ public class PiiScanner extends ValidatorBase {
 		@SuppressWarnings("unchecked")
 		static Map<String, Object> load() {
 			ClassLoader loader = PiiScanner.class.getClassLoader();
-			InputStream in = loader != null ? loader.getResourceAsStream(PATTERNS_RESOURCE) : null;
+			InputStream in = (loader != null) ? loader.getResourceAsStream(PATTERNS_RESOURCE) : null;
 			if (in == null) {
 				in = ClassLoader.getSystemResourceAsStream(PATTERNS_RESOURCE);
 			}
@@ -1702,8 +1958,8 @@ public class PiiScanner extends ValidatorBase {
 				}
 				return (Map<String, Object>) data;
 			}
-			catch (IOException e) {
-				throw new UncheckedIOException(e);
+			catch (IOException ex) {
+				throw new UncheckedIOException(ex);
 			}
 		}
 

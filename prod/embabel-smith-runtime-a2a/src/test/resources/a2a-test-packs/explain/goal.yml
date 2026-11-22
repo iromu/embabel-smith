@@ -1,0 +1,5 @@
+stepType: goal
+name: explainDone
+description: "A complete explanation has been produced"
+outputTypeName: com.embabel.agent.spec.model.BackgroundMessage
+export: true

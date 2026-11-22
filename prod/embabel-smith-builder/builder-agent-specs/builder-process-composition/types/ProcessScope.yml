@@ -1,0 +1,17 @@
+name: ProcessScope
+description: "The end-to-end process the multi-agent composition must cover, and the responsibilities it contains"
+ownProperties:
+  - name: primaryProcess
+    type: string
+    description: "The core end-to-end process chosen for composition, in one paragraph"
+  - name: responsibilities
+    type: string
+    description: "The responsibilities the process contains, one per line, in the order the process runs them"
+  - name: finalDeliverable
+    type: string
+    description: "PascalCase name of the type the last agent's goal returns"
+  - name: processName
+    type: string
+    description: "snake_case name chosen for the process"
+parents: []
+creationPermitted: true

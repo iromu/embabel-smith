@@ -8,6 +8,7 @@ package com.embabel.smith.builder.skill;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.embabel.smith.builder.core.PromptData;
 import com.embabel.smith.builder.core.SpecPromptCaller;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -46,12 +47,15 @@ public class SkillGrader {
 	 * @return the grading, one entry per expectation, in order.
 	 */
 	public Grading grade(String task, String answer, List<String> expectations) {
-		StringBuilder user = new StringBuilder();
-		user.append("TASK:\n").append(task).append("\n\nANSWER:\n").append(answer).append("\n\nEXPECTATIONS:\n");
+		StringBuilder user = new StringBuilder().append(PromptData.block("task", task))
+			.append("\n\n")
+			.append(PromptData.block("answer", answer))
+			.append("\n\n<expectations>\n");
 		int i = 1;
 		for (String expectation : expectations) {
 			user.append(i++).append(". ").append(expectation).append("\n");
 		}
+		user.append("</expectations>");
 		JsonNode array = LlmJson.callAndParse(this.caller, this.prompt, user.toString(), 3, "the grading",
 				(raw) -> this.json.readTree(raw).path("expectations"));
 

@@ -18,6 +18,13 @@ import com.embabel.smith.common.validation.AgentSpecValidator;
  * the iteration bound has not been reached — rewrites the terminal action's prompt from
  * the failures, re-validates it, and tries again. It never corrupts the pack: a rewrite
  * that fails validation is discarded.
+ * <p>
+ * This is the build-time refinement: it improves a draft that has not been published yet,
+ * driven by which eval tasks failed. The
+ * {@link com.embabel.smith.builder.improve.Refiner} in {@code improve/} does the other
+ * job — rewriting the prompts of the steps named in production failure traces for a pack
+ * already in the spec source. The two are similar by name only and are not
+ * interchangeable.
  *
  * @author Ivan Rodriguez
  */

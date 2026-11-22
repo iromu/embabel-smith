@@ -1,6 +1,7 @@
 # Building Agentic Applications with Skills, Not Agents
 ### A research survey (arXiv-primary, with industry grounding)
-*Compiled 2026-10-30*
+*Compiled 2026-10-30 — a literature snapshot. It makes no claim about this repository; the POC
+evidence for those claims is in [`../04-poc-run-results.md`](../04-poc-run-results.md).*
 
 ---
 

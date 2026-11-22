@@ -9,7 +9,10 @@ source_paths:
   - "poc/poc-18-agent-spec-lifecycle/src/main/java/com/embabel/smith/lifecycle/SpecContentHash.java"
   - "poc/poc-18-agent-spec-lifecycle/src/main/java/com/embabel/smith/lifecycle/LifecycleState.java"
   - "poc/poc-18-agent-spec-lifecycle/src/main/java/com/embabel/smith/lifecycle/LiveEvalRunner.java"
-updated_at: "2026-11-04"
+  - "prod/embabel-smith-builder/src/main/java/com/embabel/smith/builder/lifecycle/LifecycleStamper.java"
+  - "prod/embabel-smith-builder/src/main/java/com/embabel/smith/builder/improve/LifecycleTransitions.java"
+  - "prod/embabel-smith-runtime/src/main/java/com/embabel/smith/runtime/core/LifecycleSidecar.java"
+updated_at: "2026-11-22"
 ---
 
 # Spec lifecycle and drift detection (POC 18)
@@ -64,4 +67,13 @@ reworded (content drift) → regressed **0%** → `RETIRED`. The live re-eval co
 real model. Seventeen offline tests pin the hash, both drift signals, and every state transition.
 The lifecycle is **applied in the POC 15 builder UI**: the retrieval pane drops retired specs and
 de-ranks degraded ones, and the curate re-eval endpoint moves a spec through the lifecycle.
+
+In `prod/` the same states are carried in a `lifecycle.yml` sidecar and are **binding, not advisory**.
+The builder's `lifecycle/LifecycleStamper` always stamps a freshly published pack `incubating` with its
+baseline pass-rate; the improvement loop's `improve/LifecycleTransitions` moves a re-evaluated pack
+(degraded → retired, a healthy re-eval back to active), and a retired pack is only ever republished by an
+explicit rebuild. The runtime then enforces it: a retired pack is not ingested, and a goal exported only
+by one fails with a lifecycle block whose message prefix distinguishes it from a spec defect
+([[smith-runtime]]).
+
 See [[retrieval-shadowing]] and [[what-the-pocs-prove]].

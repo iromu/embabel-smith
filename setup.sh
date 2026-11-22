@@ -51,3 +51,14 @@ else
     echo "error: need node/npx to update project skills and the OpenSpec CLI" >&2
     exit 1
 fi
+
+echo "Installing rules..."
+mkdir -p .qwen/rules && for r in  \
+  typescript-best-practices \
+  python-conventions  \
+  jinja-llm-prompts \
+  ; do
+  curl -fsSL "https://raw.githubusercontent.com/iromu/awesome-qwen/main/rules/$r.md" \
+    -o ".qwen/rules/$r.md"
+done
+echo "Done."

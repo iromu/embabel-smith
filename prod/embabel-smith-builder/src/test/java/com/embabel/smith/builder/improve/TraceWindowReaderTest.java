@@ -1,0 +1,47 @@
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2026 Ivan Rodriguez. All rights reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package com.embabel.smith.builder.improve;
+
+import com.embabel.smith.common.trace.TraceRecord;
+import com.embabel.smith.common.trace.TraceStore;
+import org.junit.jupiter.api.Test;
+
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+class TraceWindowReaderTest {
+
+	@Test
+	void windowBoundsInputAtN() {
+		TraceStore store = new InMemoryTraceStore();
+		for (int i = 0; i < 10; i++) {
+			store.append(TestFixtures.okTrace("r" + i, "extract", "in", TestFixtures.step("s1", "completed", "ok")));
+		}
+
+		TraceWindowReader reader = new TraceWindowReader(store, 3);
+		List<TraceRecord> window = reader.window("extract");
+
+		assertThat(window).hasSize(3); // bounded to the most recent 3
+		assertThat(window.get(0).runId()).isEqualTo("r7");
+		assertThat(window.get(2).runId()).isEqualTo("r9");
+	}
+
+	@Test
+	void windowIsPerSpec() {
+		TraceStore store = new InMemoryTraceStore();
+		store.append(TestFixtures.okTrace("r1", "extract", "in", TestFixtures.step("s1", "completed", "ok")));
+		store.append(TestFixtures.okTrace("r2", "summarize", "in", TestFixtures.step("s1", "completed", "ok")));
+		store.append(TestFixtures.okTrace("r3", "extract", "in", TestFixtures.step("s1", "completed", "ok")));
+
+		TraceWindowReader reader = new TraceWindowReader(store);
+
+		assertThat(reader.window("extract").stream().map(TraceRecord::runId).toList()).containsExactly("r1", "r3");
+		assertThat(reader.window("summarize").stream().map(TraceRecord::runId).toList()).containsExactly("r2");
+		assertThat(reader.specs()).containsExactly("extract", "summarize");
+	}
+
+}

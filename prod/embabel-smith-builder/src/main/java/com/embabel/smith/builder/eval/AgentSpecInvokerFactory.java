@@ -38,6 +38,13 @@ import com.embabel.smith.common.model.ProcessSpec;
  * see every pack's steps and goals together, because the hand-off between two agents is a
  * shared type and a planner that can only see one pack at a time cannot plan across it.
  *
+ * <p>
+ * Deploys carry no tool list. A step can only select a tool from that list by naming it
+ * in a {@code tools:} key, which {@code ActionStepSpec} cannot express, so a wired tool
+ * is unreachable by a pack; the validator reaches these deploys through the platform
+ * instead, because {@code tools/ValidationToolGroup} registers the {@code validate} group
+ * that a builder pack's step already declares.
+ *
  * @author Ivan Rodriguez
  */
 public class AgentSpecInvokerFactory implements InvokerFactory, ProcessInvokerFactory {
@@ -87,6 +94,11 @@ public class AgentSpecInvokerFactory implements InvokerFactory, ProcessInvokerFa
 			throw new IllegalStateException("Failed to assemble step specs for eval: " + ex.getMessage(), ex);
 		}
 		String suffix = Long.toHexString(System.nanoTime());
+		// The last argument is the scope's tool list, and it stays empty: a step selects
+		// from it by a `tools:` name ActionStepSpec cannot express, so a wired tool is
+		// unreachable. The validator arrives as the `validate` group instead — see
+		// tools/ValidationToolGroup. The fifth argument, the scope's own
+		// ToolGroupDescription list, is unchanged.
 		StepSpecAgentScopeBuilder builder = new StepSpecAgentScopeBuilder("builder-eval-scope-" + suffix, this.platform,
 				new YmlStepSpecRepository(stepsDir.toString(), List.of()), types, List.of(), List.of());
 		Agent agent = builder.deploy()
@@ -110,8 +122,31 @@ public class AgentSpecInvokerFactory implements InvokerFactory, ProcessInvokerFa
 			if (last == null) {
 				return null;
 			}
-			return (last instanceof BackgroundMessage message) ? message.getContent() : String.valueOf(last);
+			return goalOutputText(last);
 		};
+	}
+
+	/**
+	 * The content of a completed run's last output. A step whose output type is a
+	 * {@code DynamicType} is answered by {@code PromptedActionSpecAction} as a raw
+	 * {@code Map} of that type's properties — there is no class to read a property off —
+	 * so a value type wrapping one string arrives as {@code {json=<text>}}. Stringifying
+	 * that renders the wrapper, whose unquoted key the spec parse then trips on, so the
+	 * bound text is what gets returned.
+	 * @param last the goal output the blackboard holds
+	 * @return its content as text
+	 */
+	private static String goalOutputText(Object last) {
+		if (last instanceof BackgroundMessage message) {
+			return message.getContent();
+		}
+		if (last instanceof Map<?, ?> properties && properties.size() == 1) {
+			Object only = properties.values().iterator().next();
+			if (only instanceof String text) {
+				return text;
+			}
+		}
+		return String.valueOf(last);
 	}
 
 	/**

@@ -1,0 +1,8 @@
+name: ProcessJson
+description: "The finished multi-agent process as JSON text, not as nested objects; Java parses this string into the process"
+ownProperties:
+  - name: json
+    type: string
+    description: "One JSON document with the process name and its agents in run order, as text"
+parents: []
+creationPermitted: true

@@ -5,6 +5,7 @@
 
 package org.iromu.embabel.smith.skillevaluator.validator;
 
+import java.io.StringReader;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -14,6 +15,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
 import org.iromu.embabel.smith.skillevaluator.util.Constants;
 import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
@@ -28,12 +30,10 @@ import org.yaml.snakeyaml.nodes.NodeTuple;
 import org.yaml.snakeyaml.nodes.ScalarNode;
 import org.yaml.snakeyaml.nodes.SequenceNode;
 import org.yaml.snakeyaml.nodes.Tag;
-import java.io.StringReader;
 
 /**
  * Port of {@code validators/pii_ownership.py}: locate the contact address a skill
  * explicitly declares as its owner, without granting it an exemption.
- *
  * <p>
  * Ownership is a *check*, not a suppression: the address found here is reported as
  * {@code ownership_emails} (still blocking) instead of {@code emails}, so a repository
@@ -43,9 +43,7 @@ import java.io.StringReader;
  * keys, block scalars and prose keep the ordinary email policy. Spans (not whole lines or
  * whole values) are returned so adjacent fields on one flow-mapping line stay
  * independent.
- *
  * <h2>Documented deviations</h2>
- *
  * <ul>
  * <li><b>snakeyaml instead of PyYAML.</b> {@code yaml.parse}/{@code yaml.compose} become
  * snakeyaml's event parser and {@link Yaml#compose}. Node marks carry the same 0-based
@@ -68,6 +66,8 @@ import java.io.StringReader;
  * UTF-16 units here and code points in Python, which only differs for contacts containing
  * astral characters.</li>
  * </ul>
+ *
+ * @author Ivan Rodriguez
  */
 final class PiiOwnership {
 
@@ -102,6 +102,11 @@ final class PiiOwnership {
 	/**
 	 * Python {@code ownership_email_spans}: 1-based file line to the source spans of the
 	 * single-line {@code metadata.pic}/{@code metadata.email} contact values.
+	 * @param filePath file being scanned; a name outside
+	 * {@link Constants#SKILL_MANIFEST_VARIANTS} declares no owner
+	 * @param content full text of that file, whose frontmatter is inspected
+	 * @return file line number to the {@code [start, end)} character spans of the
+	 * declared addresses, empty when no address qualifies as a declared owner
 	 */
 	static Map<Integer, List<int[]>> ownershipEmailSpans(Path filePath, String content) {
 		Map<Integer, List<int[]>> spans = new LinkedHashMap<>();
@@ -141,7 +146,7 @@ final class PiiOwnership {
 				}
 			}
 		}
-		catch (RuntimeException | StackOverflowError e) {
+		catch (RuntimeException | StackOverflowError ex) {
 			// StructuredDataError / YAMLError / RecursionError upstream: no ownership
 			// claim.
 			return spans;
@@ -162,7 +167,7 @@ final class PiiOwnership {
 		}
 		Mark start = value.getStartMark();
 		Mark end = value.getEndMark();
-		String email = contact.group("email") != null ? contact.group("email") : contact.group("namedEmail");
+		String email = (contact.group("email") != null) ? contact.group("email") : contact.group("namedEmail");
 		// Python slices the scalar's *source* text, quotes included: the column of
 		// the opening quote is what the offset is added to, so the value text
 		// (quotes stripped, escapes decoded) would place the span a character early.
@@ -171,7 +176,7 @@ final class PiiOwnership {
 		if (offset >= 0) {
 			int line = start.getLine() + 2; // YAML source begins on file line 2
 			int from = start.getColumn() + offset;
-			spans.computeIfAbsent(line, ignored -> new ArrayList<>()).add(new int[] { from, from + email.length() });
+			spans.computeIfAbsent(line, (ignored) -> new ArrayList<>()).add(new int[] { from, from + email.length() });
 		}
 	}
 
@@ -189,6 +194,9 @@ final class PiiOwnership {
 	 * spellings of one Python value ({@code 1} next to {@code 1.0}, or {@code true} next
 	 * to {@code True}) are not seen as a repeat here; quoted and unquoted forms of the
 	 * same text do match, as they do upstream.
+	 * @param node node to walk, from the document root down through sequences
+	 * @return {@code true} when some mapping repeats a key or holds a non-scalar key,
+	 * both of which upstream's loader rejects
 	 */
 	private static boolean hasDuplicateMappingKey(Node node) {
 		if (node instanceof SequenceNode sequence) {
@@ -228,6 +236,8 @@ final class PiiOwnership {
 
 	/**
 	 * Python's {@code style in ('|', '>')}: a block scalar, whose value may span lines.
+	 * @param style scalar style SnakeYAML assigned to the value
+	 * @return {@code true} for a literal or folded block style
 	 */
 	private static boolean isMultilineStyle(org.yaml.snakeyaml.DumperOptions.ScalarStyle style) {
 		return style == org.yaml.snakeyaml.DumperOptions.ScalarStyle.LITERAL

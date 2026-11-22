@@ -1,0 +1,8 @@
+name: TypeCatalog
+description: "Every intermediate type the agent spec needs, each with a one-line description"
+ownProperties:
+  - name: types
+    type: string
+    description: "One line per type: PascalCase name, colon, one-line description of what the data is"
+parents: []
+creationPermitted: true

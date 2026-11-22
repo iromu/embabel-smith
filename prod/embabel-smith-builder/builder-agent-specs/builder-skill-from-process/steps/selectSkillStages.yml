@@ -1,0 +1,26 @@
+stepType: action
+name: selectSkillStages
+description: "Decide which stages of the process warrant a skill and which are plain prompting"
+inputTypeNames:
+  - ProcessDecomposition
+outputTypeName: StageShortlist
+pre: []
+post: []
+cost: null
+value: null
+canRerun: null
+nullable: null
+toolGroups: []
+prompt: |
+  Decide which stages of the process below warrant a skill of their own.
+  A stage warrants a skill when handling it correctly depends on judgment the process encodes
+  rather than on general competence: it recurs, it has decision points with branch rules, it has
+  escalation rules, or it has counter-intuitive constraints. A stage that just moves an artifact
+  along, or that any capable agent gets right by default, does not need one.
+  Do not split one stage into two skills, and do not merge two stages into one skill unless they
+  share the same decision rules.
+  Under "in": the stages that warrant a skill, one per line, each with the one reason it qualifies.
+  Under "out": the stages that do not, one per line, each with the reason it was left out.
+  Stages, in run order, with their owners: {{processDecomposition.stages}}
+  Decision points and branch rules: {{processDecomposition.decisionRules}}
+  Escalations and hard constraints: {{processDecomposition.escalations}}

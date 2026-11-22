@@ -8,7 +8,7 @@ package com.embabel.smith.runtime.cli;
 import com.embabel.smith.runtime.AgentSpecRunService;
 import com.embabel.smith.runtime.core.GoalNotFoundException;
 import com.embabel.smith.runtime.core.TrustTier;
-import com.embabel.smith.runtime.trace.TraceRecord;
+import com.embabel.smith.common.trace.TraceRecord;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
 import org.iromu.embabel.smith.skillevaluator.model.Finding;
 import org.iromu.embabel.smith.skillevaluator.model.Severity;
 import org.iromu.embabel.smith.skillevaluator.model.ValidationResult;
@@ -35,12 +36,13 @@ import org.yaml.snakeyaml.constructor.SafeConstructor;
 
 /**
  * 4-dimension skill quality analysis with a 0-100 composite score and A-F grades.
- *
  * <p>
  * Port of the Python {@code validators/quality_score.py}: Correctness (35%),
  * Discoverability (25%), Reliability (25%) and Efficiency (15%), scored by deterministic
  * deductions and recorded as {@code QUALITY} findings plus the {@code quality_scores}
  * metadata digest.
+ *
+ * @author Ivan Rodriguez
  */
 public class QualityScoreValidator extends ValidatorBase {
 
@@ -49,10 +51,6 @@ public class QualityScoreValidator extends ValidatorBase {
 	static final double WEIGHT_DISCOVERABILITY = 0.25;
 	static final double WEIGHT_RELIABILITY = 0.25;
 	static final double WEIGHT_EFFICIENCY = 0.15;
-
-	/** Python {@code QUALITY_GRADE_THRESHOLDS}, highest threshold first. */
-	private record GradeThreshold(int threshold, String grade) {
-	}
 
 	private static final List<GradeThreshold> GRADE_THRESHOLDS = List.of(new GradeThreshold(90, "A"),
 			new GradeThreshold(80, "B"), new GradeThreshold(70, "C"), new GradeThreshold(60, "D"),
@@ -77,7 +75,11 @@ public class QualityScoreValidator extends ValidatorBase {
 	 */
 	private static final String PY_DOLLAR = "(?=\\n?\\z)";
 
-	/** Python's {@code str.isspace()} for a single code point. */
+	/**
+	 * Python's {@code str.isspace()} for a single code point.
+	 * @param codePoint the character to test
+	 * @return {@code true} when it is one of the whitespace code points Python accepts
+	 */
 	static boolean pyIsSpace(int codePoint) {
 		if (codePoint >= 0x1C && codePoint <= 0x1F) {
 			return true;
@@ -93,7 +95,11 @@ public class QualityScoreValidator extends ValidatorBase {
 		};
 	}
 
-	/** Python's {@code str.strip()} over Unicode whitespace. */
+	/**
+	 * Python's {@code str.strip()} over Unicode whitespace.
+	 * @param value the string to trim
+	 * @return the string without its leading and trailing whitespace
+	 */
 	static String pyStrip(String value) {
 		int start = 0;
 		int end = value.length();
@@ -117,6 +123,8 @@ public class QualityScoreValidator extends ValidatorBase {
 	/**
 	 * Python's {@code str.split()} with no separator: runs of Unicode whitespace, no
 	 * empty tokens.
+	 * @param value the string to split
+	 * @return the runs of non-whitespace, in order, never empty
 	 */
 	static List<String> pySplitWords(String value) {
 		List<String> words = new ArrayList<>();
@@ -144,6 +152,10 @@ public class QualityScoreValidator extends ValidatorBase {
 	/**
 	 * Python's {@code str.split(sep, maxsplit)}: literal separator, never drops empty
 	 * parts.
+	 * @param text the string to split
+	 * @param separator literal separator to split on, never a regex
+	 * @param maxParts maximum number of parts produced, so Python's {@code maxsplit + 1}
+	 * @return the parts, empty ones included for adjacent separators
 	 */
 	private static String[] literalSplit(String text, String separator, int maxParts) {
 		List<String> parts = new ArrayList<>();
@@ -164,6 +176,9 @@ public class QualityScoreValidator extends ValidatorBase {
 	 * Python's {@code round(float, ndigits)}: correctly-rounded half-to-even on the exact
 	 * binary value of the double (Java's {@code Math.round} and {@code %.1f} are
 	 * half-up).
+	 * @param value the number to round
+	 * @param digits decimal places to keep
+	 * @return the half-to-even rounded value; NaN and infinities unchanged
 	 */
 	static double pyRound(double value, int digits) {
 		if (Double.isNaN(value) || Double.isInfinite(value)) {
@@ -175,6 +190,9 @@ public class QualityScoreValidator extends ValidatorBase {
 	/**
 	 * Python's {@code f"{value:.1f}"}: same half-to-even rounding, fixed one-decimal
 	 * text.
+	 * @param value the number to render
+	 * @return one decimal place always, and Python's {@code nan}/{@code inf} spellings
+	 * for non-finite values
 	 */
 	static String pyFormat1(double value) {
 		if (Double.isNaN(value) || Double.isInfinite(value)) {
@@ -190,25 +208,28 @@ public class QualityScoreValidator extends ValidatorBase {
 	 * .toString} produces the same digits but switches to {@code E} notation on its own
 	 * bounds (1e-3 and 1e7) and always keeps a digit after the point, so the digits are
 	 * re-placed here.
+	 * @param value the number to render
+	 * @return the digits in Python's notation, lower-case {@code e} exponent only outside
+	 * {@code [-4, 16)}
 	 */
 	static String pyFloatStr(double value) {
 		if (Double.isNaN(value)) {
 			return "nan";
 		}
 		if (Double.isInfinite(value)) {
-			return value > 0 ? "inf" : "-inf";
+			return (value > 0) ? "inf" : "-inf";
 		}
 		if (value == 0.0) {
-			return Double.doubleToRawLongBits(value) < 0 ? "-0.0" : "0.0";
+			return (Double.doubleToRawLongBits(value) < 0) ? "-0.0" : "0.0";
 		}
-		String sign = value < 0 ? "-" : "";
+		String sign = (value < 0) ? "-" : "";
 		String text = String.valueOf(Math.abs(value));
 		int mark = text.indexOf('E');
-		String mantissa = mark < 0 ? text : text.substring(0, mark);
-		int exponent = mark < 0 ? 0 : Integer.parseInt(text.substring(mark + 1));
+		String mantissa = (mark < 0) ? text : text.substring(0, mark);
+		int exponent = (mark < 0) ? 0 : Integer.parseInt(text.substring(mark + 1));
 		int dot = mantissa.indexOf('.');
-		int beforeDot = dot < 0 ? mantissa.length() : dot;
-		String digits = dot < 0 ? mantissa : mantissa.substring(0, dot) + mantissa.substring(dot + 1);
+		int beforeDot = (dot < 0) ? mantissa.length() : dot;
+		String digits = (dot < 0) ? mantissa : mantissa.substring(0, dot) + mantissa.substring(dot + 1);
 		int leading = 0;
 		while (leading < digits.length() - 1 && digits.charAt(leading) == '0') {
 			leading++;
@@ -218,8 +239,8 @@ public class QualityScoreValidator extends ValidatorBase {
 		digits = digits.substring(leading).replaceFirst("0+$", "");
 		if (power < -4 || power >= 16) {
 			String head = digits.substring(0, 1);
-			String tail = digits.length() > 1 ? "." + digits.substring(1) : "";
-			return sign + head + tail + "e" + (power >= 0 ? "+" : "-")
+			String tail = (digits.length() > 1) ? "." + digits.substring(1) : "";
+			return sign + head + tail + "e" + ((power >= 0) ? "+" : "-")
 					+ String.format(Locale.ROOT, "%02d", Math.abs(power));
 		}
 		if (power < 0) {
@@ -232,12 +253,21 @@ public class QualityScoreValidator extends ValidatorBase {
 		return sign + digits + "0".repeat(whole - digits.length()) + ".0";
 	}
 
-	/** Python's {@code f"{value:.1f}"} for a value already narrowed to one decimal. */
+	/**
+	 * Python's {@code f"{value:.1f}"} for a value already narrowed to one decimal.
+	 * @param value the number to render
+	 * @return the value rounded and formatted at one decimal place
+	 */
 	private static String oneDecimal(double value) {
 		return pyFormat1(pyRound(value, 1));
 	}
 
-	/** Python's {@code len(str)} for a message or metadata value. */
+	/**
+	 * Python's {@code len(str)} for a message or metadata value.
+	 * @param value the value to spell as Python would
+	 * @return {@code None}, {@code True}/{@code False}, a round-tripped float, or the
+	 * string itself
+	 */
 	private static String pyStr(Object value) {
 		if (value == null) {
 			return "None";
@@ -287,7 +317,12 @@ public class QualityScoreValidator extends ValidatorBase {
 
 	private static final int ARGUMENT_PLACEHOLDER_MAX_WORDS = 4;
 
-	/** Python {@code _is_argument_placeholder}. */
+	/**
+	 * Python {@code _is_argument_placeholder}.
+	 * @param body the text between a pair of angle brackets
+	 * @return {@code true} when it reads as a short CLI placeholder rather than an XML
+	 * tag
+	 */
 	static boolean isArgumentPlaceholder(String body) {
 		int lastCodePoint = body.isEmpty() ? -1 : body.codePointBefore(body.length());
 		if (lastCodePoint < 0 || pyIsSpace(lastCodePoint) || ARGUMENT_COMMAND_SYNTAX.matcher(body).find()) {
@@ -326,6 +361,9 @@ public class QualityScoreValidator extends ValidatorBase {
 	 * Python {@code _masking_hides_text}: whether masking left a {@code >} that could
 	 * hide text inside a group. Walks the masked string tracking open groups, masked
 	 * placeholders and arrow/comparison operators.
+	 * @param masked the hint after placeholder masking
+	 * @return {@code true} when a {@code >} survives that could conceal text inside a
+	 * group
 	 */
 	static boolean maskingHidesText(String masked) {
 		Set<Integer> operators = new HashSet<>();
@@ -372,6 +410,9 @@ public class QualityScoreValidator extends ValidatorBase {
 	/**
 	 * Python {@code _mask_argument_hint}: mask short CLI placeholders for the XML tag
 	 * check.
+	 * @param hint the {@code argument-hint} value to mask
+	 * @return the hint with short placeholders collapsed to {@code []}, unchanged when it
+	 * holds a control tag or masking would hide text
 	 */
 	static String maskArgumentHint(String hint) {
 		if (ARGUMENT_CONTROL_TAG.matcher(hint).find()) {
@@ -396,7 +437,12 @@ public class QualityScoreValidator extends ValidatorBase {
 
 	private static final Pattern WORD_EDGE_BEFORE = Pattern.compile("(?<![A-Za-z0-9_])");
 
-	/** Python {@code _contains_term}: whole word or phrase, never inside another word. */
+	/**
+	 * Python {@code _contains_term}: whole word or phrase, never inside another word.
+	 * @param text the text to search
+	 * @param term the word or phrase to find, stripped and matched case-insensitively
+	 * @return {@code true} when the term occurs at a word boundary
+	 */
 	static boolean containsTerm(String text, String term) {
 		String normalized = pyStrip(term);
 		String regex = "(?<![A-Za-z0-9_])" + Pattern.quote(normalized) + "(?![A-Za-z0-9_])";
@@ -415,6 +461,9 @@ public class QualityScoreValidator extends ValidatorBase {
 	/**
 	 * Python {@code _contains_any_word}: whitespace inside a term matches any whitespace
 	 * run.
+	 * @param text the text to search
+	 * @param words terms to look for, matched case-insensitively at word boundaries
+	 * @return {@code true} when at least one of them occurs
 	 */
 	static boolean containsAnyWord(String text, List<String> words) {
 		List<String> alternatives = new ArrayList<>();
@@ -443,7 +492,12 @@ public class QualityScoreValidator extends ValidatorBase {
 			Pattern.compile("\\bclasses?\\b", Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CHARACTER_CLASS),
 			Pattern.compile("\\bfunctions?\\b", Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CHARACTER_CLASS));
 
-	/** Python {@code _has_api_documentation}. */
+	/**
+	 * Python {@code _has_api_documentation}.
+	 * @param content the SKILL.md body
+	 * @return {@code true} when it mentions imports, APIs, modules, libraries, packages,
+	 * classes or functions
+	 */
 	static boolean hasApiDocumentation(String content) {
 		for (Pattern pattern : API_PATTERNS) {
 			if (pattern.matcher(content).find()) {
@@ -469,6 +523,9 @@ public class QualityScoreValidator extends ValidatorBase {
 	 * Python {@code _normalized_quality_local_path}: Quality Score's legacy
 	 * classification order, intentionally looser than Hygiene's stricter path policy
 	 * (issue #108).
+	 * @param href the link target as written in SKILL.md
+	 * @return the normalized relative path, or {@code null} when it is not a plain local
+	 * path
 	 */
 	static String normalizedQualityLocalPath(String href) {
 		String trimmed = URL_EDGE.matcher(href).replaceAll("");
@@ -497,6 +554,8 @@ public class QualityScoreValidator extends ValidatorBase {
 	 * Whether CPython's {@code urlsplit} would read a scheme here: the first character
 	 * outside the scheme character set must be a {@code :} at index 2 or later, and the
 	 * URL must start with a letter (so {@code C:/x} stays a path, not a scheme).
+	 * @param url the text to inspect
+	 * @return the index just past the scheme, {@code -1} when it reads as a path
 	 */
 	private static int schemeEnd(String url) {
 		int i = 0;
@@ -511,13 +570,21 @@ public class QualityScoreValidator extends ValidatorBase {
 		return letter ? i + 1 : -1;
 	}
 
-	/** CPython's {@code urlsplit._scheme_chars}. */
+	/**
+	 * CPython's {@code urlsplit._scheme_chars}.
+	 * @param c the character to test
+	 * @return {@code true} when it may appear in a URL scheme
+	 */
 	private static boolean isSchemeChar(char c) {
 		return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '+' || c == '-'
 				|| c == '.';
 	}
 
-	/** URL path component: everything before the first {@code ?} or {@code #}. */
+	/**
+	 * URL path component: everything before the first {@code ?} or {@code #}.
+	 * @param url the URL to cut
+	 * @return the part with no query or fragment on it
+	 */
 	private static String pathPart(String url) {
 		int cut = url.length();
 		int query = url.indexOf('?');
@@ -535,6 +602,9 @@ public class QualityScoreValidator extends ValidatorBase {
 	 * Python {@code urllib.parse.unquote}: decode percent-escaped bytes per run as UTF-8,
 	 * replacing malformed sequences (CPython's {@code errors="replace"}), and leave every
 	 * other character untouched.
+	 * @param value the possibly percent-escaped text
+	 * @return the decoded text, malformed escapes replaced as CPython's {@code replace}
+	 * error handler does
 	 */
 	private static String percentDecode(String value) {
 		StringBuilder out = new StringBuilder();
@@ -567,7 +637,11 @@ public class QualityScoreValidator extends ValidatorBase {
 		return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
 	}
 
-	/** POSIX {@code normpath} for a relative path. */
+	/**
+	 * POSIX {@code normpath} for a relative path.
+	 * @param path the path to collapse, {@code .} and {@code ..} segments resolved
+	 * @return the collapsed path, keeping a trailing slash and never escaping upwards
+	 */
 	private static String posixNormpath(String path) {
 		if (path.isEmpty()) {
 			return ".";
@@ -597,7 +671,12 @@ public class QualityScoreValidator extends ValidatorBase {
 		return (absolute ? "/" : "") + joined + (trailingSlash ? "/" : "");
 	}
 
-	/** Python {@code _has_nested_markdown_reference}. */
+	/**
+	 * Python {@code _has_nested_markdown_reference}.
+	 * @param content a reference document's body
+	 * @return {@code true} when it links to a local {@code .md} file other than its own
+	 * {@code ../skill.md}
+	 */
 	static boolean hasNestedMarkdownReference(String content) {
 		for (String target : HygieneValidator.MarkdownLinks.linkTargets(content, false)) {
 			String path = normalizedQualityLocalPath(target);
@@ -612,169 +691,11 @@ public class QualityScoreValidator extends ValidatorBase {
 		return false;
 	}
 
-	// --- scoring model ---------------------------------------------------------
-
-	/** Python {@code QualityIssue}. */
-	record QualityIssue(String severity, String dimension, String message, String suggestion, double deduction) {
-		Map<String, Object> toMap() {
-			Map<String, Object> map = new LinkedHashMap<>();
-			map.put("severity", severity);
-			map.put("message", message);
-			map.put("suggestion", suggestion);
-			map.put("deduction", integral(deduction));
-			return map;
-		}
-	}
-
-	/** Python {@code QualityDimension}. */
-	static final class QualityDimension {
-
-		private final String name;
-
-		private final double weight;
-
-		private double score = 100.0;
-
-		private final List<QualityIssue> issues = new ArrayList<>();
-
-		QualityDimension(String name, double weight) {
-			this.name = name;
-			this.weight = weight;
-		}
-
-		double weightedScore() {
-			return score * weight;
-		}
-
-		int issuesCount() {
-			return issues.size();
-		}
-
-		double score() {
-			return score;
-		}
-
-		List<QualityIssue> issues() {
-			return issues;
-		}
-
-		/** Python {@code deduct}: record the issue, then floor the score at zero. */
-		void deduct(double amount, String severity, String message, String suggestion) {
-			issues.add(new QualityIssue(severity, name, message, suggestion, amount));
-			score = Math.max(0.0, score - amount);
-		}
-
-		void deduct(double amount, String severity, String message) {
-			deduct(amount, severity, message, null);
-		}
-
-		Map<String, Object> toMap() {
-			Map<String, Object> map = new LinkedHashMap<>();
-			map.put("score", pyRound(score, 1));
-			map.put("weight", weight);
-			map.put("issues_count", issuesCount());
-			List<Map<String, Object>> listed = new ArrayList<>();
-			for (QualityIssue issue : issues) {
-				listed.add(issue.toMap());
-			}
-			map.put("issues", listed);
-			return map;
-		}
-
-	}
-
-	/** Python {@code QualityScoreResult}. */
-	static final class QualityScores {
-
-		final String skillName;
-
-		String skillType = "unknown";
-
-		final QualityDimension correctness = new QualityDimension("correctness", WEIGHT_CORRECTNESS);
-
-		final QualityDimension discoverability = new QualityDimension("discoverability", WEIGHT_DISCOVERABILITY);
-
-		final QualityDimension reliability = new QualityDimension("reliability", WEIGHT_RELIABILITY);
-
-		final QualityDimension efficiency = new QualityDimension("efficiency", WEIGHT_EFFICIENCY);
-
-		int totalTokens;
-
-		int frontmatterTokens;
-
-		int instructionsTokens;
-
-		int scriptCount;
-
-		boolean hasExamples;
-
-		boolean hasErrorHandling;
-
-		boolean hasFrontmatter;
-
-		boolean hasInstructions;
-
-		boolean hasScripts;
-
-		boolean hasLibModule;
-
-		QualityScores(String skillName) {
-			this.skillName = skillName;
-		}
-
-		double overallScore() {
-			return correctness.weightedScore() + discoverability.weightedScore() + reliability.weightedScore()
-					+ efficiency.weightedScore();
-		}
-
-		String grade() {
-			return scoreToGrade(overallScore());
-		}
-
-		List<QualityIssue> allIssues() {
-			List<QualityIssue> all = new ArrayList<>();
-			all.addAll(correctness.issues());
-			all.addAll(discoverability.issues());
-			all.addAll(reliability.issues());
-			all.addAll(efficiency.issues());
-			return all;
-		}
-
-		Map<String, Object> toMap() {
-			Map<String, Object> dimensions = new LinkedHashMap<>();
-			dimensions.put("correctness", correctness.toMap());
-			dimensions.put("discoverability", discoverability.toMap());
-			dimensions.put("reliability", reliability.toMap());
-			dimensions.put("efficiency", efficiency.toMap());
-
-			Map<String, Object> metrics = new LinkedHashMap<>();
-			metrics.put("total_tokens", totalTokens);
-			metrics.put("estimated_tokens", totalTokens);
-			metrics.put("estimate_method", "characters/" + Constants.QUALITY_CHARS_PER_TOKEN);
-			metrics.put("recommended_max_tokens", Constants.QUALITY_RECOMMENDED_MAX_TOKENS);
-			metrics.put("frontmatter_tokens", frontmatterTokens);
-			metrics.put("instructions_tokens", instructionsTokens);
-			metrics.put("script_count", scriptCount);
-			metrics.put("has_examples", hasExamples);
-			metrics.put("has_error_handling", hasErrorHandling);
-			metrics.put("has_frontmatter", hasFrontmatter);
-			metrics.put("has_instructions", hasInstructions);
-			metrics.put("has_scripts", hasScripts);
-			metrics.put("has_lib_module", hasLibModule);
-
-			Map<String, Object> map = new LinkedHashMap<>();
-			map.put("overall_score", pyRound(overallScore(), 1));
-			map.put("grade", grade());
-			map.put("skill_type", skillType);
-			map.put("skill_name", skillName);
-			map.put("dimensions", dimensions);
-			map.put("metrics", metrics);
-			return map;
-		}
-
-	}
-
-	/** Python {@code score_to_grade}. */
+	/**
+	 * Python {@code score_to_grade}.
+	 * @param score the composite 0-100 score
+	 * @return the letter of the highest threshold it reaches, {@code F} below 60
+	 */
 	static String scoreToGrade(double score) {
 		for (GradeThreshold entry : GRADE_THRESHOLDS) {
 			if (score >= entry.threshold()) {
@@ -787,25 +708,14 @@ public class QualityScoreValidator extends ValidatorBase {
 	/**
 	 * Python's int-vs-float JSON shape: integral values serialize without a decimal
 	 * point.
+	 * @param value the score or deduction to emit
+	 * @return an {@code int} when the value is whole, otherwise the original double
 	 */
 	private static Object integral(double value) {
 		if (value == Math.rint(value) && !Double.isInfinite(value) && Math.abs(value) < Integer.MAX_VALUE) {
 			return (int) value;
 		}
 		return value;
-	}
-
-	// --- configuration ---------------------------------------------------------
-
-	/** One {@code expected_headers} rule. */
-	record ExpectedHeader(String heading, List<String> alternatives, Number points, String message, String suggestion) {
-	}
-
-	/** One {@code error_handling} rule (its list is {@code terms} or {@code markers}). */
-	record ErrorRule(Number points, String message, String suggestion, String listKey, List<String> entries) {
-	}
-
-	private record QualityConfig(List<ExpectedHeader> expectedHeaders, Map<String, ErrorRule> errorHandling) {
 	}
 
 	private final int minScore;
@@ -821,7 +731,7 @@ public class QualityScoreValidator extends ValidatorBase {
 	public QualityScoreValidator(int minScore) {
 		this.minScore = minScore;
 		this.qualityConfig = loadQualityConfig();
-		this.qualityConfigProvenance = packagedProvenance(qualityConfig);
+		this.qualityConfigProvenance = packagedProvenance(this.qualityConfig);
 	}
 
 	@Override
@@ -837,11 +747,12 @@ public class QualityScoreValidator extends ValidatorBase {
 
 	/**
 	 * Loads the packaged config through the classloader with snakeyaml SafeConstructor.
+	 * @return the parsed expected headers and error-handling rules
 	 */
 	@SuppressWarnings("unchecked")
 	private static QualityConfig loadQualityConfig() {
 		ClassLoader loader = QualityScoreValidator.class.getClassLoader();
-		try (InputStream in = loader != null ? loader.getResourceAsStream(RESOURCE_PATH) : null) {
+		try (InputStream in = (loader != null) ? loader.getResourceAsStream(RESOURCE_PATH) : null) {
 			if (in == null) {
 				throw new IllegalStateException("Missing packaged quality config: " + RESOURCE_PATH);
 			}
@@ -887,8 +798,8 @@ public class QualityScoreValidator extends ValidatorBase {
 			}
 			return new QualityConfig(List.copyOf(headers), Map.copyOf(parsed));
 		}
-		catch (IOException e) {
-			throw new IllegalStateException("Cannot read packaged quality config", e);
+		catch (IOException ex) {
+			throw new IllegalStateException("Cannot read packaged quality config", ex);
 		}
 	}
 
@@ -899,7 +810,12 @@ public class QualityScoreValidator extends ValidatorBase {
 		return 0;
 	}
 
-	/** Python {@code load_quality_config_with_provenance} for the packaged file. */
+	/**
+	 * Python {@code load_quality_config_with_provenance} for the packaged file.
+	 * @param config the config that was loaded from the classpath
+	 * @return the provenance map: source {@code packaged}, a null file, and the digest of
+	 * the declared rules
+	 */
 	private static Map<String, Object> packagedProvenance(QualityConfig config) {
 		Map<String, Object> declared = new LinkedHashMap<>();
 		declared.put("expected_headers", config.expectedHeaders());
@@ -915,7 +831,11 @@ public class QualityScoreValidator extends ValidatorBase {
 		return provenance;
 	}
 
-	/** Python {@code quality_config_digest}: sha256 over canonical, key-sorted JSON. */
+	/**
+	 * Python {@code quality_config_digest}: sha256 over canonical, key-sorted JSON.
+	 * @param config the declared config values to hash
+	 * @return the digest prefixed with {@code sha256:}
+	 */
 	static String qualityConfigDigest(Map<String, Object> config) {
 		try {
 			byte[] hash = MessageDigest.getInstance("SHA-256")
@@ -926,14 +846,17 @@ public class QualityScoreValidator extends ValidatorBase {
 			}
 			return "sha256:" + hex;
 		}
-		catch (java.security.NoSuchAlgorithmException e) {
-			throw new IllegalStateException("SHA-256 unavailable", e);
+		catch (java.security.NoSuchAlgorithmException ex) {
+			throw new IllegalStateException("SHA-256 unavailable", ex);
 		}
 	}
 
 	/**
 	 * Python
 	 * {@code json.dumps(config, sort_keys=True, separators=(",", ":"), ensure_ascii=True)}.
+	 * @param value maps, lists, numbers, booleans, strings, or the config records to
+	 * serialize
+	 * @return compact JSON with sorted keys and non-ASCII escaped
 	 */
 	static String canonicalJson(Object value) {
 		StringBuilder sb = new StringBuilder();
@@ -1048,6 +971,10 @@ public class QualityScoreValidator extends ValidatorBase {
 	/**
 	 * Python {@code _executable_files}: sorted glob matches per directory, in pattern
 	 * order.
+	 * @param skillPath the skill directory whose executable subdirectories are searched
+	 * @param patterns glob patterns matched against entry names
+	 * @return the matching files, grouped by pattern and sorted by path within each
+	 * directory
 	 */
 	static List<Path> executableFiles(Path skillPath, List<String> patterns) {
 		List<Path> files = new ArrayList<>();
@@ -1065,7 +992,7 @@ public class QualityScoreValidator extends ValidatorBase {
 						}
 					}
 				}
-				catch (IOException e) {
+				catch (IOException ex) {
 					continue;
 				}
 				matches.sort(Comparator.comparing(Path::toString));
@@ -1075,7 +1002,12 @@ public class QualityScoreValidator extends ValidatorBase {
 		return files;
 	}
 
-	/** fnmatch {@code Path.match} on the entry name. */
+	/**
+	 * fnmatch {@code Path.match} on the entry name.
+	 * @param name the entry basename
+	 * @param pattern shell glob in which only {@code *} and {@code ?} are wildcards
+	 * @return {@code true} when the whole name matches the pattern
+	 */
 	private static boolean globNameMatches(String name, String pattern) {
 		StringBuilder regex = new StringBuilder();
 		for (int i = 0; i < pattern.length(); i++) {
@@ -1091,7 +1023,12 @@ public class QualityScoreValidator extends ValidatorBase {
 		return Pattern.compile(regex.toString()).matcher(name).matches();
 	}
 
-	/** Python {@code _runs_only_node_scripts}. */
+	/**
+	 * Python {@code _runs_only_node_scripts}.
+	 * @param scriptFiles the skill's executable scripts
+	 * @return {@code false} for an empty list, otherwise {@code true} only when every
+	 * script is a Node one
+	 */
 	static boolean runsOnlyNodeScripts(List<Path> scriptFiles) {
 		if (scriptFiles.isEmpty()) {
 			return false;
@@ -1129,7 +1066,7 @@ public class QualityScoreValidator extends ValidatorBase {
 				}
 			}
 		}
-		catch (IOException e) {
+		catch (IOException ex) {
 			return List.of();
 		}
 		dirs.sort(Comparator.comparing(Path::toString));
@@ -1139,6 +1076,8 @@ public class QualityScoreValidator extends ValidatorBase {
 	/**
 	 * Python {@code find_lib_module}: first non-excluded child directory holding
 	 * {@code __init__.py}.
+	 * @param skillPath the skill directory whose children are inspected
+	 * @return that module directory, {@code null} when no child qualifies
 	 */
 	static Path findLibModule(Path skillPath) {
 		for (Path child : childDirectories(skillPath)) {
@@ -1153,7 +1092,12 @@ public class QualityScoreValidator extends ValidatorBase {
 		return null;
 	}
 
-	/** Python {@code detect_skill_type}. */
+	/**
+	 * Python {@code detect_skill_type}.
+	 * @param skillPath the skill directory to classify
+	 * @return {@code hybrid}, {@code script-based}, {@code lib-based},
+	 * {@code resource-based} or {@code guide-only}
+	 */
 	public static String detectSkillType(Path skillPath) {
 		boolean hasScripts = !executableFiles(skillPath, Constants.EXECUTABLE_SCRIPT_PATTERNS).isEmpty();
 		boolean hasLib = findLibModule(skillPath) != null;
@@ -1187,13 +1131,18 @@ public class QualityScoreValidator extends ValidatorBase {
 				: validateFolder(skillPath);
 		// min_score sits beside the digest rather than in it: the digest names the rules,
 		// min_score the pass bar.
-		Map<String, Object> config = new LinkedHashMap<>(qualityConfigProvenance);
-		config.put("min_score", minScore);
+		Map<String, Object> config = new LinkedHashMap<>(this.qualityConfigProvenance);
+		config.put("min_score", this.minScore);
 		result.getMetadata().put("quality_config", config);
 		return result;
 	}
 
-	/** Python {@code _validate_folder}: aggregate one quality result per skill. */
+	/**
+	 * Python {@code _validate_folder}: aggregate one quality result per skill.
+	 * @param root the folder to scan for skills
+	 * @return the merged per-skill results plus the averaged {@code quality_scores}
+	 * digest, or one HIGH finding when the folder holds no skills
+	 */
 	ValidationResult validateFolder(Path root) {
 		List<Path> skillDirs = findAllSkills(root);
 		if (skillDirs.isEmpty()) {
@@ -1259,12 +1208,16 @@ public class QualityScoreValidator extends ValidatorBase {
 
 	/**
 	 * Python {@code _validate_single_skill}: the full 4-dimension analysis on one skill.
+	 * @param skillPath the skill directory to score
+	 * @return one finding per deduction, a failed gate when the score is under the
+	 * minimum, and the {@code quality_scores} metadata
 	 */
 	ValidationResult validateSingleSkill(Path skillPath) {
 		ValidationResult result = new ValidationResult();
 		result.setValidatorName("QUALITY");
 		result.setValidatorDescription(getDescription());
-		QualityScores qs = new QualityScores(skillPath.getFileName() == null ? "" : skillPath.getFileName().toString());
+		QualityScores qs = new QualityScores(
+				(skillPath.getFileName() == null) ? "" : skillPath.getFileName().toString());
 
 		Path manifest = findSkillManifest(skillPath);
 		if (manifest == null) {
@@ -1306,9 +1259,9 @@ public class QualityScoreValidator extends ValidatorBase {
 					manifest.toString(), null, null, issue.suggestion(), metadata));
 		}
 
-		if (qs.overallScore() < minScore) {
-			result.failGate("Quality score " + oneDecimal(qs.overallScore()) + "/100 is below the required " + minScore
-					+ "/100 in " + manifest);
+		if (qs.overallScore() < this.minScore) {
+			result.failGate("Quality score " + oneDecimal(qs.overallScore()) + "/100 is below the required "
+					+ this.minScore + "/100 in " + manifest);
 		}
 
 		result.getMetadata().put("quality_scores", qs.toMap());
@@ -1319,7 +1272,12 @@ public class QualityScoreValidator extends ValidatorBase {
 		return result;
 	}
 
-	/** Python {@code _parse_frontmatter}. */
+	/**
+	 * Python {@code _parse_frontmatter}.
+	 * @param content the raw SKILL.md text
+	 * @return the delimited YAML mapping, or {@code null} without one, when it is not a
+	 * mapping, or when the YAML fails to parse
+	 */
 	@SuppressWarnings("unchecked")
 	static Map<String, Object> parseFrontmatter(String content) {
 		Matcher matcher = FRONTMATTER_PATTERN.matcher(content);
@@ -1328,9 +1286,9 @@ public class QualityScoreValidator extends ValidatorBase {
 		}
 		try {
 			Object data = new Yaml(new SafeConstructor(new LoaderOptions())).load(matcher.group(1));
-			return data instanceof Map ? (Map<String, Object>) data : null;
+			return (data instanceof Map) ? (Map<String, Object>) data : null;
 		}
-		catch (RuntimeException e) {
+		catch (RuntimeException ex) {
 			return null;
 		}
 	}
@@ -1375,7 +1333,11 @@ public class QualityScoreValidator extends ValidatorBase {
 	private static final Pattern WINDOWS_PATH = Pattern.compile("(?:scripts|references|assets)\\\\[\\w\\\\]+",
 			Pattern.UNICODE_CHARACTER_CLASS);
 
-	/** Python {@code _references_readme}. */
+	/**
+	 * Python {@code _references_readme}.
+	 * @param content the SKILL.md body
+	 * @return {@code true} when a link target normalizes to {@code readme.md}
+	 */
 	static boolean referencesReadme(String content) {
 		for (String linkTarget : HygieneValidator.MarkdownLinks.linkTargets(content, false)) {
 			String path = normalizedQualityLocalPath(linkTarget);
@@ -1386,7 +1348,11 @@ public class QualityScoreValidator extends ValidatorBase {
 		return false;
 	}
 
-	/** Python {@code _check_frontmatter_correctness}. */
+	/**
+	 * Python {@code _check_frontmatter_correctness}.
+	 * @param dim the Correctness dimension that receives the deductions
+	 * @param fm the parsed frontmatter mapping
+	 */
 	void checkFrontmatterCorrectness(QualityDimension dim, Map<String, Object> fm) {
 		// XML tags in non-name/description fields (Anthropic H3)
 		for (Map.Entry<String, Object> entry : fm.entrySet()) {
@@ -1401,7 +1367,7 @@ public class QualityScoreValidator extends ValidatorBase {
 				values = List.of(maskArgumentHint((String) val));
 			}
 			else if ("argument-hint".equals(key) && val instanceof List<?> list && !list.isEmpty()) {
-				boolean allStrings = list.stream().allMatch(item -> item instanceof String);
+				boolean allStrings = list.stream().allMatch((item) -> item instanceof String);
 				if (allStrings) {
 					// YAML reads an unquoted ``[<file>]`` hint as a list. Check every
 					// item and
@@ -1455,7 +1421,12 @@ public class QualityScoreValidator extends ValidatorBase {
 
 	private static final Pattern NAME_FORMAT = Pattern.compile("[a-z0-9-]+");
 
-	/** Python {@code _check_type_specific}. */
+	/**
+	 * Python {@code _check_type_specific}.
+	 * @param qs the scores under construction, whose {@code skillType} picks the branch
+	 * @param content the SKILL.md body
+	 * @param skillPath the skill directory holding its scripts, library and resources
+	 */
 	void checkTypeSpecific(QualityScores qs, String content, Path skillPath) {
 		String skillType = qs.skillType;
 
@@ -1601,7 +1572,7 @@ public class QualityScoreValidator extends ValidatorBase {
 
 	void checkReliability(QualityScores qs, String content, Path skillPath) {
 		QualityDimension dim = qs.reliability;
-		Map<String, ErrorRule> errorHandling = qualityConfig.errorHandling();
+		Map<String, ErrorRule> errorHandling = this.qualityConfig.errorHandling();
 
 		ErrorRule mentioned = errorHandling.get("mentioned");
 		qs.hasErrorHandling = containsAnyWord(content, mentioned.entries());
@@ -1620,20 +1591,20 @@ public class QualityScoreValidator extends ValidatorBase {
 				List<Path> modules = new ArrayList<>();
 				try (var stream = Files.walk(libDir)) {
 					for (Path file : stream.sorted(Comparator.comparing(Path::toString)).toList()) {
-						String name = file.getFileName() == null ? "" : file.getFileName().toString();
+						String name = (file.getFileName() == null) ? "" : file.getFileName().toString();
 						if (Files.isRegularFile(file) && name.endsWith(".py") && !"__init__.py".equals(name)) {
 							modules.add(file);
 						}
 					}
 				}
-				catch (IOException e) {
+				catch (IOException ex) {
 					modules = List.of();
 				}
 				checkCodeErrorHandling(dim, modules, errorHandling.get("lib"));
 			}
 		}
 
-		for (ExpectedHeader expected : qualityConfig.expectedHeaders()) {
+		for (ExpectedHeader expected : this.qualityConfig.expectedHeaders()) {
 			List<String> acceptedHeadings = new ArrayList<>();
 			acceptedHeadings.add(expected.heading());
 			acceptedHeadings.addAll(expected.alternatives());
@@ -1651,14 +1622,20 @@ public class QualityScoreValidator extends ValidatorBase {
 	}
 
 	private static double pointsOf(ExpectedHeader rule) {
-		return rule.points() == null ? 0 : rule.points().doubleValue();
+		return (rule.points() == null) ? 0 : rule.points().doubleValue();
 	}
 
 	private static double pointsOf(ErrorRule rule) {
-		return rule.points() == null ? 0 : rule.points().doubleValue();
+		return (rule.points() == null) ? 0 : rule.points().doubleValue();
 	}
 
-	/** Python {@code _check_code_error_handling}. */
+	/**
+	 * Python {@code _check_code_error_handling}.
+	 * @param dim the Reliability dimension that receives the deduction
+	 * @param files the Python sources to read
+	 * @param rule the error-handling rule supplying points, markers, message and
+	 * suggestion
+	 */
 	static void checkCodeErrorHandling(QualityDimension dim, List<Path> files, ErrorRule rule) {
 		if (pointsOf(rule) == 0) {
 			return;
@@ -1740,7 +1717,7 @@ public class QualityScoreValidator extends ValidatorBase {
 				continue;
 			}
 			String[] parts = literalSplit(content, "\n" + heading + "\n", 2);
-			section = parts.length > 1 ? literalSplit(parts[1], "\n## ", 2)[0] : "";
+			section = (parts.length > 1) ? literalSplit(parts[1], "\n## ", 2)[0] : "";
 			break;
 		}
 		if (!section.isEmpty()) {
@@ -1792,7 +1769,7 @@ public class QualityScoreValidator extends ValidatorBase {
 			for (Path ref : sortedChildren(refsDir)) {
 				String name = ref.getFileName().toString();
 				int dot = name.lastIndexOf('.');
-				String suffix = dot > 0 ? name.substring(dot) : "";
+				String suffix = (dot > 0) ? name.substring(dot) : "";
 				if (Files.isRegularFile(ref) && nonDoc.contains(suffix)) {
 					dim.deduct(5, "info", "Non-doc file in references/: " + ref.getFileName(),
 							"Code belongs in scripts/, data in assets/. references/ is for .md docs.");
@@ -1811,7 +1788,7 @@ public class QualityScoreValidator extends ValidatorBase {
 				}
 			}
 		}
-		catch (IOException e) {
+		catch (IOException ex) {
 			return List.of();
 		}
 		out.sort(Comparator.comparing(Path::toString));
@@ -1823,18 +1800,22 @@ public class QualityScoreValidator extends ValidatorBase {
 		try (var stream = Files.list(directory)) {
 			out.addAll(stream.toList());
 		}
-		catch (IOException e) {
+		catch (IOException ex) {
 			return List.of();
 		}
 		out.sort(Comparator.comparing(Path::toString));
 		return out;
 	}
 
-	/** Python {@code Path.stem}: the name without its final suffix. */
+	/**
+	 * Python {@code Path.stem}: the name without its final suffix.
+	 * @param path the file to name
+	 * @return the basename up to its last dot, or the whole basename when it has none
+	 */
 	private static String stemOf(Path path) {
 		String name = path.getFileName().toString();
 		int dot = name.lastIndexOf('.');
-		return dot > 0 ? name.substring(0, dot) : name;
+		return (dot > 0) ? name.substring(0, dot) : name;
 	}
 
 	private static boolean isAllDigits(String value) {
@@ -1885,7 +1866,222 @@ public class QualityScoreValidator extends ValidatorBase {
 
 	@SuppressWarnings("unchecked")
 	private static Map<String, Object> asMap(Object value) {
-		return value instanceof Map ? (Map<String, Object>) value : null;
+		return (value instanceof Map) ? (Map<String, Object>) value : null;
+	}
+
+	/** Python {@code QUALITY_GRADE_THRESHOLDS}, highest threshold first. */
+	private record GradeThreshold(int threshold, String grade) {
+	}
+
+	// --- scoring model ---------------------------------------------------------
+
+	/**
+	 * Python {@code QualityIssue}.
+	 *
+	 * @param severity the rule's own level: {@code error}, {@code warning} or
+	 * {@code info}
+	 * @param dimension the scored dimension the deduction came from
+	 * @param message the finding text
+	 * @param suggestion remediation advice, nullable
+	 * @param deduction points taken off the dimension's score
+	 * @author Ivan Rodriguez
+	 */
+	record QualityIssue(String severity, String dimension, String message, String suggestion, double deduction) {
+		Map<String, Object> toMap() {
+			Map<String, Object> map = new LinkedHashMap<>();
+			map.put("severity", this.severity);
+			map.put("message", this.message);
+			map.put("suggestion", this.suggestion);
+			map.put("deduction", integral(this.deduction));
+			return map;
+		}
+	}
+
+	/** Python {@code QualityDimension}. */
+	static final class QualityDimension {
+
+		private final String name;
+
+		private final double weight;
+
+		private double score = 100.0;
+
+		private final List<QualityIssue> issues = new ArrayList<>();
+
+		QualityDimension(String name, double weight) {
+			this.name = name;
+			this.weight = weight;
+		}
+
+		double weightedScore() {
+			return this.score * this.weight;
+		}
+
+		int issuesCount() {
+			return this.issues.size();
+		}
+
+		double score() {
+			return this.score;
+		}
+
+		List<QualityIssue> issues() {
+			return this.issues;
+		}
+
+		/**
+		 * Python {@code deduct}: record the issue, then floor the score at zero.
+		 * @param amount points to take off this dimension
+		 * @param severity the issue's own level, mapped to a finding severity later
+		 * @param message the finding text
+		 * @param suggestion remediation advice, {@code null} from the three-argument
+		 * overload
+		 */
+		void deduct(double amount, String severity, String message, String suggestion) {
+			this.issues.add(new QualityIssue(severity, this.name, message, suggestion, amount));
+			this.score = Math.max(0.0, this.score - amount);
+		}
+
+		void deduct(double amount, String severity, String message) {
+			deduct(amount, severity, message, null);
+		}
+
+		Map<String, Object> toMap() {
+			Map<String, Object> map = new LinkedHashMap<>();
+			map.put("score", pyRound(this.score, 1));
+			map.put("weight", this.weight);
+			map.put("issues_count", issuesCount());
+			List<Map<String, Object>> listed = new ArrayList<>();
+			for (QualityIssue issue : this.issues) {
+				listed.add(issue.toMap());
+			}
+			map.put("issues", listed);
+			return map;
+		}
+
+	}
+
+	/** Python {@code QualityScoreResult}. */
+	static final class QualityScores {
+
+		final String skillName;
+
+		String skillType = "unknown";
+
+		final QualityDimension correctness = new QualityDimension("correctness", WEIGHT_CORRECTNESS);
+
+		final QualityDimension discoverability = new QualityDimension("discoverability", WEIGHT_DISCOVERABILITY);
+
+		final QualityDimension reliability = new QualityDimension("reliability", WEIGHT_RELIABILITY);
+
+		final QualityDimension efficiency = new QualityDimension("efficiency", WEIGHT_EFFICIENCY);
+
+		int totalTokens;
+
+		int frontmatterTokens;
+
+		int instructionsTokens;
+
+		int scriptCount;
+
+		boolean hasExamples;
+
+		boolean hasErrorHandling;
+
+		boolean hasFrontmatter;
+
+		boolean hasInstructions;
+
+		boolean hasScripts;
+
+		boolean hasLibModule;
+
+		QualityScores(String skillName) {
+			this.skillName = skillName;
+		}
+
+		double overallScore() {
+			return this.correctness.weightedScore() + this.discoverability.weightedScore()
+					+ this.reliability.weightedScore() + this.efficiency.weightedScore();
+		}
+
+		String grade() {
+			return scoreToGrade(overallScore());
+		}
+
+		List<QualityIssue> allIssues() {
+			List<QualityIssue> all = new ArrayList<>();
+			all.addAll(this.correctness.issues());
+			all.addAll(this.discoverability.issues());
+			all.addAll(this.reliability.issues());
+			all.addAll(this.efficiency.issues());
+			return all;
+		}
+
+		Map<String, Object> toMap() {
+			Map<String, Object> dimensions = new LinkedHashMap<>();
+			dimensions.put("correctness", this.correctness.toMap());
+			dimensions.put("discoverability", this.discoverability.toMap());
+			dimensions.put("reliability", this.reliability.toMap());
+			dimensions.put("efficiency", this.efficiency.toMap());
+
+			Map<String, Object> metrics = new LinkedHashMap<>();
+			metrics.put("total_tokens", this.totalTokens);
+			metrics.put("estimated_tokens", this.totalTokens);
+			metrics.put("estimate_method", "characters/" + Constants.QUALITY_CHARS_PER_TOKEN);
+			metrics.put("recommended_max_tokens", Constants.QUALITY_RECOMMENDED_MAX_TOKENS);
+			metrics.put("frontmatter_tokens", this.frontmatterTokens);
+			metrics.put("instructions_tokens", this.instructionsTokens);
+			metrics.put("script_count", this.scriptCount);
+			metrics.put("has_examples", this.hasExamples);
+			metrics.put("has_error_handling", this.hasErrorHandling);
+			metrics.put("has_frontmatter", this.hasFrontmatter);
+			metrics.put("has_instructions", this.hasInstructions);
+			metrics.put("has_scripts", this.hasScripts);
+			metrics.put("has_lib_module", this.hasLibModule);
+
+			Map<String, Object> map = new LinkedHashMap<>();
+			map.put("overall_score", pyRound(overallScore(), 1));
+			map.put("grade", grade());
+			map.put("skill_type", this.skillType);
+			map.put("skill_name", this.skillName);
+			map.put("dimensions", dimensions);
+			map.put("metrics", metrics);
+			return map;
+		}
+
+	}
+
+	// --- configuration ---------------------------------------------------------
+
+	/**
+	 * One {@code expected_headers} rule.
+	 *
+	 * @param heading the preferred section heading
+	 * @param alternatives other headings that also satisfy the rule
+	 * @param points deduction applied when no accepted heading is present
+	 * @param message the finding text
+	 * @param suggestion remediation advice
+	 * @author Ivan Rodriguez
+	 */
+	record ExpectedHeader(String heading, List<String> alternatives, Number points, String message, String suggestion) {
+	}
+
+	/**
+	 * One {@code error_handling} rule (its list is {@code terms} or {@code markers}).
+	 *
+	 * @param points deduction applied when no marker is present
+	 * @param message the finding text
+	 * @param suggestion remediation advice
+	 * @param listKey the config key the entries live under, {@code terms} or
+	 * {@code markers}
+	 * @param entries substrings that count as error handling in a source file
+	 * @author Ivan Rodriguez
+	 */
+	record ErrorRule(Number points, String message, String suggestion, String listKey, List<String> entries) {
+	}
+
+	private record QualityConfig(List<ExpectedHeader> expectedHeaders, Map<String, ErrorRule> errorHandling) {
 	}
 
 }

@@ -14,8 +14,8 @@ source_paths:
   - "smith-common/src/main/java/com/embabel/smith/common/model/ProcessSpec.java"
   - "smith-common/src/main/java/com/embabel/smith/common/validation/ProcessValidator.java"
   - "smith-common/src/main/java/com/embabel/smith/common/validation/ProcessValidationResult.java"
-  - "openspec/specs/agent-spec-process/spec.md"
-updated_at: "2026-11-15"
+  - "docs/08-builder.md"
+updated_at: "2026-11-22"
 ---
 
 # Two-candidate build (single agent vs multi-agent process)
@@ -50,8 +50,8 @@ runtime would refuse to ingest what the build just published.
 
 A detected cycle gets one bounded repair — `ProcessRepair` reorders the agents topologically over the
 data-flow graph, up to `MAX_ATTEMPTS = 3`, then re-validates. A reorder cannot fix data flow that is
-itself circular; that case **blocks the process candidate only** (the ruling from the archived
-`builder-process-target` change): the candidate is neither stored nor published, the report names the
+itself circular; that case **blocks the process candidate only** (`docs/08-builder.md` §Process
+output records the ruling): the candidate is neither stored nor published, the report names the
 cycle, and the build ships the single-agent spec.
 
 ## Gate, storage, publication
@@ -70,5 +70,5 @@ a model call.
 
 `ProcessValidationResult` reports `sharedTypes` (types used by more than one agent — the glue that
 makes it a process rather than a pile of packs) but **nothing fails on it**. Two agents that share no
-type still validate, so the spec's "two or more agent specs that share intermediate types" is enforced
-only on the count, not the sharing.
+type still validate: the two-or-more-agents rule is enforced only on the count, by
+`SingleShotProcessSpecGenerator` throwing below two, not on the sharing.

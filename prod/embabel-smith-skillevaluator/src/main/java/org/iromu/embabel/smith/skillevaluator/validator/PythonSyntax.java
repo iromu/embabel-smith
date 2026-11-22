@@ -12,14 +12,12 @@ import java.util.regex.Pattern;
 /**
  * Line/regex model of a Python source file — the deterministic stand-in for the
  * {@code ast} tree that upstream {@code validators/script_lint.py} walks.
- *
  * <p>
  * The Java port may not embed a Python parser and may not shell out, so the three
  * AST-derived lint rules ({@code flat_script}, {@code deep_nesting},
  * {@code magic_numbers}) are re-implemented over the token-light representation built
  * here: per-line code text with comments and string literals removed, plus the
  * indentation and bracket state needed to reason about blocks.
- *
  * <p>
  * It also carries the syntax-error verdict that lets {@code _lint_script} skip
  * unparseable files silently. That verdict is a heuristic, not a grammar: a file is
@@ -29,72 +27,30 @@ import java.util.regex.Pattern;
  * unbalanced at EOF. Code that tokenizes cleanly but is grammatically invalid (a
  * misindented block, a {@code try} without an {@code except}) is linted rather than
  * skipped.
- *
  * <p>
  * Only used by {@link ScriptLintValidator}; not a general Python front end.
+ *
+ * @author Ivan Rodriguez
  */
 final class PythonSyntax {
 
-	/** One physical line after comments and string literals were removed. */
-	static final class CodeLine {
-
-		/** Indentation in expanded-tab columns. */
-		final int indent;
-
-		/** Line text with comments and strings stripped. */
-		final String code;
-
-		/** One-based line number in the original file. */
-		final int lineNumber;
-
-		/**
-		 * True when the line continues a logical line (open bracket, backslash or
-		 * string).
-		 */
-		final boolean continuation;
-
-		CodeLine(int indent, String code, int lineNumber, boolean continuation) {
-			this.indent = indent;
-			this.code = code;
-			this.lineNumber = lineNumber;
-			this.continuation = continuation;
-		}
-
-	}
-
-	/** Result of modelling one file. */
-	static final class Model {
-
-		/**
-		 * Every non-blank code line, in order. Block analysis filters out the entries
-		 * flagged as continuations; the text scans keep them so a value written inside a
-		 * wrapped call is still seen.
-		 */
-		final List<CodeLine> lines;
-
-		/** Whether the file looks unparseable and should be skipped by the linter. */
-		final boolean syntaxError;
-
-		/** Why {@link #syntaxError} was set, for logs and tests. */
-		final String syntaxErrorReason;
-
-		private Model(List<CodeLine> lines, boolean syntaxError, String syntaxErrorReason) {
-			this.lines = lines;
-			this.syntaxError = syntaxError;
-			this.syntaxErrorReason = syntaxErrorReason;
-		}
-
-	}
-
 	private static final Pattern FIRST_WORD = Pattern.compile("^([A-Za-z_][A-Za-z0-9_]*)");
 
-	/** Leading word of a code line, or empty when the line starts with punctuation. */
+	/**
+	 * Leading word of a code line, or empty when the line starts with punctuation.
+	 * @param code the comment- and string-stripped line text
+	 * @return the leading identifier, or the empty string
+	 */
 	static String firstWord(String code) {
 		var matcher = FIRST_WORD.matcher(code);
 		return matcher.find() ? matcher.group(1) : "";
 	}
 
-	/** Word after the first — distinguishes {@code async def} from {@code async for}. */
+	/**
+	 * Word after the first — distinguishes {@code async def} from {@code async for}.
+	 * @param code the comment- and string-stripped line text
+	 * @return the second identifier, or the empty string when there is none
+	 */
 	static String secondWord(String code) {
 		String rest = code.substring(firstWord(code).length()).stripLeading();
 		var matcher = FIRST_WORD.matcher(rest);
@@ -107,6 +63,7 @@ final class PythonSyntax {
 	/**
 	 * Model a Python source file.
 	 * @param content raw file text, newlines intact
+	 * @return the per-line model carrying the file's syntax-error verdict
 	 */
 	static Model model(String content) {
 		List<CodeLine> lines = new ArrayList<>();
@@ -163,7 +120,7 @@ final class PythonSyntax {
 		}
 
 		if (syntaxError == null && openString != null) {
-			syntaxError = openStringReason != null ? openStringReason : "unterminated string literal";
+			syntaxError = (openStringReason != null) ? openStringReason : "unterminated string literal";
 		}
 		if (syntaxError == null && bracketDepth != 0) {
 			syntaxError = "unbalanced bracket at end of file";
@@ -173,6 +130,8 @@ final class PythonSyntax {
 
 	/**
 	 * Split on the newline conventions Python accepts, dropping the final empty fragment.
+	 * @param content the raw file text
+	 * @return the physical lines, without their trailing newlines
 	 */
 	private static String[] splitPhysical(String content) {
 		String normalized = content.replace("\r\n", "\n").replace('\r', '\n');
@@ -187,6 +146,8 @@ final class PythonSyntax {
 
 	/**
 	 * Column of the first non-whitespace character, with tabs advanced to multiples of 8.
+	 * @param line the physical line
+	 * @return the expanded-tab column at which code starts
 	 */
 	private static int indentOf(String line) {
 		int column = 0;
@@ -205,7 +166,12 @@ final class PythonSyntax {
 		return column;
 	}
 
-	/** Index of an unescaped {@code delimiter} in {@code line}, or -1. */
+	/**
+	 * Index of an unescaped {@code delimiter} in {@code line}, or -1.
+	 * @param line the text to search
+	 * @param delimiter the quote sequence to locate
+	 * @return the start index of an unescaped {@code delimiter}, or {@code -1}
+	 */
 	private static int findClose(String line, String delimiter) {
 		return findCloseFrom(line, delimiter, 0);
 	}
@@ -227,23 +193,13 @@ final class PythonSyntax {
 		return count;
 	}
 
-	/** One-line scan result. */
-	private static final class Scan {
-
-		String code = "";
-
-		int bracketDepth;
-
-		boolean lineContinuation;
-
-		String openString;
-
-	}
-
 	/**
 	 * Strip comments and string literals from one physical line, tracking bracket depth
 	 * and the ways a logical line can spill onto the next one. String bodies collapse to
 	 * a placeholder so their contents cannot register as code.
+	 * @param line the physical line
+	 * @param bracketDepthIn the depth carried in from the preceding lines
+	 * @return the stripped code with the updated bracket and continuation state
 	 */
 	private static Scan scanLine(String line, int bracketDepthIn) {
 		Scan scan = new Scan();
@@ -277,7 +233,7 @@ final class PythonSyntax {
 				continue;
 			}
 			if (c == '\'' || c == '"') {
-				String delimiter = tripleAt(line, i) != null ? tripleAt(line, i) : String.valueOf(c);
+				String delimiter = (tripleAt(line, i) != null) ? tripleAt(line, i) : String.valueOf(c);
 				int close = findCloseFrom(line, delimiter, i + delimiter.length());
 				if (close < 0) {
 					scan.openString = delimiter;
@@ -303,12 +259,20 @@ final class PythonSyntax {
 	/**
 	 * True when the backslash at {@code position} is the line's last meaningful
 	 * character.
+	 * @param line the physical line
+	 * @param position the index of the backslash
+	 * @return {@code true} when only whitespace follows it
 	 */
 	private static boolean isTail(String line, int position) {
 		return line.substring(position + 1).isBlank();
 	}
 
-	/** The triple-quote delimiter starting at {@code position}, or null. */
+	/**
+	 * The triple-quote delimiter starting at {@code position}, or null.
+	 * @param line the physical line
+	 * @param position the index of the opening quote
+	 * @return the three-character delimiter, or {@code null} when fewer follow
+	 */
 	private static String tripleAt(String line, int position) {
 		char quote = line.charAt(position);
 		if (position + 2 < line.length() && line.charAt(position + 1) == quote && line.charAt(position + 2) == quote
@@ -316,6 +280,70 @@ final class PythonSyntax {
 			return String.valueOf(quote).repeat(3);
 		}
 		return null;
+	}
+
+	/** One physical line after comments and string literals were removed. */
+	static final class CodeLine {
+
+		/** Indentation in expanded-tab columns. */
+		final int indent;
+
+		/** Line text with comments and strings stripped. */
+		final String code;
+
+		/** One-based line number in the original file. */
+		final int lineNumber;
+
+		/**
+		 * True when the line continues a logical line (open bracket, backslash or
+		 * string).
+		 */
+		final boolean continuation;
+
+		CodeLine(int indent, String code, int lineNumber, boolean continuation) {
+			this.indent = indent;
+			this.code = code;
+			this.lineNumber = lineNumber;
+			this.continuation = continuation;
+		}
+
+	}
+
+	/** Result of modelling one file. */
+	static final class Model {
+
+		/**
+		 * Every non-blank code line, in order. Block analysis filters out the entries
+		 * flagged as continuations; the text scans keep them so a value written inside a
+		 * wrapped call is still seen.
+		 */
+		final List<CodeLine> lines;
+
+		/** Whether the file looks unparseable and should be skipped by the linter. */
+		final boolean syntaxError;
+
+		/** Why {@link #syntaxError} was set, for logs and tests. */
+		final String syntaxErrorReason;
+
+		private Model(List<CodeLine> lines, boolean syntaxError, String syntaxErrorReason) {
+			this.lines = lines;
+			this.syntaxError = syntaxError;
+			this.syntaxErrorReason = syntaxErrorReason;
+		}
+
+	}
+
+	/** One-line scan result. */
+	private static final class Scan {
+
+		String code = "";
+
+		int bracketDepth;
+
+		boolean lineContinuation;
+
+		String openString;
+
 	}
 
 }

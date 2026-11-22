@@ -25,10 +25,14 @@ import com.embabel.smith.common.model.GoalStepSpec;
  * <p>
  * Shared by the single-shot generators — the one that emits a pack and the one that emits
  * a process — so a pack is normalised identically whichever candidate it came from.
+ * Public because {@code eval/PackDrivenAgentSpecGenerator} — the pack flow's generator —
+ * has to normalise the same way for the two flows' drafts to be comparable at all
+ * ({@code openspec/changes/builder-executes-its-own-packs} task 3.3); a second copy of
+ * these rules in {@code eval/} would be free to drift from the flow it is meant to match.
  *
  * @author Ivan Rodriguez
  */
-final class AgentSpecNormalizer {
+public final class AgentSpecNormalizer {
 
 	/**
 	 * Matches a Jinja2 template reference such as {@code {{userInput}}} or
@@ -48,7 +52,7 @@ final class AgentSpecNormalizer {
 	 * @return the outermost JSON object found in the answer
 	 * @throws IllegalStateException when the answer carries no JSON object
 	 */
-	static String extractJson(String raw) {
+	public static String extractJson(String raw) {
 		String s = (raw != null) ? raw.trim() : "";
 		int fence = s.indexOf("```");
 		if (fence >= 0) {
@@ -77,7 +81,7 @@ final class AgentSpecNormalizer {
 	 * @param pack the parsed agent spec
 	 * @return the normalised agent spec
 	 */
-	static AgentSpec normalize(AgentSpec pack) {
+	public static AgentSpec normalize(AgentSpec pack) {
 		AgentSpecManifest manifest = pack.manifest();
 		if (manifest == null || manifest.name() == null || manifest.name().isBlank()) {
 			String name = (pack.goal() != null && pack.goal().name() != null) ? slug(pack.goal().name())

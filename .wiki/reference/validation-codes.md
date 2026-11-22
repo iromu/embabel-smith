@@ -16,7 +16,7 @@ updated_at: "2026-11-01"
 agent spec runs it before ingesting, building, or writing one. See [[agent-spec-format]] for what
 the checks mean and [[validate-before-write]] for why the builder depends on it.
 
-## The four checks, in order
+## The five checks, in order
 
 1. **Layout** — `manifest.yml`, `goal.yml`, a non-empty `steps/`, and a `types/` directory are all
    present.
@@ -26,6 +26,10 @@ the checks mean and [[validate-before-write]] for why the builder depends on it.
    dynamic type.
 4. **Type references resolve** — every input/output type name used by the goal or any step is either
    framework-provided or declared in `types/`.
+5. **Declared inputs actually reach the prompt** — a step that declares input types whose prompt
+   interpolates none of them is reported, because the input would never reach the model. The check is
+   satisfied as soon as one declared input is referenced by name (decapitalised short form), so it
+   catches the silent case where a step takes a type it never uses.
 
 A `ValidationIssue` is a `(code, message, location)` record — a stable machine-readable `code`, a
 human-readable `message`, and the file/step the issue was found in (or `null` if pack-wide).
@@ -45,6 +49,7 @@ human-readable `message`, and the file/step the issue was found in (or `null` if
 | `PROMPT_MISSING` | An action has no prompt |
 | `PROMPT_UNDECLARED_INPUT` | A prompt reference is not bound by any declared input type |
 | `PROMPT_UNKNOWN_PROPERTY` | A prompt references a property not declared on the type |
+| `PROMPT_IGNORES_DECLARED_INPUT` | An action declares input types but interpolates none of them, so the input never reaches the model |
 | `PARSE_ERROR` | The pack failed to parse (thrown during `read`) |
 
 ## Framework types

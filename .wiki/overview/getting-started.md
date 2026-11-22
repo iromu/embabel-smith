@@ -10,7 +10,8 @@ source_paths:
   - "setup.sh"
   - "run-loop.sh"
   - "poc/poc-1-no-code-runtime/src/main/resources/application.yml"
-updated_at: "2026-11-14"
+  - ".github/workflows/offline-verification.yml"
+updated_at: "2026-11-22"
 ---
 
 # Get started
@@ -25,20 +26,31 @@ read those modules' own `README.md` files).
 mvn -q verify
 ```
 
-Builds every module and runs every **offline** test. This needs no model endpoint and no network
-beyond Maven's first-time dependency fetch (Embabel comes from `repo.embabel.com`, declared in the
-parent `pom.xml`). A green `mvn -q verify` is the project's baseline: it proves the format round-trips,
-validation, the builder's validate/write steps, eval scoring, the spec-format surface, the retrieval
-benchmark, the progressive-disclosure measurement, and the trust-tier allowlist all behave.
+Builds every module in the **default reactor** and runs every **offline** test — that is
+`smith-common` and `prod/`; the POCs sit behind a profile, so add `POC=1` / `-Ppoc` to build them.
+This needs no model endpoint and no network beyond Maven's first-time dependency fetch (Embabel comes
+from `repo.embabel.com`, declared in the parent `pom.xml`). A green `mvn -q verify` is the local
+baseline: it proves the format round-trips, validation, the builder's validate/write steps, eval
+scoring, the spec-format surface, the retrieval benchmark, the progressive-disclosure measurement, and
+the trust-tier allowlist all behave.
 
 The root `Makefile` exists so nobody invents their own `mvn` invocation — see [[build-tooling]]. Its
 `build` target is `compile -DskipTests`, so it is **not** a substitute for `verify`; the targets worth
-knowing are `test`, `test-module`, `lint`, and `module`.
+knowing are `test`, `test-module`, `lint`, and `module`. **CI runs those targets, not `verify`** —
+`.github/workflows/offline-verification.yml` runs `make build`, `make test` and `make lint`, which
+differ from the bare command in that they interpolate `$(POC_FLAG)` and, for `test`, source
+`~/.config/env/llm.env` first.
 
-**Use `make test`, not bare `mvn test`, when you want the endpoint-gated tests to actually run.** It
-sources `~/.config/env/llm.env` and exports the four model variables first; an IDE launch that did not
-inherit your shell environment will silently skip them instead ([[model-endpoint]]). For one module:
-`make test-module MODULE=poc/poc-1-no-code-runtime`.
+**The endpoint-gated tests are off by default, and `make test` does not change that.** The live group is
+excluded through the overridable `test.excludedGroups` property (default `live` in the root POM), so
+`make test` stays green with no endpoint configured — it sources `~/.config/env/llm.env` and exports the
+model variables, but the tag exclusion still applies. **`make test-live` is the only supported opt-in**
+(it clears the exclusion *and* selects the group; `mvn test -Dgroups=live` alone selects nothing, because
+the exclusion is still in force). An IDE launch that did not inherit your shell environment will skip
+them silently instead ([[model-endpoint]]). For one module:
+`make test-module MODULE=prod/embabel-smith-studio` — that target passes `$(POC_FLAG)`, and a `poc/...`
+`MODULE` value switches the profile on by itself (`Makefile:12`), so
+`make test-module MODULE=poc/poc-1-no-code-runtime` needs no `POC=1`.
 
 Before your first commit, run `make setup` once — it installs the pre-commit hooks (gitleaks,
 whitespace, and `make lint`), which are otherwise **off** for a fresh clone ([[build-tooling]]).
@@ -55,13 +67,15 @@ export OPENAI_CUSTOM_MODELS=my-model
 export EMBABEL_MODELS_DEFAULT_LLM=my-model
 ```
 
-Then install the modules once so sibling artifacts resolve, and run a single module by `-pl`:
+Then install the modules once so sibling artifacts resolve, and run a single module by `-pl`. The
+`-Ppoc` profile is **required** — the POCs are not in the default reactor, so `-pl poc/...` matches
+nothing without it:
 
 ```bash
 mvn install -DskipTests
 BUILDER_PACK_DIR="$PWD/agent-specs/explainer" \
 BUILDER_INPUT="Explain how a coffee machine works" BUILDER_PLANNER=GOAP \
-    mvn -pl poc/poc-1-no-code-runtime spring-boot:run
+    mvn -Ppoc -pl poc/poc-1-no-code-runtime spring-boot:run
 ```
 
 Expected successful output: `=== Spec output ===` followed by the explainer text the model

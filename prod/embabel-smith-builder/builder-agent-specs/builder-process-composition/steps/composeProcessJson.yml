@@ -1,0 +1,65 @@
+stepType: action
+name: composeProcessJson
+description: "Emit the whole multi-agent process as one JSON document; Java parses this text into the process it writes"
+inputTypeNames:
+  - ProcessScope
+  - AgentSplit
+  - HandoffPlan
+outputTypeName: ProcessJson
+pre: []
+post: []
+cost: null
+value: null
+canRerun: null
+nullable: null
+toolGroups: []
+prompt: |
+  Emit the process below as ONE JSON object and nothing else. Match these field names exactly.
+  {
+    "process": "<snake_case_process_name>",
+    "agents": [
+      {
+        "manifest": { "name": "<snake_case_agent_name>", "version": "1.0.0" },
+        "goal": {
+          "stepType": "goal",
+          "name": "<goal_name>",
+          "description": "<what this agent's finished run returns>",
+          "outputTypeName": "<AgentOutputType>",
+          "export": true
+        },
+        "steps": [
+          {
+            "stepType": "action",
+            "name": "<step_name>",
+            "description": "<what this step does, in business terms>",
+            "inputTypeNames": ["<TypeA>", "<TypeB>"],
+            "outputTypeName": "<TypeOut>",
+            "prompt": "<template that produces the output from the inputs>",
+            "toolGroups": []
+          }
+        ],
+        "types": [
+          { "name": "<Type>", "description": "<what this data is>" }
+        ]
+      }
+    ]
+  }
+  List the agents in the order the process runs. Use PascalCase type names and snake_case step,
+  goal and agent names, and give every agent a distinct goal name.
+  Each step's own prompt is a template that produces its output from its inputs. In it, reference
+  each input EXACTLY by its decapitalized type name: first letter lower-cased, with no underscores
+  and no spaces. So type `MarketReport` is referenced as `marketReport` and type `UserInput` as
+  `userInput`. Never write a snake_case variable such as `market_report`.
+  Each agent is self-contained: its goal is produced by one of its own steps, and every step input
+  it uses is produced by its own steps, produced by an earlier agent's goal, or is `UserInput`. The
+  hand-offs below are the shared types that connect the agents; use the same type name on both sides
+  of a hand-off. List in each agent's `types` every type that agent produces or references that is
+  not `UserInput`. Keep the decision points and hand-offs between agents explicit as shared types,
+  and keep every step in business terms.
+  Output ONLY the JSON object: no markdown fences, no commentary before or after.
+  Process name: {{processScope.processName}}
+  Process being composed: {{processScope.primaryProcess}}
+  Final deliverable type: {{processScope.finalDeliverable}}
+  Agents in run order, with their goals and needs: {{agentSplit.agents}}
+  Hand-offs, missing producers and self-containment gaps: {{handoffPlan.handoffs}}
+  Gaps to resolve: {{handoffPlan.gaps}}

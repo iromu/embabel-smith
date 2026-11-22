@@ -8,9 +8,10 @@ package com.embabel.smith.runtime;
 import com.embabel.agent.core.AgentPlatform;
 import com.embabel.smith.runtime.core.TrustTier;
 import com.embabel.smith.runtime.trace.JsonlTraceStore;
-import com.embabel.smith.runtime.trace.TraceRecord;
+import com.embabel.smith.common.trace.TraceRecord;
 import com.embabel.smith.runtime.trace.TraceRecorder;
-import com.embabel.smith.runtime.trace.TraceStore;
+import com.embabel.smith.common.trace.TraceStore;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.junit.jupiter.api.io.TempDir;
@@ -29,6 +30,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * {@code OPENAI_CUSTOM_BASE_URL} is set (the model endpoint is fully env-driven).
  */
 @SpringBootTest
+@Tag("live")
 @EnabledIfEnvironmentVariable(named = "OPENAI_CUSTOM_BASE_URL", matches = ".+")
 class LiveRunIntegrationTest {
 
