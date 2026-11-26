@@ -764,7 +764,7 @@ own comment: the polymorphic `parts` of the background type is what cost POC 27 
 Offline tests cover the `BuilderAgent` compile/validate/write, the `RefinementLoop`, the
 `AgentSpecSecurityScanner` verdicts, the `LifecycleStamper`, the publishers (collision, no-push), the
 dual-candidate path (`DualCandidateBuildTest`, `CandidateRecommenderTest`, `AgentsPackRepairTest`,
-`SingleShotProcessSpecGeneratorTest`) and the model layer on mocks (`AiPromptRewriterTest`,
+`SingleShotAgentsPackGeneratorTest`) and the model layer on mocks (`AiPromptRewriterTest`,
 `AiSpecPromptCallerTest` — the latter proves the system prompt goes out separately and that a blank
 one is omitted) plus the `NoDirectModelRequestTest` guard. The live build (which calls the model) is
 endpoint-gated; `LiveBuildIntegrationTest` asserts the caller-visible outcome, not wire-level error

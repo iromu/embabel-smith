@@ -33,7 +33,7 @@ source_paths:
   - "prod/embabel-smith-studio/src/test/java/com/embabel/smith/studio/NoA2aEndpointTest.java"
   - "prod/embabel-smith-studio/src/test/java/com/embabel/smith/studio/A2aEndpointWhenEnabledTest.java"
   - "prod/embabel-smith-studio/README.md"
-updated_at: "2026-11-25"
+updated_at: "2026-11-26"
 ---
 
 # The smith studio web product
@@ -58,7 +58,8 @@ the authoring surface added `/api/discover`, `/api/generate`, `/api/simulate`, `
 `/api/compose`, `/api/store/*`, `/api/goals` and `/api/status` — see
 [[studio-process-workspace]] and [[studio-compose-editor]].
 
-`StudioConfiguration` wires the `BuilderService` with the process generator too, so a studio build
+`StudioConfiguration` wires the `BuilderService` with the agents-pack generator
+(`SingleShotAgentsPackGenerator`) too, so a studio build
 runs the full [[two-candidate-build]]. `BuildController` is the one place that still pins the target:
 it constructs `BuildOptions` with `BuildTarget.AGENT_SPEC` and `DEFAULT_MIN_LIFT`, so the UI has no
 skill-target switch yet ([[skill-output-target]]).

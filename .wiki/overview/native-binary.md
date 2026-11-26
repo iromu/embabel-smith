@@ -72,8 +72,12 @@ those two fields still registers `smith skill-run` and then rejects its own argu
 reads as a mistyped flag rather than as the missing registration it is. `builder-traced-hints/` is **generated and
 committed** — 12 754 lines, 1 413 reflection entries and 490 resource globs — produced by
 `scripts/native-hints.sh`, which runs four CLI invocations and then the whole offline Surefire suite
-under the tracing agent. The suite is what leaks: of the file's 1 413 reflection entries, 92 name a `*Test` type and 88 of those
-carry verbatim test-method names (`DualCandidateBuildTest.aCycleTheReorderSettlesIsRepairedStoredAndPublished`).
+under the tracing agent. The suite is what leaks: of the file's 1 413 reflection entries, 92 name a
+`*Test` type, 88 of those carry a method list, and 47 name test methods verbatim
+(`DualCandidateBuildTest.aCycleTheReorderSettlesIsRepairedStoredAndPublished`). The agents-pack rename
+edited this file **in place** rather than re-running the tracer — six class names across 7 rewritten
+lines, 5 `type` entries and 2 resource globs, none added or removed — so every other entry still dates
+from the 2026-11-23 trace below.
 Both directories are load-bearing — drop the hand-written one and the catalogs and prompts stop resolving,
 drop the traced one and the third-party, Jinjava and provider-SDK reflection goes with it. The pair grows
 "by failure rather than by guesswork": a `MissingReflectionRegistrationError` names the entry to add. The

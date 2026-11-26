@@ -11,7 +11,7 @@ source_paths:
   - "prod/embabel-smith-builder/src/main/java/com/embabel/smith/builder/security/AgentSpecSecurityScanner.java"
   - "prod/embabel-smith-builder/src/main/java/com/embabel/smith/builder/security/Finding.java"
   - "prod/embabel-smith-builder/src/main/java/com/embabel/smith/builder/skill/SkillBuilderService.java"
-updated_at: "2026-11-24"
+updated_at: "2026-11-26"
 ---
 
 # Install-time spec security scanning (POC 21)
@@ -50,15 +50,16 @@ with two criticals. Eleven offline tests pin every rule.
 
 This scanner vets documents. The prod scanner vets one artifact this POC never saw: the JavaScript a skill
 publishes. `security/AgentSpecSecurityScanner.scanSkill(name, texts, scriptsByPath)`
-(`prod/embabel-smith-builder/src/main/java/com/embabel/smith/builder/security/AgentSpecSecurityScanner.java:190`)
-takes the scripts keyed by the path each publishes to, iterates them through a `TreeMap` (`:192`) so two
+(`prod/embabel-smith-builder/src/main/java/com/embabel/smith/builder/security/AgentSpecSecurityScanner.java:194`)
+takes the scripts keyed by the path each publishes to, iterates them through a `TreeMap` (`:196`) so two
 identical builds print the same report, and reads each as code rather than as text. Three CRITICAL codes
 carry it — `SCRIPT_HOST_ACCESS`, `SCRIPT_NETWORK`, `SCRIPT_PATH_ESCAPE`
 (`prod/embabel-smith-builder/src/main/java/com/embabel/smith/builder/security/Finding.java:49,56,63`) —
 fired by marker lists for the module loader and host namespaces (`java.type(`, `require(`, `child_process`,
 `globalthis.`, `eval(`), for network APIs (`fetch(`, `xmlhttprequest`, `websocket`, `http.request`) and
-for the parent-directory path (`../`) (`AgentSpecSecurityScanner.java:79-91`), emitted per script at
-`:280-284` with the evidence naming the file and the marker that hit (`:306`). Matching there is lowercased
+for the parent-directory path (`../`) (`AgentSpecSecurityScanner.java:79-91`), emitted per script inside
+`scriptFindings` (`:307-312`) with the evidence naming the file and the marker that hit (`:333`). Matching
+there is lowercased
 but deliberately *not* normalized the way prompt text is, on the ground that these are API names: an
 obfuscated `f e t c h` is not a call the engine can make either.
 
@@ -66,7 +67,7 @@ The call site is `skill/SkillBuilderService.java:283`, at stage 7 of the skill b
 arms and the lift between them (`:238`) and before the lifecycle stamp and the publish (`:312`, `:316`) —
 so a script reaching for the host, for the network, or for a path above the skill's own folder blocks the
 build inside the builder rather than being discovered by the reader's runtime
-(`docs/08-builder.md:362-366,395`). A scriptless skill scans to exactly the report the text-only call
+(`docs/08-builder.md:362-366,373-377`). A scriptless skill scans to exactly the report the text-only call
 produced, which is what keeps this an addition rather than a replacement.
 
 ## Honest limit

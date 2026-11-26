@@ -19,7 +19,7 @@ source_paths:
   - "prod/embabel-smith-studio/src/main/java/com/embabel/smith/studio/loop/LoopScheduler.java"
   - "prod/embabel-smith-studio/pom.xml"
   - "prod/embabel-smith-studio/README.md"
-updated_at: "2026-11-25"
+updated_at: "2026-11-26"
 ---
 
 # The smith studio: the self-improvement loop

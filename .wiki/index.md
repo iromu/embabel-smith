@@ -3,9 +3,27 @@ title: "Embabel Smith Wiki"
 type: "index"
 status: "active"
 language: "default"
-last_commit: "9c5ce18ab7e609fb7ae917ecd52292c529ef3ff4"
+last_commit: "e57bbbe5ab46cbe671639a247c34c41d2cabbd02"
 updated_at: "2026-11-26"
 ---
+
+<!-- Incremental ingest 2026-11-26 (b): the agents-pack rename at `e57bbbe`. Drift since `9c5ce18` is 54
+tracked files — `77a2b98`'s README rewrite plus one vocabulary commit that renamed the multi-agent
+artifact: `ProcessSpec` and its `Process*` satellites to `AgentsPack*`, four methods, 21 files moved on
+disk. Twenty of 47 pages carried drifted `source_paths`; three passes over disjoint page sets read the
+sources at HEAD and corrected names, moved paths and line citations. Beyond the rename the pass fixed four
+things that had drifted on their own: five citations in `spec-security-scanning.md` (the scanner file is
+byte-identical between the checkpoint and HEAD, so those predate this commit), a `mvn -q verify` CI claim
+in `model-endpoint.md` for a Makefile target that does not exist, an off-by-a-column hint recount in
+`native-binary.md` (92 `*Test` types, 88 carrying a method list, 47 naming test methods verbatim), and the
+second dangling pointer `19e87da`'s README move left in `build-tooling.md`. Names that did NOT move, and
+are not drift: `process.yml` with its `process`/`version`/`agents` keys, the `@LlmTool` tool name
+`validateProcess` with the `process` role and `processJson` argument, `AgentsPack.process()`,
+`ProcessStore`, `ProcessExtractor`, and POC 24's own `gencmp.ProcessSpec`. Lint: 525 `source_paths` with
+0 dead, 0 orphan pages, 0 pages carrying `status: "stale"`, 0 duplicate headings; the single link the
+checker flags is a shell regex inside a fenced block in `build-tooling.md`, not a wikilink. `last_commit`
+advances because the changed set was processed in full, not scoped. GitHub Pages re-publish remains OWED
+(`BLOCKERS.md` §1) and was not attempted.
 
 <!-- Full ingest 2026-11-26: 164 tracked files across 6 commits since `f96ecbe`, partitioned four ways
 across disjoint page sets — the builder's flow and skill surfaces, the runtime with its script hosts and

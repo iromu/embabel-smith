@@ -81,8 +81,12 @@ regardless; the `@Tag("live")` tests therefore do not run, and green says nothin
 they exercise; **nothing is published or deployed**; and **no coverage threshold** is enforced. See
 [[getting-started]] for the offline/endpoint-gated split this encodes. One cross-reference inside that
 header is stale: it still points at `README.md`, "Live tests are opt-in by tag" — a section the README
-rewrite removed on 2026-11-26. What it points at is unchanged and stated in
-[`docs/05-architecture.md`](../../docs/05-architecture.md).
+rewrite removed on 2026-11-26. What it points at is unchanged and now stated only in
+[`docs/05-architecture.md`](../../docs/05-architecture.md) §The live group is opt-in
+(`test.excludedGroups`). A second comment in the same file went stale the same day from the other
+direction: the `on:` block notes that "`wiki-pages.yml` still names" the dead `poc/builder` branch, and
+that same commit repointed `wiki-pages.yml` at `branches: [main]`, so the note now describes a file that
+no longer has the problem.
 
 A second workflow, `.github/workflows/native-image.yml`, compiles the builder into a native binary on
 every PR that could plausibly change it and smoke-tests the result — again through `make native`, never

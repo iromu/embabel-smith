@@ -14,7 +14,7 @@ source_paths:
   - "smith-common/src/main/java/com/embabel/smith/common/io/AgentsPackWriter.java"
   - "smith-common/src/main/java/com/embabel/smith/common/validation/AgentsPackValidator.java"
   - "smith-common/src/main/java/com/embabel/smith/common/samples/SampleAgentSpecs.java"
-updated_at: "2026-11-25"
+updated_at: "2026-11-26"
 ---
 
 # The smith-common data model

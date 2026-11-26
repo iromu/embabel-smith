@@ -16,7 +16,7 @@ source_paths:
   - "examples/blueprints"
   - "prod/embabel-smith-builder/src/main/java/com/embabel/smith/builder/skill/SkillBuilderService.java"
   - "prod/embabel-smith-builder/src/main/java/com/embabel/smith/builder/cli/BuildCommand.java"
-  - "prod/embabel-smith-builder/src/test/java/com/embabel/smith/builder/skill/SkillBuilderServiceFromProcessTest.java"
+  - "prod/embabel-smith-builder/src/test/java/com/embabel/smith/builder/skill/SkillBuilderServiceFromAgentsPackTest.java"
   - "prod/embabel-smith-builder/src/main/resources/skills/skill-card-generator/scripts/discover_assets.js"
   - "docs/13-skill-script-javascript.md"
   - "docs/08-builder.md"
@@ -94,7 +94,7 @@ scenarios. Ceiling compression, not weak skills.
 
 POC 25 asks the model how many skills a process needs (*The pipeline* above); the builder's seam asks
 nothing. `SkillBuilderService.buildFromAgentsPack(AgentsPack, PublishTarget, BuildOptions)`
-(`skill/SkillBuilderService.java:151`) takes a decomposed process and reads each member `AgentSpec` as
+(`skill/SkillBuilderService.java:151`) takes a decomposed agents-pack and reads each member `AgentSpec` as
 one stage — the only place `AgentsPack` reaches `skill/` at all (import `:31`, signature `:151`). Each
 brief is assembled in Java at `:173` from fields the pack already declares: `Stage <name>`, then per
 step its name, its description, the types it consumes and the type it produces — no model call. Each
@@ -104,8 +104,8 @@ stage a gate refuses ends the run and is the report, with no aggregate.
 
 What it does **not** do: no shortlisting — every stage buys a skill (`:151`) — and no caller. The CLI's
 `--target skill` still hands `build` free text (`cli/BuildCommand.java:346-347`), so the only caller is the
-offline test with a stand-in `SpecPromptCaller` (`skill/SkillBuilderServiceFromProcessTest`). The
-`builder-skill-from-process` pack that shares the name is inventory-only: no builder main source names
+offline test with a stand-in `SpecPromptCaller` (`skill/SkillBuilderServiceFromAgentsPackTest`). The
+`builder-skill-from-process` pack named after the seam is inventory-only: no builder main source names
 it, no JVM code parses its `SkillBriefs`. **Status: implemented, offline-tested, unwired** —
 `docs/08-builder.md` §Process output records the missing half as a caller ("what is not done is a caller"),
 and `docs/12-backlog.md` carries that half as open.

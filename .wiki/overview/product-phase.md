@@ -6,6 +6,7 @@ language: "default"
 source_paths:
   - "prod/pom.xml"
   - "pom.xml"
+  - "smith-common/src/main/java/com/embabel/smith/common/model/AgentsPack.java"
   - "prod/embabel-smith-specsource/README.md"
   - "prod/embabel-smith-runtime/README.md"
   - "prod/embabel-smith-runtime/src/main/java/com/embabel/smith/runtime/core/RuntimeCore.java"
@@ -58,7 +59,7 @@ the original account of "four modules" no longer matches the tree. The durable m
 | --- | --- | --- |
 | `prod/embabel-smith-specsource` | Spec sources: `folder:` / `git:` URIs, pack discovery, ref pinning, cache, content hash. Shared by runtime (reads) and builder (publishes). | done (change 02) |
 | `prod/embabel-smith-runtime` | The runtime product: `smith run` CLI — ingest packs from a source, run an exported goal, enforce trust tiers, refuse a pack the lifecycle retired at ingest (`RuntimeCore.java:113` — it is not deployed, and a source left empty by that refusal fails), record a JSONL trace. | done (change 03) |
-| `prod/embabel-smith-builder` | The builder product: `smith build` CLI — NL description → two candidates (single pack / multi-agent process), or a `SKILL.md` with `--target skill` → eval → security gate → lifecycle stamp → publish the winner. `smith build` also takes `--flow` with four values — `java` (the shipped default), `pack`, `agentic` and `harness` — that differ only in who issues the generation call, three of them the builder's own packs under `src/main/resources/specs/` [`prod/embabel-smith-builder/README.md`](../../prod/embabel-smith-builder/README.md), [[smith-builder]]). | done (change 04, extended by the two builder changes) |
+| `prod/embabel-smith-builder` | The builder product: `smith build` CLI — NL description → two candidates (a single-agent pack / an agents-pack), or a `SKILL.md` with `--target skill` → eval → security gate → lifecycle stamp → publish the winner. `smith build` also takes `--flow` with four values — `java` (the shipped default), `pack`, `agentic` and `harness` — that differ only in who issues the generation call, three of them the builder's own packs under `src/main/resources/specs/` [`prod/embabel-smith-builder/README.md`](../../prod/embabel-smith-builder/README.md), [[smith-builder]]). | done (change 04, extended by the two builder changes) |
 | `prod/embabel-smith-studio` | The self-improving studio: the self-improvement loop (change 05) exposed as a web product — REST surface + Vue UI + loop scheduling (change 06). | done (change 06) |
 | `prod/embabel-smith-a2a-starter` | The A2A surface as a starter library — five operations over protocol 0.3, with beans conditional on `smith.a2a.enabled` and off by default, so depending on it opens no port. `prod/embabel-smith-studio` is its servlet host when a run sets that flag; the plain CLI cannot host it, because the starter depends on the runtime. An A2A run is the same run `smith run` makes. | added later ([[a2a-endpoint]]) |
 | `prod/embabel-smith-skillevaluator` | The Tier 1 skill validator: a static, zero-model check pipeline the builder's `inspect` gate is the only production consumer of. | added later ([[skill-output-target]]) |
@@ -104,7 +105,17 @@ paths.
 | `2026-11-14-builder-generation-engine` | 2026-11-14 | Moved generation out of the studio into the builder as the `AgentSpecGenerator` / `GenerationTechnique` seam, and added the `--technique` CLI option ([[smith-builder]], [[generation-approaches]]). |
 | `2026-11-14-smith-studio-process-workspace` | 2026-11-14 | The Author-a-process home workspace and the Compose pane ([[studio-process-workspace]], [[studio-compose-editor]]). |
 | `2026-11-14-builder-skill-target` | 2026-11-14 | `--target skill`: a second build output that emits a `SKILL.md` folder gated on with/without-skill lift → the skill build-gate contract ([[skill-output-target]]). |
-| `2026-11-15-builder-process-target` | 2026-11-15 | The **two-candidate build** — one description, a single-agent spec and a multi-agent process, both scored, one recommended ([[two-candidate-build]]). |
+| `2026-11-15-builder-process-target` | 2026-11-15 | The **two-candidate build** — one description, a single-agent spec and an agents-pack (multi-agent), both scored, one recommended ([[two-candidate-build]]). |
+
+The second candidate is an **agents-pack**: a manifest naming an ordered set of member directories,
+each of them an unchanged agent spec the runtime ingests on its own. The name arrived on 2026-11-26,
+when the docs' "N-pack process" jargon retired and the classes followed it
+(`smith-common`'s `model/AgentsPack` + `model/AgentsPackManifest`, `io/AgentsPackReader` /
+`AgentsPackWriter`, `validation/AgentsPackValidator`, and the builder's `AgentsPackGenerator`,
+`AgentsPackRepair`, `AgentsPackInvokerFactory`, `AgentsPackPublishable`). The wire did not move with
+it: the file is still `process.yml`, its keys are still `process` / `version` / `agents`, and the
+`@LlmTool` is still `validateProcess` on the `process` tool group — so a pack published before the
+rename reads unchanged. `ProcessStore` and POC 24's `gencmp.ProcessSpec` kept their names on purpose.
 
 The pack flows also moved where the improvement loop's mutable boundary sits. Of the builder's eight
 `.jinja` prompts, five serve generation — `process_to_flow`, `process_to_flow_multi`,

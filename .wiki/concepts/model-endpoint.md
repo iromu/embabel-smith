@@ -97,9 +97,10 @@ it on tool round-trips has less left for its own drafting call.
 
 This is the project's central split:
 
-- **Offline** (always runs in CI via `mvn -q verify`): format round-trip, validation, the builder's
-  validate/write steps, the eval scoring/composite, the spec-format surface, planner resolution, type
-  mapping, step-spec assembly. Pure Java, testable without a model.
+- **Offline** (always runs in CI, through `make build` and `make test` — see [[build-tooling]]):
+  format round-trip, validation, the builder's validate/write steps, the eval scoring/composite, the
+  spec-format surface, planner resolution, type mapping, step-spec assembly. Pure Java, testable
+  without a model.
 - **Endpoint-gated** (requires a live endpoint): anything that actually calls the LLM — the builder's
   `compileFromDescription`, the runtime's goal run, the NL-compile, the eval invocation, the full
   build→run loop.
