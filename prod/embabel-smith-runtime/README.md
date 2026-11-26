@@ -30,10 +30,21 @@ option, unknown value) exit **2**.
 Example:
 
 ```
-smith run --source folder:./agent-specs/explainer \
-          --goal briefDone \
+smith run --source folder:./my-packs \
+          --goal explainerComplete \
           --input "Explain how a coffee machine works"
 ```
+
+`--source` names a directory that *contains* pack directories, not a pack: pointing it at
+`./agent-specs/explainer` itself answers `contains no agent specs`. `--goal` can be left off only
+when the source exports exactly one goal, so a multi-pack source normally needs it named.
+
+Pointing the source straight at this repository's `agent-specs/` is a special case worth knowing:
+it contains `shell-runner`, which declares the `shell` tool group, so a run is refused at the default
+`standard` tier (once a goal is named — an unnamed multi-goal source is refused earlier for not
+naming one) — and at `high`, planning a goal as unrelated as `explainerComplete` can route through
+`runCli`, because that step's output type is one the planner is short of. A source of the packs you
+mean to run is the habit.
 
 ### Model endpoint (env-driven)
 
@@ -47,8 +58,13 @@ POCs, see `application.yml`):
 | `OPENAI_CUSTOM_MODELS` | Comma-separated model list exposed to the platform |
 | `EMBABEL_MODELS_DEFAULT_LLM` | The model used for action bodies (must be one of the listed models) |
 
-Without an endpoint the CLI exits 1 with a clear configuration error naming the missing
-variables.
+There is no separate configuration check to fail. `application.yml` fills each of these with an
+inert placeholder when the variable is unset (`http://127.0.0.1:9/v1`, key `sk-smith-no-endpoint`,
+model `smith-no-endpoint`) so that the CLI boots and reports rather than refusing to start — which
+means an unconfigured endpoint surfaces as a **failed model call during the run**, not as a startup
+error naming the missing variables. The failure can take a while to arrive: the platform retries and
+its interaction timeout applies to the call, so a missing endpoint looks like a slow run that ends
+with exit 1 and a connection error in the log.
 
 ## Trace schema
 
