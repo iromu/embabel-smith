@@ -84,4 +84,38 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
+
+    <build>
+        <plugins>
+            <!--
+                The executable jar, beside the plain one rather than in place of it.
+
+                `repackage` with a classifier writes target/embabel-smith-runtime-<version>-exec.jar
+                and leaves the main artifact exactly as it was, so `java -jar` works without changing
+                what `mvn install` publishes. The classifier is load-bearing, not cosmetic: this
+                module is a compile dependency of embabel-smith-studio and embabel-smith-a2a-starter,
+                and a repackaged jar keeps its classes under BOOT-INF/classes where an ordinary
+                classpath cannot see them. Repackaging in place would leave both dependents compiling
+                against a jar they cannot read.
+
+                The version comes from the root pom's <pluginManagement>, and the Start-Class is
+                detected — SmithRuntimeApplication is the module's only main().
+            -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>repackage</id>
+                        <goals>
+                            <goal>repackage</goal>
+                        </goals>
+                        <configuration>
+                            <classifier>exec</classifier>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
 </project>

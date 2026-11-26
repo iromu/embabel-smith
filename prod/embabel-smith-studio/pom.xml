@@ -101,6 +101,18 @@
                     <workingDirectory>${basedir}/frontend</workingDirectory>
                 </configuration>
                 <executions>
+                    <!--
+                        The three npm runs are bound to generate-resources, the plugin's own default
+                        phase, and the phase matters more than it looks. Vite writes the bundle into
+                        src/main/resources/static (frontend/vite.config.ts), and it is
+                        maven-resources-plugin at process-resources that puts that directory into
+                        target/classes. Bound to compile — after that copy — a clean single-pass build
+                        produced a studio whose classes had no static/ at all: the app booted and 404'd
+                        at /, and only the *second* build on a tree looked correct because it copied
+                        what the first had generated. Anything that packages this module (the
+                        executable jar below, a container image) ships the gap. Running the frontend
+                        before the copy makes one build produce what the next build would have had.
+                    -->
                     <!-- Install our node and npm version to run npm/node scripts-->
                     <execution>
                         <id>install node</id>
@@ -116,7 +128,7 @@
                         <goals>
                             <goal>npm</goal>
                         </goals>
-                        <phase>compile</phase>
+                        <phase>generate-resources</phase>
                         <configuration>
                             <arguments>install</arguments>
                         </configuration>
@@ -126,7 +138,7 @@
                         <goals>
                             <goal>npm</goal>
                         </goals>
-                        <phase>compile</phase>
+                        <phase>generate-resources</phase>
                         <configuration>
                             <arguments>update</arguments>
                         </configuration>
@@ -138,7 +150,7 @@
                         <goals>
                             <goal>npm</goal>
                         </goals>
-                        <phase>compile</phase>
+                        <phase>generate-resources</phase>
                         <configuration>
                             <arguments>run build</arguments>
                         </configuration>
@@ -177,6 +189,38 @@
                         </fileset>
                     </filesets>
                 </configuration>
+            </plugin>
+            <!--
+                The executable jar, beside the plain one rather than in place of it.
+
+                `repackage` with a classifier writes target/embabel-smith-studio-<version>-exec.jar
+                and leaves the main artifact as it was, so `java -jar` works without changing what
+                `mvn install` publishes — which matters because poc/poc-27 depends on this module as
+                a library, and a repackaged jar keeps its classes under BOOT-INF/classes where an
+                ordinary classpath cannot see them.
+
+                This is the jar the container image runs. It is only a correct artifact because the
+                frontend executions above run before the resources copy: the SPA has to be inside
+                BOOT-INF/classes/static, and an executable jar of a module whose static bundle was
+                generated after the copy would boot and 404 at /.
+
+                The version comes from the root pom's <pluginManagement>, and the Start-Class is
+                detected — SmithStudioApplication is the module's only main().
+            -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>repackage</id>
+                        <goals>
+                            <goal>repackage</goal>
+                        </goals>
+                        <configuration>
+                            <classifier>exec</classifier>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>

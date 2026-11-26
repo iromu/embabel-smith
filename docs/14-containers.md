@@ -40,34 +40,47 @@ out, a skill folder in, an answer out, with no compiler anywhere in the loop.
 Both run as uid 10001 and write under `/home/smith/.smith` — traces, storage settings, the git
 source cache — so a read-only root filesystem needs that path mounted writable.
 
-## Why the images use a classpath instead of an executable jar
+## How the two images are packaged
 
-No module in this repository produces an executable Spring Boot jar. The root pom keeps
-`spring-boot-maven-plugin` in `<pluginManagement>` only (`pom.xml:349-352`) and no module declares
-a `repackage` goal, so `target/*.jar` is a thin jar: no `Main-Class`, no `BOOT-INF/`. The images
-therefore lay out what `mvn spring-boot:run` hands the JVM — the module's classes plus its resolved
-runtime dependencies, via `maven-dependency-plugin:copy-dependencies -DincludeScope=runtime` — and
-launch with `-cp`. This is the launch form `examples/smith-cli.sh` already uses on a host, chosen
-over running `spring-boot:run` inside the image so that Maven is not part of the runtime image.
+`prod/embabel-smith-studio` and `prod/embabel-smith-runtime` are packaged by
+`spring-boot-maven-plugin`'s `repackage` goal with `<classifier>exec</classifier>`, so each module
+builds two artifacts: the thin jar it has always installed, which its library consumers keep
+compiling against, and `target/<module>-<version>-exec.jar` — `Main-Class` set to Boot's
+`JarLauncher`, `Start-Class` set, `BOOT-INF/` inside — which is what these images and any `java -jar`
+run use. The version comes from the root pom's `<pluginManagement>`; the modules declare the
+execution, not the version.
 
-Three consequences are worth stating because each one is a trap someone would otherwise rediscover:
+The classifier is load-bearing rather than stylistic. `embabel-smith-runtime` is a compile dependency
+of `embabel-smith-studio` and `embabel-smith-a2a-starter`, and `embabel-smith-studio` is a library
+dependency of `poc/poc-27-recursive-self-improvement`. A repackaged jar keeps its classes under
+`BOOT-INF/classes`, where an ordinary classpath cannot see them, so repackaging *in place* would have
+left three modules compiling against a jar they cannot read.
 
-- **The frontend bundle needs an explicit overlay.** Vite writes into
-  `prod/embabel-smith-studio/src/main/resources/static` at the `compile` phase, which is *after*
-  `maven-resources-plugin` copies that directory into `target/classes`. On a clean single-pass build
-  the classes directory therefore has no `static/`, and a studio built that way boots perfectly and
-  serves 404 at `/`. A developer's working tree hides the ordering, because a second build copies
-  what the first generated. The Dockerfile overlays the generated bundle into the classes directory
-  and asserts that `index.html` arrived.
+The builder is deliberately not repackaged: its packaged form is the native `smith` binary
+(`-Pnative`), and shipping a second form of it would be a second thing to keep honest. So the runner
+image carries two launch mechanisms and each is the artifact its module really ships — the agents leg
+runs the runtime's jar, the builder leg gets the classes-plus-resolved-`lib` layout
+(`maven-dependency-plugin:copy-dependencies -DincludeScope=runtime`) that `spring-boot:run` would
+hand a JVM. They are never merged into one classpath: both modules ship an `application.yml` at their
+classpath root, so a merged classes directory would let one silently answer for the other.
+
+Two traps are worth stating because someone would otherwise rediscover them:
+
+- **The frontend bundle has to be generated before the resources copy, not merely generated.** Vite
+  writes into `prod/embabel-smith-studio/src/main/resources/static`, and it is
+  `maven-resources-plugin` at `process-resources` that puts that directory into `target/classes`. The
+  module's three npm executions used to be bound to `compile` — after that copy — so a clean
+  single-pass build produced a studio whose classes had no `static/`: it booted perfectly and 404'd
+  at `/`, and only a *second* build on the same tree looked right, because the second copies what the
+  first generated. That was a packaging bug, not a container quirk: it applied to every artifact
+  built from a clean checkout. The executions now run at `generate-resources`, the plugin's own
+  default phase, and the Dockerfile asserts `BOOT-INF/classes/static/index.html` exists in the jar
+  rather than trusting the ordering — `.dockerignore` drops the host's stale bundle, so inside the
+  image that assertion is the only thing standing between a mis-ordered stage and a shipped image.
 - **The Maven base image needs `libatomic1`.** `frontend-maven-plugin` downloads a Node 26 binary
   linked against it; without the package, `npm install` fails with exit 127 and
   `error while loading shared libraries: libatomic.so.1`. It is a build-time dependency of the
   frontend toolchain only and never reaches either final image.
-- **The runtime's and the builder's classes stay in separate directories** in the runner image, with
-  one shared `lib/`. Both modules ship an `application.yml` at their classpath root, so merging the
-  two class directories would let one silently answer for the other.
-
-If `repackage` is ever added to these poms, both final stages collapse to a `COPY` of the fat jar.
 
 ## Spec sources from a container
 

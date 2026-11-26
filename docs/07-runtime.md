@@ -172,6 +172,12 @@ smith run --source <folder:…|git:…[@ref]> [--goal <name>] [--input <text>]
 service class** (`AgentSpecRunService`) rather than holding logic itself, so the studio can embed the
 same capability without going through the CLI.
 
+Standalone, the module builds an executable jar beside its library jar —
+`java -jar target/embabel-smith-runtime-<version>-exec.jar run --source …` — which is what the
+container image runs. The classifier is what lets both exist: this module is a compile dependency of
+the studio and the a2a starter, and a repackaged jar's classes sit under `BOOT-INF/classes`, where a
+normal classpath cannot see them (see [14 — Containers](14-containers.md)).
+
 ## A2A endpoint
 
 The A2A surface — the starter library `prod/embabel-smith-a2a-starter`, hosted by

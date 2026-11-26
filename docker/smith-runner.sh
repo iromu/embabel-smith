@@ -32,9 +32,12 @@
 set -euo pipefail
 
 ROOT="${SMITH_HOME:-/opt/smith}"
-RUNTIME_CP="$ROOT/runtime/classes:$ROOT/lib/*"
+# Two launch mechanisms, one per module, because that is what each module ships: the runtime has an
+# executable jar (`repackage` with a classifier, so its library consumers still get the thin jar),
+# while the builder's packaged form is the native `smith` binary and so gets the classes-plus-lib
+# layout that `spring-boot:run` would hand a JVM.
+RUNTIME_JAR="$ROOT/bin/runtime.jar"
 BUILDER_CP="$ROOT/builder/classes:$ROOT/lib/*"
-RUNTIME_MAIN="com.embabel.smith.runtime.SmithRuntimeApplication"
 BUILDER_MAIN="com.embabel.smith.builder.SmithBuilderApplication"
 
 SMITH_AGENT_SOURCE="${SMITH_AGENT_SOURCE:-$ROOT/samples/agents}"
@@ -58,7 +61,7 @@ case "$SMITH_AGENT_SOURCE" in
 esac
 
 java_runtime() {
-	exec java "${JVM_ARGS[@]}" -cp "$RUNTIME_CP" "$RUNTIME_MAIN" "$@"
+	exec java "${JVM_ARGS[@]}" -jar "$RUNTIME_JAR" "$@"
 }
 
 java_builder() {
@@ -81,7 +84,7 @@ leg_agents() {
 	local -a argv=(run --source "$SMITH_AGENT_SOURCE" --input "$input" --trust-tier "$SMITH_TRUST_TIER")
 	[ -n "$SMITH_AGENT_GOAL" ] && argv+=(--goal "$SMITH_AGENT_GOAL")
 	local rc=0
-	java "${JVM_ARGS[@]}" -cp "$RUNTIME_CP" "$RUNTIME_MAIN" "${argv[@]}" || rc=$?
+	java "${JVM_ARGS[@]}" -jar "$RUNTIME_JAR" "${argv[@]}" || rc=$?
 	if [ "$rc" -eq 0 ]; then
 		echo "-- agents: ok (goal output above)"
 	else

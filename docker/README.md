@@ -131,22 +131,34 @@ no config file anywhere in the repository. Override it and you own the consequen
 
 ## How these images run Java
 
-Neither image is an executable Spring Boot jar, because no module in this repository produces one:
-the root pom keeps `spring-boot-maven-plugin` in `<pluginManagement>` only and nothing declares a
-`repackage` goal, so `target/*.jar` is thin — no `Main-Class`, no `BOOT-INF/`. The images therefore
-lay out the module's classes plus its resolved runtime dependencies and launch with `-cp`, which
-is the form `examples/smith-cli.sh` already uses on a host. If `repackage` is ever added to these
-poms, both final stages collapse to a `COPY` of the fat jar.
+The studio runs an executable Spring Boot jar; the runner runs one jar and one classpath.
+
+`prod/embabel-smith-studio` and `prod/embabel-smith-runtime` are packaged with `repackage` under
+`<classifier>exec</classifier>`, so `mvn package` leaves each module with both the thin jar its
+library consumers depend on and a `-exec.jar` that boots on its own:
+
+```bash
+mvn -DskipTests package -pl prod/embabel-smith-runtime
+java -jar prod/embabel-smith-runtime/target/embabel-smith-runtime-0.1.0-SNAPSHOT-exec.jar \
+    run --source folder:./my-packs --input "Explain how a coffee machine works"
+```
+
+The classifier is what makes that safe: the runtime is a compile dependency of the studio and the
+a2a starter, and a repackaged jar's classes sit under `BOOT-INF/classes` where a normal classpath
+cannot see them. The builder is not repackaged — its packaged form is the native `smith` binary — so
+the runner image's builder leg still gets classes plus resolved `lib` and launches with `-cp`.
 
 Two consequences worth knowing:
 
 - The studio's frontend is built *inside* the image. `frontend-maven-plugin` downloads Node 26 and
   runs `npm install`, `npm update` and `npm run build`; Vite writes the bundle into
   `src/main/resources/static`, which is gitignored. That stage needs network, and the Maven base
-  image needs `libatomic1` or the downloaded Node binary fails with exit 127.
-- The runner keeps the runtime's and the builder's classes in separate directories with one shared
-  `lib`. Both modules ship an `application.yml` at their classpath root, so merging the two class
-  directories would let one silently answer for the other.
+  image needs `libatomic1` or the downloaded Node binary fails with exit 127. The npm stage is bound
+  to `generate-resources` so the bundle is inside the jar — a bundle generated after the resources
+  copy makes a studio that boots and 404s at `/` — and the build asserts it arrived.
+- The runner's two legs stay separate: the runtime's jar and the builder's classes directory, never
+  one merged classpath. Both modules ship an `application.yml` at their classpath root, so merging
+  them would let one silently answer for the other.
 
 ## CI
 

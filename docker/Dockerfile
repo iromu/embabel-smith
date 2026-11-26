@@ -17,37 +17,40 @@
 #   runner needs two of those nine. Splitting the Dockerfile in two would pay for the same
 #   reactor twice, so the two final stages branch off one build.
 #
-# WHY A CLASSPATH AND NOT `java -jar`
-#   No module in this repository produces an executable Spring Boot jar. The root pom keeps
-#   spring-boot-maven-plugin in <pluginManagement> only (pom.xml:349-352) and nothing declares a
-#   `repackage` goal, so each module's target/*.jar is a thin jar with no Main-Class and no
-#   BOOT-INF/ — java -jar refuses it. Rather than add a repackage goal to production modules for
-#   packaging's sake, these images lay out what `mvn spring-boot:run` hands the JVM: the module's
-#   classes plus its resolved runtime dependencies. That is the launch form examples/smith-cli.sh
-#   already proves works here, chosen over spring-boot:run in-image because Maven would then be
-#   part of the runtime image.
+# HOW THESE IMAGES LAUNCH
+#   The studio and the runtime are packaged with spring-boot-maven-plugin's `repackage` under
+#   <classifier>exec</classifier>, so each module builds two jars: the thin one it always
+#   published, which its dependents keep compiling against, and the executable one these images
+#   run. The classifier is load-bearing, not stylistic — embabel-smith-studio and
+#   embabel-smith-a2a-starter depend on embabel-smith-runtime as a library, and a repackaged jar
+#   keeps its classes under BOOT-INF/classes where an ordinary classpath cannot see them.
 #
-#   The consequence worth knowing for the studio: the image runs the module's classes, so the
-#   frontend bundle must exist. frontend-maven-plugin (prod/embabel-smith-studio/pom.xml:97-146)
-#   installs Node v26.13.1 and runs npm install, npm update and npm run build at the compile
-#   phase, and Vite writes the SPA into src/main/resources/static
+#   The builder is the exception, so the runner image still lays out the builder's classes plus its
+#   resolved runtime dependencies and launches that leg with -cp. The builder's packaged form is
+#   the native `smith` binary (-Pnative), not a jar, and shipping a second form of it here would
+#   be a second thing to keep honest.
+#
+#   The studio's frontend is built inside the image: frontend-maven-plugin
+#   (prod/embabel-smith-studio/pom.xml) installs Node v26.13.1 and runs npm install, npm update and
+#   npm run build, and Vite writes the SPA into src/main/resources/static
 #   (prod/embabel-smith-studio/frontend/vite.config.ts:22-25), which .gitignore:14 keeps out of
-#   git. So the npm stage needs network. -Dskip.npm is not a way out: that property belongs to
-#   the plugin's `npm` goals and is inert for install-node-and-npm.
-#
-#   If a future change adds `repackage` to these poms, both final stages collapse to a COPY of
-#   the fat jar and the classpath assembly below goes away.
+#   git. So the npm stage needs network, and it is bound to generate-resources — before
+#   maven-resources-plugin copies that directory into target/classes — because a bundle generated
+#   after the copy is a jar that boots and 404s at /. The assertions below check the bundle reached
+#   BOOT-INF/classes/static rather than trusting the ordering.
 #
 # BUILD CONTEXT
 #   .dockerignore at the repo root drops target/, node_modules, the host-built static bundle, the
 #   frozen POC tree, and the gitignored application-local.yaml — a developer's file naming the
-#   dev Postgres and its credentials, which must not ride into an image.
+#   dev Postgres and its credentials, which must not ride into an image. Dropping the host's static
+#   bundle is also what makes the SPA assertion mean something: inside the image only the npm stage
+#   can produce that directory.
 #
 # The run commands, the variables that point them at a spec source, and how to tell a healthy
 # container from a booted one are in docker/README.md.
 
 # ---------------------------------------------------------------------------
-# build: the reactor, plus the classpath layout both images ship
+# build: the reactor, two executable jars, and the builder's classpath layout
 # ---------------------------------------------------------------------------
 FROM maven:3.9-eclipse-temurin-21 AS build
 
@@ -73,8 +76,9 @@ COPY . .
 # starts empty and Maven resolves the reactor's dependencies from scratch; the layer cache below is
 # what CI actually reuses.
 #
-# dependency:copy-dependencies -DincludeScope=runtime is what turns "the module's classpath"
-# into files — the same graph spring-boot:run would resolve, minus test-scope jars.
+# dependency:copy-dependencies -DincludeScope=runtime is what turns "the builder's classpath" into
+# files — the same graph spring-boot:run would resolve, minus test-scope jars. Only the builder
+# needs it now: the studio and the runtime arrive as executable jars.
 #
 # The plugin is named by fully-qualified coordinates, not by the `dependency:` prefix. Prefix
 # resolution reads plugin-group metadata from the repository, and inside a clean image that
@@ -82,31 +86,28 @@ COPY . .
 # 'dependency'" — and -o makes it unrecoverable. The version is pinned for the same reason: an
 # unpinned prefix resolves to whatever a cache happens to hold.
 #
-# The bundle overlay is the one non-obvious step, and it exists because of plugin order. Vite
-# writes to src/main/resources/static at the compile phase, which is AFTER maven-resources-plugin
-# copied that directory into target/classes — so on a clean single-pass build the classes
-# directory has no static/ at all, and the studio would serve 404 at / while booting perfectly. A
-# developer's working tree hides this: a second build copies what the first one generated. The
-# overlay does what that second build would have done.
-#
-# The assertions after it are not decoration either: an npm stage that produced nothing fails the
-# build here rather than shipping an image that only answers on /api routes.
+# The three assertions are the part that keeps this honest. The studio one is the interesting one:
+# a jar can be perfectly well-formed and still have no UI in it, because Vite's output is a
+# generated directory that maven-resources-plugin has to copy *after* it exists — an npm stage bound
+# after that copy produces a studio that boots and 404s at /, serving only its /api routes. A
+# developer's tree hides that (the second build copies what the first generated), and the host's
+# stale bundle is excluded by .dockerignore, so inside this image the assertion is the only thing
+# standing between a mis-ordered frontend stage and a shipped image.
 RUN --mount=type=cache,target=/root/.m2 \
     mvn -B -ntp -DskipTests install \
         -pl prod/embabel-smith-studio,prod/embabel-smith-runtime,prod/embabel-smith-builder -am \
-    && for m in studio runtime builder; do \
-        case "$m" in studio) p=prod/embabel-smith-studio;; runtime) p=prod/embabel-smith-runtime;; builder) p=prod/embabel-smith-builder;; esac; \
-        mvn -B -ntp -q -pl "$p" \
-            org.apache.maven.plugins:maven-dependency-plugin:3.8.1:copy-dependencies \
-            -DoutputDirectory=/staging/$m/lib -DincludeScope=runtime; \
-        mkdir -p "/staging/$m/classes"; \
-        cp -a "$p/target/classes/." "/staging/$m/classes/"; \
-        echo "$m: $(find /staging/$m/classes -type f | wc -l) class files, $(ls /staging/$m/lib | wc -l) jars"; \
-    done \
-    && mkdir -p /staging/studio/classes/static \
-    && cp -a prod/embabel-smith-studio/src/main/resources/static/. /staging/studio/classes/static/ \
-    && test -f /staging/studio/classes/static/index.html \
-        || { echo "no frontend bundle in the studio's classes — the npm build did not run"; exit 1; } \
+    && mkdir -p /staging/studio /staging/runtime /staging/builder/classes \
+    && cp prod/embabel-smith-studio/target/embabel-smith-studio-*-exec.jar /staging/studio/app.jar \
+    && cp prod/embabel-smith-runtime/target/embabel-smith-runtime-*-exec.jar /staging/runtime/app.jar \
+    && mvn -B -ntp -q -pl prod/embabel-smith-builder \
+        org.apache.maven.plugins:maven-dependency-plugin:3.8.1:copy-dependencies \
+        -DoutputDirectory=/staging/builder/lib -DincludeScope=runtime \
+    && cp -a prod/embabel-smith-builder/target/classes/. /staging/builder/classes/ \
+    && echo "studio $(du -h /staging/studio/app.jar | cut -f1), runtime $(du -h /staging/runtime/app.jar | cut -f1), builder $(find /staging/builder/classes -type f | wc -l) class files + $(ls /staging/builder/lib | wc -l) jars" \
+    && ( jar tf /staging/studio/app.jar | grep -q '^BOOT-INF/classes/static/index.html$' \
+        || { echo "no frontend bundle inside the studio jar — the npm build did not run before the resources copy"; exit 1; } ) \
+    && ( jar tf /staging/runtime/app.jar | grep -q '^org/springframework/boot/loader/launch/JarLauncher.class$' \
+        || { echo "the runtime jar is not executable — repackage did not run"; exit 1; } ) \
     && test -f /staging/builder/classes/skills/skill-card-generator/SKILL.md \
         || { echo "the builder shipped no skill folder to sample"; exit 1; }
 
@@ -140,7 +141,7 @@ RUN groupadd --gid 10001 smith \
     && mkdir -p /opt/smith /opt/smith/specs /home/smith/.smith \
     && chown -R smith:smith /opt/smith /home/smith
 
-COPY --from=build --chown=smith:smith /staging/studio/ /opt/smith/
+COPY --from=build --chown=smith:smith /staging/studio/app.jar /opt/smith/app.jar
 
 WORKDIR /opt/smith
 USER smith
@@ -164,12 +165,13 @@ USER smith
 # Overriding the default profile is what stops a container from trying to start a container.
 #
 # MaxRAMPercentage lets the container's memory limit size the heap rather than the host's RAM.
+# There is no CLASSPATH here: this is an executable jar, and `-jar` takes its classpath from
+# BOOT-INF/lib inside the file, so a CLASSPATH env var would be silently ignored rather than
+# misleading.
 ENV SERVER_PORT=8080 \
     SPRING_PROFILES_ACTIVE=container \
     SMITH_STUDIO_SOURCES="folder:/opt/smith/specs" \
-    JAVA_OPTS="-XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom" \
-    CLASSPATH="/opt/smith/classes:/opt/smith/lib/*" \
-    MAIN_CLASS="com.embabel.smith.studio.SmithStudioApplication"
+    JAVA_OPTS="-XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom"
 
 EXPOSE 8080
 
@@ -182,7 +184,7 @@ HEALTHCHECK --interval=15s --timeout=3s --start-period=90s --retries=5 \
 
 # Exec form, with the JVM re-execed so it becomes PID 1 and receives SIGTERM: Spring Boot then
 # closes its context instead of being killed at the grace period.
-ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS -cp \"$CLASSPATH\" $MAIN_CLASS \"$@\""]
+ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS -jar /opt/smith/app.jar \"$@\""]
 
 # ---------------------------------------------------------------------------
 # runner: the same product, pointed at a sample of itself
@@ -209,9 +211,17 @@ RUN groupadd --gid 10001 smith \
 # application.yml at their classpath root, so merging their classes directories would let one
 # silently answer for the other; the lib directory is shared because the reactor resolves one
 # version of every artifact, so a shared filename is the same bytes.
-COPY --from=build --chown=smith:smith /staging/runtime/lib/ /opt/smith/lib/
+# Two launch mechanisms in one image, and each is the product's own artifact rather than a
+# container invention. The agents leg runs the runtime's executable jar; the builder leg has no
+# executable jar to run — its packaged form is the native `smith` binary — so it gets the same
+# layout spring-boot:run would hand the JVM: the builder's classes plus its resolved runtime
+# dependencies, launched with -cp.
+#
+# They were never merged into one classpath even when both legs were -cp: the runtime and the
+# builder each ship an application.yml at their classpath root, so a merged classes directory would
+# let one silently answer for the other.
+COPY --from=build --chown=smith:smith /staging/runtime/app.jar /opt/smith/bin/runtime.jar
 COPY --from=build --chown=smith:smith /staging/builder/lib/ /opt/smith/lib/
-COPY --from=build --chown=smith:smith /staging/runtime/classes/ /opt/smith/runtime/classes/
 COPY --from=build --chown=smith:smith /staging/builder/classes/ /opt/smith/builder/classes/
 # --chmod rather than trusting the context's mode: COPY preserves the file's mode as sent, and a
 # checkout with core.fileMode=false (or a Windows one) would deliver an entrypoint the kernel refuses

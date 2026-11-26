@@ -30,9 +30,9 @@ history page and a reference page disagree, the reference page and the code win.
 - [13 — JavaScript for skill scripts](13-skill-script-javascript.md) — the surface a generated skill's
   `scripts/*.js` is given, the portability subset that runs unchanged under both the in-JVM GraalJS
   engine and `node`, and the idioms that stay on it.
-- [14 — Containers](14-containers.md) — the two images and the pipeline that builds them: why they run
-  on a classpath rather than an executable jar, the packaging traps that follow from it, the profile a
-  container has to set, and what the container leg does not gate.
+- [14 — Containers](14-containers.md) — the two images and the pipeline that builds them: which
+  artifacts each one runs and why one is a jar and one a classpath, the packaging traps that follow
+  from that, the profile a container has to set, and what the container leg does not gate.
 
 ## Research and design
 
