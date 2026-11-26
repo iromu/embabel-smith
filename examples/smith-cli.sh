@@ -157,10 +157,20 @@ smith_write_report() {
 
 # Run the builder CLI with the arguments given. Paths must be ABSOLUTE: --docs and --out
 # resolve against the JVM's working directory, not this script's.
+#
+# SMITH_JAVA_OPTS holds JVM arguments passed ahead of -cp, and it is the documented route for a
+# builder switch that has no CLI flag of its own — the skill-script engine, say:
+#
+#   SMITH_JAVA_OPTS=-Dsmith.builder.skill-scripts.enabled=true examples/generate-skill.sh X
+#
+# Without it the only route was the ambient JAVA_TOOL_OPTIONS, which works (the CLI's own
+# "Picked up JAVA_TOOL_OPTIONS" line proves it) but is invisible in this script and invisible to
+# --help. The split is deliberate: several -D flags are several arguments.
 run_smith() {
   local cp
   cp="$SMITH_ROOT/$BUILDER_MODULE/target/classes:$(smith_classpath)"
-  (cd "$SMITH_ROOT" && java -cp "$cp" "$BUILDER_MAIN" "$@")
+  # shellcheck disable=SC2086
+  (cd "$SMITH_ROOT" && java ${SMITH_JAVA_OPTS:-} -cp "$cp" "$BUILDER_MAIN" "$@")
 }
 
 # The blueprint directory for a slug — a blueprint is a directory under examples/blueprints/,

@@ -29,9 +29,10 @@ import com.embabel.smith.common.model.AgentSpecManifest;
  *
  * <p>
  * The packs are read from disk with {@code smith-common}'s reader rather than restated as
- * Java. They live in a module directory and not under {@code src/main/resources} for the
- * reason design D1 gives: the reader lists {@code steps/} and {@code types/} with
- * {@code Files.list}, so a directory packaged into a jar is not addressable.
+ * Java. They are classpath resources of the builder module, under its
+ * {@code src/main/resources/specs}, and this loop reads them from that directory on disk
+ * rather than through a class loader. A directory on disk is addressable, so the
+ * {@code Files.list} the reader runs over {@code steps/} and {@code types/} works here.
  *
  * @author Ivan Rodriguez
  */
@@ -40,7 +41,7 @@ public final class BuilderPacks {
 	/**
 	 * Where the builder keeps its packs, below the repository root.
 	 */
-	private static final Path PACK_ROOT = Path.of("prod", "embabel-smith-builder", "builder-agent-specs");
+	private static final Path PACK_ROOT = Path.of("prod", "embabel-smith-builder", "src", "main", "resources", "specs");
 
 	/**
 	 * How many directories above the working directory the repository root is looked for.

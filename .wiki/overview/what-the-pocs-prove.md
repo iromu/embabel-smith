@@ -5,6 +5,7 @@ status: "active"
 language: "default"
 source_paths:
   - "docs/04-poc-run-results.md"
+  - "docs/08-builder.md"
   - "docs/research/01-embabel-agent-builder-research.md"
   - "docs/research/02-skill-research.md"
   - "docs/03-embabel-spec-agent-builder-design.md"
@@ -12,7 +13,8 @@ source_paths:
   - "poc/poc-25-skill-generation/README.md"
   - "poc/poc-26-graaljs-skill-scripts/README.md"
   - "poc/poc-27-recursive-self-improvement/README.md"
-updated_at: "2026-11-22"
+  - "docs/12-backlog.md"
+updated_at: "2026-11-26"
 ---
 
 # What the POCs prove (vs. the theory)
@@ -91,9 +93,10 @@ The POCs **prove the feasibility core** (the "70% already there") and confirm do
 | POC 22 (unified builder UI) | the POC 15 builder UI re-built as a Vue 3 + Quasar SPA over the same REST surface — one app hosting the run, author, compose, retrieve, scale, trust, security, lifecycle, and remote panes | a frontend consolidation; the panes' backend behaviour is the POC 15/18/20 REST controllers it calls |
 | [[shadowing-remedies]] (23) | a **remote** `nomic-embed-text-v2` `EmbeddingService` (OpenAI-compatible endpoint) behind the `SpecScorer` seam: 100% P@1 to 191 distinct and to **1000** generated specs, with steady-state per-query retrieval 0.48 → 1.27 ms (cosine over cached vectors, **zero per-query model calls**) | **endpoint-gated** (offline tests use a stub transport / local `HttpServer`); under shadowing it ties lexical (17%) — the specific embedding model matters, and curation (POC 18) remains the real fix |
 | [[generation-approaches]] (24) | two ways to generate a multi-agent flow, measured on 3 blueprints: **single-shot 3/3 valid flat** vs the Embabel NL compiler's degenerate 1–5-step disconnected output; multi-agent single-shot reaches Aurora 8 agents / 7 shared types while the compiler is disconnected on **every** run | the compiler compiles each agent against only its own `StepSpecContext`, so cross-agent hand-off types never line up; single-shot can introduce cycles where parallel branches merge; **endpoint-gated**, and one README's "3/3 multi" claim has no committed artifact |
-| [[skill-generation]] (25) | a blueprint decomposes into a coherent **Agent Skill** set (Aurora 9, Sentinel 8, TradingAgents 16 roles), each a valid `SKILL.md` with its own eval suite; mean **+16.4%** with-skill lift over 27 measured skills, positive on 19, peaking at +75% on non-obvious domain rules | the portable unit here is a *description*, not an executable spec; decomposition is non-deterministic and the evals are model-drafted, so lifts are not comparable across runs until pinned; 6 of 33 skills were unscoreable (grader fragility); LLM-as-judge grading |
+| [[skill-generation]] (25) | a blueprint decomposes into a coherent **Agent Skill** set (Aurora 9, Sentinel 8, TradingAgents 16 roles), each a valid `SKILL.md` with its own eval suite; mean **+16.4%** with-skill lift over 27 measured skills, positive on 19, peaking at +75% on non-obvious domain rules — every one of them a prompt-substitution lift, so a number taken with `smith.builder.skill-scripts.enabled` on is not comparable with these | the portable unit here is a *description*, not an executable spec; decomposition is non-deterministic and the evals are model-drafted, so lifts are not comparable across runs until pinned; 6 of 33 skills were unscoreable (grader fragility); LLM-as-judge grading |
 | [[skill-scripts-graaljs]] (26) | Embabel's `SkillScriptExecutionEngine` SPI had no in-JVM JavaScript runner (default logs *"script execution is not yet supported"*, the shipped one spawns `node`) — one ~525-line GraalJS-on-a-plain-JDK engine makes a skill's `scripts/*.js` a callable agent tool, **14/14** ES2026 probes, script answering in 18 ms | interpreter-only is ~10× slower than Node on CPU-bound work (396 ms vs 38 ms); the 25 M-statement budget is a real ceiling; **hardened, not a security boundary** — untrusted scripts belong in the Docker/Podman engines |
-| POC 27 (recursive self-improvement) | a mutable/fixed boundary a self-referential loop can live inside — a checked-in artifact later classes cite and a launcher enforces, refusing a paid run on the artifact's *contents*, with the three scorer prompts held outside the editable packs by a boundary test; a frozen benchmark whose human-label arm caught the gate arm disagreeing with a human on **2 of 6** tasks; an inner loop that recurses for zero model calls; a spend ceiling declared from arithmetic before the first call; a distinctness guard that stops a candidate answering two different tasks with the same string; and an exclusion that drops a task the two arms disagree about from the deciding score, named by id so the smaller denominator stays visible | **verdict: not proven.** The inner loop's best variant was its own seed (every mutation scored worse; it converged by exhausting patience, so "recursive" decorates one round of hill-climbing), and the outer loop — the only half with measured headroom — never produced a single scored candidate: its candidates interpolated no `{{userInput…}}`, so all six eval tasks were one request. Unmeasured, not blocked. Nothing promoted into `prod/`. |
+| POC 27 (recursive self-improvement) | a mutable/fixed boundary a self-referential loop can live inside — a checked-in artifact later classes cite and a launcher enforces, refusing a paid run on the artifact's *contents*, with the three scorer prompts held outside the editable packs by a boundary test; a frozen benchmark whose human-label arm caught the gate arm disagreeing with a human on **2 of 6** tasks; an inner loop that recurses for zero model calls; a spend ceiling declared from arithmetic before the first call; a distinctness guard that stops a candidate answering two different tasks with the same string; and an exclusion that drops a task the two arms disagree about from the deciding score, named by id so the smaller denominator stays visible | **verdict: not proven.** The inner loop's best variant was its own seed (every mutation scored worse; it converged by exhausting patience, so "recursive" decorates one round of hill-climbing), and the outer loop — the only half with measured headroom — never produced a single scored candidate. Its two named causes are now answered inside the tree rather than measured: the candidate is the builder's own shipped pack with exactly one step prompt mutated (`outerloop/PolicyImprover` targets `scopeCoreProcess`, the only step that interpolates `{{userInput.content}}`, and `BuilderPackCandidateTest` pins that nothing else differs), and four **headroom** tasks a general prior answers wrongly sit in `benchmark/tasks-headroom/` — deliberately *beside* the frozen six, because the frozen file count is an input to the spend ceiling (ten tasks declare 110 calls ≈ 6600 s against a 5400 s wall clock, so folding them in makes the launcher refuse with `OuterLoopRefused` before it spends). Unmeasured, not blocked. Nothing promoted into `prod/`. The normative form of these rules is not this row but the two requirements promoted from the change
+that closed it, now carried as prose by `docs/10-self-improvement.md` — `builder-spec-improvement` (the candidate is the builder's own spec with a step prompt rewritten, never a pack assembled for the purpose; deterministic gates stay outside the writable surface) and `improvement-evaluation-validity` (headroom proven before a paid run, the disagreement-excluding human arm, the distinctness guard, the declared ceiling, and the **measured noise floor** this row omits). |
 
 ## Still open
 
@@ -125,7 +128,23 @@ Anthropic `SKILL.md` rather than a YAML spec ([[skill-generation]]), whether a s
 executable JavaScript that runs inside the agent ([[skill-scripts-graaljs]]), and whether the builder
 can improve the process it builds with — POC 27's verdict on that last one is *not proven*. The
 changes that carried POCs 24 and 25 (`builder-process-target`, `builder-skill-target`) were archived
-and consolidated into `docs/`; the live OpenSpec work grown out of this wave is
-`builder-owns-improvement-loop`, `poc27-improves-builder-agentspecs` and
-`builder-executes-its-own-packs`, so these are directions still under evaluation, not settled
-conclusions ([[product-phase]]).
+and consolidated into `docs/`. `builder-owns-improvement-loop` joined them on 2026-11-22: it was
+verified against the code, archived, and its two rules promoted into `docs/` as
+`improvement-loop-location` (the engine lives in the builder, and no class of it may depend on the
+studio) and `agent-spec-validation`. The rest of the wave has since followed it into the archive —
+`poc27-improves-builder-agentspecs` on 2026-11-23, then `builder-executes-its-own-packs`,
+`builder-agentic-tool-surface` and `builder-as-agent-harness` on 2026-11-24, and
+`builder-skill-script-host` on 2026-11-25 — so no change grown out of this wave is still open, and no
+change is open repo-wide. The archive folders themselves were folded into `docs/` and deleted on
+2026-11-25 (`docs/12-backlog.md` §Re-creating a planning change), so these change names are lineage:
+what they promoted survives as `docs/` prose, not as spec files. What that
+leaves is the routes themselves, and on the endpoint this machine has they are **not measured** rather
+than measured and found wanting. `smith build --flow` now offers `java` (the shipped default), `pack`,
+`agentic` and `harness`; six packs sit under `prod/embabel-smith-builder/src/main/resources/specs/` as
+classpath resources, addressed by
+`core/BuilderPackPaths`, three of
+them wired to a flow. `docs/08-builder.md` records the agentic arm as `built 0 of 3` against the java
+arm's 2-of-3 bar with no verdict line printed on any of its six attempts, and the harness arm as one
+input run into the same silence. None of that says the route builds worse specs — only that its drafting
+call never landed here — which is why `java` stays the default and why these remain directions under
+evaluation rather than settled conclusions ([[product-phase]]).

@@ -33,6 +33,14 @@
             <groupId>org.iromu.embabel.smith</groupId>
             <artifactId>embabel-smith-runtime</artifactId>
         </dependency>
+        <!-- The A2A surface. This module is the repo's servlet host, so it is the module the
+             surface is turned on in; it stays inert here unless a run sets
+             smith.a2a.enabled. Declared explicitly rather than reached through another
+             module, because the studio's contract now includes serving /a2a on request. -->
+        <dependency>
+            <groupId>org.iromu.embabel.smith</groupId>
+            <artifactId>embabel-smith-a2a-starter</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.iromu.embabel.smith</groupId>
             <artifactId>embabel-smith-builder</artifactId>

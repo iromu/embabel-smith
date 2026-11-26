@@ -63,12 +63,14 @@ flowchart TB
 edit. The boundary is a checked-in file,
 [`evidence/MUTABILITY.md`](src/main/resources/evidence/MUTABILITY.md), listing seven mutable surfaces
 plus the builder's own four packs against fifteen fixed ones; later classes cite it rather than
-restating it.
+restating it. (Four as this run counted them — six packs ship now, the folder since moved to
+`prod/embabel-smith-builder/src/main/resources/specs`; `docs/12-backlog.md` tracks the move. The
+mutability ruling itself is unchanged.)
 
 ### The reframe: the improvement object is a builder pack
 
 The candidate is no longer a pack assembled in Java. `PolicyImprover.candidate(...)` loads
-`builder-single-spec` from `prod/embabel-smith-builder/builder-agent-specs/` — through
+`builder-single-spec` from `prod/embabel-smith-builder/src/main/resources/specs/` — through
 `outerloop/BuilderPacks`, which walks up from the working directory the way POC 14 and POC 21 walk for
 `agent-specs/`, and names a refusal when the pack is not there rather than falling back to one
 assembled in code — renames it to the variant id, and appends the generated policy text to **one** step
@@ -82,14 +84,16 @@ private and its public `refine` needs failure traces and a model call — so the
 [`evidence/MUTABILITY.md`](src/main/resources/evidence/MUTABILITY.md) stays the single statement of it.
 
 That is what puts the generator's instructions on the surface without widening what a mutation may
-touch. The builder's flow now exists in the format it builds — four packs under `builder-agent-specs/`
-— and `builder-single-spec`'s step prompts are a transcription of the instructions
+touch. The builder's flow now exists in the format it builds — four packs at this run, six under
+`src/main/resources/specs/` now (`docs/12-backlog.md`) — and `builder-single-spec`'s step prompts are a
+transcription of the
+instructions
 `SingleShotAgentSpecGenerator.defaultPrompt()` carries, split by decision rather than by sentence. A
 candidate therefore changes the builder's instructions *as pack text*. It does not change what
 `smith build` does by default: the CLI calls the Java generators and reads those prompts off the
 classpath, so the packs are a second, mutable representation of the same instructions and not the one in
 production. `smith build --flow pack` is the exception, and it is not the default: that invocation
-deploys `builder-agent-specs/builder-spec-one-shot` through the eval invoker instead of calling the Java
+deploys `src/main/resources/specs/builder-spec-one-shot` through the eval invoker instead of calling the Java
 generator, so a published candidate to that pack would change what such a run does. Reach moved on
 2026-11-22, and it moved into the packs. `builder-single-spec/steps/assembleAgentSpec.yml` and
 `builder-spec-one-shot/steps/draftAgentSpec.yml` declare `toolGroups: [validate]`, and

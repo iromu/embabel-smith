@@ -14,7 +14,9 @@ source_paths:
   - "poc/poc-24-generation-approaches/src/main/java/com/embabel/smith/gencmp/ComparisonReport.java"
   - "poc/poc-24-generation-approaches/src/main/java/com/embabel/smith/gencmp/OpenAiLlmCaller.java"
   - "examples/blueprints"
-updated_at: "2026-11-22"
+  - "prod/embabel-smith-builder/src/main/resources/prompts/process_to_flow.jinja"
+  - "prod/embabel-smith-builder/src/main/resources/specs/builder-spec-one-shot/steps/draftAgentSpec.yml"
+updated_at: "2026-11-24"
 ---
 
 # Generation approaches (POC 24)
@@ -103,3 +105,9 @@ gated ([[model-endpoint]]). `OpenAiLlmCaller` uses `max_tokens` 12000, temperatu
 **Productized 2026-11-15:** the single-vs-multi comparison this POC measured by hand is now a build
 stage — the builder generates both shapes from one description, scores them on the same eval tasks,
 and recommends one ([[two-candidate-build]]).
+
+A third variant now ships in the builder rather than in this POC: `smith build --flow pack` issues the same
+one-call, whole-spec-JSON job from a prompt that lives in the builder's own pack, under
+`prod/embabel-smith-builder/src/main/resources/specs/` rather than in the `prompts/` directory beside it,
+which puts a validator tool loop around the single
+call this table's `single-shot` row makes ([[smith-builder]]).

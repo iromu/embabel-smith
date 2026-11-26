@@ -25,6 +25,7 @@ generation and its with/without-skill eval) and never depends on a `poc-*` artif
 smith build ("<description>" | --docs <path>) --out <source-uri>
                             [--extract] [--target <agent-spec|skill>]
                             [--technique <single-shot|embabel>]
+                            [--flow <java|pack|agentic|harness>]
                             [--max-refine <n>] [--overwrite] [--push]
 ```
 
@@ -49,6 +50,13 @@ smith build ("<description>" | --docs <path>) --out <source-uri>
 - `--technique` — how the description is generated: `single-shot` (default) or `embabel`
   (see [Generation techniques](#generation-techniques)). An unknown value is a usage error
   (exit **2**). Applies to the `agent-spec` target.
+- `--flow` — who issues the generation call: `java` (default), `pack`, `agentic` or `harness`. The three
+  pack flows deploy one of this module's own packs under `src/main/resources/specs/` instead of calling the Java
+  generator; `agentic` and `harness` also run the validator and the security scanner from the driver between
+  model calls. An unknown value is a usage error (exit **2**), and any pack flow combined with
+  `--technique embabel` is refused before anything is spent, because no pack exists for the NL compiler. The
+  build report prints the flow that ran. See [`docs/08-builder.md`](../../docs/08-builder.md) §Who issues
+  the generation call.
 - `--max-refine` — maximum refinement rounds (default **3**). Applies to the `agent-spec` target.
 - `--overwrite` — replace an existing same-named pack or skill in the target instead of colliding.
 - `--push` — push the git commit to the remote (default: **local commit only**, no push).
@@ -104,7 +112,10 @@ stops the build names itself in the report and publishes nothing.
    description, each with verifiable expectations. An empty suite blocks the build — there is nothing
    to validate the skill against.
 4. **Run both arms** (`EvalRunner`). Every scenario runs twice through the builder's model layer: once
-   with the skill in the system prompt, once without it (the baseline).
+   with the skill in the system prompt, once without it (the baseline). That is the whole difference
+   between them on an ordinary build. With `smith.builder.skill-scripts.enabled` on — off by default —
+   the with-skill arm is additionally offered a tool per script the skill carries, which the baseline
+   arm is not, so a lift measured with the switch on is not comparable with one measured with it off.
 5. **Grade and compare** (`SkillGrader`, `Benchmark`). An LLM judge grades each answer against that
    scenario's expectations; the two pass rates and the lift between them are the gate.
 6. **Security → lifecycle → publish.** The same stages the spec path uses (`scanText` over the

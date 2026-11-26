@@ -5,7 +5,9 @@
 
 package com.embabel.smith.builder.skill;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import com.embabel.smith.builder.core.PromptData;
 import com.embabel.smith.builder.core.SpecPromptCaller;
@@ -66,8 +68,9 @@ public class SkillGenerator {
 	 * @param description the business-process description.
 	 * @param blockingFindings the previous round's blocking findings, in report order;
 	 * empty asks for a first draft
-	 * @return the generated skill.
-	 * @throws IllegalStateException when the model omits the description or the body.
+	 * @return the generated skill, carrying any scripts the model wrote
+	 * @throws IllegalStateException when the model omits the description or the body, or
+	 * names a script that is not a JavaScript file.
 	 */
 	public Skill generate(String skillName, String description, List<String> blockingFindings) {
 		String user = "Below is a business-process description. Generate the skill for the skill named '" + skillName
@@ -79,7 +82,47 @@ public class SkillGenerator {
 		if (skillDescription.isBlank() || body.isBlank()) {
 			throw new IllegalStateException("Skill generation returned a missing description or body");
 		}
-		return new Skill(skillName, skillDescription, body);
+		return new Skill(skillName, skillDescription, body, scripts(node.path("scripts")));
+	}
+
+	/**
+	 * The scripts the generated answer carries. A missing or empty {@code scripts} member
+	 * is the ordinary case and yields no scripts at all — a skill is instructions-only
+	 * unless the model had something worth computing.
+	 * <p>
+	 * A declared path is reduced to its file name by {@link SkillScript#of}, so a model
+	 * cannot address a file outside the skill's own {@code scripts/} folder. A blank
+	 * script is dropped rather than refused: an empty file is not a script and refusing a
+	 * whole build for one buys nothing, whereas a name that is not a {@code .js} file
+	 * name stops the build at {@code generate} — the engine could never run what it
+	 * names, and dropping it quietly would leave the body pointing at a file that was
+	 * never written.
+	 * @param scripts the {@code scripts} member of the generated JSON.
+	 * @return the scripts, in the order the model declared them, deduplicated by path.
+	 * @throws IllegalStateException when a declared script name is not a {@code .js}
+	 * file.
+	 */
+	private static List<SkillScript> scripts(JsonNode scripts) {
+		if (!scripts.isArray() || scripts.isEmpty()) {
+			return List.of();
+		}
+		Map<String, SkillScript> byPath = new LinkedHashMap<>();
+		for (JsonNode script : scripts) {
+			String content = script.path("content").asText("");
+			if (content.isBlank()) {
+				continue;
+			}
+			String declaredPath = script.path("path").asText(script.path("name").asText(""));
+			try {
+				SkillScript parsed = SkillScript.of(declaredPath, content.strip() + "\n");
+				byPath.put(parsed.path(), parsed);
+			}
+			catch (IllegalArgumentException ex) {
+				throw new IllegalStateException(
+						"Skill generation returned a script that is not a JavaScript file: " + ex.getMessage(), ex);
+			}
+		}
+		return List.copyOf(byPath.values());
 	}
 
 	/**

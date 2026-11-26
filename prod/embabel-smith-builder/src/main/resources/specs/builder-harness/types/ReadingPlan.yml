@@ -1,0 +1,11 @@
+name: ReadingPlan
+description: "What the build reads next and why: the documents still outstanding, the process skeleton the readings so far support, and what the drafting step must not invent"
+ownProperties:
+  - name: plan
+    type: string
+    description: "The skeleton of the process as the documents read so far support it, in run order, each stage naming the document it came from"
+  - name: outstanding
+    type: string
+    description: "The documents still to read or still to finish, in the order they matter, with what each is expected to settle"
+parents: []
+creationPermitted: true

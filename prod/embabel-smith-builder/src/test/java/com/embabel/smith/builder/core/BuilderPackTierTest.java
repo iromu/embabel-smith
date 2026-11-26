@@ -49,20 +49,22 @@ import static org.assertj.core.api.Assertions.assertThat;
  * strings</em> against each tier's allowlist and resolves nothing against a
  * {@code ToolGroup} bean or a {@code CoreToolGroups} role. So any declaration at all
  * moves {@code recommendedTier()}: {@code web} or {@code search} gives T2, {@code file}
- * or {@code shell} gives T3, and any other name — a typo, or a builder tool with no
- * upstream group to name — lands on {@link TrustTier#T4_PLATFORM}, because T4 allows
- * {@code *} and {@code minimumTier} therefore always terminates there. The control at the
- * end of this class pins that: a pack declaring a name that provably resolves to nothing
- * reports the same tier as this pack does. A moved tier is evidence the scanner read the
- * step, never evidence that a tool resolves — which is design D10's amendment to the "a
- * pack's tier is what bounds it" reading.
+ * or {@code shell} gives T3, and any other name — a typo, or one of the builder's own
+ * roles now that {@code tools/*ToolGroup} publishes them — lands on
+ * {@link TrustTier#T4_PLATFORM}, because T4 allows {@code *} and {@code minimumTier}
+ * therefore always terminates there. The control at the end of this class pins that: a
+ * pack declaring a name that provably resolves to nothing reports the same tier as every
+ * declaring pack reports. A moved tier is evidence the scanner read the step, never
+ * evidence that a tool resolves — which is design D10's amendment to the "a pack's tier
+ * is what bounds it" reading. Whether a role reaches a tool at all is a different test,
+ * on a booted platform, in {@code tools/ExposedToolGroupsTest}.
  *
  * <p>
- * <b>Locating the packs</b> is {@code core/BuilderAgentSpecPackTest}'s convention:
- * {@code builder-agent-specs/} sits at the module root rather than under
- * {@code src/main/resources}, so it is addressed from the working directory with
- * {@code Path.of("builder-agent-specs", name)} and the load assertion names the path it
- * tried. Everything here is offline — a scanner over a model, no platform, no model call.
+ * <b>Locating the packs</b> is {@code core/BuilderAgentSpecPackTest}'s convention: the
+ * packs are classpath resources under {@code src/main/resources/specs}, addressed through
+ * the class loader by {@code BuilderPackPaths.directory(name)} rather than resolved
+ * against the working directory, and the load assertion names the path it tried.
+ * Everything here is offline — a scanner over a model, no platform, no model call.
  *
  * @author Ivan Rodriguez
  */
@@ -89,6 +91,19 @@ class BuilderPackTierTest {
 	private static final String ONE_SHOT_STEP = "draftAgentSpec";
 
 	/**
+	 * The fifth builder pack: the agentic route. Both of its steps declare groups — the
+	 * surveying step reads the blueprint documents and the library through
+	 * {@code blueprint} and {@code library}, the drafting step reaches the validator and
+	 * the scanner as well. Those declarations are the subject of the change rather than
+	 * an addendum to a prompt, so both placements are named below.
+	 */
+	private static final String AGENTIC_PACK = "builder-agentic-blueprint";
+
+	private static final String AGENTIC_SURVEY_STEP = "surveyBlueprint";
+
+	private static final String AGENTIC_DRAFTING_STEP = "draftAgentSpecFromBlueprint";
+
+	/**
 	 * The tool group named by design D9 ("the tool that decides it is {@code validate}")
 	 * and published by {@code tools/AgentSpecValidationTool}. No better-grounded name
 	 * exists in this repository: that tool carries no group member on its
@@ -106,19 +121,27 @@ class BuilderPackTierTest {
 	private static final List<String> UNDECLARED_PACKS = List.of("builder-process-composition",
 			"builder-skill-from-process");
 
+	/**
+	 * The packs whose steps do declare a group, which is the set the tier assertions run
+	 * over: the {@code builder-single-spec} drafting step task 8.3 edited, the one-shot
+	 * pack's equivalent step, and both steps of the agentic pack.
+	 */
+	private static final List<String> DECLARING_PACKS = List.of(DRAFTING_PACK, ONE_SHOT_PACK, AGENTIC_PACK);
+
 	private static final List<String> ALL_PACKS = List.of("builder-single-spec", "builder-process-composition",
-			"builder-skill-from-process", "builder-spec-one-shot");
+			"builder-skill-from-process", "builder-spec-one-shot", AGENTIC_PACK);
 
 	/**
 	 * A group name that resolves to nothing, deliberately spelled so it cannot be one of
-	 * the four names the {@code TrustTier} allowlists carry. Task 8.2 found that no
-	 * {@code ToolGroup} bean can be authored in Java at all, so every name a step
-	 * declares is of this kind; the control says so in a name rather than in prose.
+	 * the four names the {@code TrustTier} allowlists carry. It is the control half of a
+	 * pair now: the builder's own groups ({@code validate}, {@code blueprint},
+	 * {@code library}, {@code security}) are published beans, and this name is not — yet
+	 * the scanner cannot tell them apart, which is the point of the test below.
 	 */
 	private static final String UNRESOLVABLE_GROUP = "no-such-group";
 
 	private static Path packDir(String packName) {
-		return Path.of("builder-agent-specs", packName);
+		return BuilderPackPaths.directory(packName);
 	}
 
 	private static AgentSpec load(String packName) throws IOException {
@@ -177,13 +200,14 @@ class BuilderPackTierTest {
 	 * and enumeration steps would move the tier identically while claiming a capability
 	 * the planner never uses, so the placement is asserted as well as the presence.
 	 * <p>
-	 * {@code builder-spec-one-shot} now declares too — its one step is that same drafting
-	 * act expressed as a pack — so this is a two-placement claim rather than the one step
-	 * it was while three packs were all that existed.
+	 * {@code builder-spec-one-shot} declares too — its one step is that same drafting act
+	 * expressed as a pack — and the agentic pack declares on both of its steps, because
+	 * reading the blueprint through a tool is that pack's purpose rather than an addendum
+	 * to a prompt. So this is a four-placement claim, where it was one step while three
+	 * packs were all that existed.
 	 * <p>
-	 * Mutation: revert {@code assembleAgentSpec.yml} to {@code toolGroups: []} and the
-	 * list drops to one entry; move either declaration to another step and the name is
-	 * wrong.
+	 * Mutation: revert any of the four to {@code toolGroups: []} and the list drops; move
+	 * one to another step and the name is wrong.
 	 */
 	@Test
 	void theDraftingStepsAreTheOnlyBuilderPackStepsThatDeclareAToolGroup() throws IOException {
@@ -200,26 +224,28 @@ class BuilderPackTierTest {
 			}
 		}
 
-		assertThat(declaring).as("builder-agent-specs/ steps carrying a tool-group declaration")
-			.containsExactly(DRAFTING_PACK + "/steps/" + DRAFTING_STEP, ONE_SHOT_PACK + "/steps/" + ONE_SHOT_STEP);
+		assertThat(declaring).as("specs/ steps carrying a tool-group declaration")
+			.containsExactlyInAnyOrder(DRAFTING_PACK + "/steps/" + DRAFTING_STEP,
+					ONE_SHOT_PACK + "/steps/" + ONE_SHOT_STEP, AGENTIC_PACK + "/steps/" + AGENTIC_SURVEY_STEP,
+					AGENTIC_PACK + "/steps/" + AGENTIC_DRAFTING_STEP);
 		assertThat(draftedWith).as("groups declared by %s/%s", DRAFTING_PACK, DRAFTING_STEP)
 			.containsExactly(VALIDATE_GROUP);
 	}
 
 	/**
-	 * The "declaration reaches the scanner" half of task 8.3, now over both packs that
-	 * declare: after the edit, each pack's {@code recommendedTier()} is above
-	 * {@code T1_COMMUNITY}, which is what {@code minimumTier} reports only once a step's
-	 * declared groups are non-empty. Read with the control below — this says the scanner
-	 * read the step, not that {@code validate} names a capability.
+	 * The "declaration reaches the scanner" half of task 8.3, now over every pack that
+	 * declares: for each, {@code recommendedTier()} is above {@code T1_COMMUNITY}, which
+	 * is what {@code minimumTier} reports only once a step's declared groups are
+	 * non-empty. Read with the control below — this says the scanner read the step, not
+	 * that {@code validate} names a capability.
 	 * <p>
-	 * Mutation: revert {@code assembleAgentSpec.yml} or {@code draftAgentSpec.yml} to
-	 * {@code toolGroups: []} and that pack's tier is T1 again.
+	 * Mutation: revert a declaration to {@code toolGroups: []} and that pack's tier is T1
+	 * again.
 	 */
 	@Test
 	void aBuilderPackThatDeclaresAToolGroupNoLongerScansAtTheCommunityTier() throws IOException {
 		AgentSpecSecurityScanner scanner = new AgentSpecSecurityScanner();
-		for (String packName : List.of(DRAFTING_PACK, ONE_SHOT_PACK)) {
+		for (String packName : DECLARING_PACKS) {
 			ScanReport report = scanner.scan(load(packName));
 
 			assertThat(report.recommendedTier())
@@ -233,15 +259,21 @@ class BuilderPackTierTest {
 	/**
 	 * The control, and the reason the assertion above must never be cited as a reach
 	 * test. A pack whose only step declares a name that resolves to nothing reports
-	 * {@code T4_PLATFORM} — the same tier the drafting pack now reports. It reaches T4 by
-	 * exhaustion rather than by grant: T3 refuses the name, and T4 is the tier whose
-	 * allowlist is {@code *}, so {@code minimumTier} has nowhere further to go. An
-	 * unresolvable declaration therefore reads as maximally privileged instead of as an
-	 * error, which is design D10's finding about the tier as a containment mechanism.
+	 * {@code T4_PLATFORM} — the same tier every declaring pack reports, including the
+	 * ones whose names now do resolve. It reaches T4 by exhaustion rather than by grant:
+	 * T3 refuses the name, and T4 is the tier whose allowlist is {@code *}, so
+	 * {@code minimumTier} has nowhere further to go. Since the tool surface landed, this
+	 * is a stronger claim than it was: {@code blueprint}, {@code library}, {@code
+	 * security} and {@code validate} are published {@code ToolGroup} beans on the booted
+	 * platform (asserted in {@code tools/ExposedToolGroupsTest}), and the scanner reports
+	 * for them exactly what it reports for {@code no-such-group}. A moved tier is
+	 * evidence the scanner read the step and never evidence that a tool resolves — design
+	 * D10's finding about the tier as a containment mechanism, now with the resolved half
+	 * filled in.
 	 * <p>
 	 * Mutations: add {@code no-such-group} to {@code TrustTier.T3_PARTNER}'s allowlist
 	 * and the T3 refusal fails; give {@code T4_PLATFORM} an allowlist without {@code *}
-	 * and the terminal tier fails; and if the drafting pack's declaration ever becomes an
+	 * and the terminal tier fails; and if a declaring pack's groups ever became an
 	 * allowlisted role ({@code web}, {@code search}, {@code file}, {@code shell}) its
 	 * tier drops below T4 and the last assertion fails — a real divergence worth
 	 * reviewing, not a flake.
@@ -262,7 +294,7 @@ class BuilderPackTierTest {
 			.isFalse();
 
 		AgentSpecSecurityScanner scanner = new AgentSpecSecurityScanner();
-		for (String packName : List.of(DRAFTING_PACK, ONE_SHOT_PACK)) {
+		for (String packName : DECLARING_PACKS) {
 			TrustTier declaredTier = scanner.scan(load(packName)).recommendedTier();
 			assertThat(declaredTier)
 				.as("%s's tier is the tier an admittedly-unresolvable name also produces, so a moved tier is"

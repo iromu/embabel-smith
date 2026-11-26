@@ -1,0 +1,5 @@
+stepType: goal
+name: explainerWritten
+description: "The explainer for the topic named in the request has been written"
+outputTypeName: ExplainerText
+export: true

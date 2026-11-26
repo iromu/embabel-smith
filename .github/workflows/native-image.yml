@@ -145,6 +145,13 @@ jobs:
             echo "- Binary: \`$SMITH_BIN\` ($size)"
             echo "- Platform: $platform"
           } >> "$GITHUB_STEP_SUMMARY"
+          # The pack folder the `native` profile lays down beside the binary is the route a
+          # pack flow takes in an image (an image's resource set has no directory entries),
+          # so its absence means the binary cannot run one -- see builder-native-hints. The
+          # no-argument smoke below cannot notice, which is why it is asserted here.
+          packDir="$(dirname "$SMITH_BIN")/specs"
+          test -d "$packDir" || { echo "no specs/ beside the binary (target/specs missing)"; exit 1; }
+          echo "- Pack folder: \`$packDir\` ($(find "$packDir" -type f | wc -l) files)" >> "$GITHUB_STEP_SUMMARY"
           rc=0
           out=$("$SMITH_BIN" 2>&1) || rc=$?
           printf '%s\n' "$out" | tail -12
@@ -164,7 +171,15 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: smith-linux-${{ env.GRAAL_ARCH }}
-          path: prod/embabel-smith-builder/target/smith
+          # Two paths, and upload-artifact strips their common ancestor (`target/`), so the
+          # artifact root holds `smith` with `specs/` beside it -- the layout SpecFolders'
+          # beside-the-program route reads, and the reason the binary can run a pack flow at
+          # all (the image's flat resource set is not listable). Naming only the binary would
+          # publish an image that refuses on its first pack flow.
+          path: |
+            prod/embabel-smith-builder/target/smith
+            prod/embabel-smith-builder/target/specs
+          description: Keep `specs/` beside `smith` when unpacking -- a pack flow reads that folder, not the image.
           compression-level: 0
           retention-days: 7
           if-no-files-found: error

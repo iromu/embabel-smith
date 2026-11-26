@@ -129,7 +129,7 @@ class ValidationToolNormalizationTest {
 	 */
 	@Test
 	void anAnswerThatIsNotASpecIsStillJustAParseError() {
-		ValidationReport report = this.tool.validatePack("\"builder-agent-specs/builder-single-spec\"");
+		ValidationReport report = this.tool.validatePack("\"specs/builder-single-spec\"");
 
 		assertThat(codes(report.issues())).containsExactly("PARSE_ERROR");
 		assertThat(report.patchedByBuild()).isEmpty();

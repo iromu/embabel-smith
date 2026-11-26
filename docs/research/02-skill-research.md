@@ -90,7 +90,7 @@ The "more advanced techniques" layer is where the 2025→2026 literature concent
 - **SEAgent — "Self-Evolving Computer Use Agent with Autonomous Learning from Experience"** (arXiv:2508.04700). A computer-use agent that **autonomously discovers and writes skills from its own interaction traces** with unfamiliar software, no human annotations.
 - **Compositional skill synthesis** (survey axis ii): combining/deriving new skills from existing ones rather than authoring from scratch.
 
-This is the most "advanced" reading of your idea: the agent doesn't just *use* skills you wrote — it **acquires and grows** them from experience.
+The most "advanced" reading of the skills-over-agents stance: the agent doesn't just *use* skills someone authored — it **acquires and grows** them from experience.
 
 ### 3.2 Hierarchical skill bases
 

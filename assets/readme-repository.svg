@@ -1,0 +1,190 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 656" preserveAspectRatio="xMidYMid meet" role="img" aria-labelledby="p2-title p2-desc">
+  <title id="p2-title">Embabel Smith repository: the shipped product on the left, 27 frozen POC modules on the right</title>
+  <desc id="p2-desc">The left group lists the seven modules of the default reactor: smith-common holds the agent-spec format; embabel-smith-specsource holds spec sources and publishing; embabel-smith-runtime ingests and runs with zero compilation; embabel-smith-a2a-starter is an A2A surface a host enables; embabel-smith-builder does generation and validation before write; embabel-smith-skillevaluator runs static skill checks for the builder; embabel-smith-studio is the browser UI over REST. The right group lists the 27 POC modules under poc/, which are frozen evidence behind the poc Maven profile. The rule between them is that no product module depends on a poc-* module, enforced by the maven-enforcer bannedDependencies rule ban-poc-dependencies on prod/pom.xml.</desc>
+
+  <style>
+    text { font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .canvas { fill: #F8FAFC; stroke: #E2E8F0; stroke-width: 1; }
+    .group { fill: #FFFFFF; stroke: #E2E8F0; stroke-width: 1; }
+    .box-builder { fill: #FEF3C7; stroke: #B45309; stroke-width: 1.4; }
+    .box-builder-lib { fill: #FFFBEB; stroke: #C9930A; stroke-width: 1.4; stroke-dasharray: 5 3; }
+    .box-runtime { fill: #ECFDF8; stroke: #0F766E; stroke-width: 1.4; }
+    .box-artifact { fill: #F1F5F9; stroke: #64748B; stroke-width: 1.4; }
+    .poc-chip { fill: #F1F5F9; stroke: #94A3B8; stroke-width: 1; }
+    .rule-band { fill: #EEF2F7; stroke: #64748B; stroke-width: 1.4; }
+    .divider { stroke: #64748B; stroke-width: 1.4; stroke-dasharray: 6 6; }
+    .ah-neutral { fill: #64748B; }
+    .h1 { font-size: 14px; font-weight: 600; fill: #0F172A; }
+    .band-strong { font-size: 13px; font-weight: 600; fill: #0F172A; }
+    .body-mid { font-size: 12.5px; fill: #334155; }
+    .label-mid { font-size: 11.5px; fill: #334155; }
+    .label-soft { font-size: 11px; fill: #475569; }
+    .mono-name { font-size: 13px; font-weight: 600; fill: #0F172A; }
+    .mono-num { font-size: 11.5px; font-weight: 600; fill: #334155; }
+    .mono-tail { font-size: 10.5px; fill: #475569; }
+    .mono-soft { font-size: 10.5px; fill: #475569; }
+    @media (prefers-color-scheme: dark) {
+      .canvas { fill: #0F172A; stroke: #243244; }
+      .group { fill: #131E30; stroke: #28374C; }
+      .box-builder { fill: #33260E; stroke: #E0A02A; }
+      .box-builder-lib { fill: #241D0E; stroke: #C9930A; }
+      .box-runtime { fill: #0E2F2C; stroke: #34D3B4; }
+      .box-artifact { fill: #1A2434; stroke: #94A3B8; }
+      .poc-chip { fill: #182234; stroke: #4B5D78; }
+      .rule-band { fill: #182234; stroke: #94A3B8; }
+      .divider { stroke: #64748B; }
+      .ah-neutral { fill: #94A3B8; }
+      .h1, .band-strong, .mono-name { fill: #F1F5F9; }
+      .body-mid, .label-mid, .mono-num { fill: #CBD5E1; }
+      .label-soft, .mono-tail, .mono-soft { fill: #A6B4C6; }
+    }
+  </style>
+
+  <defs>
+    <marker id="p2-ar" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,1 L9,5 L0,9 Z" class="ah-neutral"/>
+    </marker>
+  </defs>
+
+  <rect class="canvas" x="0" y="0" width="1200" height="656" rx="16"/>
+
+  <!-- group headings -->
+  <text class="h1" x="32" y="56">Shipped product - default reactor</text>
+  <text class="label-soft" x="32" y="76"><tspan class="mono">smith-common</tspan> and the six <tspan class="mono">prod/</tspan> modules</text>
+  <text class="h1" x="632" y="56"><tspan class="mono">poc/</tspan> - 27 POC modules</text>
+  <text class="label-soft" x="632" y="76">frozen evidence, behind the <tspan class="mono">poc</tspan> Maven profile</text>
+
+  <!-- left group: product modules -->
+  <rect class="group" x="32" y="96" width="536" height="472" rx="12"/>
+  <rect class="box-artifact" x="48" y="112" width="504" height="56" rx="10"/>
+  <text class="mono-name" x="64" y="135">smith-common</text>
+  <text class="body-mid" x="64" y="154">The agent-spec format</text>
+
+  <rect class="box-artifact" x="48" y="176" width="504" height="56" rx="10"/>
+  <text class="mono-name" x="64" y="199">embabel-smith-specsource</text>
+  <text class="body-mid" x="64" y="218">Spec sources and publishing</text>
+
+  <rect class="box-runtime" x="48" y="240" width="504" height="56" rx="10"/>
+  <text class="mono-name" x="64" y="263">embabel-smith-runtime</text>
+  <text class="body-mid" x="64" y="282">Ingest and run, zero compilation</text>
+
+  <rect class="box-artifact" x="48" y="304" width="504" height="56" rx="10"/>
+  <text class="mono-name" x="64" y="327">embabel-smith-a2a-starter</text>
+  <text class="body-mid" x="64" y="346">An A2A surface a host enables</text>
+
+  <rect class="box-builder" x="48" y="368" width="504" height="56" rx="10"/>
+  <text class="mono-name" x="64" y="391">embabel-smith-builder</text>
+  <text class="body-mid" x="64" y="410">Generation and validation before write</text>
+
+  <rect class="box-builder-lib" x="48" y="432" width="504" height="56" rx="10"/>
+  <text class="mono-name" x="64" y="455">embabel-smith-skillevaluator</text>
+  <text class="body-mid" x="64" y="474">Static skill checks for the builder</text>
+
+  <rect class="box-artifact" x="48" y="496" width="504" height="56" rx="10"/>
+  <text class="mono-name" x="64" y="519">embabel-smith-studio</text>
+  <text class="body-mid" x="64" y="538">Browser UI over REST</text>
+
+  <!-- divider between the halves -->
+  <line class="divider" x1="600" y1="96" x2="600" y2="584"/>
+
+  <!-- right group: 27 POC modules -->
+  <rect class="group" x="632" y="96" width="536" height="472" rx="12"/>
+
+  <rect class="poc-chip" x="648" y="112" width="246" height="24" rx="6"/>
+  <text class="mono mono-num" x="660" y="128">poc-1</text>
+  <text class="mono mono-tail" x="714" y="128">no-code-runtime</text>
+  <rect class="poc-chip" x="648" y="144" width="246" height="24" rx="6"/>
+  <text class="mono mono-num" x="660" y="160">poc-2</text>
+  <text class="mono mono-tail" x="714" y="160">nl-compile</text>
+  <rect class="poc-chip" x="648" y="176" width="246" height="24" rx="6"/>
+  <text class="mono mono-num" x="660" y="192">poc-3</text>
+  <text class="mono mono-tail" x="714" y="192">builder-agent</text>
+  <rect class="poc-chip" x="648" y="208" width="246" height="24" rx="6"/>
+  <text class="mono mono-num" x="660" y="224">poc-4</text>
+  <text class="mono mono-tail" x="714" y="224">agent-spec-format</text>
+  <rect class="poc-chip" x="648" y="240" width="246" height="24" rx="6"/>
+  <text class="mono mono-num" x="660" y="256">poc-5</text>
+  <text class="mono mono-tail" x="714" y="256">eval</text>
+  <rect class="poc-chip" x="648" y="272" width="246" height="24" rx="6"/>
+  <text class="mono mono-num" x="660" y="288">poc-6</text>
+  <text class="mono mono-tail" x="714" y="288">agent-spec-composition</text>
+  <rect class="poc-chip" x="648" y="304" width="246" height="24" rx="6"/>
+  <text class="mono mono-num" x="660" y="320">poc-7</text>
+  <text class="mono mono-tail" x="714" y="320">runtime-adapter</text>
+  <rect class="poc-chip" x="648" y="336" width="246" height="24" rx="6"/>
+  <text class="mono mono-num" x="660" y="352">poc-8</text>
+  <text class="mono mono-tail" x="714" y="352">retrieval</text>
+  <rect class="poc-chip" x="648" y="368" width="246" height="24" rx="6"/>
+  <text class="mono mono-num" x="660" y="384">poc-9</text>
+  <text class="mono mono-tail" x="714" y="384">quality-refinement</text>
+  <rect class="poc-chip" x="648" y="400" width="246" height="24" rx="6"/>
+  <text class="mono mono-num" x="660" y="416">poc-10</text>
+  <text class="mono mono-tail" x="714" y="416">trust-tiers</text>
+  <rect class="poc-chip" x="648" y="432" width="246" height="24" rx="6"/>
+  <text class="mono mono-num" x="660" y="448">poc-11</text>
+  <text class="mono mono-tail" x="714" y="448">progressive-disclosure</text>
+  <rect class="poc-chip" x="648" y="464" width="246" height="24" rx="6"/>
+  <text class="mono mono-num" x="660" y="480">poc-12</text>
+  <text class="mono mono-tail" x="714" y="480">semantic-retrieval</text>
+  <rect class="poc-chip" x="648" y="496" width="246" height="24" rx="6"/>
+  <text class="mono mono-num" x="660" y="512">poc-13</text>
+  <text class="mono mono-tail" x="714" y="512">remote-mcp</text>
+  <rect class="poc-chip" x="648" y="528" width="246" height="24" rx="6"/>
+  <text class="mono mono-num" x="660" y="544">poc-14</text>
+  <text class="mono mono-tail" x="714" y="544">composer</text>
+
+  <rect class="poc-chip" x="906" y="112" width="246" height="24" rx="6"/>
+  <text class="mono mono-num" x="918" y="128">poc-15</text>
+  <text class="mono mono-tail" x="972" y="128">composer-ui</text>
+  <rect class="poc-chip" x="906" y="144" width="246" height="24" rx="6"/>
+  <text class="mono mono-num" x="918" y="160">poc-16</text>
+  <text class="mono mono-tail" x="972" y="160">remote-action</text>
+  <rect class="poc-chip" x="906" y="176" width="246" height="24" rx="6"/>
+  <text class="mono mono-num" x="918" y="192">poc-17</text>
+  <text class="mono mono-tail" x="972" y="192">gliner-retrieval</text>
+  <rect class="poc-chip" x="906" y="208" width="246" height="24" rx="6"/>
+  <text class="mono mono-num" x="918" y="224">poc-18</text>
+  <text class="mono mono-tail" x="972" y="224">agent-spec-lifecycle</text>
+  <rect class="poc-chip" x="906" y="240" width="246" height="24" rx="6"/>
+  <text class="mono mono-num" x="918" y="256">poc-19</text>
+  <text class="mono mono-tail" x="972" y="256">small-llm-selector</text>
+  <rect class="poc-chip" x="906" y="272" width="246" height="24" rx="6"/>
+  <text class="mono mono-num" x="918" y="288">poc-20</text>
+  <text class="mono mono-tail" x="972" y="288">semantic-embedding</text>
+  <rect class="poc-chip" x="906" y="304" width="246" height="24" rx="6"/>
+  <text class="mono mono-num" x="918" y="320">poc-21</text>
+  <text class="mono mono-tail" x="972" y="320">agent-spec-security</text>
+  <rect class="poc-chip" x="906" y="336" width="246" height="24" rx="6"/>
+  <text class="mono mono-num" x="918" y="352">poc-22</text>
+  <text class="mono mono-tail" x="972" y="352">unified-ui</text>
+  <rect class="poc-chip" x="906" y="368" width="246" height="24" rx="6"/>
+  <text class="mono mono-num" x="918" y="384">poc-23</text>
+  <text class="mono mono-tail" x="972" y="384">remote-embedding-scale</text>
+  <rect class="poc-chip" x="906" y="400" width="246" height="24" rx="6"/>
+  <text class="mono mono-num" x="918" y="416">poc-24</text>
+  <text class="mono mono-tail" x="972" y="416">generation-approaches</text>
+  <rect class="poc-chip" x="906" y="432" width="246" height="24" rx="6"/>
+  <text class="mono mono-num" x="918" y="448">poc-25</text>
+  <text class="mono mono-tail" x="972" y="448">skill-generation</text>
+  <rect class="poc-chip" x="906" y="464" width="246" height="24" rx="6"/>
+  <text class="mono mono-num" x="918" y="480">poc-26</text>
+  <text class="mono mono-tail" x="972" y="480">graaljs-skill-scripts</text>
+  <rect class="poc-chip" x="906" y="496" width="246" height="24" rx="6"/>
+  <text class="mono mono-num" x="918" y="512">poc-27</text>
+  <text class="mono mono-tail" x="972" y="512">recursive-self-improvement</text>
+
+  <!-- the rule between the halves -->
+  <rect class="rule-band" x="32" y="584" width="748" height="40" rx="10"/>
+  <text class="band-strong" x="56" y="609">No product module depends on a poc-* module</text>
+  <text class="mono mono-soft" x="760" y="609" text-anchor="end">maven-enforcer ban-poc-dependencies</text>
+
+  <!-- legend -->
+  <rect class="box-builder" x="830" y="602" width="11" height="11" rx="3"/>
+  <text class="label-mid" x="847" y="611">builder side</text>
+  <rect class="box-runtime" x="933" y="602" width="11" height="11" rx="3"/>
+  <text class="label-mid" x="950" y="611">runtime side</text>
+  <rect class="box-artifact" x="1036" y="602" width="11" height="11" rx="3"/>
+  <text class="label-mid" x="1053" y="611">disk and surfaces</text>
+</svg>

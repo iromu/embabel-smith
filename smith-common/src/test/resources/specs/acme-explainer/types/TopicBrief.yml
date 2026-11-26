@@ -1,0 +1,8 @@
+name: TopicBrief
+description: "The topic the request is asking about"
+ownProperties:
+  - name: topic
+    type: string
+    description: "The subject to explain"
+parents: []
+creationPermitted: true

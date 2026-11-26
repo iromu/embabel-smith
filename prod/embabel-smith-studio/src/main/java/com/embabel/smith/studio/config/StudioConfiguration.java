@@ -32,6 +32,7 @@ import com.embabel.smith.builder.eval.EvalTask;
 import com.embabel.smith.builder.eval.InvokerFactory;
 import com.embabel.smith.builder.eval.PromptRewriter;
 import com.embabel.smith.builder.eval.RefinementLoop;
+import com.embabel.smith.builder.improve.BuilderPackSurface;
 import com.embabel.smith.builder.improve.ImprovementLoop;
 import com.embabel.smith.builder.improve.LoopPublishPolicy;
 import com.embabel.smith.builder.improve.LoopPushDisabledException;
@@ -337,12 +338,17 @@ public class StudioConfiguration {
 	}
 
 	/**
-	 * The source the improvement loop watches and refines (defaults to the first
-	 * configured source).
+	 * The source the improvement loop watches and refines: the configured improve source,
+	 * else the first configured source, else — when neither is set — the builder's own
+	 * pack <em>sources</em> under {@code src/main/resources/specs}, so an unconfigured
+	 * studio improves the packs that actually ship rather than improving nothing.
 	 * @param improveSource the configured improve source URI, or empty for the default.
 	 * @param sources the comma-separated configured sources.
 	 * @param cacheDir the configured source cache directory.
 	 * @return the improve source.
+	 * @throws IllegalStateException when nothing is configured and this process has no
+	 * checkout to point at — an installed binary. {@link BuilderPackSurface} refuses
+	 * rather than handing the loop the built copy, which the next build would overwrite.
 	 */
 	@Bean
 	public SpecSource improveSource(@Value("${smith.studio.improve-source:}") String improveSource,
@@ -353,10 +359,14 @@ public class StudioConfiguration {
 			uri = firstSource(sources);
 		}
 		if (uri == null || uri.isBlank()) {
-			// No source configured: the loop is inert (an empty folder source yields no
-			// packs).
-			Path empty = Files.createTempDirectory("smith-studio-empty-source-");
-			return new com.embabel.smith.specsource.FolderSpecSource("folder:" + empty, empty);
+			// The seam is BuilderPackSurface, not smith-common's SpecFolders, and the
+			// difference is deliberate: SpecFolders answers where a run finds packs, so
+			// it honours the SMITH_SPECS_DIR / smith.specs.dir read-only fallback. The
+			// loop rewrites the pack it is holding, so its surface must be a writable
+			// source tree — the directory the builder's own builds copy from. Do not
+			// "fix" that inconsistency here: a fallback a binary can serve is exactly
+			// the copy the next build silently reverts.
+			return BuilderPackSurface.specSource();
 		}
 		return Sources.parse(uri, cacheRoot(cacheDir));
 	}
@@ -367,6 +377,13 @@ public class StudioConfiguration {
 	 * publisher refuses the publish and names the setting to change — the same way
 	 * {@link LoopPublishPolicy} refuses a git source with pushing off — and the candidate
 	 * stays pending.
+	 * <p>
+	 * The asymmetry with {@link #improveSource} is the point: reading the builder's packs
+	 * from a checkout needs no decision, but naming a place an approved candidate is
+	 * written does — and the destination is not the loop's surface. Defaulting it to that
+	 * surface would make an unattended loop overwrite the working checkout's pack
+	 * sources, which is why the refuse stays and this bean never consults the source it
+	 * is wired beside.
 	 * @param improveSource the improve source the loop watches; not consulted here, the
 	 * URI decides the destination.
 	 * @param improveSourceUri the configured improve source URI, or empty.

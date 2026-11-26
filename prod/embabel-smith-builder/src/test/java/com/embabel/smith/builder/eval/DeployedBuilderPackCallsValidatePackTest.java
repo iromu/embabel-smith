@@ -47,8 +47,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  * ({@code AgentPlatformConfiguration.toolGroupResolver}). Two shipped files decide the
  * answer, and nothing model-side can change either: {@code tools/ValidationToolGroup}
  * registers the {@code validate} group carrying
- * {@link BuilderPackTools#validationTool()}, and
- * {@code builder-spec-one-shot/steps/draftAgentSpec.yml} declares that role on the
+ * {@link BuilderPackTools#validationTool(com.embabel.smith.builder.tools.ToolSurface)},
+ * and {@code builder-spec-one-shot/steps/draftAgentSpec.yml} declares that role on the
  * drafting step. Why this route and not the deploy's own tool list is that class's own
  * record, not restated here. A run whose offered list omits {@code validatePack} is
  * therefore a resolution failure, which is what the assertion below fails on. The
@@ -139,11 +139,11 @@ class DeployedBuilderPackCallsValidatePackTest {
 
 	@Test
 	void theDeployedPackOffersTheValidatorToALiveModelWhichMayCallIt() throws IOException {
-		assertThat(PackDrivenAgentSpecGenerator.BUILDER_PACK.resolve("manifest.yml"))
-			.as("pack directory %s exists on disk", PackDrivenAgentSpecGenerator.BUILDER_PACK)
+		assertThat(PackDrivenAgentSpecGenerator.builderPack().resolve("manifest.yml"))
+			.as("pack directory %s exists on disk", PackDrivenAgentSpecGenerator.builderPack())
 			.isRegularFile();
 		this.recordings.reset();
-		AgentSpec pack = new AgentSpecReader().read(PackDrivenAgentSpecGenerator.BUILDER_PACK);
+		AgentSpec pack = new AgentSpecReader().read(PackDrivenAgentSpecGenerator.builderPack());
 
 		// The deploy is the production seam the pack flow uses, so the group the step
 		// declares resolves the way it does in a build. The answer is not asserted:

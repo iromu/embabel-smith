@@ -1,0 +1,6 @@
+# Registers the environment contribution that keeps the Embabel library's own A2A
+# auto-configuration out of any app depending on this starter. Boot 4.1 loads
+# EnvironmentPostProcessors from spring.factories under this key (the
+# META-INF/spring/*.imports convention is auto-configuration only).
+org.springframework.boot.EnvironmentPostProcessor=\
+com.embabel.smith.a2a.SmithA2aEnvironmentPostProcessor

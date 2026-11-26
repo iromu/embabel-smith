@@ -50,7 +50,8 @@ import com.embabel.smith.common.model.ProcessSpec;
  *   5. EvalRunner       — every scenario run with the skill and without it
  *   6. Benchmark        — the two pass rates and the lift between them (the gate)
  *   7. security scan    — the static prompt-injection scan over both documents the build
- *                         publishes from model output: SKILL.md and evals.json
+ *                         publishes from model output — SKILL.md and evals.json — plus the
+ *                         static code checks over any scripts/ folder it also publishes
  *   8. LifecycleStamper — content hash + with-skill pass rate as baseline + incubating
  *   9. Publisher        — FolderPublisher | GitPublisher (collision gate; no push by default)
  * </pre>
@@ -84,12 +85,43 @@ public class SkillBuilderService {
 				SkillPrompts.agentWithSkill(), SkillPrompts.agentBaseline());
 	}
 
+	/**
+	 * The wiring {@code BuildCommand} uses, with the script host the engine bean made
+	 * possible: a null host is an ordinary build, whose eval arms are prompt substitution
+	 * and nothing else.
+	 * @param caller the builder's model layer.
+	 * @param scriptHost the host to run the skill's scripts with, or null.
+	 */
+	public SkillBuilderService(SpecPromptCaller caller, SkillScriptHost scriptHost) {
+		this(caller, SkillPrompts.generateSkill(), SkillPrompts.generateEvals(), SkillPrompts.gradeEval(),
+				SkillPrompts.agentWithSkill(), SkillPrompts.agentBaseline(), scriptHost);
+	}
+
 	public SkillBuilderService(SpecPromptCaller caller, String skillPrompt, String evalsPrompt, String gradePrompt,
 			String withSkillPrompt, String baselinePrompt) {
+		this(caller, skillPrompt, evalsPrompt, gradePrompt, withSkillPrompt, baselinePrompt, null);
+	}
+
+	/**
+	 * Builds a skill service with every prompt named and a script host.
+	 * @param caller the builder's model layer.
+	 * @param skillPrompt the generation prompt.
+	 * @param evalsPrompt the eval-generation prompt.
+	 * @param gradePrompt the judge prompt.
+	 * @param withSkillPrompt the with-skill arm prompt.
+	 * @param baselinePrompt the baseline arm prompt.
+	 * @param scriptHost the host that lets the with-skill arm run the skill's scripts, or
+	 * null — which is the state of a build that did not install
+	 * {@code smith.builder.skill-scripts.enabled}. Every other stage is unchanged by it:
+	 * the security scan still reads the scripts, and publish still refuses a failing one.
+	 */
+	public SkillBuilderService(SpecPromptCaller caller, String skillPrompt, String evalsPrompt, String gradePrompt,
+			String withSkillPrompt, String baselinePrompt, SkillScriptHost scriptHost) {
 		this.caller = caller;
 		this.generator = new SkillGenerator(caller, skillPrompt);
 		this.evalsPrompt = evalsPrompt;
-		this.runner = new EvalRunner(caller, new SkillGrader(caller, gradePrompt), withSkillPrompt, baselinePrompt);
+		this.runner = new EvalRunner(caller, new SkillGrader(caller, gradePrompt), withSkillPrompt, baselinePrompt,
+				scriptHost);
 	}
 
 	/**
@@ -238,16 +270,43 @@ public class SkillBuilderService {
 					inspected);
 		}
 
-		// 7. Security gate (static, offline) over every document the skill publishes from
-		// model output. The lifecycle sidecar is excluded: the builder wrote it, not the
-		// model.
-		ScanReport scan = this.scanner.scanText(skillName, List.of(skill.toSkillMd(), evals.toJson()));
+		// 7. Security gate (static, offline) over everything the skill publishes from
+		// model
+		// output: the two documents and the JavaScript. The lifecycle sidecar is
+		// excluded:
+		// the builder wrote it, not the model. A script is the one part of a published
+		// skill
+		// that executes, so it is scanned as code and not as text alone — a script that
+		// reaches for the host, the network or a parent-directory path blocks the build
+		// here
+		// rather than being discovered by the reader's runtime.
+		ScanReport scan = this.scanner.scanSkill(skillName, List.of(skill.toSkillMd(), evals.toJson()),
+				skill.scriptSources());
 		if (scan.verdict() == ScanVerdict.BLOCK) {
 			List<String> findings = scan.findings()
 				.stream()
 				.map((f) -> f.severity() + " " + f.category() + ": " + f.message() + " [" + f.evidence() + "]")
 				.toList();
 			return SkillBuildResult.blocked("security", skillName, findings, summary, scan, inspected);
+		}
+
+		// 7b. Reference gate, beside the security one and for the same reason: it is
+		// static, it costs no model call, and what it refuses is an artifact that cannot
+		// do what it says. A body that tells the agent to run scripts/x.js the folder
+		// does
+		// not carry is not a warning about that script — a reader's loader validates the
+		// references as it loads and refuses the whole skill, logging the reason on the
+		// reader's side and nowhere the builder can see. So the published folder is
+		// checked against the body's own claims here, before anything is written, rather
+		// than discovered unreadable later. See SkillFileReferences.
+		List<String> dangling = SkillFileReferences.missing(skill);
+		if (!dangling.isEmpty()) {
+			return SkillBuildResult.blocked("references", skillName,
+					List.of("the SKILL.md names " + String.join(", ", dangling)
+							+ ", which the published folder does not contain; a reader's loader refuses the whole"
+							+ " skill on a missing reference, so the skill would publish unreadable — either emit the"
+							+ " script it names or stop pointing at it"),
+					summary, scan, inspected);
 		}
 
 		// 8. Lifecycle stamp: the with-skill pass rate is the baseline the library later

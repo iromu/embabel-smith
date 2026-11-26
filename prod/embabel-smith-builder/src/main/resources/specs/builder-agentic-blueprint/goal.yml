@@ -1,0 +1,5 @@
+stepType: goal
+name: agentSpecAuthoredFromBlueprint
+description: "The agent spec for the process the blueprint documents describe has been authored as JSON text, for Java to parse"
+outputTypeName: AgentSpecJson
+export: true

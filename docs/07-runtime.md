@@ -57,6 +57,15 @@ collision.
 - **There is no override.** The documented revival is an explicit rebuild, which republishes the pack
   and leaves `retired`; a bypass flag would be a second, weaker revival path.
 
+The lifecycle vocabulary is deliberately duplicated rather than shared. The builder owns it —
+`lifecycle/LifecycleState` is the four-valued enum and `lifecycle/LifecycleStamper` writes it — while
+the runtime reads `state` **as a string** and compares it only against its own local `RETIRED`
+constant, so the reader side never depends on the writer side. The loop's `Detector` on the builder
+side likewise matches `LifecycleBlockedException`'s message prefix instead of importing the class. The
+settled plan is to move these types down into `smith-common` *when a second reader appears*, not to
+add a builder-to-runtime edge in the meantime — which leaves the contract between the two modules as
+one state string and one message prefix, so renaming either is a change in both places.
+
 ## Remote action bridges
 
 `remote/` is the one part of the runtime that talks to another process. It is a *client* of a
@@ -165,20 +174,31 @@ same capability without going through the CLI.
 
 ## A2A endpoint
 
-`prod/embabel-smith-runtime-a2a` is a **local development surface on an explicit non-default port
-(18090) with no authentication and no TLS**, so **anyone who can reach the port can start a real run
-and pay for its model calls**; it speaks **A2A protocol 0.3**, so a client expecting the current 1.0
-specification will not find it. Both halves are rulings rather than gaps: the posture is the studio's,
-widened to a port anyone on the network can open, and 0.3 is what
+The A2A surface — the starter library `prod/embabel-smith-a2a-starter`, hosted by
+`prod/embabel-smith-studio` when a run sets `smith.a2a.enabled` — is a **local development surface on
+an explicit non-default port (18090) with no authentication and no TLS**, so **anyone who can reach the
+port can start a real run and pay for its model calls**; it speaks **A2A protocol 0.3**, so a client
+expecting the current 1.0 specification will not find it. Both halves are rulings rather than gaps: the
+posture is the studio's, widened to a port anyone on the network can open, and 0.3 is what
 `embabel-agent-starter-a2a:1.5.4` implements. The module's own README
-(`prod/embabel-smith-runtime-a2a/README.md`) holds the deviation table; what a reader of the runtime
+(`prod/embabel-smith-a2a-starter/README.md`) holds the deviation table; what a reader of the runtime
 needs is here.
 
-The surface is `GET /a2a/.well-known/agent.json` plus `POST /a2a`, started with `make run-a2a`. It is
-the only `prod/` module that declares the starter, and therefore the only one that gains a servlet
-engine from it; `SmithA2aApplication` forces `spring.main.web-application-type` to `SERVLET` as a
-system property, and `SmithRuntimeApplication` is untouched — `smith run` still boots non-web and
-opens no socket.
+The surface is `GET /a2a/.well-known/agent.json` plus `POST /a2a`, started with `make run-a2a`. The
+library is the only `prod/` module that declares the starter, and there is no launcher: `make run-a2a`
+starts the studio with `smith.a2a.enabled=true` and `SERVER_PORT` (18090 by default, because the
+studio's own `application.yml` defaults to 8080). Setting the flag is also what contributes servlet
+mode and that port default, from the starter's `SmithA2aEnvironmentPostProcessor` as the
+lowest-precedence property source in the environment — so the host's own config, `SERVER_PORT` and
+`SPRING_APPLICATION_JSON` all outrank it, and a host whose own file says `none` keeps `none`. A
+host that merely depends on the library registers no endpoint and opens no port: the
+auto-configuration is conditional on that property, and the library's own
+`AgentA2AAutoConfiguration` is excluded from the environment in any process that carries this
+starter, whether or not the surface is enabled. `SmithRuntimeApplication` is untouched — `smith run`
+still boots non-web and opens no socket — and it could not host the surface in any case, because the
+starter depends on the runtime, so the reverse edge is a Maven cycle. The studio's
+`NoA2aEndpointTest` and `A2aEndpointWhenEnabledTest` are the guards that notice a regression, one in
+each direction.
 
 **Five operations, never six:** `message/send`, `message/stream`, `tasks/get`, `tasks/cancel`, plus the
 card document. **Listing tasks is not among them**, and a client that asks gets HTTP 500 with

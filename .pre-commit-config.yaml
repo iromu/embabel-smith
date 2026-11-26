@@ -6,8 +6,13 @@ repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
+      # A .sig is a vendor's own bytes -- a sigstore bundle whose contents are
+      # signed -- so a formatter that "fixes" one has changed an artifact whose
+      # whole job is to be checkable. Leave those bytes alone.
       - id: end-of-file-fixer
+        exclude: \.sig$
       - id: trailing-whitespace
+        exclude: \.sig$
   # Run the project lint suite on every commit.
   - repo: local
     hooks:

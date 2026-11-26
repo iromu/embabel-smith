@@ -10,7 +10,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import com.embabel.agent.core.AgentPlatform;
 import com.embabel.agent.domain.io.UserInput;
+import com.embabel.agent.spi.support.RegistryToolGroupResolver;
 import com.embabel.smith.builder.cli.BuildFlow;
 import com.embabel.smith.builder.core.AgentSpecGenerator;
 import com.embabel.smith.builder.core.AgentSpecRef;
@@ -20,14 +22,18 @@ import com.embabel.smith.builder.core.GenerationTechnique;
 import com.embabel.smith.builder.core.SingleShotAgentSpecGenerator;
 import com.embabel.smith.builder.core.ValidatedDraft;
 import com.embabel.smith.builder.eval.EvalTask;
+import com.embabel.smith.builder.eval.HarnessAgentSpecGenerator;
 import com.embabel.smith.builder.eval.InvokerFactory;
 import com.embabel.smith.builder.eval.PackDrivenAgentSpecGenerator;
 import com.embabel.smith.builder.eval.PromptRewriter;
 import com.embabel.smith.builder.publish.PublishTarget;
+import com.embabel.smith.builder.tools.ToolGroups;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * Task 3.3: the deterministic gates are the same sequence whichever flow issued the
@@ -65,6 +71,14 @@ import static org.assertj.core.api.Assertions.assertThat;
  * {@code DualCandidateBuildTest} because it drives {@code BuilderService} itself from the
  * {@code eval} generator, and both of those existing classes wire their own single
  * generator through their own helpers.
+ *
+ * <p>
+ * <b>The harness arm is a fourth flow through the same pipeline.</b> It is here rather
+ * than in a file of its own because the claim is the same one and the wiring above is
+ * what makes it checkable: the harness flow's generation seam is a pack deploy like the
+ * pack flow's, and the stages after it are the same Java stages. Where it differs it says
+ * so in the assertions — a flow that runs the validator inside the generate stage changes
+ * the recorded list and not the outcome.
  *
  * @author Ivan Rodriguez
  */
@@ -198,6 +212,88 @@ class FlowGateParityTest {
 
 	// --- wiring -------------------------------------------------------------
 
+	/**
+	 * Task 3.5, one flow later: the harness flow cannot publish where the Java flow would
+	 * be blocked. On a draft that gets all the way through, the two flows record the same
+	 * gates in the same order and both publish; on a draft whose goal names a type
+	 * nothing produces, both stop at the <em>build</em> stage and neither writes
+	 * anything.
+	 * <p>
+	 * The one difference is in the gate list rather than the outcome, and it is the flow:
+	 * the harness driver runs the validator itself, so a dangling type is already a
+	 * finding the draft carries when it leaves the generate stage, and
+	 * {@code BuilderService} stops there rather than at the separate validate gate. Same
+	 * stage named, same refusal, one fewer recorded gate — the check moved into
+	 * generation, which is what a forced check means. The issues are compared by what
+	 * they name rather than by wording for the same reason: one list is the validator's,
+	 * the other the driver's restatement of it.
+	 */
+	@Test
+	void theHarnessFlowIsBlockedWhereTheJavaFlowIsBlocked() {
+		Run java = buildBy(BuildFlow.JAVA, scratch("java"), library("java"), DRAFTED, PASS);
+		Run harness = buildBy(BuildFlow.HARNESS, scratch("harness"), library("harness"), DRAFTED, PASS);
+
+		assertThat(harness.gates).as("the gates the harness flow ran on a draft that finishes")
+			.isEqualTo(java.gates)
+			.containsExactly("generate", "validate", "write", "eval");
+		assertThat(harness.result.isBuilt()).as(() -> harness.result.report()).isTrue();
+		assertThat(harness.result.packName()).isEqualTo(java.result.packName());
+		assertThat(Path.of(harness.result.published().location()).resolve("lifecycle.yml")).isRegularFile();
+
+		Run javaBlocked = buildBy(BuildFlow.JAVA, scratch("java-blocked"), library("java-blocked"), DANGLING, PASS);
+		Run harnessBlocked = buildBy(BuildFlow.HARNESS, scratch("harness-blocked"), library("harness-blocked"),
+				DANGLING, PASS);
+
+		assertThat(harnessBlocked.result.isBuilt()).as(() -> harnessBlocked.result.report()).isFalse();
+		assertThat(harnessBlocked.result.stage()).as("the same stage the Java flow stops at")
+			.isEqualTo(javaBlocked.result.stage())
+			.isEqualTo("build");
+		assertThat(harnessBlocked.result.issues()).as("and both name the defect, whoever ran the validator")
+			.isNotEmpty()
+			.anyMatch((issue) -> issue.contains("NonExistentType"));
+		assertThat(javaBlocked.result.issues()).anyMatch((issue) -> issue.contains("NonExistentType"));
+		// The claim above, as a fact rather than as prose: the Java flow's validation is
+		// a
+		// gate of its own, the harness flow's ran inside generate, and the build stops at
+		// the stage both of them name.
+		assertThat(javaBlocked.gates).containsExactly("generate", "validate");
+		assertThat(harnessBlocked.gates).as("the separate validate gate never ran — the check came with the draft")
+			.containsExactly("generate");
+		assertThat(library("harness-blocked")).as("nothing published, as nothing was published on the Java flow")
+			.doesNotExist();
+	}
+
+	/**
+	 * The two gates further down the pipeline, on the harness flow: below the score gate
+	 * and against an existing pack of the same name, it stops where the Java flow stops,
+	 * having run the earlier gates in the same order.
+	 */
+	@Test
+	void theHarnessFlowStopsAtTheLaterGatesWhereTheJavaFlowStops() {
+		Run java = buildBy(BuildFlow.JAVA, scratch("java"), library("java"), DRAFTED, FAIL);
+		Run harness = buildBy(BuildFlow.HARNESS, scratch("harness"), library("harness"), DRAFTED, FAIL);
+
+		assertThat(harness.gates).as("the refinement loop ran the same rounds on both flows").isEqualTo(java.gates);
+		assertThat(harness.result.stage()).isEqualTo(java.result.stage()).isEqualTo("eval");
+		assertThat(harness.result.score()).isEqualTo(java.result.score());
+		assertThat(library("harness")).doesNotExist();
+
+		buildBy(BuildFlow.JAVA, scratch("java-twice"), library("java-twice"), DRAFTED, PASS);
+		Run javaAgain = buildBy(BuildFlow.JAVA, scratch("java-twice"), library("java-twice"), DRAFTED, PASS);
+		buildBy(BuildFlow.HARNESS, scratch("harness-twice"), library("harness-twice"), DRAFTED, PASS);
+		Run harnessAgain = buildBy(BuildFlow.HARNESS, scratch("harness-twice"), library("harness-twice"), DRAFTED,
+				PASS);
+
+		assertThat(harnessAgain.gates).as("every gate up to publish ran again, in the same order")
+			.isEqualTo(javaAgain.gates);
+		assertThat(harnessAgain.result.stage()).as("the collision is the publish gate, not the flow")
+			.isEqualTo(javaAgain.result.stage())
+			.isEqualTo("publish");
+		assertThat(harnessAgain.result.packName()).isEqualTo(javaAgain.result.packName()).isEqualTo("parity-pack");
+	}
+
+	// --- wiring -------------------------------------------------------------
+
 	/** What one flow's build did: the gates it recorded, and what it reported. */
 	private record Run(List<String> gates, BuildResult result) {
 
@@ -219,10 +315,18 @@ class FlowGateParityTest {
 			recorder.gate("eval");
 			return (input) -> evalAnswer;
 		};
+		InvokerFactory packInvokers = (pack) -> (input) -> drafted;
 		AgentSpecGenerator generator;
 		if (flow == BuildFlow.PACK) {
-			InvokerFactory packInvokers = (pack) -> (input) -> drafted;
-			generator = new PackDrivenAgentSpecGenerator(packInvokers, PackDrivenAgentSpecGenerator.BUILDER_PACK);
+			generator = new PackDrivenAgentSpecGenerator(packInvokers, PackDrivenAgentSpecGenerator.builderPack());
+		}
+		else if (flow == BuildFlow.HARNESS) {
+			// The four roles builder-harness's three steps declare, offered by a registry
+			// of
+			// the production recipe: the deploy-time role check is the only part of this
+			// flow
+			// that reads a platform, and it reads the roles, not the tools.
+			generator = new HarnessAgentSpecGenerator(packInvokers, platformOffering(HARNESS_ROLES));
 		}
 		else {
 			generator = new SingleShotAgentSpecGenerator((system, user) -> drafted,
@@ -241,6 +345,20 @@ class FlowGateParityTest {
 
 	private Path scratch(String name) {
 		return this.tmp.resolve(name).resolve("scratch");
+	}
+
+	/** The roles {@code builder-harness}'s three steps declare between them. */
+	private static final List<String> HARNESS_ROLES = List.of("blueprint", "library", "validate", "security");
+
+	private static AgentPlatform platformOffering(List<String> roles) {
+		// A real registry rather than a mock of availableToolGroups(): the groups are the
+		// production recipe with no tools in them, which is all the harness deploy's role
+		// check reads. Nothing here calls a model.
+		var resolver = new RegistryToolGroupResolver("flow-gate-parity",
+				roles.stream().map((role) -> ToolGroups.ofTools(role, "The " + role + " group", List.of())).toList());
+		AgentPlatform platform = mock(AgentPlatform.class);
+		when(platform.getToolGroupResolver()).thenReturn(resolver);
+		return platform;
 	}
 
 	private Path library(String name) {

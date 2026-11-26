@@ -1,0 +1,4 @@
+name: acme-explainer
+version: 1.0.0
+defaultPlanner: GOAP
+defaultModel: null

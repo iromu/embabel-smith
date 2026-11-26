@@ -13,8 +13,9 @@ name: Offline verification
 #     and the live group stays excluded through the root pom's
 #     `test.excludedGroups` default (`live`) regardless of what is exported,
 #     which is the mechanism that keeps this run model-free (README.md, "Live
-#     tests are opt-in by tag"; docs/05-architecture.md). The four @Tag("live")
-#     tests (build-publish, run, loop, studio REST) therefore do not run here,
+#     tests are opt-in by tag"; docs/05-architecture.md). The @Tag("live")
+#     tests (build-publish, run, the a2a surface, loop, studio REST, pack
+#     deploy) therefore do not run here,
 #     and green says nothing about the paths only they exercise.
 #   * Nothing is published or deployed, and no coverage threshold is enforced.
 on:

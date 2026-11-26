@@ -10,6 +10,8 @@ import java.util.List;
 
 import com.embabel.agent.api.tool.Tool;
 import com.embabel.smith.builder.tools.AgentSpecValidationTool;
+import com.embabel.smith.builder.tools.ToolOutput;
+import com.embabel.smith.builder.tools.ToolSurface;
 import com.embabel.smith.common.validation.ValidationIssue;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -99,13 +101,20 @@ public final class BuilderPackTools {
 	/**
 	 * The validator as a callable tool: {@link #VALIDATE_PACK} with one named string
 	 * argument, whose body calls {@link AgentSpecValidationTool} and reports what the
-	 * validator found, split by what the build can do about each finding.
+	 * validator found, split by what the build can do about each finding. An identical
+	 * repeat of the call is answered from the first one: the validator is a pure function
+	 * of the spec text it is given, so a step that re-sends an unchanged draft is shown
+	 * it already asked rather than paying for the same deterministic check twice — the
+	 * repeat that {@code docs/12-backlog.md} records as 19 calls on one input.
+	 * @param surface the surface the driver populated for this build, of which this tool
+	 * uses the memo
 	 * @return the tool the {@code validate} group carries
 	 */
-	public static Tool validationTool() {
+	public static Tool validationTool(ToolSurface surface) {
 		return Tool.Companion.of(VALIDATE_PACK, DESCRIPTION,
 				Tool.InputSchema.of(Tool.Parameter.string(SPEC_JSON, SPEC_JSON_DESCRIPTION, true)),
-				Tool.Metadata.DEFAULT, (Tool.Function) (arguments) -> Tool.Result.text(findings(arguments)));
+				Tool.Metadata.DEFAULT, (Tool.Function) (arguments) -> Tool.Result
+					.text(ToolOutput.cap(surface.remembered(VALIDATE_PACK, arguments, () -> findings(arguments)))));
 	}
 
 	/**

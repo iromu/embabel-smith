@@ -1,0 +1,11 @@
+name: DocumentInventory
+description: "What the opened document roots hold: the documents that exist, which of them the surveying step read, and what each says the process is"
+ownProperties:
+  - name: listing
+    type: string
+    description: "One line per document the listing printed: its name, its size, whether it was read, and what it turned out to cover"
+  - name: unread
+    type: string
+    description: "The documents not read in full, and what the step gave up on — the part of the roots the next step has to decide about"
+parents: []
+creationPermitted: true

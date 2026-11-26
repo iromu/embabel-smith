@@ -1,0 +1,9 @@
+stepType: action
+name: extractTopic
+description: "Pull the topic the request is asking about out of the request"
+inputTypeNames:
+  - UserInput
+outputTypeName: TopicBrief
+prompt: |
+  Name the topic the request asks for an explainer about.
+  Request: {{userInput.content}}

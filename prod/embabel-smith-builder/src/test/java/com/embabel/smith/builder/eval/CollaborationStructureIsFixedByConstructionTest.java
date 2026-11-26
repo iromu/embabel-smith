@@ -11,6 +11,7 @@ import com.embabel.agent.core.AgentPlatform;
 import com.embabel.agent.core.AgentScope;
 import com.embabel.agent.core.DataDictionary;
 import com.embabel.agent.core.Goal;
+import com.embabel.smith.builder.core.BuilderPackPaths;
 import com.embabel.smith.builder.improve.Refiner;
 import com.embabel.smith.common.io.AgentSpecReader;
 import com.embabel.smith.common.model.ActionStepSpec;
@@ -116,8 +117,10 @@ import static org.mockito.Mockito.when;
 class CollaborationStructureIsFixedByConstructionTest {
 
 	/**
-	 * The builder's own packs, in the order the change's process lists them, addressed
-	 * from the module directory as {@code core/BuilderAgentSpecPackTest} addresses them.
+	 * The builder's own packs, in the order the change's process lists them, addressed as
+	 * {@code core/BuilderAgentSpecPackTest} addresses them: through the class loader, at
+	 * this module's {@code specs/} resources, so the process is assembled from the packs
+	 * the module ships rather than from whatever directory the test run started in.
 	 */
 	private static final List<String> PACK_NAMES = List.of("builder-single-spec", "builder-process-composition",
 			"builder-skill-from-process");
@@ -130,7 +133,7 @@ class CollaborationStructureIsFixedByConstructionTest {
 	private static final String REWRITTEN = "[rewritten] ";
 
 	private static Path packDir(String packName) {
-		return Path.of("builder-agent-specs", packName);
+		return BuilderPackPaths.directory(packName);
 	}
 
 	private static AgentSpec load(String packName) throws IOException {

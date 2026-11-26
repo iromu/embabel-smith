@@ -41,6 +41,27 @@ public record Finding(Severity severity, String category, String message, String
 	 */
 	public static final String CAT_UNTRUSTED_INPUT_TO_SHELL = "UNTRUSTED_INPUT_TO_SHELL";
 
+	/**
+	 * A skill script reaches for the host: its module loader, its class loader, a
+	 * subprocess, or generated code. The script sandbox denies every one of these, so a
+	 * script that asks for them is a script written outside its contract.
+	 */
+	public static final String CAT_SCRIPT_HOST_ACCESS = "SCRIPT_HOST_ACCESS";
+
+	/**
+	 * A skill script reaches the network through an API (fetch, XHR, a socket). The
+	 * engine gives a script no network at all, so this is both a broken promise to the
+	 * reader and an attempt to leave the sandbox by another door.
+	 */
+	public static final String CAT_SCRIPT_NETWORK = "SCRIPT_NETWORK";
+
+	/**
+	 * A skill script names a path that walks out of the skill's own folder. The engine
+	 * binds file access to that folder, so a script reaching above it is reaching for
+	 * something outside the artifact.
+	 */
+	public static final String CAT_SCRIPT_PATH_ESCAPE = "SCRIPT_PATH_ESCAPE";
+
 	public boolean isCritical() {
 		return this.severity == Severity.CRITICAL;
 	}

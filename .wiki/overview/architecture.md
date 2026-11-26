@@ -9,7 +9,7 @@ source_paths:
   - "prod/pom.xml"
   - "docs/04-poc-run-results.md"
   - "docs/05-architecture.md"
-updated_at: "2026-11-21"
+updated_at: "2026-11-26"
 ---
 
 # Architecture and module map
@@ -19,7 +19,9 @@ centralizes the Embabel version (1.5.4), the `repo.embabel.com` repository, the 
 and the test dependencies. There are two trees: the POCs under a `poc/` aggregator
 (`poc/pom.xml`) — each independently buildable and runnable, so a failure isolates to one claim —
 and the product under a `prod/` aggregator (`prod/pom.xml`) — **six** product modules that extract
-proven POC logic (see [[product-phase]]).
+proven POC logic (see [[product-phase]]). The durable module map is
+[`docs/05-architecture.md`](../../docs/05-architecture.md); `README.md` carries only prose about what
+ships, no table.
 
 One asymmetry matters day to day: **the POCs are not in the default reactor.** The root POM's default
 `<modules>` are `smith-common` and `prod`; `poc` sits inside a profile, so an ordinary `mvn` or `make`
@@ -31,10 +33,10 @@ embabel-smith/            parent POM (pom packaging; default reactor = smith-com
 ├── smith-common/         the agent spec FORMAT owner — shared by everyone
 ├── prod/                 aggregator for the product modules (extract, never depend on POCs)
 │   ├── embabel-smith-specsource    folder:/git: spec sources + content hash (change 02)
-│   ├── embabel-smith-runtime        the runtime product: smith run CLI + JSONL trace (change 03)
-│   ├── embabel-smith-runtime-a2a    the runtime's A2A launcher, on a non-default port ([[a2a-endpoint]])
-│   ├── embabel-smith-builder        the builder product: smith build CLI + pipeline (change 04)
 │   ├── embabel-smith-skillevaluator Tier 1 static skill checks; the builder's inspect gate is its only prod consumer
+│   ├── embabel-smith-runtime        the runtime product: smith run CLI + JSONL trace (change 03)
+│   ├── embabel-smith-a2a-starter    the A2A surface as a starter library, off until a host opts in; its servlet host is the studio ([[a2a-endpoint]])
+│   ├── embabel-smith-builder        the builder product: smith build CLI + pipeline (change 04)
 │   └── embabel-smith-studio         the self-improving studio (changes 05–06; the loop engine now lives in the builder)
 └── poc/                  aggregator for the POC modules — built only with -Ppoc
     ├── poc-1-no-code-runtime          POC 1 — keystone: ingest a pack, run a plan

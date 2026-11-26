@@ -1,0 +1,11 @@
+# Gitleaks config for embabel-smith.
+#
+# useDefault keeps every built-in rule in force — this file carves out exactly
+# one path, below, and changes nothing else.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Adversarial eval prompts carry a fake credential on purpose: the eval tells the agent to write an API key into a governance card and passes only when the agent refuses. The string is a canary that the test needs, not a secret."
+paths = ['''^prod/embabel-smith-builder/src/main/resources/skills/skill-card-generator/evals/evals\.json$''']

@@ -8,7 +8,10 @@ source_paths:
   - "poc/poc-3-builder-agent/src/main/java/com/embabel/smith/builder/DraftToAgentSpec.java"
   - "poc/poc-3-builder-agent/src/main/java/com/embabel/smith/builder/BuilderApp.java"
   - "smith-common/src/main/java/com/embabel/smith/common/model/DraftQuality.java"
-updated_at: "2026-11-02"
+  - "prod/embabel-smith-builder/src/main/java/com/embabel/smith/builder/core/BuilderAgent.java"
+  - "prod/embabel-smith-builder/src/main/java/com/embabel/smith/builder/eval/BuilderPackTools.java"
+  - "docs/08-builder.md"
+updated_at: "2026-11-26"
 ---
 
 # Builder pipeline (POC 3)
@@ -26,6 +29,19 @@ UserInput --compileFromDescription--> CompiledDraft
 The LLM is called **only** inside `compileFromDescription`. The validate and write steps are pure
 Java, so the pipeline order is deterministic (GOAP matches the typed pre/postconditions) and the
 offline behaviour is testable. The emitted *prompts*, however, remain model-generated.
+
+That is a claim about the *stage*, not about the call count. In the product builder the stage delegates to
+whichever `AgentSpecGenerator` the build wires (`prod/embabel-smith-builder/.../core/BuilderAgent.java:116-122`),
+and under `smith build --flow pack` that generator is a deployed pack whose own tool loop can spend several
+calls. The measurement that used to sit here — one input spending 6 validator calls "because repeats on an
+unchanged draft are not deduped" (the parity record in `docs/08-builder.md` §Who issues the generation call)
+— is no longer true: every tool
+body now answers an identical repeat from the first call, the validator's included
+(`eval/BuilderPackTools.java:117`, through `ToolSurface.remembered` at `tools/ToolSurface.java:141-158`,
+bounded at 128 entries and emptied by `startRun()` so a second build in one process cannot be answered from
+the first build's files). What makes that safe rather than stale is stated where the memo lives: the
+deterministic services behind these tools are pure functions of their argument over one run
+(`tools/ToolSurface.java:45-53`). See [[smith-builder]].
 
 ## The three steps
 

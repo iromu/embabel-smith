@@ -29,8 +29,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
- * The four builder packs under {@code builder-agent-specs/} are loadable, valid and
- * deployable, so they are capabilities rather than a directory nobody reads.
+ * The five builder packs under {@code specs/} are loadable, valid and deployable, so they
+ * are capabilities rather than a directory nobody reads.
  *
  * <p>
  * <b>Why the deploy is the assertion that matters.</b> The builder's flow is reachable
@@ -58,14 +58,17 @@ import static org.mockito.Mockito.when;
  * that the packs' planner conditions or tool groups mean anything.
  *
  * <p>
- * <b>Locating the packs.</b> {@code builder-agent-specs/} sits at the module root, not
- * under {@code src/main/resources}, so it is not on the test classpath as a resource and
- * is addressed from the working directory — the same convention
- * {@code LiveExampleBuildTest} and {@code NoDirectModelRequestTest} use for their
- * fixtures. Surefire sets that directory to the module basedir whether {@code mvn test}
- * runs from the repository root or from the module, so the relative path works both ways;
- * the directory assertion below is what fails, naming the path it tried, if it ever does
- * not.
+ * <b>Locating the packs.</b> The packs are classpath resources under
+ * {@code src/main/resources/specs}, so they are addressed through the class loader by
+ * {@link BuilderPackPaths} rather than resolved against the working directory, and this
+ * run does not depend on the directory it was launched from.
+ * {@link BuilderPackPaths#directory(String)} hands back a real directory — the class
+ * directory itself while the module's classes are exploded, a temporary copy of the
+ * resource once it travels inside a jar — which is why {@link AgentSpecReader} reads a
+ * pack here on the same terms it reads one from anywhere else on disk. The packs are
+ * resources of the module that runs them, so nothing has to be standing in
+ * {@code prod/embabel-smith-builder/} for a pack to be found. The directory assertion
+ * below is what fails, naming the path it tried, if the resource ever stops resolving.
  *
  * <p>
  * <b>The platform double</b> is {@code eval/ToolGroupBindingTest}'s, unchanged: a mock
@@ -88,6 +91,25 @@ import static org.mockito.Mockito.when;
  * count.
  *
  * <p>
+ * <b>The fifth pack is the agentic route.</b> {@code builder-agentic-blueprint} reads the
+ * blueprint documents through tools rather than receiving a corpus the driver already
+ * assembled: its first step surveys them with the {@code blueprint} and {@code library}
+ * groups, its second drafts the spec with {@code blueprint}, {@code validate} and
+ * {@code security}. It is the pack {@code --flow agentic} deploys, and it is where the
+ * group roles published by {@code tools/*ToolGroup} have to resolve — which is why the
+ * deploy assertion below covers it on the same terms as the other four.
+ *
+ * <p>
+ * <b>The sixth pack is the harness route.</b> {@code builder-harness} is the pack
+ * {@code --flow harness} deploys, and it is the one whose steps decide what to read: a
+ * survey step that lists the document roots, a planning step that says what is still
+ * outstanding, a drafting step that reads what the plan named before it writes. Its type
+ * rule is the same as the others' — every step output is a type the pack declares — which
+ * is what {@link #everyBuilderPackDeclaresItsOwnTypeForEveryStepAndGoalOutput()} now
+ * checks for six directories rather than five, and why the pack is in {@link #PACK_NAMES}
+ * rather than covered by a test of its own.
+ *
+ * <p>
  * <b>What fails when a pack goes missing.</b> {@link #load(String)} asserts the manifest
  * is a regular file and prints the path it tried, so hiding
  * {@code builder-spec-one-shot/} — or any other pack directory named by
@@ -99,14 +121,15 @@ import static org.mockito.Mockito.when;
 class BuilderAgentSpecPackTest {
 
 	/**
-	 * The packs under test, addressed from the module directory. A pack's directory name
-	 * is also its manifest name, which the first assertion below checks.
+	 * The packs under test, addressed as classpath resources through
+	 * {@link BuilderPackPaths}. A pack's directory name is also its manifest name, which
+	 * the first assertion below checks.
 	 */
 	private static final List<String> PACK_NAMES = List.of("builder-single-spec", "builder-process-composition",
-			"builder-skill-from-process", "builder-spec-one-shot");
+			"builder-skill-from-process", "builder-spec-one-shot", "builder-agentic-blueprint", "builder-harness");
 
 	private static Path packDir(String packName) {
-		return Path.of("builder-agent-specs", packName);
+		return BuilderPackPaths.directory(packName);
 	}
 
 	private static AgentSpec load(String packName) throws IOException {
@@ -249,29 +272,36 @@ class BuilderAgentSpecPackTest {
 	 * competing shape instruction, and following it is task 4.2's unwrapped answer (the
 	 * {@code ('m'} variant of the same crash). Read from the pack rather than hardcoded,
 	 * so renaming the property without renaming it in the prompt fails here rather than
-	 * at a live build. Only this pack is claimed, because {@code --flow pack} deploys
-	 * only this one.
+	 * at a live build. Three packs are claimed: {@code builder-spec-one-shot}, which
+	 * {@code --flow pack} deploys; {@code builder-agentic-blueprint}, which
+	 * {@code --flow agentic} deploys; and {@code builder-harness}, which
+	 * {@code --flow harness} deploys. The three planning packs are not, because their
+	 * goals carry planning artifacts that Java consumes field by field.
 	 * @throws IOException when the pack is not where the other tests read it
 	 */
 	@Test
 	void theStepThatProducesTheGoalOutputNamesTheEnvelopeItsGoalTypeDeclares() throws IOException {
-		AgentSpec pack = load("builder-spec-one-shot");
-		DynamicTypeDef goalType = pack.type(pack.goalOutputType());
+		for (String packName : List.of("builder-spec-one-shot", "builder-agentic-blueprint", "builder-harness")) {
+			AgentSpec pack = load(packName);
+			DynamicTypeDef goalType = pack.type(pack.goalOutputType());
 
-		assertThat(goalType.ownProperties()).as("goal output type %s is a one-key envelope", pack.goalOutputType())
-			.hasSize(1);
-		String envelope = goalType.ownProperties().get(0).name();
-		List<String> producers = pack.steps()
-			.stream()
-			.filter((step) -> pack.goalOutputType().equals(step.outputTypeName()))
-			.map(ActionStepSpec::name)
-			.toList();
+			assertThat(goalType.ownProperties())
+				.as("goal output type %s of %s is a one-key envelope", pack.goalOutputType(), packName)
+				.hasSize(1);
+			String envelope = goalType.ownProperties().get(0).name();
+			List<String> producers = pack.steps()
+				.stream()
+				.filter((step) -> pack.goalOutputType().equals(step.outputTypeName()))
+				.map(ActionStepSpec::name)
+				.toList();
 
-		assertThat(producers).as("steps of builder-spec-one-shot producing its goal output").isNotEmpty();
-		for (String stepName : producers) {
-			assertThat(pack.step(stepName).prompt())
-				.as("step %s shows the reply as an object keyed by the property its own output type declares", stepName)
-				.contains("\"" + envelope + "\"");
+			assertThat(producers).as("steps of %s producing its goal output", packName).isNotEmpty();
+			for (String stepName : producers) {
+				assertThat(pack.step(stepName).prompt())
+					.as("step %s of %s shows the reply as an object keyed by the property its own output type declares",
+							stepName, packName)
+					.contains("\"" + envelope + "\"");
+			}
 		}
 	}
 

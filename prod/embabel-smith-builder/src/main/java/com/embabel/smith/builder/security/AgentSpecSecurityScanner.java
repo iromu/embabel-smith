@@ -8,6 +8,8 @@ package com.embabel.smith.builder.security;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.TreeSet;
 
 import com.embabel.smith.common.model.ActionStepSpec;
@@ -29,6 +31,15 @@ import com.embabel.smith.common.samples.SampleAgentSpecs;
  * scanner, it is a pattern matcher, not a semantic detector — a novel rephrasing outside
  * the pattern set can slip through. That is the honest limit of a non-LLM install-time
  * scan.
+ *
+ * <p>
+ * A published skill is scanned as documents <em>plus scripts</em>
+ * ({@link #scanSkill(String, List, Map)}): a {@code scripts/*.js} file is code that
+ * executes in the reader's JVM, so it gets its own construct checks — host access,
+ * network reach, and a path that leaves the skill's own folder — on top of the text
+ * checks, each with a finding code of its own. Those checks are the script sandbox's
+ * contract read backwards, which is why they are static: the runtime tier gate they would
+ * otherwise lean on resolves nothing in this builder.
  *
  * @author Ivan Rodriguez
  */
@@ -57,6 +68,27 @@ public class AgentSpecSecurityScanner {
 	 */
 	private static final List<String> SECRET_MARKERS = List.of("api key", "api_key", "apikey", "client secret",
 			"access token", "auth token", "credential", "private key", "process.env", ".env", ".aws/credentials");
+
+	/**
+	 * Constructs that reach the host from inside a script: the module loader, the host
+	 * class and package namespaces, a subprocess, the global object reached for by way of
+	 * an escape, and runtime-generated code. Each is denied by the engine's sandbox
+	 * ({@code skill/script/}), so a script carrying one was written against a promise the
+	 * runtime will not keep.
+	 */
+	private static final List<String> SCRIPT_HOST_MARKERS = List.of("java.type(", "java.from(", "java.to(", "packages.",
+			"require(", "import(", "child_process", "process.binding", "globalthis.", "eval(", "new function(");
+
+	/** Network APIs a script might call. The engine gives a script no network at all. */
+	private static final List<String> SCRIPT_NETWORK_MARKERS = List.of("fetch(", "xmlhttprequest", "websocket",
+			"net.connect", "dgram.", "http.request", "https.request");
+
+	/**
+	 * Path markers that leave the skill folder. The engine binds {@code readFile} and
+	 * {@code writeFile} to the skill's own directory, so a script that walks up out of it
+	 * is naming a file the published artifact does not contain.
+	 */
+	private static final List<String> SCRIPT_PATH_MARKERS = List.of("../");
 
 	private final TrustTierPolicy tiers = new TrustTierPolicy();
 
@@ -134,6 +166,63 @@ public class AgentSpecSecurityScanner {
 	}
 
 	/**
+	 * Scans a published skill: its two model-authored documents <em>and</em> the
+	 * JavaScript it publishes beside them. A script is code that runs in the reader's
+	 * JVM, so it is the one artifact in this builder whose payload executes, and a skill
+	 * is not vetted until the code has been read too — the same reasoning that made
+	 * {@code evals.json} part of this scan rather than an exception to it.
+	 * <p>
+	 * The script checks are the sandbox's own contract read backwards. The engine runs a
+	 * script with host class lookup, environment, threads, processes and network all
+	 * denied, and file access bound to the skill's own folder; so a script that reaches
+	 * for a module loader, a host class, a subprocess, a socket or a parent-directory
+	 * path is written outside the contract it will be run under, and is refused rather
+	 * than shipped for the runtime to discover. Each is a {@link Severity#CRITICAL}
+	 * finding with its own code, so the refusal names what it objected to. The text
+	 * checks then run over the script source as well, because a script is also a document
+	 * the model wrote.
+	 * <p>
+	 * A skill that publishes scripts is published at a tier that permits execution; see
+	 * {@link #skillTier(Map)}. This is the trust tier's one say over a skill's executable
+	 * half, and it is a report rather than a gate.
+	 * @param name the artifact name to report the findings against.
+	 * @param texts the documents to scan.
+	 * @param scriptsByPath the scripts to scan, keyed by the path they publish to, so a
+	 * finding names the file it came from.
+	 * @return the scan report with findings, verdict, and recommended tier.
+	 */
+	public ScanReport scanSkill(String name, List<String> texts, Map<String, String> scriptsByPath) {
+		List<Finding> findings = new ArrayList<>(textFindings(texts));
+		for (Map.Entry<String, String> script : new TreeMap<>(scriptsByPath).entrySet()) {
+			findings.addAll(scriptFindings(script.getKey(), script.getValue()));
+		}
+		return new ScanReport(name, findings, verdict(findings), skillTier(scriptsByPath));
+	}
+
+	/**
+	 * The tier a published skill asks its reader to run it at.
+	 * <p>
+	 * A skill that publishes JavaScript is not the same kind of artifact as an
+	 * instructions-only document: whatever the sandbox denies at execution, the reader is
+	 * being asked to run code a model wrote, and a published claim that says "community
+	 * tier, no tool access" about that is a claim about a document this one is not.
+	 * {@code T3_PARTNER} is the lowest tier whose allowlist covers running files and
+	 * commands, and it is not {@code T4_PLATFORM} because the engine denies host-level
+	 * execution — a tier naming T4 would overstate what the skill asks for.
+	 * <p>
+	 * This is a report, not a gate. A tier admits a source by the tool-group roles its
+	 * packs declare, and a script declares none, so no loader can consult a tier about
+	 * one (design D3). The pack-side rule is the separate
+	 * {@link #minimumTier(AgentSpec)}; skills were never packs, and the per-spec tier
+	 * rows on the record are about packs.
+	 * @param scriptsByPath the scripts the skill publishes, keyed by path.
+	 * @return the tier to publish the skill at.
+	 */
+	private static TrustTier skillTier(Map<String, String> scriptsByPath) {
+		return scriptsByPath.isEmpty() ? TrustTier.T1_COMMUNITY : TrustTier.T3_PARTNER;
+	}
+
+	/**
 	 * Every prompt body in the pack (the attack surface a static scan can see).
 	 * @param pack the agent spec whose prompts are collected.
 	 * @return the prompt bodies of the spec's steps.
@@ -204,6 +293,61 @@ public class AgentSpecSecurityScanner {
 			}
 		}
 		return out;
+	}
+
+	/**
+	 * The checks over one published script: the text checks, reported against the file it
+	 * sits in, plus the three constructs the script sandbox exists to deny.
+	 * @param path the path the script publishes to.
+	 * @param source the JavaScript source.
+	 * @return the findings raised over that script.
+	 */
+	private List<Finding> scriptFindings(String path, String source) {
+		List<Finding> out = new ArrayList<>(attributed(path, textFindings(List.of(source))));
+		out.addAll(markerFindings(path, source, SCRIPT_HOST_MARKERS, Finding.CAT_SCRIPT_HOST_ACCESS,
+				"Skill script reaches the host outside its sandbox"));
+		out.addAll(markerFindings(path, source, SCRIPT_NETWORK_MARKERS, Finding.CAT_SCRIPT_NETWORK,
+				"Skill script reaches the network, which the script sandbox denies"));
+		out.addAll(markerFindings(path, source, SCRIPT_PATH_MARKERS, Finding.CAT_SCRIPT_PATH_ESCAPE,
+				"Skill script names a path outside the skill's own folder"));
+		return out;
+	}
+
+	/**
+	 * One marker list over one script. Matching is lowercased but not normalized the way
+	 * prompt text is: these are API names, and an obfuscated {@code f e t c h} is not a
+	 * call the engine can make either. The first hit per class is enough to block, so the
+	 * report names the file and the construct rather than every occurrence.
+	 * @param path the path the script publishes to.
+	 * @param source the JavaScript source.
+	 * @param markers the constructs that class blocks.
+	 * @param category the finding code to report.
+	 * @param message the finding message to report.
+	 * @return one finding when the script carries one of the constructs, else none.
+	 */
+	private List<Finding> markerFindings(String path, String source, List<String> markers, String category,
+			String message) {
+		String lower = source.toLowerCase(Locale.ROOT);
+		for (String marker : markers) {
+			if (lower.contains(marker)) {
+				return List.of(new Finding(Severity.CRITICAL, category, message, path + ": " + marker));
+			}
+		}
+		return List.of();
+	}
+
+	/**
+	 * Re-reports the document-level findings against the script file they were found in,
+	 * so a refusal says which of the published files carried it.
+	 * @param path the path the script publishes to.
+	 * @param findings the findings raised over its text.
+	 * @return the same findings with the file named in the evidence.
+	 */
+	private static List<Finding> attributed(String path, List<Finding> findings) {
+		return findings.stream()
+			.map((finding) -> new Finding(finding.severity(), finding.category(), finding.message(),
+					path + ": " + finding.evidence()))
+			.toList();
 	}
 
 	private List<Finding> toolGroupFindings(AgentSpec pack) {

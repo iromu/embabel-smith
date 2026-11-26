@@ -17,7 +17,8 @@ source_paths:
   - "docs/08-builder.md"
   - "docs/09-studio.md"
   - "docs/10-self-improvement.md"
-updated_at: "2026-11-22"
+  - "docs/12-backlog.md"
+updated_at: "2026-11-26"
 ---
 
 # The product phase
@@ -50,15 +51,16 @@ The temporary dependency was removed afterwards; the reactor is green again.
 ## The six modules
 
 `prod/pom.xml` now lists six children. The last two arrived after the numbered phase, which is why
-the original account of "four modules" no longer matches the tree.
+the original account of "four modules" no longer matches the tree. The durable module map is
+[`docs/05-architecture.md`](../../docs/05-architecture.md) — `README.md` no longer carries one.
 
 | Module | What it is | Status |
 | --- | --- | --- |
 | `prod/embabel-smith-specsource` | Spec sources: `folder:` / `git:` URIs, pack discovery, ref pinning, cache, content hash. Shared by runtime (reads) and builder (publishes). | done (change 02) |
 | `prod/embabel-smith-runtime` | The runtime product: `smith run` CLI — ingest packs from a source, run an exported goal, enforce trust tiers, refuse a pack the lifecycle retired at ingest (`RuntimeCore.java:113` — it is not deployed, and a source left empty by that refusal fails), record a JSONL trace. | done (change 03) |
-| `prod/embabel-smith-builder` | The builder product: `smith build` CLI — NL description → two candidates (single pack / multi-agent process), or a `SKILL.md` with `--target skill` → eval → security gate → lifecycle stamp → publish the winner. | done (change 04, extended by the two builder changes) |
+| `prod/embabel-smith-builder` | The builder product: `smith build` CLI — NL description → two candidates (single pack / multi-agent process), or a `SKILL.md` with `--target skill` → eval → security gate → lifecycle stamp → publish the winner. `smith build` also takes `--flow` with four values — `java` (the shipped default), `pack`, `agentic` and `harness` — that differ only in who issues the generation call, three of them the builder's own packs under `src/main/resources/specs/` [`prod/embabel-smith-builder/README.md`](../../prod/embabel-smith-builder/README.md), [[smith-builder]]). | done (change 04, extended by the two builder changes) |
 | `prod/embabel-smith-studio` | The self-improving studio: the self-improvement loop (change 05) exposed as a web product — REST surface + Vue UI + loop scheduling (change 06). | done (change 06) |
-| `prod/embabel-smith-runtime-a2a` | The runtime's A2A surface — five operations over protocol 0.3, from a separate launcher so the plain CLI stays non-web. An A2A run is the same run `smith run` makes. | added later ([[a2a-endpoint]]) |
+| `prod/embabel-smith-a2a-starter` | The A2A surface as a starter library — five operations over protocol 0.3, with beans conditional on `smith.a2a.enabled` and off by default, so depending on it opens no port. `prod/embabel-smith-studio` is its servlet host when a run sets that flag; the plain CLI cannot host it, because the starter depends on the runtime. An A2A run is the same run `smith run` makes. | added later ([[a2a-endpoint]]) |
 | `prod/embabel-smith-skillevaluator` | The Tier 1 skill validator: a static, zero-model check pipeline the builder's `inspect` gate is the only production consumer of. | added later ([[skill-output-target]]) |
 
 See [[spec-sources]], [[smith-runtime]], [[smith-builder]], and [[smith-studio]] for each module's
@@ -104,6 +106,24 @@ paths.
 | `2026-11-14-builder-skill-target` | 2026-11-14 | `--target skill`: a second build output that emits a `SKILL.md` folder gated on with/without-skill lift → the skill build-gate contract ([[skill-output-target]]). |
 | `2026-11-15-builder-process-target` | 2026-11-15 | The **two-candidate build** — one description, a single-agent spec and a multi-agent process, both scored, one recommended ([[two-candidate-build]]). |
 
+The pack flows also moved where the improvement loop's mutable boundary sits. Of the builder's eight
+`.jinja` prompts, five serve generation — `process_to_flow`, `process_to_flow_multi`,
+  `business_process_discovery`,
+`generate_skill`, `generate_evals` — and are the surface an improvement loop rewrites; `generate_skill`
+is now on that mutable side and asks the model to author `scripts/*.js` beside the `SKILL.md`. The other
+three are the scoring instrumentation — `grade_eval` plus the two eval arms `agent_baseline` and
+`agent_with_skill` — and stay off the mutable surface **by placement**: they are classpath resources
+under `src/main/resources/prompts`, while the builder's flow also lives as packs under
+`prod/embabel-smith-builder/src/main/resources/specs/` — classpath resources too now, which is the half
+that moved. The boundary is directory rather than class membership: `prompts/` holds the referee and
+`specs/` the surface an improvement loop rewrites, and each pack-driving generator names its pack as
+`core/BuilderPackPaths.directory(<pack>)` over `smith-common`'s `SpecFolders.classpath` instead of a
+`Path.of` resolved against the working directory. So
+the split is by directory and by kind of surface at once. That
+placement is why `skill/ScorerPromptBoundaryTest` can hold the line at all — a mutation
+confined to pack files has no route to the referee, and what the test still has to catch is someone
+copying the referee's own wording into a step prompt.
+
 **`prod-model-layer` is finished and settled.** It unified the production modules' model layer on
 Embabel's `Ai`, deleting the hand-rolled OpenAI-compatible callers the POC-era code carried into
 `prod/`. The rule is now stated in [`docs/05-architecture.md`](../../docs/05-architecture.md)
@@ -112,18 +132,22 @@ Embabel's `Ai`, deleting the hand-rolled OpenAI-compatible callers the POC-era c
 
 ## What the contract looks like now
 
-The 14 capability specs that existed here at the checkpoint were consolidated into `docs/` and deleted
-on 2026-11-15. Since then, completed changes have been archived with the plain `openspec archive`
-route, which promotes each change's delta into `openspec/specs/` as it archives — so that tree is
-populated again with **nine** specs, none of them carrying an old name:
-`business-process-ingestion`, `live-coverage-record`, `loop-publish-policy`,
-`offline-verification-pipeline`, `published-location`, `runtime-a2a`, `runtime-lifecycle-gate`,
-`skill-build-gate`, `skill-build-inspection`.
+There is no specs tree to read any more. Archiving with plain `openspec archive` regenerates capability
+specs under `openspec/specs/` as it promotes each change's delta into them, so after the 2026-11-15 purge
+the trees had refilled to 140 files — 25 capability specs and 20 archived folders, nothing active — and
+`docs/` absorbed and deleted them a second time on 2026-11-25. At HEAD `openspec/` holds only
+`config.yaml` and two `.gitkeep` placeholders; the check for whether another purge is owed is
+`find openspec/changes openspec/specs -type f | wc -l`, where 3 is clean.
+[`docs/12-backlog.md`](../../docs/12-backlog.md) §Re-creating a planning change owns that account,
+including why the workflow survives the deletion: `make setup` still installs the OpenSpec CLI, so
+starting a change is still valid and the capability specs it would edit are these `docs/` pages.
 
-`docs/` remains the durable reference and the code outranks both where they disagree; the nine specs
-are the promoted requirements of changes that shipped, and they overlap the docs pages rather than
-replacing them. Nine changes are in `openspec/changes/archive/`, all dated 2026-11-21, and eight
-remain open under `openspec/changes/`.
+So the capability names this page used to enumerate are lineage, not paths: they are the promoted
+requirements of changes that shipped, carried now by the `docs/` pages they were folded into, where they
+overlap the reference prose rather than replacing it. `docs/` remains the durable reference and the code
+outranks both where they disagree. Nothing remains open — the four boxes that were still unchecked when
+the trees went are recorded in [`docs/12-backlog.md`](../../docs/12-backlog.md) §Pending right now, and
+none of them is code.
 
 ## How it maps to the POCs
 

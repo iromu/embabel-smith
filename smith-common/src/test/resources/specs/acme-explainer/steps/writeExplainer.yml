@@ -1,0 +1,8 @@
+stepType: action
+name: writeExplainer
+description: "Write the explainer for the topic that was extracted"
+inputTypeNames:
+  - TopicBrief
+outputTypeName: ExplainerText
+prompt: |
+  Write an explainer of {{topicBrief.topic}} for a reader new to the subject.

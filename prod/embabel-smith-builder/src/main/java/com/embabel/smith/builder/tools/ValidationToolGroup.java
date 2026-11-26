@@ -74,14 +74,16 @@ public class ValidationToolGroup {
 	/**
 	 * The group the platform registers under {@link #ROLE}, holding exactly the tool
 	 * {@code eval.BuilderPackTools.validationTool()} authors.
+	 * @param surface what the driver opened for this build; of it this tool uses only the
+	 * memo, which answers an identical repeat of the same call from the first one
 	 * @return the {@code validate} tool group
 	 */
 	@Bean
-	public ToolGroup validateToolGroup() {
+	public ToolGroup validateToolGroup(ToolSurface surface) {
 		ToolGroupDescription description = ToolGroupDescription
 			.create("Validates the agent spec a drafting step is about to return with the builder's own "
 					+ "validator and reports its findings, so the step can re-draft against them.", ROLE);
-		return ToolGroup.Companion.ofTools(metadata(description), List.of(BuilderPackTools.validationTool()));
+		return ToolGroup.Companion.ofTools(metadata(description), List.of(BuilderPackTools.validationTool(surface)));
 	}
 
 	/**

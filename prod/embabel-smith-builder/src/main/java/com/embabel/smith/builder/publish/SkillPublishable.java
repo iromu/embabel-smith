@@ -14,13 +14,17 @@ import com.embabel.smith.builder.lifecycle.LifecycleMetadata;
 import com.embabel.smith.builder.lifecycle.LifecycleStamper;
 import com.embabel.smith.builder.skill.EvalSuite;
 import com.embabel.smith.builder.skill.Skill;
+import com.embabel.smith.builder.skill.SkillScript;
 
 /**
  * The skill writer: an Agent Skill folder as a {@link Publishable}. A skill is a
  * directory named after the skill carrying its required {@code SKILL.md}, the
  * {@code evals.json} suite it was validated against, and the {@code lifecycle.yml}
  * sidecar — the same collision and no-push semantics as a pack, over a different
- * directory shape.
+ * directory shape. When the skill carries scripts they are written into a
+ * {@code scripts/} folder beside those three files; when it carries none the folder is
+ * not created, so an instructions-only skill publishes exactly the tree it always
+ * published.
  *
  * @author Ivan Rodriguez
  */
@@ -54,6 +58,13 @@ public class SkillPublishable implements Publishable {
 	public void writeTo(Path directory) throws IOException {
 		Files.writeString(directory.resolve("SKILL.md"), this.skill.toSkillMd(), StandardCharsets.UTF_8);
 		Files.writeString(directory.resolve("evals.json"), this.evals.toJson(), StandardCharsets.UTF_8);
+		for (SkillScript script : this.skill.scripts()) {
+			// The path is already confined to scripts/<name>.js by SkillScript, so this
+			// resolves inside the published folder whatever the model declared.
+			Path target = directory.resolve(script.path());
+			Files.createDirectories(target.getParent());
+			Files.writeString(target, script.content(), StandardCharsets.UTF_8);
+		}
 		this.stamper.write(directory, this.lifecycle);
 	}
 

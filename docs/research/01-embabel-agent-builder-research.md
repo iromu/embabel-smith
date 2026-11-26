@@ -573,9 +573,9 @@ Two more things the CI is evidence for, both directly reusable here:
   `{ name: thingsByKey, kind: feed, url: https://example.invalid/things.xml }` — an RFC-reserved
   `.invalid` TLD that still validates, which is the concrete proof of the header's "Nothing is
   fetched from any source the realm declares, no secret is needed, and the checkout is mounted
-  read-only" (`:4-6`). Note also the CI-hardening rule at `:56-57`: "Inputs reach the shell as
+  read-only" (`:4-6`). The CI-hardening rule at `:56-57`: "Inputs reach the shell as
   environment, never spliced into the script: a value from a caller's workflow is data." Any
-  builder CI we write should copy that discipline verbatim.
+  builder CI the project writes should copy that discipline verbatim.
 
 **The documents lane, where "no code" is strongest.** `EXTERNAL_DOCUMENTS.md` splits a store by
 *content type*, not by system: **live ops** (volatile operational data — "Ingesting these

@@ -28,7 +28,7 @@ export default defineConfig({
     port: 5173,
     // The dev server proxies API calls to the Spring app so the SPA needs no CORS handling.
     proxy: {
-      '/api': { target: 'http://localhost:18080', changeOrigin: true },
+      '/api': { target: 'http://localhost:8080', changeOrigin: true },
     },
   },
   test: {

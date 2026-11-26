@@ -14,6 +14,7 @@ import com.embabel.agent.api.tool.Tool;
 import com.embabel.agent.core.AgentPlatform;
 import com.embabel.agent.core.ToolGroup;
 import com.embabel.agent.core.ToolGroupDescription;
+import com.embabel.smith.builder.core.BuilderPackPaths;
 import com.embabel.smith.builder.eval.BuilderPackTools;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -53,11 +54,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ValidationToolGroupTest {
 
 	/** The shipped pack's step, whose {@code toolGroups} block this bean makes true. */
-	private static final Path SHIPPED_STEP = Path.of("builder-agent-specs", "builder-spec-one-shot", "steps",
-			"draftAgentSpec.yml");
+	private static final Path SHIPPED_STEP = BuilderPackPaths.directory("builder-spec-one-shot")
+		.resolve("steps")
+		.resolve("draftAgentSpec.yml");
 
 	private static ToolGroup group() {
-		return new ValidationToolGroup().validateToolGroup();
+		return group(new ToolSurface());
+	}
+
+	private static ToolGroup group(ToolSurface surface) {
+		return new ValidationToolGroup().validateToolGroup(surface);
 	}
 
 	@Test
@@ -101,6 +107,34 @@ class ValidationToolGroupTest {
 		assertThat(parameters.get(0).getName()).isEqualTo(BuilderPackTools.SPEC_JSON);
 		assertThat(tool.getDefinition().getInputSchema().toJsonSchema()).contains(BuilderPackTools.SPEC_JSON)
 			.doesNotContain("arg0");
+	}
+
+	/**
+	 * The repeat the backlog names — a step that re-sends an unchanged draft and pays
+	 * twice for the same deterministic check — answered from the first call. Both halves
+	 * of the memo are asserted on their own in {@code BlueprintToolGroupTest}; what this
+	 * case pins is that the validator's body goes through it. The arguments name no spec
+	 * because the answer does not depend on one: what is under test is the routing, and a
+	 * call that parses nothing still has an answer to be repeated.
+	 */
+	@Test
+	void anIdenticalRepeatOfTheValidationCallIsAnsweredFromTheFirstOne() {
+		ToolSurface surface = new ToolSurface();
+		String arguments = "{\"specJson\": \"\"}";
+		Tool tool = group(surface).getTools().get(0);
+
+		String first = text(tool.call(arguments));
+		String repeat = text(tool.call(arguments));
+
+		assertThat(first).as("the first call runs the body")
+			.contains(BuilderPackTools.SPEC_JSON)
+			.doesNotContain("identical to an earlier call");
+		assertThat(repeat).as("the same call with the same arguments, in one run")
+			.startsWith("[identical to an earlier call in this run");
+	}
+
+	private static String text(Tool.Result result) {
+		return ((Tool.Result.Text) result).getContent();
 	}
 
 	/**

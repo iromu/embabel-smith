@@ -9,11 +9,12 @@ source_paths:
   - "smith-common/src/main/java/com/embabel/smith/common/model/ProcessSpecManifest.java"
   - "smith-common/src/main/java/com/embabel/smith/common/io/AgentSpecReader.java"
   - "smith-common/src/main/java/com/embabel/smith/common/io/AgentSpecWriter.java"
+  - "smith-common/src/main/java/com/embabel/smith/common/io/SpecFolders.java"
   - "smith-common/src/main/java/com/embabel/smith/common/io/ProcessSpecReader.java"
   - "smith-common/src/main/java/com/embabel/smith/common/io/ProcessSpecWriter.java"
   - "smith-common/src/main/java/com/embabel/smith/common/validation/ProcessValidator.java"
   - "smith-common/src/main/java/com/embabel/smith/common/samples/SampleAgentSpecs.java"
-updated_at: "2026-11-15"
+updated_at: "2026-11-25"
 ---
 
 # The smith-common data model
@@ -58,6 +59,13 @@ code never sees null collections.
 - **`Yaml.mapper()`** — the single shared `ObjectMapper` (Jackson YAML). Configured to **omit null
   fields on write** and to **tolerate unknown fields on read**, so the reader can also ingest
   richer Embabel-emitted step files that carry extra fields the pure model doesn't retain.
+- **`SpecFolders.classpath(resourcePath)`** — turns a pack that ships as a classpath directory (e.g.
+  `specs/builder-single-spec`) into a listable `Path`, which is what `AgentSpecReader.read(Path)`
+  needs: the class directory itself when classes are exploded, a cached temporary copy when they sit
+  inside a jar. A native image cannot list a classpath directory, so there the lookup falls back to a
+  directory named by `smith.specs.dir` / `SMITH_SPECS_DIR` and then to the `specs/` folder beside the
+  running program — in that order, so a run that can list its own classpath never consults either.
+  `AgentSpecReader.readResource(String)` is the reader's use of it.
 
 ## The process aggregate (`ProcessSpec`)
 

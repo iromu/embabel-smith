@@ -12,7 +12,7 @@ The root POM (`pom.xml`) aggregates two trees by default, and a third behind the
 | --- | --- |
 | `smith-common` | The agent-spec format: data model (`common.model`), YAML I/O (`common.io`), validation (`common.validation`), the endpoint gate (`common.config`), and the sample packs (`common.samples`). Framework-free and fully offline-testable. |
 | `poc/` | 26 numbered proof-of-concept modules. **Frozen evidence** — see below. Not in the default reactor: they build only with `-Ppoc` (`make … POC=1`). |
-| `prod/` | The product: `embabel-smith-specsource`, `embabel-smith-runtime`, `embabel-smith-runtime-a2a`, `embabel-smith-builder`, `embabel-smith-skillevaluator`, `embabel-smith-studio`. |
+| `prod/` | The product: `embabel-smith-specsource`, `embabel-smith-runtime`, `embabel-smith-a2a-starter`, `embabel-smith-builder`, `embabel-smith-skillevaluator`, `embabel-smith-studio`. |
 
 `embabel-smith-skillevaluator` is the **Tier 1 skill validator**: a static pipeline
 (`Tier1Runner`) over a skill or a folder of skills, with one `ValidationResult` per validator —
@@ -33,7 +33,7 @@ carries a line saying so. `--full-inspection` is the only route that requests th
 writing-quality gate; the builder's security gate remains `security/AgentSpecSecurityScanner`.
 
 The POCs sit behind the profile because they are evidence, not shipped code: they are slow to build
-(the POC 17 ONNX bundle, the POC 20 encoder) and their interesting tests are endpoint-gated, so a
+(the POC 17 ONNX bundle, the POC 20 encoder) and their model-dependent tests are endpoint-gated, so a
 default build of the product should not pay for either. The consequence is that `-pl poc/…` needs
 `-Ppoc` — Maven can only select a module that is in the reactor.
 
@@ -41,15 +41,29 @@ default build of the product should not pay for either. The consequence is that 
 builder publishes into it and runs the improvement loop against it, and the studio browses sources and
 drives that loop from it. It holds no Embabel agent code, so it stays offline-testable.
 
-`embabel-smith-runtime-a2a` is the only `prod/` module that gains a network surface **from a
-dependency rather than by asking for one**: it is the only module that declares
-`embabel-agent-starter-a2a`, and that starter is what brings `spring-boot-starter-web` and the servlet
-engine — the studio is the only other `prod/` listener and declares its own web starter, because it is
-the UI. Its launcher sets `spring.main.web-application-type` to `SERVLET` as a system property, as the
-studio's launcher does, because a transitive jar ships a classpath `application.yml` saying `none`. It
-still **holds no model call** — every request delegates to the runtime's `AgentSpecRunService` — so it
-adds a transport, not a second route to the model. What it serves, and what it deliberately does not,
-is in [`07-runtime.md`](07-runtime.md).
+`embabel-smith-a2a-starter` is a starter library and the only `prod/` module that declares
+`embabel-agent-starter-a2a`, so it is the only one that gains `spring-boot-starter-web` and a servlet
+engine *from that dependency*. Its beans are conditional on `smith.a2a.enabled`, which is unset by
+default, so depending on it opens no endpoint and no port. There is no launcher module: the host is
+`embabel-smith-studio`, the repo's only long-lived web application, started with `make run-a2a`, which
+sets the flag. What the deleted launcher used to supply now comes from the starter's
+`SmithA2aEnvironmentPostProcessor`: when, and only when, the flag is `true`, one property source
+contributes `spring.main.web-application-type: servlet` and the `18090` default, added with `addLast`
+— deliberately the lowest precedence — so the host's own config files, `SERVER_PORT` and
+`SPRING_APPLICATION_JSON` all outrank it, and with the flag absent the source contributes nothing. The
+studio declares its own web starter, because it is the UI, and its main still sets the web type as a
+system property, because a transitive jar ships a classpath `application.properties` saying `none`.
+
+**Who can host it.** `embabel-smith-runtime` cannot: the starter's request handler, configuration and
+card skills import `AgentSpecRunService`, `TrustTier`, `TrustTierPolicy` and `JsonlTraceStore` from the
+runtime, so a runtime-to-starter edge is a Maven cycle that `provided` and `optional` scopes do not
+avoid. The CLI could not hold a server either way — `SmithRuntimeApplication` boots non-web, closes the
+context and exits, and has no servlet engine on its classpath. So the surface reaches a process through
+the studio, or through a host that depends on this starter directly: wiring a new host means
+declaring the starter and setting the flag, and nothing else. The surface still **holds no model
+call** — every request delegates to the runtime's `AgentSpecRunService` — so it adds a transport, not
+a second route to the model. What it serves, and what it deliberately does not, is in
+[`07-runtime.md`](07-runtime.md).
 
 ## Extract, do not depend
 
@@ -72,6 +86,15 @@ module and a stale `poc-*` jar resolved from the local repo.
 **POC modules are frozen.** Product work never edits anything under `poc/`. A POC's job was to
 de-risk exactly one claim, in its own module; folding new behavior into one changes its identity and
 makes it unclear which claim it still evidences.
+
+The rule also settles where a *shared* type goes when two product modules need one. When the
+improvement loop moved out of the studio into `builder/improve`, the trace record it reads had to
+follow it — and importing it from the runtime would have made the builder depend on the runtime, so
+the two stopped being siblings and the runtime's fate became the builder's. `TraceRecord` and
+`TraceStore` therefore live in `smith-common` (`common/trace/`) rather than in either of them, and the
+loop's readers import the framework-free type. The same reasoning moved the lifecycle state
+discussion: a second reader of it is the trigger for moving those types down, not for adding an edge
+between the modules that read it.
 
 ## Testing discipline: the gating taxonomy
 
@@ -111,9 +134,9 @@ happens to be first in the list.
 
 The guard is two offline tests that walk the source tree and fail on a forbidden import
 (`import java.net.http.`): `builder/NoDirectModelRequestTest` and `studio/NoDirectModelRequestTest`.
-They cover the two modules that talk to a model; `runtime`, `runtime-a2a`, `specsource` and
+They cover the two modules that talk to a model; `runtime`, `a2a-starter`, `specsource` and
 `skillevaluator` carry no guard because they hold no model call — the runtime reaches the model only
-by executing actions on the platform, and `runtime-a2a` reaches the runtime.
+by executing actions on the platform, and `a2a-starter` reaches the runtime.
 Because checkstyle and tests run in the normal build, a violation fails `make test` with no endpoint
 needed.
 
@@ -132,6 +155,17 @@ Two behaviour changes came with the migration, both deliberate:
 `ModelEndpointConfig` (in `smith-common`) survives as the **endpoint gate** controllers consult
 (`configError()` → `MODEL_NOT_CONFIGURED`) and as the env bridge the POC launchers read. It is not
 the product's source of model names.
+
+Which provider a run uses is decided once, by `ModelEndpointConfig.detect`, in a fixed first-match
+order: any one of `OPENAI_CUSTOM_BASE_URL` / `_API_KEY` / `_MODELS` present selects the
+OpenAI-compatible endpoint; otherwise `OPENAI_API_KEY` selects the bundled OpenAI catalog; otherwise
+`ANTHROPIC_API_KEY` selects the bundled Anthropic catalog; otherwise the provider is `NONE` and every
+model-backed call is refused before it reaches a client. The two catalog providers take their
+endpoint from Embabel's own defaults, and their base URL is overridable by `OPENAI_BASE_URL` /
+`ANTHROPIC_BASE_URL` — the full env-and-property table is
+[`prod/embabel-smith-studio/README.md`](../prod/embabel-smith-studio/README.md). `EMBABEL_MODELS_DEFAULT_LLM`
+names the model whichever way the provider was chosen, and `configError()` lists only the variables
+that provider still lacks. The POC launchers read the same bridge but are OpenAI-compatible only.
 
 ## Cross-cutting invariants
 
@@ -204,15 +238,25 @@ condition says "can it run here". An opted-in run on a laptop with no endpoint i
 not a wall of failures. Removing the env condition is what turns that into failures; removing the tag
 is what makes `make test` depend on a model agreeing.
 
-The live tests are the builder's `LiveBuildIntegrationTest` and `LiveExampleBuildTest`, the runtime's
-`LiveRunIntegrationTest`, the a2a launcher's `SmithA2aLiveTest`, and the studio's
-`improve/RestIntegrationTest` and `improve/LiveLoopIntegrationTest` — and that is the whole list.
-**It is deliberately stated without a
-count**: a fifth joined it when the a2a launcher landed, and a page that says "exactly these four"
-silently becomes false the moment someone adds a test, which is what happened here. Check the list
-against the tree rather than against this page:
-`grep -rln '@Tag("live")' prod/*/src/test` prints the files named above, and when the two disagree the
-grep is right. The builder's example suites are *not* in it; they were removed on 2026-11-17, and
+The live tests are the builder's `LiveBuildIntegrationTest`, `LiveExampleBuildTest`,
+`eval/DeployedBuilderPackCallsValidatePackTest` and one method of `eval/ToolGroupBindingTest`, the
+runtime's `LiveRunIntegrationTest`, the a2a starter's `SmithA2aLiveTest`, and the studio's
+`improve/RestIntegrationTest`, `improve/LiveLoopIntegrationTest` and
+`storage/PacksKeyMigrationPostgresTest`. **The list is deliberately open rather than numbered**: a
+fifth test joined it when the A2A surface landed and three more arrived with the builder's pack and
+tool-group work and the studio's key migration, and a page that says "exactly these four" silently
+becomes false the moment someone adds a test — which is what happened here twice. Check it against the
+tree rather than against this page:
+
+```bash
+grep -rn '@Tag("live")' prod/*/src/test | grep -v '\*'
+```
+
+That prints one line per real annotation, and when it disagrees with the paragraph above, the grep is
+right. The `grep -v` is not decoration: two builder tests (`tools/ExposedToolGroupsTest`,
+`tools/ValidationToolGroupTest`) carry the tag's *name* in a comment explaining why they deliberately
+do not carry the tag, so the plain `grep -rln` counts two tests that never run live. The builder's
+example suites are *not* in it; they were removed on 2026-11-17, and
 building against a live model is now a set of hand-started scripts under `examples/` that
 `make test-live` does not run (see [`08-builder.md`](08-builder.md)).
 
@@ -252,7 +296,8 @@ The pre-commit hook installed by `make setup` runs `make lint`; a clone without 
 ## Ports
 
 Port 8080 is held by an unrelated local service, so the POCs and the studio take explicit ports:
-18080 for POC 13's MCP server, 18081 for POC 19's llama.cpp container, 18090 for the A2A endpoint
-(`make run-a2a`, overridden with `SERVER_PORT`), and `SERVER_PORT` for anything else. POC 16's
+18080 for POC 13's MCP server, 18081 for POC 19's llama.cpp container, 18090 for the A2A surface —
+which `make run-a2a` serves from the studio by passing `SERVER_PORT`, because the studio's own
+default is 8080 — and `SERVER_PORT` for anything else. POC 16's
 sidecar also defaults to 18090, so running that launcher and the A2A endpoint at the same time needs
 one of the two moved.

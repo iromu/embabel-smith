@@ -34,14 +34,13 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
- * Falsifier for design decision D9 of
- * {@code openspec/changes/poc27-improves-builder-agentspecs/design.md}: that a pack
- * step's {@code toolGroups} declaration <em>reaches execution</em>. The design's stated
- * evidence is that {@code StepSpecAgentScopeBuilder} and
+ * Falsifier for the claim in {@code docs/08-builder.md} (§Who issues the generation call)
+ * that a pack step's {@code toolGroups} declaration <em>reaches execution</em>. The
+ * claim's stated evidence is that {@code StepSpecAgentScopeBuilder} and
  * {@code support.PromptedActionSpecAction} reference tool groups inside
  * {@code embabel-agent-spec-1.5.4-20261112.000934-68.jar} — a reference, not a behaviour
- * — and its Risks section asks for "a test that a step declaring a group can use it and a
- * step declaring none cannot".
+ * — and the risk it records asks for "a test that a step declaring a group can use it and
+ * a step declaring none cannot".
  *
  * <p>
  * <b>What this establishes offline.</b> A declared group becomes a

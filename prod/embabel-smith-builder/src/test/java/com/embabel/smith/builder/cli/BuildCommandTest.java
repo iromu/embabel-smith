@@ -14,6 +14,8 @@ import com.embabel.smith.builder.core.BuildTarget;
 import com.embabel.smith.builder.core.EmbabelAgentSpecGenerator;
 import com.embabel.smith.builder.core.GenerationTechnique;
 import com.embabel.smith.builder.core.SingleShotAgentSpecGenerator;
+import com.embabel.smith.builder.eval.AgenticAgentSpecGenerator;
+import com.embabel.smith.builder.eval.HarnessAgentSpecGenerator;
 import com.embabel.smith.builder.eval.PackDrivenAgentSpecGenerator;
 import com.embabel.smith.builder.lifecycle.LifecycleStamper;
 import com.embabel.smith.builder.publish.PublishResult;
@@ -21,6 +23,7 @@ import com.embabel.smith.builder.publish.PublishTarget;
 import com.embabel.smith.builder.skill.Benchmark;
 import com.embabel.smith.builder.skill.SkillBuildResult;
 import com.embabel.smith.builder.skill.SkillBuilderService;
+import com.embabel.smith.builder.tools.ToolSurface;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import picocli.CommandLine;
@@ -123,6 +126,22 @@ class BuildCommandTest {
 			.doesNotContainKey(GenerationTechnique.EMBABEL);
 	}
 
+	/**
+	 * The third flow, whose generator is a different kind of thing: it does not only run
+	 * the pack, it checks what came back and re-asks. Nothing is wired for the Embabel
+	 * technique, so there is no Java generator left for a failed agentic flow to fall
+	 * back to — the same rule {@code --flow pack} follows.
+	 */
+	@Test
+	void theAgenticFlowWiresTheAgenticPackAlone() {
+		Map<GenerationTechnique, AgentSpecGenerator> generators = generatorsFor("--flow", "agentic");
+
+		assertThat(generators).hasSize(1);
+		assertThat(generators.get(GenerationTechnique.SINGLE_SHOT)).isInstanceOf(AgenticAgentSpecGenerator.class);
+		assertThat(generators).as("nothing to fall back to on the Java flow")
+			.doesNotContainKey(GenerationTechnique.EMBABEL);
+	}
+
 	@Test
 	void anUnknownFlowIsAUsageError(@TempDir Path out) {
 		AtomicReference<BuildOptions> seen = new AtomicReference<>();
@@ -163,6 +182,148 @@ class BuildCommandTest {
 	}
 
 	/**
+	 * The same rule as the pack flow, one flow later: {@code --flow agentic} has a pack
+	 * too, and it is not a pack for the Embabel NL compiler. The message names the pack
+	 * that flow runs, so the refusal is about the combination and not about the flag in
+	 * general.
+	 */
+	@Test
+	void askingForTheAgenticFlowWithTheEmbabelTechniqueRefusesWithoutBuilding(@TempDir Path out) {
+		AtomicReference<BuildOptions> seen = new AtomicReference<>();
+		PrintStream err = System.err;
+		ByteArrayOutputStream captured = new ByteArrayOutputStream();
+		System.setErr(new PrintStream(captured, true, StandardCharsets.UTF_8));
+		int exit;
+		try {
+			exit = new CommandLine(new RecordingBuildCommand(seen)).execute("a description", "--out", "folder:" + out,
+					"--flow", "agentic", "--technique", "embabel");
+		}
+		finally {
+			System.setErr(err);
+		}
+
+		assertThat(exit).isEqualTo(1);
+		assertThat(seen.get()).as("the build was never entered").isNull();
+		assertThat(captured.toString(StandardCharsets.UTF_8)).contains("Refusing")
+			.contains("--flow agentic")
+			.contains("builder-agentic-blueprint");
+	}
+
+	/**
+	 * The fourth flow, and the same rule as the two before it: {@code --flow harness} has
+	 * a pack of its own ({@code builder-harness}), it wires nothing for the Embabel
+	 * technique, and there is no Java generator left in the build for it to fall back to.
+	 */
+	@Test
+	void theHarnessFlowWiresTheHarnessPackAlone() {
+		Map<GenerationTechnique, AgentSpecGenerator> generators = generatorsFor("--flow", "harness");
+
+		assertThat(generators).hasSize(1);
+		assertThat(generators.get(GenerationTechnique.SINGLE_SHOT)).isInstanceOf(HarnessAgentSpecGenerator.class);
+		assertThat(generators).as("nothing to fall back to on the Java flow")
+			.doesNotContainKey(GenerationTechnique.EMBABEL);
+	}
+
+	/**
+	 * The same rule as the pack and agentic flows: {@code --flow harness} has a pack, and
+	 * it is not a pack for the Embabel NL compiler. The refusal names the pack the flow
+	 * runs, so it reads as a refusal of the combination rather than of the flag.
+	 */
+	@Test
+	void askingForTheHarnessFlowWithTheEmbabelTechniqueRefusesWithoutBuilding(@TempDir Path out) {
+		AtomicReference<BuildOptions> seen = new AtomicReference<>();
+		PrintStream err = System.err;
+		ByteArrayOutputStream captured = new ByteArrayOutputStream();
+		System.setErr(new PrintStream(captured, true, StandardCharsets.UTF_8));
+		int exit;
+		try {
+			exit = new CommandLine(new RecordingBuildCommand(seen)).execute("a description", "--out", "folder:" + out,
+					"--flow", "harness", "--technique", "embabel");
+		}
+		finally {
+			System.setErr(err);
+		}
+
+		assertThat(exit).isEqualTo(1);
+		assertThat(seen.get()).as("the build was never entered, so no call was spent").isNull();
+		assertThat(captured.toString(StandardCharsets.UTF_8)).contains("Refusing")
+			.contains("--flow harness")
+			.contains("builder-harness");
+	}
+
+	/**
+	 * What the harness flow hands its pack's tools: the documents from {@code --docs},
+	 * which is the whole of a step's reach, and a memo window that began with this build.
+	 * The second half matters because the harness steps re-read documents across three of
+	 * them and across the driver's re-invocations — a window left over from an earlier
+	 * build in the same process would answer a reading loop out of files that build had
+	 * opened.
+	 */
+	@Test
+	void theHarnessFlowOpensItsDocumentRootsAndStartsAFreshToolWindow(@TempDir Path docs) {
+		ToolSurface surface = new ToolSurface();
+		// Left over from a build this process ran before this one.
+		surface.remembered("list_docs", "{}", () -> "the documents of the previous build");
+		surface.openedTo(List.of(Path.of("/tmp/a-build-that-has-come-and-gone")));
+
+		BuildCommand command = new BuildCommand(null, null, surface);
+		new CommandLine(command).parseArgs("--out", "folder:/tmp/unused-by-this-test", "--docs", docs.toString(),
+				"--flow", "harness");
+		command.generators(null);
+
+		assertThat(surface.blueprintRoots()).as("the roots the command line opened, and only those")
+			.containsExactly(docs);
+		assertThat(surface.remembered("list_docs", "{}", () -> "the documents of this build"))
+			.as("the window was cleared when the harness flow wired its generator")
+			.isEqualTo("the documents of this build");
+	}
+
+	/**
+	 * The report names the flow that ran, so a parity or cost run is attributable from
+	 * its output rather than from how it was launched. The build service is substituted,
+	 * which is the point: the flow line is the driver's stamp on the result it got back,
+	 * not something the pipeline could have known.
+	 */
+	@Test
+	void theBuildReportNamesTheFlowThatRan(@TempDir Path out) {
+		PrintStream outStream = System.out;
+		ByteArrayOutputStream captured = new ByteArrayOutputStream();
+		System.setOut(new PrintStream(captured, true, StandardCharsets.UTF_8));
+		int exit;
+		try {
+			exit = new CommandLine(new RecordingBuildCommand(new AtomicReference<>())).execute("a description", "--out",
+					"folder:" + out, "--flow", "harness");
+		}
+		finally {
+			System.setOut(outStream);
+		}
+
+		assertThat(exit).isZero();
+		assertThat(captured.toString(StandardCharsets.UTF_8)).contains("BUILD OK: sample")
+			.contains("flow:        harness");
+	}
+
+	/**
+	 * The default flow prints itself too — the report line is not a flag advertisement
+	 * that only appears when someone asks for something unusual.
+	 */
+	@Test
+	void theDefaultFlowNamesItselfInTheReport(@TempDir Path out) {
+		PrintStream outStream = System.out;
+		ByteArrayOutputStream captured = new ByteArrayOutputStream();
+		System.setOut(new PrintStream(captured, true, StandardCharsets.UTF_8));
+		try {
+			new CommandLine(new RecordingBuildCommand(new AtomicReference<>())).execute("a description", "--out",
+					"folder:" + out);
+		}
+		finally {
+			System.setOut(outStream);
+		}
+
+		assertThat(captured.toString(StandardCharsets.UTF_8)).contains("flow:        java");
+	}
+
+	/**
 	 * The command after parsing its arguments, asking which generators {@code --flow}
 	 * wired. This is the one place the flag branches, so it is examined directly rather
 	 * than through the substituted service.
@@ -170,7 +331,7 @@ class BuildCommandTest {
 	 * @return the generator map the parsed command would build its agent with
 	 */
 	private static Map<GenerationTechnique, AgentSpecGenerator> generatorsFor(String... extra) {
-		BuildCommand command = new BuildCommand(null, null);
+		BuildCommand command = new BuildCommand(null, null, new ToolSurface());
 		List<String> args = new ArrayList<>(List.of("a description", "--out", "folder:/tmp/unused-by-this-test"));
 		args.addAll(Arrays.asList(extra));
 		new CommandLine(command).parseArgs(args.toArray(new String[0]));
@@ -462,7 +623,7 @@ class BuildCommandTest {
 		}
 
 		RecordingBuildCommand(AtomicReference<BuildOptions> seen, AtomicReference<BuildOptions> skillSeen) {
-			super(null, null);
+			super(null, null, new ToolSurface());
 			this.seen = seen;
 			this.skillSeen = skillSeen;
 		}

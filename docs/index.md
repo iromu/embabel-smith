@@ -1,7 +1,7 @@
 # Embabel Smith — Documentation
 
 Documents that research, ground, synthesize, and report a GOAP-based agent builder on the Embabel
-platform (v1.5.4). Pages 01–04 are the design history and the POC record; 05–12 and the unnumbered
+platform (v1.5.4). Pages 01–04 are the design history and the POC record; 05–13 and the unnumbered
 pages are the current reference, and each claim in them is checkable against the tree. Where a
 history page and a reference page disagree, the reference page and the code win.
 
@@ -27,6 +27,9 @@ history page and a reference page disagree, the reference page and the code win.
   for POCs 17, 19 and 23, and the caveats that must travel with any number taken from them.
 - [12 — Backlog](12-backlog.md) — every known open or deliberately-accepted gap, with the reason and
   the check that confirms it is still open.
+- [13 — JavaScript for skill scripts](13-skill-script-javascript.md) — the surface a generated skill's
+  `scripts/*.js` is given, the portability subset that runs unchanged under both the in-JVM GraalJS
+  engine and `node`, and the idioms that stay on it.
 
 ## Research and design
 
@@ -52,7 +55,12 @@ history page and a reference page disagree, the reference page and the code win.
 
 ## Where knowledge lives
 
-Three layers, deliberately not merged. `README.md` is the introduction and run book. These pages are
-the durable reference. [`.wiki/index.md`](../.wiki/index.md) is the orientation map with 44 pages of
-cross-links, published to GitHub Pages. The `poc/poc-N-*/README.md` files are per-claim evidence and
-are frozen.
+Three layers, deliberately not merged. `README.md` is the short introduction and overview; the run
+commands live in these pages — [`05-architecture.md`](05-architecture.md) for the build and test entry
+points and [`04-poc-run-results.md`](04-poc-run-results.md) §8 for re-running a POC. These pages are
+the durable reference. [`.wiki/index.md`](../.wiki/index.md) is the orientation map with 46 pages of
+cross-links (47 markdown files under `.wiki/` — the index is the one file no link names), published to
+GitHub Pages. The `poc/poc-N-*/README.md` files are per-claim evidence and
+are frozen. No planning tree is part of that stack: the OpenSpec specs and change folders were folded
+into these pages and purged, and `12-backlog.md` §Re-creating a planning change says what remains and
+how to tell whether another purge is owed.

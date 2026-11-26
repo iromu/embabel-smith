@@ -52,8 +52,21 @@ checkstyle-module: ## Project SpringChecks on one module (MODULE=poc/poc-1-no-co
 module: ## Run a goal on one module + upstream deps (MODULE=... GOAL=compile|test|install)
 	$(MVN) $(POC_FLAG) $(GOAL) -pl $(MODULE) -am -DskipTests
 
-run-a2a: ## Launch the A2A development server (SERVER_PORT=, SMITH_A2A_SOURCE=, SMITH_A2A_TRUST_TIER=)
-	$(MVN) -q -pl prod/embabel-smith-runtime-a2a spring-boot:run
+# There is no A2A launcher any more: the surface is the embabel-smith-a2a-starter library, and
+# the process that hosts it is the studio — the repo's only long-lived web application (the
+# runtime's main runs the `smith` CLI, closes the context and exits, and it cannot declare the
+# starter anyway because the starter depends on the runtime). SMITH_A2A_ENABLED is the
+# relaxed-binding spelling of smith.a2a.enabled, so the flag needs no -D. SERVER_PORT defaults
+# to the surface's 18090 because the studio's own application.yml says 8080, and 8080 belongs
+# to an unrelated long-running service on this machine. The install line is what makes the
+# renamed starter resolvable to a single-module spring-boot:run; spring-boot:run cannot be given
+# -am because Maven would then run the goal on the aggregator and every library too.
+# SPRING_PROFILES_ACTIVE names a profile with no config file, so the studio's default `local`
+# profile — and the Docker Postgres whose compose path is repo-root relative, so unresolvable
+# from a module-directory run — stays out of a surface that needs no database.
+run-a2a: ## Serve the A2A surface from the studio (SERVER_PORT=, SMITH_A2A_SOURCE=, SMITH_A2A_TRUST_TIER=)
+	$(MVN) -q install -DskipTests -Dskip.npm=true -pl prod/embabel-smith-a2a-starter -am
+	SPRING_PROFILES_ACTIVE=a2a SMITH_A2A_ENABLED=true SERVER_PORT=$(if $(SERVER_PORT),$(SERVER_PORT),18090) $(MVN) -q -pl prod/embabel-smith-studio spring-boot:run
 
 # Needs a GraalVM JDK with native-image on PATH — scripts/native.sh selects one with sdkman.
 native: ## Build the builder's native `smith` binary (GraalVM JDK + native-image required)

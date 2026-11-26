@@ -6,7 +6,7 @@ page records the contracts, the shared methodology, and the design reasoning, so
 restated (and cannot drift) in two places.
 
 These are **POC-only**: no module here is a dependency of `prod/`, and the studio's `/scale` route is
-still an explicit POC-only stub. One exception is worth naming, because it is this page's own finding
+still an explicit POC-only stub. One exception is this page's own finding
 being acted on rather than a second POC: the *mechanism* these POCs were measured against — POC 8's
 index-entry shape and POC 12's lexical scorer, plus POC 18's lifecycle curation rule — was **copied**
 into the builder's `retrieval/` package and is wired behind the studio's `/retrieve` pane. Copied, not

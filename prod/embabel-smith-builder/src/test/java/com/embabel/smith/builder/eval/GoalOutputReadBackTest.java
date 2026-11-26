@@ -17,6 +17,7 @@ import com.embabel.agent.core.AgentScope;
 import com.embabel.agent.core.DataDictionary;
 import com.embabel.agent.core.ProcessOptions;
 import com.embabel.agent.spec.model.BackgroundMessage;
+import com.embabel.smith.builder.core.BuilderPackPaths;
 import com.embabel.smith.common.io.AgentSpecReader;
 import com.embabel.smith.common.model.AgentSpec;
 import org.junit.jupiter.api.Test;
@@ -55,15 +56,19 @@ import static org.mockito.Mockito.when;
  * runAgentFrom} answering a completed process whose {@code lastResult()} is whatever this
  * test is asking about. Everything between the pack directory and that call — the reader,
  * the writer, the assembler, the type mapper, the scope builder — runs unmocked, and the
- * pack is the shipped one on disk, so the test is about the goal boundary of the flow
- * {@code --flow pack} actually runs. No model is called: the answer is supplied.
+ * pack is the shipped one, read from this module's {@code specs/} resources the way the
+ * flow reads it, so the test is about the goal boundary of the flow {@code --flow pack}
+ * actually runs. No model is called: the answer is supplied.
  *
  * @author Ivan Rodriguez
  */
 class GoalOutputReadBackTest {
 
-	/** The pack {@code --flow pack} deploys, read from disk as the shipped contract. */
-	private static final Path PACK_DIR = Path.of("builder-agent-specs", "builder-spec-one-shot");
+	/**
+	 * The pack {@code --flow pack} deploys, read from the classpath as the shipped
+	 * contract.
+	 */
+	private static final Path PACK_DIR = BuilderPackPaths.directory("builder-spec-one-shot");
 
 	/** The spec text the value type's single {@code string} property carries. */
 	private static final String SPEC_TEXT = """

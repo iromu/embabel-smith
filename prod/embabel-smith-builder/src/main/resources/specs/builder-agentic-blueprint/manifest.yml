@@ -1,0 +1,4 @@
+name: builder-agentic-blueprint
+version: 1.0.0
+defaultPlanner: GOAP
+defaultModel: null

@@ -43,6 +43,14 @@
             <groupId>com.embabel.agent</groupId>
             <artifactId>embabel-agent-starter-anthropic</artifactId>
         </dependency>
+        <!-- embabel-agent-starter-a2a is deliberately absent from this pom: it belongs to
+             embabel-smith-a2a-starter alone, and it brings spring-boot-starter-web plus an
+             auto-configuration that registers /a2a on any servlet app that sees it — which
+             includes embabel-smith-studio, a consumer of this module. This module cannot
+             declare the a2a starter itself either: the starter depends on this module, so
+             that edge would be a Maven cycle. The surface reaches a process through the
+             studio, or through a host that depends on the starter directly, where the A2A
+             starter stays one hop away and inert until smith.a2a.enabled is set. -->
         <dependency>
             <groupId>com.embabel.agent</groupId>
             <artifactId>embabel-agent-spec</artifactId>

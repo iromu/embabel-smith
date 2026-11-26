@@ -5,21 +5,27 @@
 
 package com.embabel.smith.builder.skill;
 
+import com.embabel.agent.skills.support.DefaultDirectorySkillDefinitionLoader;
+import com.embabel.agent.skills.support.LoadedSkill;
+import com.embabel.agent.skills.support.SkillLoadException;
 import com.embabel.smith.builder.BuildOptions;
 import com.embabel.smith.builder.core.BuildTarget;
 import com.embabel.smith.builder.core.GenerationTechnique;
 import com.embabel.smith.builder.core.PackName;
 import com.embabel.smith.builder.core.SpecPromptCaller;
 import com.embabel.smith.builder.publish.PublishTarget;
+import com.embabel.smith.builder.security.Finding;
 import com.embabel.smith.builder.security.ScanVerdict;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Offline tests for the skill build (tasks 3.1 and 4.2): with the model substituted by a
@@ -156,11 +162,11 @@ class SkillBuilderServiceTest {
 		assertThat(report).contains("lifecycle:   INCUBATING").contains("baseline 1.000");
 		assertThat(report).contains("published:   " + library.resolve(PackName.slug(DESCRIPTION)));
 		// The inspection section is on the built report too: the score it gave, the
-		// drafts
-		// it took, and — always, not only when something came back incomplete — the
-		// checks
-		// a default build did not run. A reader must not infer that the absence of a
-		// complaint means a secret scan happened.
+		// drafts it took, and
+		// — always, not only when something came back incomplete — the checks a default
+		// build did not
+		// run. A reader must not infer that the absence of a complaint means a secret
+		// scan happened.
 		assertThat(report).contains("inspect:     7 checks run, quality ").contains("1 draft");
 		assertThat(report).contains("not scanned: security, secrets, code-integrity")
 			.contains("pass --full-inspection to request them");
@@ -445,6 +451,186 @@ class SkillBuilderServiceTest {
 	private static BuildOptions options(boolean overwrite, double minLift) {
 		return new BuildOptions(BuildOptions.DEFAULT_MAX_REFINE, BuildOptions.DEFAULT_SCORE_GATE, overwrite, false,
 				GenerationTechnique.SINGLE_SHOT, BuildTarget.SKILL, minLift);
+	}
+
+	// ---- the scripts a generated skill can carry (task 2.3) ----
+
+	@Test
+	void aScriptThatFailsTheScanIsRefusedAtPublishAndTheRefusalNamesTheFinding(@TempDir Path library) {
+		String reachingForTheHost = "const fs = require('node:fs');\n"
+				+ "console.log(fs.readFileSync('/etc/passwd', 'utf8'));\n";
+
+		SkillBuildResult result = build(library, skillJsonWithScript(benignBody(), reachingForTheHost), true, false,
+				BuildOptions.DEFAULT_MIN_LIFT);
+
+		assertThat(result.isBuilt()).as(() -> result.report()).isFalse();
+		assertThat(result.stage()).isEqualTo("security");
+		assertThat(result.published()).isNull();
+		assertThat(result.scan().findingsIn(Finding.CAT_SCRIPT_HOST_ACCESS)).isNotEmpty();
+		// The refusal is a finding with a code, and it names the file it came from — not
+		// a warning line
+		// saying the skill looked odd.
+		assertThat(result.issues())
+			.anyMatch((issue) -> issue.contains("SCRIPT_HOST_ACCESS") && issue.contains("scripts/score-draft.js"));
+		assertThat(library).isEmptyDirectory();
+	}
+
+	@Test
+	void aCleanScriptPublishesWithTheScanReportUnchangedInShape(@TempDir Path library) throws Exception {
+		SkillBuildResult result = build(library, skillJsonWithScript(benignBody(), CLEAN_SCRIPT), true, false,
+				BuildOptions.DEFAULT_MIN_LIFT);
+
+		assertThat(result.isBuilt()).as(() -> result.report()).isTrue();
+		Path skillDir = library.resolve(PackName.slug(DESCRIPTION));
+		assertThat(skillDir.resolve("SKILL.md")).isRegularFile();
+		assertThat(skillDir.resolve("evals.json")).isRegularFile();
+		assertThat(skillDir.resolve("lifecycle.yml")).isRegularFile();
+		assertThat(skillDir.resolve("scripts/score-draft.js")).isRegularFile();
+		// The source as written, modulo the generator's one normalization: a script file
+		// ends with
+		// exactly one newline, whatever the model put at the end of it.
+		assertThat(Files.readString(skillDir.resolve("scripts/score-draft.js"))).isEqualTo(CLEAN_SCRIPT);
+
+		// The verdict a scriptless build prints is the verdict this one prints — the
+		// script
+		// was read and found clean — but the tier is not the same, because this skill
+		// publishes
+		// code its reader runs. See AgentSpecSecurityScannerTest's tier pair for the rule
+		// and
+		// its scriptless control.
+		assertThat(result.report()).contains("security:    SAFE");
+		assertThat(result.scan().summary()).isEqualTo("SAFE (0 critical, 0 warning) at T3_PARTNER");
+	}
+
+	/**
+	 * The generation answer for a skill that also writes one script, with the source
+	 * JSON-escaped so the scripted caller returns what a model would have returned.
+	 */
+	private static String skillJsonWithScript(String body, String scriptSource) {
+		String json = skillJson(body);
+		String escaped = scriptSource.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n");
+		return json.substring(0, json.length() - 1) + ", \"scripts\": [{\"path\": \"scripts/score-draft.js\","
+				+ " \"content\": \"" + escaped + "\"}]}";
+	}
+
+	private static final String CLEAN_SCRIPT = "const draft = stdin.trim();\n" + "if (!draft) {\n"
+			+ "  console.error('no draft on stdin');\n" + "  process.exit(2);\n" + "}\n"
+			+ "console.log('scored ' + draft.length + ' characters of draft');\n";
+
+	// ---- a body that claims a file the folder does not carry ----
+
+	@Test
+	void aBodyNamingAScriptTheSkillDoesNotCarryIsRefusedAndTheRefusalNamesTheFile(@TempDir Path library) {
+		String pointingAtNothing = benignBody()
+				+ "\\n## Scripts\\nRun scripts/check-temperature.js and quote what it printed, verbatim.\\n";
+
+		// The scripts array is empty: the model wrote the instruction and no file — which
+		// is also what a
+		// blank-content script reduces to, since the generator drops those.
+		SkillBuildResult result = build(library, skillJson(pointingAtNothing), true, false,
+				BuildOptions.DEFAULT_MIN_LIFT);
+
+		assertThat(result.isBuilt()).as(() -> result.report()).isFalse();
+		assertThat(result.stage()).isEqualTo("references");
+		assertThat(result.published()).isNull();
+		// Named, not warned about: the refusal says which file, and what a reader would
+		// have done with it — the whole skill, not just the missing script.
+		assertThat(result.issues())
+			.anyMatch((issue) -> issue.contains("scripts/check-temperature.js") && issue.contains("refuses the whole"));
+		assertThat(library).isEmptyDirectory();
+	}
+
+	@Test
+	void aBodyLinkingAFileTheBuilderNeverPublishesIsRefusedInTheSameWay(@TempDir Path library) {
+		// The rule is the reader's and not a scripts-only special case: a markdown link
+		// to a local file
+		// is a claim, and the builder writes no assets/, so the folder cannot honour this
+		// one either.
+		String linkingAnAsset = benignBody() + "\\n## Forms\\n[The receipt form](assets/receipt.pdf) is the record.\\n";
+
+		SkillBuildResult result = build(library, skillJson(linkingAnAsset), true, false, BuildOptions.DEFAULT_MIN_LIFT);
+
+		assertThat(result.isBuilt()).as(() -> result.report()).isFalse();
+		assertThat(result.stage()).isEqualTo("references");
+		assertThat(result.issues()).anyMatch((issue) -> issue.contains("assets/receipt.pdf"));
+		assertThat(library).isEmptyDirectory();
+	}
+
+	@Test
+	void aBodyThatNamesNoFileAtAllStillPublishes(@TempDir Path library) {
+		// The control, and the ordinary case: an instructions-only skill says nothing
+		// about files, so it
+		// has no dangling reference to be refused for. Without it the two refusals above
+		// could be any
+		// rule that happens to stop a build at this point.
+		SkillBuildResult result = build(library, skillJson(benignBody()), true, false, BuildOptions.DEFAULT_MIN_LIFT);
+
+		assertThat(result.isBuilt()).as(() -> result.report()).isTrue();
+		Path skillDir = library.resolve(PackName.slug(DESCRIPTION));
+		assertThat(skillDir.resolve("SKILL.md")).isRegularFile();
+		assertThat(skillDir.resolve("scripts")).doesNotExist();
+	}
+
+	/**
+	 * The premise every refusal above rests on, measured instead of read from upstream
+	 * source: the loader a reader actually uses — Embabel's
+	 * {@link DefaultDirectorySkillDefinitionLoader}, file validation on by default —
+	 * drops an <em>entire</em> skill whose body names a file its folder does not carry.
+	 * It needs no model call and no production class, because the rule being mirrored is
+	 * the framework's, and the day upstream flips {@code validateFileReferences} or
+	 * changes what counts as a reference, this is the test that notices. That is its
+	 * value stated exactly: the builder's publish-time refusal shares this loader's own
+	 * extractor — {@code InstructionFileReferenceExtractor} — and refuses on the
+	 * condition the loader's default enforces, so what is pinned here is that default and
+	 * the extractor's notion of a file reference, not the wording of either refusal.
+	 */
+	@Test
+	void theRealReaderLoaderDropsTheWholeSkillForADanglingReference(@TempDir Path skills) throws Exception {
+		writeSkillFolder(skills.resolve("dangling"), new Skill("dangling", "Reads a carrier's temperature record.",
+				"Run scripts/check-temperature.js and quote what it printed."));
+		// The control: the same kind of claim, honoured by the folder, still loads.
+		// Without
+		// it the absence below would only prove the loader read neither folder.
+		writeSkillFolder(skills.resolve("honoured"),
+				new Skill("honoured", "Scores a draft for review.",
+						"Run scripts/score-draft.js and quote what it printed.",
+						List.of(new SkillScript("scripts/score-draft.js", CLEAN_SCRIPT))));
+
+		DefaultDirectorySkillDefinitionLoader reader = new DefaultDirectorySkillDefinitionLoader();
+		List<String> loaded = reader.loadAll(skills).stream().map(LoadedSkill::getName).toList();
+		assertThat(loaded).containsExactly("honoured");
+		// And asking for the one skill by path stays strict rather than silent, naming
+		// the
+		// file — which is what the builder's own refusal says too.
+		assertThatThrownBy(() -> reader.load(skills.resolve("dangling"))).isInstanceOf(SkillLoadException.class)
+			.hasMessageContaining("scripts/check-temperature.js");
+	}
+
+	private static void writeSkillFolder(Path dir, Skill skill) throws Exception {
+		Files.createDirectories(dir);
+		Files.writeString(dir.resolve("SKILL.md"), skill.toSkillMd());
+		for (SkillScript script : skill.scripts()) {
+			Path written = dir.resolve(script.path());
+			Files.createDirectories(written.getParent());
+			Files.writeString(written, script.content());
+		}
+	}
+
+	@Test
+	void aBodyNamingTheScriptItActuallyCarriesPublishes(@TempDir Path library) {
+		String pointingAtItsOwnScript = benignBody()
+				+ "\\n## Scripts\\nRun scripts/score-draft.js and quote what it printed, verbatim.\\n";
+
+		SkillBuildResult result = build(library, skillJsonWithScript(pointingAtItsOwnScript, CLEAN_SCRIPT), true, false,
+				BuildOptions.DEFAULT_MIN_LIFT);
+
+		// The claim is honoured by the folder, so there is nothing to refuse: this is the
+		// scripted skill
+		// the section exists to produce, and the guard must stay out of its way.
+		assertThat(result.isBuilt()).as(() -> result.report()).isTrue();
+		Path skillDir = library.resolve(PackName.slug(DESCRIPTION));
+		assertThat(skillDir.resolve("SKILL.md")).isRegularFile();
+		assertThat(skillDir.resolve("scripts/score-draft.js")).isRegularFile();
 	}
 
 }

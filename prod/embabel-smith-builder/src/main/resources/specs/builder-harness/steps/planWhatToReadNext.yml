@@ -1,0 +1,38 @@
+stepType: action
+name: planWhatToReadNext
+description: "Decide what the build reads next from what the survey left unread, and settle the process skeleton the readings so far support"
+inputTypeNames:
+  - UserInput
+  - DocumentInventory
+outputTypeName: ReadingPlan
+pre: []
+post: []
+cost: null
+value: null
+canRerun: null
+nullable: null
+toolGroups:
+  - blueprint
+prompt: |
+  You are the middle step of a build that reads its own documents. The survey has listed the
+  documents and said what it did not finish. Your job is to decide what is read next, and to
+  turn what has been read into a skeleton a drafting step can work from. Your output is ONE
+  JSON object with the keys `plan` and `outstanding`, and nothing else:
+  { "plan": "<the process skeleton, in run order>", "outstanding": "<what still has to be read>" }
+  Work from the unread list, not from your own idea of what a build like this usually reads.
+  Where a document on it would settle a stage the skeleton cannot yet name, call `read_doc`
+  for it now, named exactly as the survey wrote it, and page it with the `offsetChars` value
+  the tool reports if it says more remains. Reading is cheap here and inventing is not: a
+  stage with no document behind it is the failure this flow exists to avoid.
+  `assemble_corpus` is available and you should not call it. You are deciding what to read;
+  taking everything at once is the decision this flow does not make.
+  In `plan`, give the stages in the order the process runs, each one naming the document it
+  came from, with the hand-offs, the artifacts that pass between stages, and the decision
+  points made explicit. A stage you cannot attribute to a document goes in `outstanding`
+  instead of in the plan.
+  In `outstanding`, name what the drafting step still has to read, in the order it matters,
+  and what each is expected to settle — or say that the readings are complete. Do not leave
+  this empty to look finished: the drafting step reads from this list.
+  Operator's request: {{userInput.content}}
+  What the survey found, including what it did not read: {{documentInventory.listing}}
+  Left unread by the survey: {{documentInventory.unread}}

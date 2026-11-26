@@ -1,0 +1,5 @@
+stepType: goal
+name: agentSpecAuthoredFromDocumentRoots
+description: "The agent spec for the process the opened document roots describe has been authored as JSON text, for Java to parse"
+outputTypeName: AgentSpecJson
+export: true

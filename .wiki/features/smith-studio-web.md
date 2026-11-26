@@ -28,8 +28,12 @@ source_paths:
   - "prod/embabel-smith-builder/src/main/java/com/embabel/smith/builder/retrieval/SpecEntry.java"
   - "prod/embabel-smith-studio/frontend/src/panes/ScalePane.vue"
   - "prod/embabel-smith-studio/frontend/src/router.ts"
+  - "prod/embabel-smith-studio/frontend/vite.config.ts"
+  - "prod/embabel-smith-studio/pom.xml"
+  - "prod/embabel-smith-studio/src/test/java/com/embabel/smith/studio/NoA2aEndpointTest.java"
+  - "prod/embabel-smith-studio/src/test/java/com/embabel/smith/studio/A2aEndpointWhenEnabledTest.java"
   - "prod/embabel-smith-studio/README.md"
-updated_at: "2026-11-22"
+updated_at: "2026-11-25"
 ---
 
 # The smith studio web product
@@ -38,7 +42,11 @@ Change 06 turns the studio's self-improvement loop ([[smith-studio]]) into a web
 application that hosts the production cores — run a goal ([[smith-runtime]]), build a pack
 ([[smith-builder]]), and operate the loop — behind a JSON REST surface, with a Vue 3 + Quasar front
 end. It is the production counterpart of POC 22's unified builder UI, re-pointed at the production
-cores instead of POC launchers.
+cores instead of POC launchers. The module also declares `embabel-smith-a2a-starter`, because this is
+the repo's long-lived servlet process and therefore the process where the A2A surface gets switched on
+([[a2a-endpoint]]): with no flag set the starter contributes no controller and no mapping here, and
+what keeps the surface shut is `smith.a2a.enabled` plus the starter's exclusion of Embabel's own A2A
+auto-configuration — not the classpath.
 
 ## Thin controllers, cores do the work
 
@@ -158,13 +166,19 @@ checked by `vue-tsc --noEmit` + Vitest.
 The router uses HTML5 history mode, so a deep link like `/improve` arrives at Spring with no
 controller behind it. `config/SpaWebConfig.java:29-46` forwards unknown paths to the SPA shell — with
 `api/` deliberately **excluded**, so a mistyped endpoint still returns a real 404 instead of the
-index page. Separately, `SmithStudioApplication.main` forces `spring.main.web-application-type=SERVLET`
+index page. The other half of that rule matters to a guard rather than to a user: every unmapped path
+outside `api/` answers **200** with the shell (405 to a `POST`), so a status code cannot prove an
+endpoint is absent in this application — which is why `NoA2aEndpointTest` asks whether any request
+mapping is registered under `/a2a` rather than asking for a 404 ([[a2a-endpoint]]). Separately,
+`SmithStudioApplication.main` forces `spring.main.web-application-type=SERVLET`
 as a *system property*; the reason is non-obvious enough that it is documented on the storage page
 ([[smith-studio-storage]]).
 
-Dev runs use Vite on 5173 proxying `/api` to `http://localhost:18080` (`frontend/vite.config.ts:29-33`),
-while the app's own port defaults to **8080** — so the README's `SERVER_PORT=18080` is not optional
-advice, and the proxy target is hardcoded. Note 8080 is commonly taken on developer machines.
+Dev runs use Vite on 5173 proxying `/api` to `http://localhost:8080` (`frontend/vite.config.ts:31`) —
+which is the app's own default (`src/main/resources/application.yml:2`, `${SERVER_PORT:8080}`), so the
+pair works with nothing set in the environment. That target is hardcoded, though: move the app to any
+other port and the dev server proxies into nothing until that line moves with it. The POC run book's
+`SERVER_PORT=18080` habit is exactly that case, 8080 being commonly taken on developer machines.
 
 ## Loop scheduling
 

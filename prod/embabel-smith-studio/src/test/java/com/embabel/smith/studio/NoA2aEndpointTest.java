@@ -20,32 +20,35 @@ import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandl
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * The studio exposes no A2A surface.
+ * The studio exposes no A2A surface by default.
  *
  * <p>
- * This is the whole-repo invariant the A2A change has to keep: the A2A starter is
- * declared by {@code embabel-smith-runtime-a2a} alone, so no other module can answer
- * {@code /a2a}. It matters most for the modules that <em>are</em> servlet applications —
- * the studio forces SERVLET mode, so the moment the starter reaches it through a
- * dependency (realistically {@code embabel-smith-runtime}, which the studio already
- * depends on) the Embabel A2A auto-configuration activates and registers
- * {@code GET /a2a/.well-known/agent.json} and {@code POST /a2a} in this app. That
- * endpoint would run goals through Embabel Autonomy — no trust-tier gate, no trace record
- * — on a module whose contract is a UI utility.
+ * This is the whole-repo invariant the A2A change has to keep. This module now depends on
+ * {@code embabel-smith-a2a-starter} on purpose — it is the repo's servlet host, so it is
+ * the module the surface is turned on in — and what keeps it shut is not the classpath
+ * but two conditions: the starter's beans are conditional on {@code smith.a2a.enabled},
+ * and the starter's {@code EnvironmentPostProcessor} keeps the Embabel library's own
+ * {@code AgentA2AAutoConfiguration} out of the process even here. Without that
+ * suppression the library's unconditional, Autonomy-backed card handler would register
+ * {@code GET /a2a/.well-known/agent.json} and {@code POST /a2a} in this app on a module
+ * whose contract is a UI utility — a surface that runs goals with no trust-tier gate and
+ * no trace record, which is exactly what the starter exists to replace.
+ * {@link A2aEndpointWhenEnabledTest} is the other half of the same claim: set the flag
+ * and the mappings do appear.
  *
  * <p>
  * <b>Why the assertion is on the mappings and not on a 404.</b> It cannot be a 404:
- * {@code SpaWebConfig} maps {@code /**} to the built frontend with an {@code index.html}
- * fallback, so every unmapped path in this application answers 200, and 405 to a POST.
- * Measured: {@code GET /a2a/.well-known/agent.json} answered 200 and {@code POST /a2a}
- * answered 405 with no A2A code anywhere on the classpath. So the test asks the two
- * questions that actually distinguish the cases — no request mapping is registered under
- * {@code /a2a}, and the card route does not answer with an agent card.
+ * {@code SpaWebConfig} maps the frontend catch-all with an {@code index.html} fallback,
+ * so every unmapped path in this application answers 200, and 405 to a POST. Measured:
+ * {@code GET /a2a/.well-known/agent.json} answered 200 and {@code POST /a2a} answered 405
+ * with no A2A code anywhere on the classpath. So the test asks the two questions that
+ * actually distinguish the cases — no request mapping is registered under {@code /a2a},
+ * and the card route does not answer with an agent card.
  *
  * <p>
  * The web-application-type property is stated explicitly because without it the test
  * context comes up non-web in this module and there are no request mappings to inspect;
- * the launcher carries the same override for the same class of problem.
+ * the application sets the same value as a system property for the same class of problem.
  *
  * @author Ivan Rodriguez
  */

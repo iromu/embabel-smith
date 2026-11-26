@@ -1,0 +1,13 @@
+spring:
+  docker:
+    compose:
+      enabled: true
+      required: true
+      file:
+        - ./docker/docker-compose-infra.yml
+smith:
+  studio:
+    storage:
+      url: jdbc:postgresql://localhost:5433/embabel_smith
+      user: embabel_smith
+      password: embabel_smith

@@ -47,6 +47,11 @@ generation that rewrites everything cannot be attributed to anything.
 The surface the reframe names is the builder's own packs, four directories under
 `prod/embabel-smith-builder/builder-agent-specs/`:
 
+> [Later, as of the current tree: **six** directories, and the folder has moved to
+> `prod/embabel-smith-builder/src/main/resources/specs/`. The count and the placement above are as this
+> run recorded them; the move is what `docs/12-backlog.md` tracks. What these packs are *on* the
+> mutable surface — step `prompt:` text and nothing else — is unchanged.]
+
 | Pack | The process it is the builder of |
 | --- | --- |
 | `builder-skill-from-process` | builds skills from a process specification |
@@ -58,6 +63,12 @@ The packs are authored by this change, which also fixes where they sit: a module
 filesystem, not the published `agent-specs/` spec source and not `src/main/resources/` —
 `AgentSpecReader.read(Path)` lists `steps/` and `types/`, and a file packaged into a jar is not
 addressable as a directory. Until they land, the mutable surface named here is a path with nothing on it.
+
+> [Later: that placement was reversed. The packs now sit under `src/main/resources/`, and the jar
+> addressability problem the sentence above reasons from is solved rather than avoided —
+> `smith-common`'s `SpecFolders.classpath` hands back the class directory itself when classes are
+> exploded and a temporary copy when they are in a jar. See `docs/12-backlog.md`; the mutable surface
+> and its one editable field are unchanged.]
 
 What a generation changes inside a pack is the `prompt:` text of its steps, and nothing else. The
 mutation primitive already draws that line in code: `Refiner.withPrompt`
@@ -103,7 +114,9 @@ rewritten condition name is not a validation finding: it fails at *deploy*, afte
 published and handed to the planner. Silent and expensive, the same class as the misspelled `toolGroups`
 entry, with the difference that the prompt-variable case at least acquired a validator rule. Keeping it is
 free — `Refiner.withPrompt` copies the field rather than rebuilding it, and the four packs above declare
-`pre: []` and `post: []` on all thirteen steps, so there is nothing on the surface to lose.
+`pre: []` and `post: []` on all thirteen steps (four packs and thirteen steps as this run counted them;
+six packs and eighteen steps now, the two packs added afterwards unchanged in these two fields —
+`docs/12-backlog.md`), so there is nothing on the surface to lose.
 `prod/embabel-smith-builder/src/test/java/com/embabel/smith/builder/eval/CollaborationStructureIsFixedByConstructionTest`
 pins both halves on a pack that does name conditions, so the guard is not an absence of evidence.
 

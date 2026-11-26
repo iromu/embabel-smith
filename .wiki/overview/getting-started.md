@@ -9,16 +9,21 @@ source_paths:
   - "Makefile"
   - "setup.sh"
   - "run-loop.sh"
+  - "scripts/native.sh"
   - "poc/poc-1-no-code-runtime/src/main/resources/application.yml"
+  - "prod/embabel-smith-studio/README.md"
   - ".github/workflows/offline-verification.yml"
-updated_at: "2026-11-22"
+  - "docs/04-poc-run-results.md"
+  - "docs/05-architecture.md"
+updated_at: "2026-11-26"
 ---
 
 # Get started
 
-A smart newcomer's first ten minutes. This is codebase orientation, not a duplicate of `README.md`
-(which carries the per-POC command table — note it currently omits rows for POC 21, 22, 24 and 25, so
-read those modules' own `README.md` files).
+A smart newcomer's first ten minutes. `README.md` is an overview — two diagrams, the sample pack, and
+pointers to `docs/index.md` and `.wiki/index.md` — and holds no command reference, so the run book this
+page summarizes lives in `docs/`: the per-POC launchers in `docs/04-poc-run-results.md` §8, the build
+and test entry points and the live-group opt-in in `docs/05-architecture.md`.
 
 ## The one command that always works
 
@@ -39,7 +44,16 @@ The root `Makefile` exists so nobody invents their own `mvn` invocation — see 
 knowing are `test`, `test-module`, `lint`, and `module`. **CI runs those targets, not `verify`** —
 `.github/workflows/offline-verification.yml` runs `make build`, `make test` and `make lint`, which
 differ from the bare command in that they interpolate `$(POC_FLAG)` and, for `test`, source
-`~/.config/env/llm.env` first.
+`~/.config/env/llm.env` first. One more target is worth knowing before you go looking for it:
+`make native` builds the builder's native `smith` binary into
+`prod/embabel-smith-builder/target/smith` (`Makefile:72-73`), and needs a GraalVM JDK with
+`native-image` on `PATH` — `scripts/native.sh` is the sdkman variant, which prefers the **25.0.2** patch
+CI pins and warns when it falls back to a rolling candidate. The same build puts a `specs/` folder beside
+the binary, at `prod/embabel-smith-builder/target/specs`: an image carries its resources as a flat named
+set with no directory entries, so a pack flow reads that folder from disk rather than from inside the
+image, and a `smith` with nothing beside it refuses on its first pack flow. What that
+binary is for is on [[native-binary]]. The README names no target but `make build`, `make test` and
+`make help`, so `native` is a fact about the `Makefile`, not about the README.
 
 **The endpoint-gated tests are off by default, and `make test` does not change that.** The live group is
 excluded through the overridable `test.excludedGroups` property (default `live` in the root POM), so
@@ -66,6 +80,13 @@ export OPENAI_CUSTOM_API_KEY=sk-...
 export OPENAI_CUSTOM_MODELS=my-model
 export EMBABEL_MODELS_DEFAULT_LLM=my-model
 ```
+
+Which provider a run resolves to is decided once, in a fixed first-match order: the
+`OPENAI_CUSTOM_*` trio selects the OpenAI-compatible endpoint, else `OPENAI_API_KEY` selects the bundled
+OpenAI catalog, else `ANTHROPIC_API_KEY` selects the bundled Anthropic catalog, else the provider is
+`NONE` and every model-backed call is refused before it reaches a client
+(`docs/05-architecture.md`). The POC launchers read the same bridge but are OpenAI-compatible only; the
+full env-and-property table is in `prod/embabel-smith-studio/README.md`.
 
 Then install the modules once so sibling artifacts resolve, and run a single module by `-pl`. The
 `-Ppoc` profile is **required** — the POCs are not in the default reactor, so `-pl poc/...` matches
@@ -103,7 +124,9 @@ output if the built draft fails validation (design D5 — an invalid spec is nev
 
 ## First files to read (in order)
 
-1. `README.md` — module table + per-POC run commands.
+1. `README.md` — the short overview: what the project does and one command to run it. The per-POC run
+   commands are in `docs/04-poc-run-results.md` §8, the build and test entry points in
+   `docs/05-architecture.md`.
 2. `docs/agent-spec-format.md` — the on-disk contract. See [[agent-spec-format]].
 3. `agent-specs/explainer/` — the concrete sample pack (manifest, goal, two steps, one type).
 4. `poc/poc-1-no-code-runtime/src/main/java/com/embabel/smith/runtime/SpecRunner.java` — the

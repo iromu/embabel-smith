@@ -159,13 +159,24 @@ restrict which provider serves a model chosen in a pane.
 - **No endpoint still boots.** `application.yml` gives all three providers an inert placeholder
   key, which is what satisfies the starters' key checks at construction time; the gate then answers
   `MODEL_NOT_CONFIGURED` for model-backed actions while the offline panes keep working.
+- **With no improve source the loop reads the checkout, and publishes nothing into it.** Unset, the
+  loop's source is the builder's own packs under `prod/embabel-smith-builder/src/main/resources/specs` —
+  the source tree, never `target/classes`, because a build recopies that and would silently revert
+  a candidate. Reading it needs no decision; naming a destination does, so an approved candidate
+  still refuses to publish until `smith.studio.improve-source` is set, and the studio never publishes
+  into the working checkout — the one write that source-tree surface can see is the `lifecycle.yml`
+  sidecar the loop stamps into a pack directory when it detects a regression, which the publish
+  refusal does not gate but which a clean checkout never gets, because the absent sidecar's baseline
+  is 0.0, the comparison against it is strict, and no `lifecycle.yml` ships anywhere under `prod/`. Run
+  from a checkout: an installed binary has no source tree to point
+  at, and the boot says so rather than handing the loop the built copy.
 
 ## Configuration
 
 | Property | Env | Default | Purpose |
 |---|---|---|---|
 | `smith.studio.sources` | `SMITH_STUDIO_SOURCES` | — | Comma-separated source URIs the UI offers (`folder:<path>` or `git:<url>[@ref]`). |
-| `smith.studio.improve-source` | `SMITH_STUDIO_IMPROVE_SOURCE` | first of `sources` | The source the loop watches and refines. |
+| `smith.studio.improve-source` | `SMITH_STUDIO_IMPROVE_SOURCE` | first of `sources`, else the builder's pack sources | The source the loop watches and refines. |
 | `smith.studio.trace-dir` | `SMITH_STUDIO_TRACE_DIR` | `~/.smith/traces` | Trace store dir; the store file is `<dir>/runs.jsonl`. |
 | `smith.studio.source-cache-dir` | `SMITH_STUDIO_SOURCE_CACHE_DIR` | `~/.smith/spec-sources` | Git source cache root. |
 | `smith.studio.loop.interval` | `SMITH_STUDIO_LOOP_INTERVAL` | `60000` | Interval between scheduled iterations (ms); the schedule is **off by default**. |

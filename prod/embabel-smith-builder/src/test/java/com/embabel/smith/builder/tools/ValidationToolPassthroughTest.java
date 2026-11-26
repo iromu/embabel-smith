@@ -5,12 +5,8 @@
 
 package com.embabel.smith.builder.tools;
 
-import java.io.IOException;
-import java.nio.file.Path;
 import java.util.List;
 
-import com.embabel.smith.common.io.ProcessSpecReader;
-import com.embabel.smith.common.io.ProcessSpecWriter;
 import com.embabel.smith.common.model.ActionStepSpec;
 import com.embabel.smith.common.model.AgentSpec;
 import com.embabel.smith.common.model.AgentSpecManifest;
@@ -23,7 +19,6 @@ import com.embabel.smith.common.validation.ValidationIssue;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -53,11 +48,6 @@ class ValidationToolPassthroughTest {
 
 	private final ProcessValidator processValidator = new ProcessValidator();
 
-	private final ProcessSpecWriter processWriter = new ProcessSpecWriter();
-
-	@TempDir
-	Path workDir;
-
 	@Test
 	void aWellFormedPackIsReportedAsCarryingNoFindings() throws JsonProcessingException {
 		assertThat(this.packTool.validatePack(specJson(SampleAgentSpecs.singleStep())).issues()).as("tool findings")
@@ -84,28 +74,30 @@ class ValidationToolPassthroughTest {
 	}
 
 	@Test
-	void aSoundProcessIsReportedAsCarryingNoFindings() throws IOException {
-		Path dir = this.workDir.resolve("sound-process");
-		this.processWriter.write(ProcessSpec.single("solo", SampleAgentSpecs.explainer()), dir);
-
-		assertThat(this.processTool.validateProcess(dir.toString()).issues()).as("tool findings").isEmpty();
+	void aSoundProcessIsReportedAsCarryingNoFindings() throws JsonProcessingException {
+		assertThat(
+				this.processTool.validateProcess(processJson(ProcessSpec.single("solo", SampleAgentSpecs.explainer())))
+					.issues())
+			.as("tool findings")
+			.isEmpty();
 	}
 
 	/**
 	 * Two agents exporting one goal name — the collision the runtime rejects. Same
 	 * finding text through the tool as from the service, and the cycle and connectivity
-	 * fields are the service's rather than a restatement of them.
+	 * fields are the service's rather than a restatement of them. Both are handed the
+	 * same aggregate: the tool reads it from its JSON form and the service takes it as it
+	 * stands, which is exactly the equivalence the move from a directory argument claims.
 	 */
 	@Test
-	void aProcessTheValidatorRejectsIsReportedWithItsFindingsUnaltered() throws IOException {
+	void aProcessTheValidatorRejectsIsReportedWithItsFindingsUnaltered() throws JsonProcessingException {
 		AgentSpec first = SampleAgentSpecs.explainer();
 		AgentSpec second = new AgentSpec(new AgentSpecManifest("repeater", "1.0.0"), first.goal(), first.steps(),
 				first.types());
-		Path dir = this.workDir.resolve("colliding-process");
-		this.processWriter.write(new ProcessSpec("colliding", List.of(first, second)), dir);
+		ProcessSpec colliding = new ProcessSpec("colliding", List.of(first, second));
 
-		var throughTool = this.processTool.validateProcess(dir.toString());
-		var fromService = this.processValidator.validate(new ProcessSpecReader().read(dir));
+		var throughTool = this.processTool.validateProcess(processJson(colliding));
+		var fromService = this.processValidator.validate(colliding);
 
 		assertThat(throughTool.issues()).isEqualTo(fromService.issues());
 		assertThat(throughTool.issues()).as("the collision is reported, not swallowed")
@@ -136,6 +128,17 @@ class ValidationToolPassthroughTest {
 	 */
 	private static String specJson(AgentSpec spec) throws JsonProcessingException {
 		return new ObjectMapper().writeValueAsString(spec);
+	}
+
+	/**
+	 * The process in the form the process tool now takes: its own JSON document, which is
+	 * the aggregate as the multi-agent generator already holds it rather than as the
+	 * directory {@code io/ProcessSpecReader} reads.
+	 * @param process the process to hand to the tool
+	 * @return the process as JSON text
+	 */
+	private static String processJson(ProcessSpec process) throws JsonProcessingException {
+		return new ObjectMapper().writeValueAsString(process);
 	}
 
 	private static List<String> codes(List<ValidationIssue> issues) {

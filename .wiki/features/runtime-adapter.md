@@ -16,7 +16,8 @@ source_paths:
   - "prod/embabel-smith-runtime/src/main/java/com/embabel/smith/runtime/remote/RemoteBridges.java"
   - "prod/embabel-smith-studio/src/main/java/com/embabel/smith/studio/rest/RemoteController.java"
   - "docs/07-runtime.md"
-updated_at: "2026-11-22"
+  - "docs/04-poc-run-results.md"
+updated_at: "2026-11-26"
 ---
 
 # Runtime adapter: CLI + remote/MCP + remote-action invocation (POC 7, POC 13, POC 16)
@@ -29,6 +30,12 @@ bridge**: the same exported-goal-as-spec surface, published as an MCP tool and i
 network. POC 16 covers the **remote-action bridge**: a GOAP plan plans over, and executes over
 HTTP, an action running in a separate sidecar process. All three bridges are now exercised (see
 [[what-the-pocs-prove]]).
+
+**Where to launch them:** `docs/04-poc-run-results.md` §8 holds the per-POC commands (POC 7 with
+`BUILDER_PACK_DIR=…/agent-specs/shell-runner`, POC 13 with `SERVER_PORT=` plus `BUILDER_MCP_URL=`, POC 16
+with `spring-boot:run`), and it opens by saying what the README no longer does — every `mvn -pl poc/…`
+needs `-Ppoc`, because the POC reactor sits behind that profile and Maven can only select a module that
+is in the reactor. §5 remains the run *evidence* for these three.
 
 ## The `shell` tool group
 

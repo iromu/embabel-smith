@@ -13,10 +13,13 @@ source_paths:
   - "prod/embabel-smith-builder/src/main/java/com/embabel/smith/builder/improve/TraceWindowReader.java"
   - "prod/embabel-smith-builder/src/main/java/com/embabel/smith/builder/improve/LoopPublishPolicy.java"
   - "prod/embabel-smith-runtime/src/main/java/com/embabel/smith/runtime/core/RuntimeCore.java"
+  - "prod/embabel-smith-builder/src/main/java/com/embabel/smith/builder/improve/BuilderPackSurface.java"
+  - "prod/embabel-smith-studio/src/main/java/com/embabel/smith/studio/config/StudioConfiguration.java"
   - "prod/embabel-smith-studio/src/main/java/com/embabel/smith/studio/loop/LoopService.java"
   - "prod/embabel-smith-studio/src/main/java/com/embabel/smith/studio/loop/LoopScheduler.java"
+  - "prod/embabel-smith-studio/pom.xml"
   - "prod/embabel-smith-studio/README.md"
-updated_at: "2026-11-22"
+updated_at: "2026-11-25"
 ---
 
 # The smith studio: the self-improvement loop
@@ -27,7 +30,9 @@ updated_at: "2026-11-22"
 agents is the builder's concern and the studio is a frontend. What the studio keeps is the driving:
 `studio/loop/LoopService` and `LoopScheduler`, the REST surface, and the Vue UI. Everything this page
 says about **what the loop does** still holds; read "the studio" below as "the loop", and see
-[[smith-builder]] for its new home.
+[[smith-builder]] for its new home. The studio is also the repo's only long-lived servlet process, which
+is why it — and not the builder or the runtime — is where the A2A surface gets switched on
+([[a2a-endpoint]]); the dependency sits inert there until `smith.a2a.enabled` is set.
 
 The loop (change 05) watches
 the runtime's traces ([[smith-runtime]]) and, when a spec's recent runs show trouble, rewrites the
@@ -38,6 +43,15 @@ itself is plain Java; change 06 exposes it as a web product — a REST surface, 
 interval scheduler — see [[smith-studio-web]].
 
 ## The pass (`ImprovementLoop.runOnce()`)
+
+"The source" is `smith.studio.improve-source`, else the first configured source, else — with neither
+set — the builder's own pack sources under `prod/embabel-smith-builder/src/main/resources/specs`
+(`builder/improve/BuilderPackSurface`), so an unconfigured studio improves the packs that actually ship
+rather than nothing. That default is a **source tree**, not the read-only `SpecFolders` route a run uses,
+because the loop rewrites what it is holding; with no checkout to point at (an installed binary) the bean
+refuses. The publish destination is not defaulted the same way: `loopPublisher` consults only the
+configured URI, so with nothing configured the publish refuses and the candidate stays pending — which is
+what keeps an unattended loop from rewriting the checkout.
 
 For each pack in the source, in one pass:
 

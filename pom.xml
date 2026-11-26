@@ -175,7 +175,7 @@
                 <version>${embabel-agent.version}</version>
             </dependency>
             <!-- A2A server (protocol 0.3): the Embabel A2A starter, declared only by
-                 embabel-smith-runtime-a2a. It brings spring-boot-starter-web, so a module
+                 embabel-smith-a2a-starter. It brings spring-boot-starter-web, so a module
                  that declares it gains a servlet engine. -->
             <dependency>
                 <groupId>com.embabel.agent</groupId>
@@ -254,7 +254,7 @@
             </dependency>
             <dependency>
                 <groupId>org.iromu.embabel.smith</groupId>
-                <artifactId>embabel-smith-runtime-a2a</artifactId>
+                <artifactId>embabel-smith-a2a-starter</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

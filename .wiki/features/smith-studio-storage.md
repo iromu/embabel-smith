@@ -7,6 +7,9 @@ source_paths:
   - "prod/embabel-smith-studio/src/main/java/com/embabel/smith/studio/storage/StorageContext.java"
   - "prod/embabel-smith-studio/src/main/java/com/embabel/smith/studio/storage/StorageBinding.java"
   - "prod/embabel-smith-studio/src/main/java/com/embabel/smith/studio/storage/PacksKeyMigration.java"
+  - "prod/embabel-smith-studio/src/test/java/com/embabel/smith/studio/storage/PacksKeyMigrationTest.java"
+  - "prod/embabel-smith-studio/src/test/java/com/embabel/smith/studio/storage/PacksKeyMigrationPostgresTest.java"
+  - "prod/embabel-smith-studio/src/main/resources/application-local.sample.yaml"
   - "prod/embabel-smith-studio/src/main/java/com/embabel/smith/studio/storage/entity/PackEntity.java"
   - "prod/embabel-smith-studio/src/main/java/com/embabel/smith/studio/storage/StorageSettings.java"
   - "prod/embabel-smith-studio/src/main/java/com/embabel/smith/studio/storage/JpaTraceStore.java"
@@ -17,8 +20,9 @@ source_paths:
   - "prod/embabel-smith-studio/src/main/java/com/embabel/smith/studio/rest/StorageSettingsController.java"
   - "prod/embabel-smith-studio/src/main/java/com/embabel/smith/studio/rest/StoreController.java"
   - "prod/embabel-smith-studio/frontend/src/panes/StoragePane.vue"
+  - "Makefile"
   - "docker/docker-compose-infra.yml"
-updated_at: "2026-11-22"
+updated_at: "2026-11-25"
 ---
 
 # The smith studio's durable storage
@@ -120,11 +124,17 @@ A gitignored `application-local.yaml` at `prod/embabel-smith-studio/src/main/res
 dev settings: it sets `smith.studio.storage.url` to that endpoint and turns on
 `spring.docker.compose`, so a plain dev run auto-starts the container and binds to it. It is reached
 via `spring.profiles.default: local` in `application.yml`, which applies **only when no profile is
-set** — an explicit profile skips it, so a packaged run never spawns the container. Note that the
+set** — an explicit profile skips it, so a packaged run never spawns the container. `make run-a2a`
+uses that rule on purpose: it sets `SPRING_PROFILES_ACTIVE=a2a`, a profile with no config file, so the
+A2A run gets no container (and no compose path that is repo-root relative and so unresolvable from the
+module-directory run) on a surface that needs no database ([[a2a-endpoint]]). Note that the
 file is gitignored by a bare `application-local.yaml` pattern (it would be ignored anywhere), and a
-stray copy still lands in `target/classes` on a build. The test-classpath `application.yml` keeps
-docker-compose off and points `smith.studio.storage.url` at in-memory H2, so the `@SpringBootTest`
-classes pass with no docker.
+stray copy still lands in `target/classes` on a build. What to put in it is now committed beside it as
+`application-local.sample.yaml` — compose `enabled` and `required` pointing at
+`./docker/docker-compose-infra.yml`, plus the 5433 URL and the two `embabel_smith` credentials — so a
+fresh clone can `cp` it instead of writing the file from memory. The test-classpath `application.yml`
+keeps docker-compose off and points `smith.studio.storage.url` at in-memory H2, so the
+`@SpringBootTest` classes pass with no docker.
 
 ## A web-server gotcha worth knowing
 
@@ -136,6 +146,13 @@ precedence than any classpath config file) — immune to the jar shadowing.
 
 **Tests:** `StorageContextTest` (bind → write → rebind; the new binding serves, the old database is
 untouched, the old pool is closed; unbound reports "storage not configured"; an unreachable endpoint
-keeps the previous binding), `ProcessStoreTest` (save/list/load/discovery against a bound H2), the
-`TraceControllerTest` (per-spec window over the store), and the endpoint-gated `RestIntegrationTest`
-+ `LiveLoopIntegrationTest` (full app boots and serves with the H2 test profile).
+keeps the previous binding), `PacksKeyMigrationTest` (H2: a name-keyed table is rebuilt on `(name,
+version)` with its rows kept, an already-migrated table is left alone, and the re-key still works when
+the store keeps identifiers lower-cased), `ProcessStoreTest` (save/list/load/discovery against a bound
+H2), the `TraceControllerTest` (per-spec window over the store), and the endpoint-gated
+`RestIntegrationTest` + `LiveLoopIntegrationTest` (full app boots and serves with the H2 test profile).
+The re-key has a live counterpart, `PacksKeyMigrationPostgresTest`, because the statements whose
+spelling only Postgres decides are the DDL ones: it is `@Tag("live")` **and** gated on
+`SMITH_POSTGRES_URL`, and refuses any database whose name does not read as scratch
+(`verify|test|scratch|tmp`) — a migration test that seeds by dropping a table must not be able to aim
+at real data.

@@ -127,11 +127,19 @@ another type name).
    dynamic type).
 4. **Type references resolve** — every input/output type name used by the goal or any step is either
    framework-provided or declared in `types/`.
+5. **A declared input reaches its step's prompt** — a prompt renders as a literal template, so an
+   input type the prompt never names is only a blackboard binding: it is never sent to the model, and
+   the step answers every distinct request with the same call. The check fires only when *none* of the
+   declared inputs is named, so a step that ignores one of several still validates, and a step that
+   declares none is out of its scope. A step with no prompt at all is already reported by check 3, so
+   it is not reported twice here. This is the guard POC 27's outer loop needed and did not have: its
+   `detect` step interpolated no input, so six frozen tasks sent six byte-identical requests and no
+   score could separate two candidates ([`04`](04-poc-run-results.md) §7.5).
 
 Issue codes: `LAYOUT_MISSING_MANIFEST`, `LAYOUT_MISSING_GOAL`, `LAYOUT_MISSING_STEPS`,
 `LAYOUT_EMPTY_STEPS`, `LAYOUT_MISSING_TYPES`, `GOAL_MISSING`, `GOAL_NOT_EXPORTED`,
 `DANGLING_TYPE_REF`, `PROMPT_MISSING`, `PROMPT_UNDECLARED_INPUT`, `PROMPT_UNKNOWN_PROPERTY`,
-`PARSE_ERROR`.
+`PROMPT_IGNORES_DECLARED_INPUT`, `PARSE_ERROR`.
 
 ## Mapping to Embabel (the runtime seam)
 

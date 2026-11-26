@@ -9,13 +9,15 @@ source_paths:
   - "docs/04-poc-run-results.md"
   - "pom.xml"
   - ".github/workflows/offline-verification.yml"
-updated_at: "2026-11-22"
+updated_at: "2026-11-26"
 ---
 
 # What is Embabel Smith?
 
 Embabel Smith is a **multi-module Maven project** on **Embabel 1.5.4** and **Java 21** — POC evidence
-under `poc/`, a working product under `prod/` (see [[product-phase]]). It proves one idea end to end:
+under `poc/`, a working product under `prod/` (see [[product-phase]]). `README.md` is the overview of it
+— two diagrams, the sample pack, and pointers to `docs/index.md` and this wiki — and holds no command
+reference. It proves one idea end to end:
 
 > A *builder agent* turns a natural-language description into an **agent spec** (a directory of
 > pure YAML, no code), validates it before writing, and emits it. A separate **fixed no-code
@@ -44,7 +46,8 @@ exercised most of it; see [[what-the-pocs-prove]] for what is proven and what is
 ## What each POC proves
 
 Each POC is an independent module so a failure isolates to one claim (design D1). See
-[[architecture]] for the module map and run commands:
+[[architecture]] for the module map and [[getting-started]] for the run commands — the per-POC launchers
+are in `docs/04-poc-run-results.md` §8:
 
 **Feasibility core (POC 1–5):**
 

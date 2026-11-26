@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 320" preserveAspectRatio="xMidYMid meet" role="img" aria-labelledby="p1-title p1-desc">
+  <title id="p1-title">Embabel Smith pipeline: natural language in, runnable agent spec out</title>
+  <desc id="p1-desc">Left to right: a natural-language description enters embabel-smith-builder, which generates a spec, validates it before writing, and emits it. The emitted artifact is an agent spec on disk, a YAML directory holding manifest.yml, goal.yml, steps and types. The no-code embabel-smith-runtime deploys that spec, plans with GOAP and executes it, producing the exported goal output. Two side notes: the builder can also emit a skill folder or an N-pack process, and publishing writes a pack into a spec source addressed folder: or git:, which is what the runtime ingests.</desc>
+
+  <style>
+    text { font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .canvas { fill: #F8FAFC; stroke: #E2E8F0; stroke-width: 1; }
+    .note { fill: #FFFFFF; stroke: #64748B; stroke-width: 1.2; stroke-dasharray: 5 4; }
+    .box-builder { fill: #FEF3C7; stroke: #B45309; stroke-width: 1.4; }
+    .box-runtime { fill: #ECFDF8; stroke: #0F766E; stroke-width: 1.4; }
+    .box-artifact { fill: #F1F5F9; stroke: #64748B; stroke-width: 1.4; }
+    .box-neutral { fill: #FFFFFF; stroke: #64748B; stroke-width: 1.4; }
+    .chip { fill: #FFFFFF; stroke: #94A3B8; stroke-width: 1.1; }
+    .rule { stroke: #CBD5E1; stroke-width: 1; }
+    .flow { fill: none; stroke: #64748B; stroke-width: 1.8; }
+    .flow-amber { fill: none; stroke: #B45309; stroke-width: 1.6; }
+    .flow-teal { fill: none; stroke: #0F766E; stroke-width: 1.6; }
+    .dash { fill: none; stroke: #64748B; stroke-width: 1.4; stroke-dasharray: 5 4; }
+    .ah-neutral { fill: #64748B; }
+    .ah-amber { fill: #B45309; }
+    .ah-teal { fill: #0F766E; }
+    .title { font-size: 15px; font-weight: 600; fill: #0F172A; }
+    .body-strong { font-size: 13px; fill: #0F172A; }
+    .body-mid { font-size: 12.5px; fill: #334155; }
+    .label-strong { font-size: 12px; font-weight: 600; fill: #0F172A; }
+    .label-mid { font-size: 11.5px; fill: #334155; }
+    .label-soft { font-size: 11px; fill: #475569; }
+    .chip-label { font-size: 12px; fill: #0F172A; }
+    .mono-mid { font-size: 11px; fill: #334155; }
+    .mono-soft { font-size: 10.5px; fill: #475569; }
+    @media (prefers-color-scheme: dark) {
+      .canvas { fill: #0F172A; stroke: #243244; }
+      .note { fill: #111C2E; stroke: #7A8AA0; }
+      .box-builder { fill: #33260E; stroke: #E0A02A; }
+      .box-runtime { fill: #0E2F2C; stroke: #34D3B4; }
+      .box-artifact { fill: #1A2434; stroke: #94A3B8; }
+      .box-neutral { fill: #162132; stroke: #7A8AA0; }
+      .chip { fill: #1B2739; stroke: #3A4A61; }
+      .rule { stroke: #3A4A61; }
+      .flow { stroke: #94A3B8; }
+      .flow-amber { stroke: #E0A02A; }
+      .flow-teal { stroke: #34D3B4; }
+      .dash { stroke: #94A3B8; }
+      .ah-neutral { fill: #94A3B8; }
+      .ah-amber { fill: #E0A02A; }
+      .ah-teal { fill: #34D3B4; }
+      .title, .body-strong, .chip-label, .label-strong { fill: #F1F5F9; }
+      .body-mid, .label-mid { fill: #CBD5E1; }
+      .label-soft, .mono-soft { fill: #A6B4C6; }
+      .mono-mid { fill: #CBD5E1; }
+    }
+  </style>
+
+  <defs>
+    <marker id="p1-ar" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,1 L9,5 L0,9 Z" class="ah-neutral"/>
+    </marker>
+    <marker id="p1-arA" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0,1 L9,5 L0,9 Z" class="ah-amber"/>
+    </marker>
+    <marker id="p1-arT" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0,1 L9,5 L0,9 Z" class="ah-teal"/>
+    </marker>
+  </defs>
+
+  <rect class="canvas" x="0" y="0" width="1200" height="320" rx="16"/>
+
+  <!-- side note: publishing target -->
+  <rect class="note" x="520" y="32" width="560" height="44" rx="10"/>
+  <text class="body-mid" x="536" y="59">publish writes a pack into a spec source</text>
+  <rect class="chip" x="812" y="42" width="118" height="26" rx="6"/>
+  <text class="mono mono-mid" x="826" y="59">folder:&lt;path&gt;</text>
+  <rect class="chip" x="942" y="42" width="124" height="26" rx="6"/>
+  <text class="mono mono-mid" x="956" y="59">git:&lt;url&gt;@&lt;ref&gt;</text>
+  <path class="dash" d="M346,96 L346,54 L514,54" marker-end="url(#p1-ar)"/>
+  <path class="dash" d="M862,76 L862,88" marker-end="url(#p1-ar)"/>
+  <text class="label-soft" x="874" y="88">ingest</text>
+
+  <!-- input -->
+  <rect class="box-neutral" x="24" y="120" width="148" height="56" rx="10"/>
+  <text class="body-strong" x="98" y="143" text-anchor="middle">natural-language</text>
+  <text class="body-strong" x="98" y="161" text-anchor="middle">description</text>
+  <path class="flow" d="M172,148 L190,148" marker-end="url(#p1-ar)"/>
+
+  <!-- builder -->
+  <rect class="box-builder" x="196" y="96" width="300" height="104" rx="10"/>
+  <text class="title" x="212" y="118">builder</text>
+  <text class="mono mono-soft" x="480" y="118" text-anchor="end">embabel-smith-builder</text>
+  <rect class="chip" x="212" y="144" width="80" height="32" rx="7"/>
+  <text class="chip-label" x="252" y="164" text-anchor="middle">generate</text>
+  <path class="flow-amber" d="M292,160 L302,160" marker-end="url(#p1-arA)"/>
+  <rect class="chip" x="306" y="144" width="80" height="32" rx="7"/>
+  <text class="chip-label" x="346" y="164" text-anchor="middle">validate</text>
+  <path class="flow-amber" d="M386,160 L396,160" marker-end="url(#p1-arA)"/>
+  <rect class="chip" x="400" y="144" width="80" height="32" rx="7"/>
+  <text class="chip-label" x="440" y="164" text-anchor="middle">emit</text>
+  <text class="label-soft" x="346" y="190" text-anchor="middle">validate before write</text>
+  <path class="flow" d="M496,148 L514,148" marker-end="url(#p1-ar)"/>
+
+  <!-- agent spec on disk -->
+  <rect class="box-artifact" x="520" y="88" width="168" height="120" rx="10"/>
+  <text class="title" x="536" y="110">agent spec</text>
+  <text class="mono mono-soft" x="672" y="110" text-anchor="end">on disk</text>
+  <line class="rule" x1="538" y1="124" x2="538" y2="188"/>
+  <text class="mono mono-mid" x="548" y="134">manifest.yml</text>
+  <text class="mono mono-mid" x="548" y="150">goal.yml</text>
+  <text class="mono mono-mid" x="548" y="166">steps/*.yml</text>
+  <text class="mono mono-mid" x="548" y="182">types/*.yml</text>
+  <text class="label-soft" x="536" y="198">pure YAML, no code</text>
+  <path class="flow" d="M688,148 L706,148" marker-end="url(#p1-ar)"/>
+
+  <!-- runtime -->
+  <rect class="box-runtime" x="712" y="96" width="300" height="104" rx="10"/>
+  <text class="title" x="728" y="118">runtime</text>
+  <text class="mono mono-soft" x="1000" y="118" text-anchor="end">embabel-smith-runtime</text>
+  <rect class="chip" x="728" y="144" width="80" height="32" rx="7"/>
+  <text class="chip-label" x="768" y="164" text-anchor="middle">deploy</text>
+  <path class="flow-teal" d="M808,160 L818,160" marker-end="url(#p1-arT)"/>
+  <rect class="chip" x="822" y="144" width="80" height="32" rx="7"/>
+  <text class="chip-label" x="862" y="164" text-anchor="middle">GOAP plan</text>
+  <path class="flow-teal" d="M902,160 L912,160" marker-end="url(#p1-arT)"/>
+  <rect class="chip" x="916" y="144" width="80" height="32" rx="7"/>
+  <text class="chip-label" x="956" y="164" text-anchor="middle">execute</text>
+  <text class="label-soft" x="862" y="190" text-anchor="middle">zero compilation</text>
+  <path class="flow" d="M1012,148 L1030,148" marker-end="url(#p1-ar)"/>
+
+  <!-- output -->
+  <rect class="box-neutral" x="1036" y="120" width="140" height="56" rx="10"/>
+  <text class="body-strong" x="1106" y="143" text-anchor="middle">goal output</text>
+  <text class="label-mid" x="1106" y="161" text-anchor="middle">exported goal</text>
+
+  <!-- side note: sibling outputs -->
+  <path class="dash" d="M346,200 L346,220" marker-end="url(#p1-ar)"/>
+  <rect class="note" x="196" y="224" width="300" height="64" rx="10"/>
+  <text class="label-strong" x="212" y="246">sibling outputs</text>
+  <rect class="chip" x="212" y="256" width="104" height="26" rx="6"/>
+  <text class="mono mono-mid" x="226" y="273">skill folder</text>
+  <rect class="chip" x="324" y="256" width="124" height="26" rx="6"/>
+  <text class="mono mono-mid" x="338" y="273">N-pack process</text>
+
+  <!-- legend -->
+  <rect class="box-builder" x="830" y="259" width="11" height="11" rx="3"/>
+  <text class="label-mid" x="847" y="268">builder side</text>
+  <rect class="box-runtime" x="933" y="259" width="11" height="11" rx="3"/>
+  <text class="label-mid" x="950" y="268">runtime side</text>
+  <rect class="box-artifact" x="1036" y="259" width="11" height="11" rx="3"/>
+  <text class="label-mid" x="1053" y="268">disk and surfaces</text>
+</svg>

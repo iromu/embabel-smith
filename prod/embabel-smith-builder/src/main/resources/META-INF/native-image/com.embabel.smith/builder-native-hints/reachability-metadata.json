@@ -1,5 +1,5 @@
 {
-  "comment": "Reachability gaps the Spring AOT pass cannot see, for the `smith` native binary. Embabel binds @ConfigurationProperties Kotlin data classes through kotlin-reflect (invisible to static analysis) and loads model catalogs and prompt templates as classpath resources by name. Add an entry here when the image reports a MissingReflectionRegistrationError or a resource that resolves on the JVM but not in the binary. Two entries are here for gaps the tracing agent cannot rediscover either. ToolGroupMetadata$Companion: ValidationToolGroup locates its factory by signature over getMethods(), and the factory's JVM name contains a hyphen, so no source line names it -- without this the scan comes back empty and validateToolGroup fails at context startup with 'No 5-arg ToolGroupMetadata factory found'. BuildCommand$FlowConverter: picocli instantiates an option's converter reflectively, and the traced hints carry TargetConverter and TechniqueConverter only because the runs that generated them passed --target and --technique and never --flow.",
+  "comment": "Reachability gaps the Spring AOT pass cannot see, for the `smith` native binary. Embabel binds @ConfigurationProperties Kotlin data classes through kotlin-reflect (invisible to static analysis) and loads model catalogs and prompt templates as classpath resources by name. Add an entry here when the image reports a MissingReflectionRegistrationError or a resource that resolves on the JVM but not in the binary. Several entries are here for gaps the tracing agent cannot rediscover either. ToolGroupMetadata$Companion: ValidationToolGroup locates its factory by signature over getMethods(), and the factory's JVM name contains a hyphen, so no source line names it -- without this the scan comes back empty and validateToolGroup fails at context startup with 'No 5-arg ToolGroupMetadata factory found'. BuildCommand$FlowConverter and BuildCommand.flow: picocli instantiates an option's converter reflectively and reads every @Option field's initial value when it clears a subcommand's scope, whether or not the caller passed that flag, and the traced runs predate --flow -- which is why the traced file lists the other eleven option fields and not this one. The field, not just the converter, matters: unregistered, it fails EVERY `smith build` invocation rather than only the ones that name a flow, and the no-argument native smoke cannot see either half. The specs/ globs are the builder's own AgentSpec packs, and they belong in this hand-written file rather than in builder-traced-hints because scripts/native-hints.sh regenerates that one wholesale and none of its runs drives a --flow pack, so nothing there would ever list them. Registering them puts the pack files IN the image, which is what makes an individual file resolve by name; it does not make a pack's directory listable, because an image has no directory entries. That half is SpecFolders' on-disk fallback -- SMITH_SPECS_DIR, or the specs/ folder the native build ships beside target/smith. Both halves are needed and neither alone is enough. com.embabel.agent.skills.spec.SkillDefinition and SkillMetadata: an image that is asked to load a published skill folder dies at the first Skills.withLocalSkills with 'KotlinReflectionInternalError: Unresolved class: SkillDefinition', through DefaultDirectorySkillDefinitionLoader.load and Jackson's Kotlin introspection. The tracer missed it for the plain reason that a path which only became reachable through a hand-written call site is invisible to static analysis, and the traced file it would have appeared in (ab28a90) predates 2b16c27, the commit that wrote the first such call site -- so its silence is not evidence that nothing was missing. The two types are the whole surface: skills.spec holds no nested class, and SkillMetadata is the interface kotlin-reflect walks to reach the data class's properties. Registering them is what makes a native image able to host a published folder at all; whether scripts inside it are callable stays what the engine switch decides, and the engine builds its Truffle Context lazily inside execute, so a clean boot says nothing about that half. com.embabel.agent.skills.Skills: making the folder loadable is not yet making it toolable -- measured one step at a time, because an image with skills.spec registered and this line missing prints 'skills loaded: <name>' and then dies in main at 'KotlinReflectionInternalError: Unresolved class: class com.embabel.agent.skills.Skills', through SkillRunCommand.call -> AiSpecPromptCaller.call -> PromptRunner.withReference -> Skills.tools -> Tool.fromInstance -> MethodToolFactory.fromInstance, which enumerates the reference's declared members over KClass.memberScope to build its tools. Nothing else in prod/ ever calls Skills.tools(): with the engine off no Skills object is constructed at all, which is why neither the tracing agent nor the switch-OFF native control ever met this one either. SkillRunCommand.skillDir and .request: the same picocli rule as BuildCommand.flow, on a subcommand no traced run ever invoked -- and measured rather than inferred, because an image built without this entry boots, registers the subcommand, and then rejects its own arguments with 'Unknown options: --skill-dir' and a usage line of 'Usage: smith skill-run' with nothing after it. addSubcommand is a compile-time call, so the subcommand is reachable and the failure reads as a mistyped flag rather than as a missing registration; without these two fields picocli sees a command with no options and no positional parameters, so the route cannot be reached in the binary at all and the skills.spec entries above are never exercised.",
   "reflection": [
     {
       "type": "com.embabel.agent.spi.support.LlmDataBindingProperties",
@@ -12,6 +12,14 @@
       "allDeclaredMethods": true
     },
     {
+      "type": "com.embabel.smith.builder.cli.BuildCommand",
+      "fields": [
+        {
+          "name": "flow"
+        }
+      ]
+    },
+    {
       "type": "com.embabel.smith.builder.cli.BuildCommand$FlowConverter",
       "methods": [
         {
@@ -19,6 +27,33 @@
           "parameterTypes": []
         }
       ]
+    },
+    {
+      "type": "com.embabel.smith.builder.cli.SkillRunCommand",
+      "fields": [
+        {
+          "name": "skillDir"
+        },
+        {
+          "name": "request"
+        }
+      ]
+    },
+    {
+      "type": "com.embabel.agent.skills.Skills",
+      "allDeclaredConstructors": true,
+      "allDeclaredMethods": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.embabel.agent.skills.spec.SkillDefinition",
+      "allDeclaredConstructors": true,
+      "allDeclaredMethods": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.embabel.agent.skills.spec.SkillMetadata",
+      "allDeclaredMethods": true
     }
   ],
   "resources": [
@@ -30,6 +65,12 @@
     },
     {
       "glob": "prompts/*.jinja"
+    },
+    {
+      "glob": "specs/*/*.yml"
+    },
+    {
+      "glob": "specs/**/*.yml"
     }
   ]
 }

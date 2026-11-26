@@ -29,6 +29,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  * {@code .yml}/{@code .yaml} (e.g. the {@code .gitkeep} placed in an empty
  * {@code types/}) are ignored.
  *
+ * <p>
+ * A pack is read from wherever it was placed: {@link #read(Path)} takes one named on the
+ * filesystem, {@link #readResource(String)} one that ships as a classpath directory. Both
+ * end up in the same {@code read(Path)} body, so the two never disagree about the format.
+ *
  * @author Ivan Rodriguez
  */
 public class AgentSpecReader {
@@ -50,6 +55,18 @@ public class AgentSpecReader {
 		}
 
 		return new AgentSpec(manifest, goal, steps, types);
+	}
+
+	/**
+	 * Reads a pack that ships as a directory on the classpath.
+	 * @param resourcePath the slash-separated resource path of the pack directory, e.g.
+	 * {@code specs/builder-single-spec}
+	 * @return the pack those files declare
+	 * @throws IOException when the pack is there but cannot be read
+	 * @throws IllegalStateException when nothing is on the classpath at that location
+	 */
+	public AgentSpec readResource(String resourcePath) throws IOException {
+		return read(SpecFolders.classpath(resourcePath));
 	}
 
 	private List<Path> ymlFiles(Path dir) throws IOException {

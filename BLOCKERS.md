@@ -7,17 +7,21 @@ that shows it, so a reader can re-run it instead of trusting this page. History 
 ## 1. The wiki is corrected locally; the published site is not
 
 Blocks the publish half of `builder-executes-its-own-packs` 5.3 and `poc27-improves-builder-agentspecs`
-9.3. Locally the wiki is clean — 45 pages, 0 broken links, 0 dead `source_paths` — but the site at
+9.3. Locally the wiki is clean — 46 pages, 0 broken links, 0 dead `source_paths` — but the site at
 https://iromu.github.io/embabel-smith/ still says the improvement loop lives in the studio while the
 repo says it lives in the builder.
 
-This needs a human, and "push `poc/iteration-2`" is not sufficient: `wiki-pages.yml` fires on a push to
-`main` that touches `.wiki/**`, plus manual dispatch. Origin's HEAD is `main`, and this branch's wiki
-commits are not on it, so a branch push deploys nothing. Either merge the wiki pages to `main` and push,
-or run the workflow by hand.
+This needs a human, and it is no longer a branch problem. The wiki text **is** on `main` now, the
+workflow fired on that push (run `45057831350`, 2026-11-22), the `build` job passed, and the `deploy` job
+failed with *"Branch "main" is not allowed to deploy to github-pages due to environment protection
+rules."* So the site is stale because a Pages environment-approval rule refuses the deploy, not because
+nobody pushed. What is needed is that rule changed — a repository or organisation setting, which no
+commit can reach. `workflow_dispatch` is the other button, and if the same environment gate guards it,
+it fails the same way. The last deploy that actually served was the 2026-11-16 one from `poc/builder`.
 
-Check: `sed -n '9,20p' .github/workflows/wiki-pages.yml` for the trigger, and
-`git ls-remote --symref origin HEAD` for the default branch.
+Check: `gh run list --workflow wiki-pages.yml -L 3` for the failure and its annotation,
+`git show origin/main:.wiki/features/smith-builder.md | grep -n 'The pack flow'` to see the text is on
+`main`, and `git ls-remote --symref origin HEAD` for the default branch.
 
 ## 2. A2A protocol 1.0 waits on an upstream release
 
@@ -27,8 +31,9 @@ The reused library speaks 0.3: the served card reports `protocolVersion: 0.3.0`,
 `io.github.a2asdk` 1.0.0 leaving Alpha, or hand-writing the binding, which the reuse ruling already
 rejected. Not work this repo can do.
 
-Check: `grep -rn 'embabel-agent-starter-a2a' prod/*/pom.xml` returns the one module, and
-`prod/embabel-smith-runtime-a2a/README.md` carries the `Non-goal: protocol 1.0` line against the
+Check: `grep -rl '<artifactId>embabel-agent-starter-a2a</artifactId>' prod/*/pom.xml` returns
+`prod/embabel-smith-a2a-starter/pom.xml` alone, and
+`prod/embabel-smith-a2a-starter/README.md` carries the `Non-goal: protocol 1.0` line against the
 discovery-path deviation.
 
 ## 3. `/scale` is a decision, not a task
@@ -62,8 +67,9 @@ prod/embabel-smith-builder/src/main/java/com/embabel/smith/builder/skill/SkillIn
   the candidate prompt never contained the eval input, so six "different" tasks sent six identical
   requests.
 - **`publish-keeps-versions` 3.2 is withdrawn** by its own design decision 7 (keep the `--overwrite`
-  flag), and `builder-live-example-tests` 3.1 is struck through. Two of the unchecked boxes in
-  `openspec/changes/` are therefore not pending work.
+  flag), and `builder-live-example-tests` 3.1 is superseded by its proposal's Direction change. Neither
+  was ever pending work; both are now ticked as closed-by-ruling, with the code re-checked against each
+  ruling rather than the paragraph taken on trust, so the tree's open-box count says what it means.
 
 ## Cleared while this page was being written (2026-11-22)
 

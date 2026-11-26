@@ -7,12 +7,16 @@ package com.embabel.smith.builder;
 
 import com.embabel.agent.api.common.Ai;
 import com.embabel.agent.core.AgentPlatform;
+import com.embabel.agent.skills.script.SkillScriptExecutionEngine;
 import com.embabel.smith.builder.cli.BlueprintCommand;
 import com.embabel.smith.builder.cli.BuildCommand;
+import com.embabel.smith.builder.cli.SkillRunCommand;
 import com.embabel.smith.builder.cli.SmithBuilderCommand;
 import com.embabel.smith.builder.core.BuilderAgent;
+import com.embabel.smith.builder.tools.ToolSurface;
 import picocli.CommandLine;
 
+import org.springframework.beans.factory.BeanFactory;
 import org.springframework.boot.WebApplicationType;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.builder.SpringApplicationBuilder;
@@ -49,7 +53,17 @@ public class SmithBuilderApplication {
 			AgentPlatform platform = context.getBean(AgentPlatform.class);
 			Ai ai = context.getBean(Ai.class);
 			CommandLine smith = new CommandLine(new SmithBuilderCommand());
-			smith.addSubcommand(new BuildCommand(platform, ai));
+			// The surface is the bean the tool groups were built with, so the CLI and the
+			// tools see the same opened roots.
+			// The script engine is asked for rather than required: it exists only when
+			// smith.builder.skill-scripts.enabled is on, and with no bean the skill path
+			// gets no script host and its eval arms stay prompt substitution.
+			// One lookup for both consumers of the engine: the build's eval arm and the
+			// reader of a published folder are the same switch, and two lookups could
+			// disagree about what it decided.
+			SkillScriptExecutionEngine scriptEngine = scriptEngine(context);
+			smith.addSubcommand(new BuildCommand(platform, ai, context.getBean(ToolSurface.class), scriptEngine));
+			smith.addSubcommand(new SkillRunCommand(ai, scriptEngine));
 			smith.addSubcommand(new BlueprintCommand(ai));
 			exitCode = smith.execute(args);
 		}
@@ -61,6 +75,20 @@ public class SmithBuilderApplication {
 			context.close();
 		}
 		System.exit(exitCode);
+	}
+
+	/**
+	 * The skill-script engine exactly as this launcher obtains it: <em>asked for</em>
+	 * through the bean provider, so a context that did not register one answers null and
+	 * both of its consumers — the build's eval arm and the published-folder reader — run
+	 * without a script tool. Constructing an engine here instead would make
+	 * {@code smith.builder.skill-scripts.enabled} a value nothing consults, which is why
+	 * the pair test goes through this method rather than through the bean directly.
+	 * @param beans the booted context
+	 * @return the engine the switch installed, or null
+	 */
+	static SkillScriptExecutionEngine scriptEngine(BeanFactory beans) {
+		return beans.getBeanProvider(SkillScriptExecutionEngine.class).getIfAvailable();
 	}
 
 }

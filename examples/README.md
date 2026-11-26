@@ -18,6 +18,7 @@ from a test phase.
 | `tmp/` | Repository downloads to build blueprints from, and the names `generate-blueprint.sh` resolves a bare argument against. Only the `*.zip` files are ignored — an unpacked tree here is untracked third-party source, and the builder unpacks to a temp directory of its own, so there is no reason to unpack one here. |
 | `generate-spec.sh <blueprint>` | One blueprint → one executable agent spec. |
 | `generate-skill.sh <blueprint>` | One blueprint → one Agent Skill. |
+| `parity-agentic.sh [blueprint...]` | The hand-run pack-flow measurement over the three inputs the parity record used — `--flow agentic` by default, `--flow harness` with `SMITH_PARITY_FLOW=harness`. Costs model calls by design; nothing runs it automatically. |
 | `out/<Name>/` | What a run leaves behind: `report.md`, `exit.txt`, and `published/` when a gate let it through. Regenerated, not authored. |
 
 ## The scripts
@@ -78,6 +79,22 @@ done
 `|| true` because a build that stops at a gate exits 1 and still leaves the report that
 explains it — that is the evidence, not a failure of the loop. The classpath the scripts need
 is resolved on the first run and cached under `/tmp` afterwards, so a sequence pays that once.
+
+### The pack-flow parity measurement
+
+`parity-agentic.sh` is the one script here that exists to produce a number rather than an
+artifact. It runs a pack flow over the three inputs the parity record in
+`docs/08-builder.md` §"Who issues the generation call" used — `parcel-claims`, `Sentinel`,
+`TradingAgents` — under the same timed `java -cp` harness, and prints built count, answered
+calls, calls spent without an answer, and tool calls per build against that record's java bar of
+2 of 3. `SMITH_PARITY_FLOW` picks the arm: `agentic` (the default, `builder-agentic-blueprint`)
+or `harness` (`builder-harness`, which adds the step that decides what to read next and costs
+another step's tool loop for it — its header says so). Either way the evidence lands in
+`out/<blueprint>/<flow>/`, so the two arms can be compared without one overwriting the other.
+
+It is unrun by default and it is not a test. Nothing in the repo claims a parity number for
+either pack flow until someone runs this and writes the result down, in whichever direction it
+comes out.
 
 ## Why no build script passes `--extract`
 

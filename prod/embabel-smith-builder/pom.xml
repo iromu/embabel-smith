@@ -18,6 +18,22 @@
         commit, no push by default). Exposes a picocli `smith build` CLI.
     </description>
 
+    <properties>
+        <!-- The GraalJS line this module builds its skill-script engine against, overriding the
+             root's graalvm.version (25.4.4.1.1) for these two artifacts only. This is an image
+             compatibility constraint, not a preference: native-image fails when the classpath
+             Truffle and the distribution's SVM Truffle feature disagree, and the distributions
+             this repo builds the shipped artifact with — scripts/native.sh on sdkman 25-graalce
+             (GraalVM CE 25+37.1) and .github/workflows/native-image.yml on GRAAL_VERSION 25.0.2
+             — are both on the 25.0.x line, whose OptimizedTruffleRuntime exposes the
+             getLoopNodeFactory() that SubstrateTruffleRuntime asks for. At 25.4.4.1.1 the build
+             dies inside TruffleBaseFeature with a NoSuchMethodError. The root property stays at
+             25.4.4.1.1 because poc-26 measured its ES2026 claims on that pair and poc/ is frozen
+             evidence, so the divergence is scoped to the module that ships as a binary. Bump it
+             only together with the distribution: the pairing, not the number, is what matters. -->
+        <graalvm.polyglot.version>25.0.2</graalvm.polyglot.version>
+    </properties>
+
     <dependencies>
         <dependency>
             <groupId>org.iromu.embabel.smith</groupId>
@@ -55,6 +71,30 @@
         <dependency>
             <groupId>com.embabel.agent</groupId>
             <artifactId>embabel-agent-eval</artifactId>
+        </dependency>
+        <!-- Agent Skills, for the SkillScriptExecutionEngine SPI the in-JVM script engine
+             implements (skill/script/). The SPI is the whole reason for the dependency:
+             Embabel loads a skill's scripts/ folder itself and asks an installed engine to
+             run them, so the builder needs the interface and nothing else from here. -->
+        <dependency>
+            <groupId>com.embabel.agent</groupId>
+            <artifactId>embabel-agent-skills</artifactId>
+        </dependency>
+        <!-- Embedded GraalJS: the interpreter that runs those scripts in this JVM, so a
+             generated skill's JavaScript needs no Node and no GraalVM on the host. "js" is a
+             POM that brings js-language, regex and the Truffle runtime; it runs
+             interpreter-only on a plain JDK. Versions are pinned here rather than inherited,
+             for the reason in the <properties> block above: the image toolchain, not taste. -->
+        <dependency>
+            <groupId>org.graalvm.polyglot</groupId>
+            <artifactId>polyglot</artifactId>
+            <version>${graalvm.polyglot.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.graalvm.polyglot</groupId>
+            <artifactId>js</artifactId>
+            <version>${graalvm.polyglot.version}</version>
+            <type>pom</type>
         </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
@@ -139,6 +179,31 @@
                                         </resource>
                                         <resource>
                                             <directory>${project.build.directory}/spring-aot/main/resources</directory>
+                                        </resource>
+                                    </resources>
+                                </configuration>
+                            </execution>
+                            <!-- The pack folder beside the binary. A native image carries resources
+                                 as a flat named set with no directory entries, so nothing in the
+                                 image can list a pack's directory, however many files are registered
+                                 (see builder-native-hints). SpecFolders therefore falls back to the
+                                 `specs/` folder next to the running program, and this is what puts it
+                                 there — next to target/smith, not inside it, because the route starts
+                                 from the executable's own directory rather than the working
+                                 directory. The classpath route still answers first wherever it can,
+                                 so this copy is inert on a JVM run. -->
+                            <execution>
+                                <id>pack-specs-beside-binary</id>
+                                <phase>prepare-package</phase>
+                                <goals>
+                                    <goal>copy-resources</goal>
+                                </goals>
+                                <configuration>
+                                    <outputDirectory>${project.build.directory}</outputDirectory>
+                                    <resources>
+                                        <resource>
+                                            <directory>${project.basedir}/src/main/resources/specs</directory>
+                                            <targetPath>specs</targetPath>
                                         </resource>
                                     </resources>
                                 </configuration>

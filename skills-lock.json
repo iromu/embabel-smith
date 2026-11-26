@@ -22,6 +22,13 @@
       "computedHash": "b093f8834fe00b45abad946f96aebaab6e6b1daaee1ada1635f865ce7e48cb84",
       "commit": "a251aac4056dc7c72690e4b443627811d7812d45"
     },
+    "embabel-agent-spec": {
+      "source": "iromu/awesome-qwen",
+      "commit": "54ffef93c0f9860c0e69ea95646b086463e0792b",
+      "sourceType": "github",
+      "skillPath": "skills/embabel-agent-spec/SKILL.md",
+      "computedHash": "966b566dd614ba4d43ec0aefd78996af599da748390a2a1e87ce00f423d8c4e4"
+    },
     "embabel-worlds-realm-spec": {
       "source": "iromu/awesome-qwen",
       "sourceType": "github",

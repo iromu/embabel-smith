@@ -1,0 +1,8 @@
+name: BlueprintBrief
+description: "What the blueprint documents say, as the surveying step read them: the process or processes they describe, the roles and stages named in them, and the library packs that already cover part of it"
+ownProperties:
+  - name: summary
+    type: string
+    description: "The business process the documents describe, in the documents' own terms, with the stages and hand-offs in the order they run"
+parents: []
+creationPermitted: true

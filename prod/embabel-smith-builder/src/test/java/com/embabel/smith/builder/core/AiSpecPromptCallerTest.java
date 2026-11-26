@@ -5,8 +5,12 @@
 
 package com.embabel.smith.builder.core;
 
+import java.util.List;
+
 import com.embabel.agent.api.common.Ai;
 import com.embabel.agent.api.common.PromptRunner;
+import com.embabel.agent.api.reference.LlmReference;
+import com.embabel.agent.skills.Skills;
 import com.embabel.common.ai.model.LlmOptions;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -34,10 +38,33 @@ class AiSpecPromptCallerTest {
 
 		assertThat(caller.call("SYSTEM-PROMPT", "USER-CONTENT")).isEqualTo("answer");
 
+		verify(runner, never()).withReference(any());
 		verify(runner).withSystemPrompt("SYSTEM-PROMPT");
 		ArgumentCaptor<String> instruction = ArgumentCaptor.forClass(String.class);
 		verify(runner).generateText(instruction.capture());
 		assertThat(instruction.getValue()).isEqualTo("USER-CONTENT");
+	}
+
+	/**
+	 * The reference-carrying call, which is how the builder's with-skill eval arm offers
+	 * a skill's scripts as tools. It is asserted on the production caller rather than on
+	 * a fake because of how this seam is doubled elsewhere: a caller that forwards
+	 * {@code call(system, user, reference)} to {@code call(system, user)} answers every
+	 * fake exactly as a plain call does, so only the real implementation can show the
+	 * reference reached the request.
+	 */
+	@Test
+	void attachesAReferenceToTheSameRunnerThatCarriesThePrompt() {
+		PromptRunner runner = runnerReturning("answer");
+		when(runner.withReference(any(LlmReference.class))).thenReturn(runner);
+		AiSpecPromptCaller caller = new AiSpecPromptCaller(ai(runner), LlmOptions.withDefaults());
+		Skills skills = new Skills("cold-store-goods-receipt", "a skill to offer", List.of());
+
+		assertThat(caller.call("SYSTEM-PROMPT", "USER-CONTENT", skills)).isEqualTo("answer");
+
+		verify(runner).withReference(skills);
+		verify(runner).withSystemPrompt("SYSTEM-PROMPT");
+		verify(runner).generateText("USER-CONTENT");
 	}
 
 	@Test

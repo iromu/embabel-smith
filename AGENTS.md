@@ -28,11 +28,12 @@ multiplier.
 
 ## What to Read First
 0. `graphify-out/graph.json` Before grepping, globbing, or reading raw source files to answer architecture, dependency, or "how does X work" questions, check if `graphify-out/graph.json` exists.
-1. `README.md` — introduction, module table, run book, and the documentation index
+1. `README.md` — short introduction: what the project does, what ships, one command to run it
 2. `.wiki/index.md` — wiki with all the knowledge you need to know
 3. `docs/index.md` — the durable reference; one page per durable concern
    (architecture, spec format, sources, runtime, builder, studio, improvement loop,
-   POC evidence, backlog). Only read here if the wiki and README did not answer.
+   POC evidence, backlog, and the run commands). Read the README for orientation, then here:
+   the README is an overview and deliberately holds no detail.
 
 ---
 
@@ -47,11 +48,6 @@ Rules:
 
 ## Documentation status
 
-Do not go looking for `openspec/specs/` or a change folder for a capability — the
-`docs/` page is the contract, and the code outranks it where they disagree. The
-scaffolding still works (`openspec/config.yaml`, the CLI from `make setup`), so
-starting a new planning change is still valid; it would edit these pages, not specs.
-
 Durable rules worth knowing before editing: `poc/` is frozen evidence and product work
 never touches it; no model call under `prod/` may bypass Embabel's `Ai` layer; a
 generated spec is validated before it is written; publishing commits and never pushes
@@ -61,5 +57,6 @@ by default. Details and the why are in `docs/05-architecture.md`.
 Maven's `validate` phase, so a style violation fails `make build` and `make test` —
 and the reactor stops at the first failing module, hiding everything behind it.
 
-A vocabulary change is a documentation change: the wiki cross-links 44 pages and is
+A vocabulary change is a documentation change: the wiki cross-links 46 pages — 47 markdown files under
+`.wiki/`, the index itself being the one file no link names — and is
 published to GitHub Pages, so it needs a wiki lint and a re-publish afterwards.

@@ -7,6 +7,7 @@ package com.embabel.smith.builder;
 
 import java.util.List;
 
+import com.embabel.smith.builder.cli.BuildFlow;
 import com.embabel.smith.builder.core.Recommendation;
 import com.embabel.smith.builder.lifecycle.LifecycleMetadata;
 import com.embabel.smith.builder.publish.PublishResult;
@@ -31,11 +32,17 @@ import com.embabel.smith.common.model.AgentSpec;
  * @param draft the retained draft when the build could not be resolved.
  * @param recommendation the build's choice between its two candidates, and the scores it
  * was made on; {@code null} for a build that never got that far.
+ * @param flow the flow that ran the build, as {@code smith build --flow} names it;
+ * {@code null} when nothing stamped one. The stamp is the CLI's, because there is
+ * deliberately no flow field in {@code BuildOptions} to carry it through the build
+ * (design D3 of the flow flag): a driver that calls {@code BuilderService} directly — the
+ * studio, the improvement loop — gets a result with no flow named, and the report says
+ * nothing rather than guess.
  * @author Ivan Rodriguez
  */
 public record BuildResult(Status status, String stage, String packName, Double score, List<String> issues,
 		ScanReport scan, LifecycleMetadata lifecycle, PublishResult published, AgentSpec draft,
-		Recommendation recommendation) {
+		Recommendation recommendation, BuildFlow flow) {
 
 	public enum Status {
 
@@ -59,13 +66,26 @@ public record BuildResult(Status status, String stage, String packName, Double s
 	public static BuildResult built(String packName, double score, ScanReport scan, LifecycleMetadata lifecycle,
 			PublishResult published, Recommendation recommendation) {
 		return new BuildResult(Status.BUILT, "done", packName, score, List.of(), scan, lifecycle, published, null,
-				recommendation);
+				recommendation, null);
 	}
 
 	public static BuildResult blocked(String stage, String packName, List<String> issues, Double score, ScanReport scan,
 			AgentSpec draft) {
 		return new BuildResult(Status.BLOCKED, stage, packName, score,
-				(issues != null) ? List.copyOf(issues) : List.of(), scan, null, null, draft, null);
+				(issues != null) ? List.copyOf(issues) : List.of(), scan, null, null, draft, null, null);
+	}
+
+	/**
+	 * The same outcome with the flow that produced it named, which is the last thing the
+	 * driver gets to say about a build. Copy rather than constructor argument: the flow
+	 * is the CLI's switch and {@code BuilderService} — which does not know it, by design
+	 * — is what constructs the result.
+	 * @param flow the flow that ran this build
+	 * @return the result, carrying the flow
+	 */
+	public BuildResult withFlow(BuildFlow flow) {
+		return new BuildResult(this.status, this.stage, this.packName, this.score, this.issues, this.scan,
+				this.lifecycle, this.published, this.draft, this.recommendation, flow);
 	}
 
 	/** A human-readable build report for stdout. */
@@ -73,6 +93,7 @@ public record BuildResult(Status status, String stage, String packName, Double s
 		StringBuilder sb = new StringBuilder();
 		if (isBuilt()) {
 			sb.append("BUILD OK: ").append(this.packName).append('\n');
+			appendFlow(sb);
 			if (this.recommendation != null) {
 				sb.append("  candidate:   ").append(this.recommendation.reason()).append('\n');
 				Double processScore = (null != this.recommendation.process()) ? this.recommendation.process().score()
@@ -106,6 +127,7 @@ public record BuildResult(Status status, String stage, String packName, Double s
 		}
 		else {
 			sb.append("BUILD BLOCKED at ").append(this.stage).append(" (").append(this.packName).append(")\n");
+			appendFlow(sb);
 			if (this.score != null) {
 				sb.append("  eval score:  ").append(String.format("%.3f", this.score)).append('\n');
 			}
@@ -117,6 +139,18 @@ public record BuildResult(Status status, String stage, String packName, Double s
 			}
 		}
 		return sb.toString();
+	}
+
+	/**
+	 * The line that makes a run attributable from its output rather than from how it was
+	 * launched: the flow that produced it, as {@code --flow} names it. Absent when no
+	 * driver stamped one, which is the honest reading — the report does not invent a flow
+	 * for a build it cannot name.
+	 */
+	private void appendFlow(StringBuilder sb) {
+		if (this.flow != null) {
+			sb.append("  flow:        ").append(this.flow.id()).append('\n');
+		}
 	}
 
 	private static String shortHash(String hash) {

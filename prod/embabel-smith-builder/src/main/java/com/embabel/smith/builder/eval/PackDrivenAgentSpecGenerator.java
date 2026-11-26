@@ -11,6 +11,7 @@ import java.util.List;
 
 import com.embabel.smith.builder.core.AgentSpecGenerator;
 import com.embabel.smith.builder.core.AgentSpecNormalizer;
+import com.embabel.smith.builder.core.BuilderPackPaths;
 import com.embabel.smith.builder.core.CompiledDraft;
 import com.embabel.smith.common.io.AgentSpecReader;
 import com.embabel.smith.common.model.AgentSpec;
@@ -19,7 +20,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
  * The pack flow's generator (design D1): the builder's own
- * {@code builder-agent-specs/builder-spec-one-shot} pack deployed through
+ * {@code specs/builder-spec-one-shot} pack deployed through
  * {@link AgentSpecInvokerFactory#invokerFor(AgentSpec, String)}, its exported goal run
  * over the description, and the JSON that comes back parsed into the draft the Java flow
  * would have produced. One model call either way — what changes is that the call now
@@ -50,13 +51,25 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 public class PackDrivenAgentSpecGenerator implements AgentSpecGenerator {
 
 	/**
-	 * The shipped pack, addressed from the module directory — the convention
+	 * The shipped pack, addressed through the class loader — the convention
 	 * {@code core/BuilderAgentSpecPackTest} and
 	 * {@code eval/CollaborationStructureIsFixedByConstructionTest} use for the same
-	 * directory. Nothing resolves it against the classpath: the packs are the mutable
-	 * surface, so they live outside {@code src/main/resources}.
+	 * directory. What governs the placement is which side of the improvement loop a file
+	 * sits on: {@code src/main/resources/prompts} holds the scorer prompts, the referee a
+	 * generation may not touch, and {@code src/main/resources/specs} holds the packs, the
+	 * surface it may edit, which is the boundary {@code skill/ScorerPromptBoundaryTest}
+	 * guards by content. Both are resources, so neither depends on the directory a build
+	 * was launched from.
+	 * <p>
+	 * Resolved when it is asked for rather than at class load, so a pack that is not
+	 * there is a build that fails with the refusal {@code SpecFolders} writes — naming
+	 * every place it looked — rather than an {@code ExceptionInInitializerError} from
+	 * loading this class, which is what a static initializer would have produced.
+	 * @return the directory of the pack this flow drives
 	 */
-	public static final Path BUILDER_PACK = Path.of("builder-agent-specs", "builder-spec-one-shot");
+	public static Path builderPack() {
+		return BuilderPackPaths.directory("builder-spec-one-shot");
+	}
 
 	private final InvokerFactory invokers;
 

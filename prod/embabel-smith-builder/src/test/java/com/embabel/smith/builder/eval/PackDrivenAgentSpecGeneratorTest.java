@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import com.embabel.smith.builder.core.BuilderPackPaths;
 import com.embabel.smith.builder.core.CompiledDraft;
 import com.embabel.smith.common.io.AgentSpecReader;
 import com.embabel.smith.common.model.AgentSpec;
@@ -22,10 +23,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * What the pack flow does between a description and a draft, offline: it reads the
- * builder pack from disk, deploys it through {@link InvokerFactory} — the seam
- * {@link AgentSpecInvokerFactory} implements, so nothing here needs a platform — and runs
- * its exported goal. The invoker answers with the same JSON the single-shot generator
- * would have parsed, so the assertions are about the route rather than about a model.
+ * builder pack from this module's {@code specs/} resources, deploys it through
+ * {@link InvokerFactory} — the seam {@link AgentSpecInvokerFactory} implements, so
+ * nothing here needs a platform — and runs its exported goal. The invoker answers with
+ * the same JSON the single-shot generator would have parsed, so the assertions are about
+ * the route rather than about a model.
  *
  * <p>
  * The failure half is task 3.4: each way this generator can fail names the flow that
@@ -36,8 +38,12 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  */
 class PackDrivenAgentSpecGeneratorTest {
 
-	/** The pack {@code cli/BuildCommand} drives under {@code --flow pack}. */
-	private static final Path PACK_DIR = Path.of("builder-agent-specs", "builder-spec-one-shot");
+	/**
+	 * The pack {@code cli/BuildCommand} drives under {@code --flow pack}, addressed
+	 * through the class loader as {@link PackDrivenAgentSpecGenerator#builderPack()}
+	 * addresses it.
+	 */
+	private static final Path PACK_DIR = BuilderPackPaths.directory("builder-spec-one-shot");
 
 	/** The goal {@code builder-spec-one-shot/goal.yml} exports. */
 	private static final String GOAL = "agentSpecDraftedInOneCall";
@@ -158,9 +164,10 @@ class PackDrivenAgentSpecGeneratorTest {
 	}
 
 	/**
-	 * The pack this flow drives is on disk and readable by the same reader the eval uses,
-	 * so the generator's failure message above is about a path that exists rather than
-	 * about a fixture this test forgot to write.
+	 * The pack this flow drives is the shipped one, addressed through the class loader
+	 * and readable by the same reader the eval uses, so the generator's failure message
+	 * above is about a pack that exists rather than about a fixture this test forgot to
+	 * write.
 	 * @throws IOException when the pack cannot be read
 	 */
 	@Test

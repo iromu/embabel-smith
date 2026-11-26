@@ -26,9 +26,10 @@ import com.embabel.smith.common.model.GoalStepSpec;
  * Shared by the single-shot generators — the one that emits a pack and the one that emits
  * a process — so a pack is normalised identically whichever candidate it came from.
  * Public because {@code eval/PackDrivenAgentSpecGenerator} — the pack flow's generator —
- * has to normalise the same way for the two flows' drafts to be comparable at all
- * ({@code openspec/changes/builder-executes-its-own-packs} task 3.3); a second copy of
- * these rules in {@code eval/} would be free to drift from the flow it is meant to match.
+ * has to normalise the same way for the two flows' drafts to be comparable at all (the
+ * parity measurement in {@code docs/08-builder.md}, §Who issues the generation call); a
+ * second copy of these rules in {@code eval/} would be free to drift from the flow it is
+ * meant to match.
  *
  * @author Ivan Rodriguez
  */

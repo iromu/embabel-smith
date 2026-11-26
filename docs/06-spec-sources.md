@@ -69,7 +69,7 @@ reading [`10-self-improvement.md`](10-self-improvement.md).
 
 Publishing writes a pack into a source. It is shared by all three kinds of publishable unit — an
 agent spec, a skill folder, an N-pack process — because the publisher was generalized to *"a named
-directory of files"* rather than staying spec-specific. Note that only `agent-spec` and `skill` are
+directory of files"* rather than staying spec-specific. Only `agent-spec` and `skill` are
 selectable with `--target`; the process is generated alongside every agent-spec build, not chosen.
 That is why the collision gate and the no-push rule are stated once here instead of three times.
 
@@ -90,6 +90,17 @@ none. **A bare pack name means that pack's highest version**, compared segment b
 numerically where a segment is a number, in `store/ProcessStore` rather than in a query; the listing
 resolves through the same rule so it cannot disagree with a load. A studio with no database bound
 records nothing and still publishes.
+
+Two alternatives to that rule were tried and rejected, and both constrain the next change here:
+resolving a bare name to the highest *non-retired* version, because it would couple storage to the
+runtime's lifecycle gate — the store would have to know a state it does not own — and an explicit
+`current` pointer, which is promote/rollback flexibility nobody has asked for. The default version has
+exactly one definition, `PackEntity.DEFAULT_VERSION`, which `store/ProcessStore` and the packs-key
+migration both read; nothing derives it from a persisted row, because a second definition is how a
+republish starts landing in a version nobody loads. The fallback is reachable rather than theoretical:
+`AgentSpecManifest` documents a version as required, but the group-1 validator has no version check,
+so a manifest that omits one arrives at publish as `null`. A skill folder's `metadata.version` is not
+read at all — out of scope by decision, not by oversight.
 
 The location is one value, stated in the source's own terms, and every surface that reports it
 prints it unchanged: `BuildResult.report()` and `skill/SkillBuildResult.report()` print it, and the

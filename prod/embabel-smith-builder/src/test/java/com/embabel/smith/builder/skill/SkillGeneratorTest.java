@@ -176,4 +176,72 @@ class SkillGeneratorTest {
 			.contains("and 7 more findings");
 	}
 
+	@Test
+	void theScriptsTheModelWritesArriveOnTheSkill() {
+		String withScript = "{\"description\": \"d\", \"body\": \"b\", \"scripts\": ["
+				+ "{\"path\": \"scripts/check-temperature.js\", \"content\": \"console.log(Number(stdin) > 4);\"}]}";
+
+		Skill skill = generator(withScript).generate("cold-store-goods-receipt", DESCRIPTION);
+
+		assertThat(skill.scripts()).singleElement().satisfies((script) -> {
+			assertThat(script.path()).isEqualTo("scripts/check-temperature.js");
+			assertThat(script.content()).isEqualTo("console.log(Number(stdin) > 4);\n");
+		});
+		// The scripts are files in the folder, not part of SKILL.md — which is what lets
+		// a
+		// script-carrying skill keep the frontmatter the validator already accepts.
+		assertThat(skill.toSkillMd()).doesNotContain("scripts");
+	}
+
+	@Test
+	void anAnswerWithNoScriptsMemberIsTheInstructionsOnlySkillItAlwaysWas() {
+		Skill skill = generator(CANNED).generate("cold-store-goods-receipt", DESCRIPTION);
+
+		assertThat(skill.scripts()).isEmpty();
+	}
+
+	@Test
+	void aModelThatDropsTheScriptsFolderPrefixStillWritesIntoIt() {
+		// The folder is the format's, not the model's to choose: the name is reduced to a
+		// file and addressed under scripts/, so neither "totals.js" nor "../totals.js"
+		// can
+		// put a file anywhere else in the published folder.
+		String declaredElsewhere = "{\"description\": \"d\", \"body\": \"b\", \"scripts\": ["
+				+ "{\"path\": \"../outside/totals.js\", \"content\": \"console.log(1);\"}]}";
+
+		Skill skill = generator(declaredElsewhere).generate("cold-store-goods-receipt", DESCRIPTION);
+
+		assertThat(skill.scripts()).singleElement()
+			.satisfies((script) -> assertThat(script.path()).isEqualTo("scripts/totals.js"));
+	}
+
+	@Test
+	void aScriptThatIsNotJavaScriptStopsTheBuildRatherThanVanishing() {
+		// Dropping it quietly would publish a body that tells the agent to run a file
+		// that
+		// was never written, and the engine could not run it either way.
+		String notJs = "{\"description\": \"d\", \"body\": \"b\", \"scripts\": ["
+				+ "{\"path\": \"scripts/notes.md\", \"content\": \"do the thing\"}]}";
+
+		assertThatThrownBy(() -> generator(notJs).generate("cold-store-goods-receipt", DESCRIPTION))
+			.isInstanceOf(IllegalStateException.class)
+			.hasMessageContaining("not a JavaScript file");
+	}
+
+	@Test
+	void aScriptCarryingNoSourceIsNotPublishedAsTheStringNull() {
+		// A model can omit the content member or set it to null, and a JSON null's own
+		// text is
+		// the four characters "null" — which would publish as a runnable file that runs
+		// to a syntax error. Both spellings of "no source" are the blank case the
+		// generator already skips, not a script.
+		String explicitNull = "{\"description\": \"d\", \"body\": \"b\", \"scripts\": ["
+				+ "{\"path\": \"scripts/totals.js\", \"content\": null}]}";
+		String absentContent = "{\"description\": \"d\", \"body\": \"b\", \"scripts\": ["
+				+ "{\"path\": \"scripts/totals.js\"}]}";
+
+		assertThat(generator(explicitNull).generate("cold-store-goods-receipt", DESCRIPTION).scripts()).isEmpty();
+		assertThat(generator(absentContent).generate("cold-store-goods-receipt", DESCRIPTION).scripts()).isEmpty();
+	}
+
 }

@@ -1058,8 +1058,10 @@ separate hand-started JVM that loads no skill folder and opens no Graal `Context
 never generate the code that grades it.
 
 **What the improvement object is now.** Retargeted 2026-11-22: a candidate is no longer a pack the POC
-assembled in Java but `builder-single-spec`, one of the four packs under
-`prod/embabel-smith-builder/builder-agent-specs/` ([`08-builder.md`](08-builder.md)), read off disk,
+assembled in Java but `builder-single-spec`, one of the five packs under
+`prod/embabel-smith-builder/builder-agent-specs/` as that directory stood on that date — it holds six now,
+since `builder-harness` arrived on 2026-11-23 as the fourth flow's pack
+([`08-builder.md`](08-builder.md)) — read off disk,
 renamed to the variant id, with the generated policy **appended** to one step prompt —
 `scopeCoreProcess`, the pack's entry step, which is what preserves the `{{userInput.content}}`
 interpolation that §4 of its README found missing. The mutation operator is the POC's own
@@ -1195,6 +1197,10 @@ export EMBABEL_MODELS_DEFAULT_LLM=<model>
 # Full loop — description → built agent spec → goal output.
 ./run-loop.sh "A spec that explains a topic in plain language and posts it as a background message" \
               "Explain how a coffee machine works"
+
+# Both arguments have defaults, so a bare run works. The planner and the builder's output directory
+# are environment overrides: PLANNER defaults to GOAP, BUILDER_OUTPUT_DIR to $PWD/built-specs.
+PLANNER=UTILITY BUILDER_OUTPUT_DIR=./built-specs ./run-loop.sh
 ```
 
 **Offline POCs (no endpoint needed):**
@@ -1286,6 +1292,40 @@ BUILDER_TOPIC="how a coffee machine works" \
     mvn -pl poc/poc-13-remote-mcp spring-boot:run
 ```
 
+**Endpoint-gated POC 1 / 2 / 3 / 4 / 5 / 6** (need the env vars above — POC 4's format surface is
+offline, its goal run is not):
+
+```bash
+# POC 1 — no-code runtime: run the explainer spec over an input.
+BUILDER_PACK_DIR="$PWD/agent-specs/explainer" \
+BUILDER_INPUT="Explain how a coffee machine works" BUILDER_PLANNER=GOAP \
+    mvn -pl poc/poc-1-no-code-runtime spring-boot:run
+
+# POC 2 — NL-compile: compile a description into a draft.
+BUILDER_DESCRIPTION="An agent spec that explains a topic in plain language and posts it as a background message" \
+    mvn -pl poc/poc-2-nl-compile spring-boot:run
+
+# POC 3 — builder agent: build a validated agent spec from a description. The output dir defaults to
+#   ./built-specs relative to the module, so an absolute path is what makes the built pack findable.
+BUILDER_DESCRIPTION="An agent spec that explains a topic in plain language and posts it as a background message" \
+BUILDER_OUTPUT_DIR="$PWD/built-specs" \
+    mvn -pl poc/poc-3-builder-agent spring-boot:run
+
+# POC 4 — agent-spec format: resolve and run the exported goal on demand.
+BUILDER_PACK_DIR="$PWD/agent-specs/explainer" BUILDER_INPUT="Explain how a coffee machine works" \
+    mvn -pl poc/poc-4-agent-spec-format spring-boot:run
+
+# POC 5 — eval: score the explainer spec on a set of tasks. Runs the eval 5× by default and reports
+#   eval-score stability; BUILDER_EVAL_RUNS=1 scores once and prints just the composite.
+BUILDER_PACK_DIR="$PWD/agent-specs/explainer" \
+    mvn -pl poc/poc-5-eval spring-boot:run
+
+# POC 6 — spec composition: chain two independent specs via GOAP.
+BUILDER_PACK_DIRS="$PWD/agent-specs/compose-extract,$PWD/agent-specs/compose-explain" \
+BUILDER_TARGET_GOAL=explainerDone BUILDER_INPUT="Explain how a coffee machine works" \
+    mvn -pl poc/poc-6-agent-spec-composition spring-boot:run
+```
+
 **POC 26 — GraalJS skill scripts (C11).** Runs the skill's `scripts/*.js` inside the agent's own
 JVM. Sections 1–5 print before Spring starts, so they need no endpoint; section 6 — the model
 calling the script through the tool loop — uses the env vars above.
@@ -1297,4 +1337,5 @@ mvn -pl poc/poc-26-graaljs-skill-scripts spring-boot:run
 #   → the in-JVM vs external-node table → (with an endpoint) "calling tool …_compute_totals"
 ```
 
-Per-POC commands (using `BUILDER_*` env vars, not `-D`) are in `README` "Per-POC run commands".
+Per-POC commands are the ones above, one module per `mvn -pl`. They take `BUILDER_*` env vars rather
+than `-D` properties because of §5's defect 1.

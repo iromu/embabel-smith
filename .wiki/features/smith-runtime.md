@@ -21,9 +21,14 @@ source_paths:
   - "prod/embabel-smith-builder/src/main/java/com/embabel/smith/builder/eval/StepSpecAssembler.java"
   - "prod/embabel-smith-studio/src/main/java/com/embabel/smith/studio/rest/RunController.java"
   - "prod/embabel-smith-studio/src/main/java/com/embabel/smith/studio/rest/RemoteController.java"
+  - "prod/embabel-smith-studio/src/test/java/com/embabel/smith/studio/NoA2aEndpointTest.java"
+  - "prod/embabel-smith-studio/src/test/java/com/embabel/smith/studio/A2aEndpointWhenEnabledTest.java"
   - "docs/07-runtime.md"
+  - "docs/05-architecture.md"
+  - "prod/embabel-smith-runtime/src/main/resources/application.yml"
+  - "smith-common/src/main/java/com/embabel/smith/common/trace/TraceRecord.java"
   - "prod/embabel-smith-runtime/README.md"
-updated_at: "2026-11-22"
+updated_at: "2026-11-26"
 ---
 
 # The smith runtime product (`smith run`)
@@ -53,8 +58,17 @@ smith run --source <uri> [--goal <name>] [--input <text>] [--planner <name>]
 - `--trace-dir` — the JSONL trace directory; defaults to `~/.smith/traces` (file `runs.jsonl`).
 
 Exit codes: **0** on success (goal output to stdout), **1** on run failure (error to stderr), **2**
-on usage errors. The model endpoint is env-driven exactly as in the POCs ([[model-endpoint]]);
-without it the CLI exits 1 with a clear configuration error naming the missing variables.
+on usage errors. The model endpoint is env-driven, as in the POCs ([[model-endpoint]]), and **the
+runtime applies no endpoint gate**: `application.yml` feeds all three providers an inert but
+well-formed default (`…:sk-smith-no-endpoint`, `…:http://127.0.0.1:9/v1`) so the app boots with
+nothing set, and an unconfigured endpoint surfaces as a *failed run* — exit 1 carrying the run's
+error — rather than as a named configuration error listing missing variables. The structured
+`MODEL_NOT_CONFIGURED` refusal is a studio-layer concern (`smith-common`'s `ModelEndpointConfig`,
+consulted by the studio's controllers). `docs/07-runtime.md` §"The model endpoint" is the authority
+for that; `prod/embabel-smith-runtime/README.md` still carries the older wording. `docs/05-architecture.md`
+states the detection order for the env-driven apps: any `OPENAI_CUSTOM_*` variable set selects the
+OpenAI-compatible endpoint, else `OPENAI_API_KEY` the bundled OpenAI catalog, else `ANTHROPIC_API_KEY`
+Anthropic's, else no provider is configured at all.
 
 ## Ingest + run
 
@@ -90,6 +104,16 @@ revival is an explicit rebuild, which republishes the pack and leaves `retired`;
 override. The block follows the trust-tier convention, and `AgentSpecRunService` catches the three
 together (`GoalNotFoundException`, `LifecycleBlockedException`, `TrustTierBlockedException`) as run
 failures rather than crashes.
+
+The lifecycle vocabulary is **duplicated rather than shared**, and `docs/07-runtime.md` §"Lifecycle
+state" is the authority. The builder owns it — `builder/lifecycle/LifecycleState` is the four-valued
+enum and `LifecycleStamper` writes it — while the runtime reads `state` **as a string** and compares it
+only against its own local `RETIRED` constant, so the reader never depends on the writer; the loop's
+`builder/improve/Detector` likewise matches `LifecycleBlockedException`'s message prefix
+(`Detector.LIFECYCLE_BLOCK_PREFIX`) rather than importing the class. The settled plan is to move those
+types down into `smith-common` *when a second reader appears*, not to add a builder→runtime edge
+meanwhile (`docs/05-architecture.md`). The contract between the modules is therefore one state string
+and one message prefix — renaming either is a change in both places.
 
 ## Per-run model pinning
 
@@ -152,6 +176,14 @@ when the goal was not found; `steps` is empty when the run never executed (tier 
 found, no plan). Readers are corrupt-line-tolerant — a malformed line is skipped and reported, not
 fatal.
 
+The store is an SPI, and the seam does **not** live here: `TraceRecord` (a record) and `TraceStore`
+(an interface) are framework-free types in `smith-common/common/trace/`, which is why the improvement
+loop could move from the studio into the builder without the builder depending on the runtime
+(`docs/05-architecture.md`). This module contributes the default implementation,
+`trace/JsonlTraceStore`, at `~/.smith/traces/runs.jsonl`; the studio contributes
+`storage/JpaTraceStore` implementing the same interface. (`docs/07-runtime.md` §"The trace store is an
+SPI" still says the seam lives in the runtime; the imports say otherwise.)
+
 ## The trace seam
 
 The per-step data comes from `AgentProcess.getHistory()` (exactly one `ActionInvocation` per
@@ -165,10 +197,19 @@ findings.
 
 ## A third door: the A2A endpoint
 
-`prod/embabel-smith-runtime-a2a` (`make run-a2a`) drives the same `AgentSpecRunService` over the
-A2A protocol, so an A2A run is the same run: same tier gate, same planner selection, one record in
-the same JSONL trace — which is also what its `tasks/get` reads. It is an unauthenticated local
-development surface on port 18090, serving five operations. See [[a2a-endpoint]].
+The starter library `prod/embabel-smith-a2a-starter` supplies the beans and
+`prod/embabel-smith-studio` hosts them (`make run-a2a` sets `SMITH_A2A_ENABLED=true`, the env form of
+`smith.a2a.enabled`), driving the same
+`AgentSpecRunService` over the A2A protocol, so an A2A run is the same run: same tier gate, same planner
+selection, one record in the same JSONL trace — which is also what its `tasks/get` reads. This module
+hosts nothing, and not by choice: `smith run` boots non-web, closes the context and exits, and the
+module cannot carry the starter even if it wanted to — the starter's main sources import
+`AgentSpecRunService`, `core.TrustTier`, `core.TrustTierPolicy` and `trace.JsonlTraceStore` from here,
+so a runtime→starter dependency is a reactor cycle. The contract is stated as an explicit opt-in
+(`docs/07-runtime.md`): no process exposes an endpoint unless the surface is enabled in
+that process, and the CLI cannot expose one at all because it never depends on the starter. The surface
+is an unauthenticated local development endpoint on port 18090, serving five operations. See
+[[a2a-endpoint]].
 
 ## Tests
 

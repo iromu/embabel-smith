@@ -12,6 +12,7 @@ import java.util.Map;
 import com.embabel.agent.api.annotation.LlmTool;
 import com.embabel.agent.api.tool.Tool;
 import com.embabel.smith.builder.tools.AgentSpecValidationTool;
+import com.embabel.smith.builder.tools.ToolSurface;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -67,7 +68,7 @@ class BuilderPackToolsTest {
 
 	@Test
 	void theSchemaNamesTheArgumentAfterTheAdaptersSignatureRatherThanJavacsPlaceholder() {
-		Tool tool = BuilderPackTools.validationTool();
+		Tool tool = BuilderPackTools.validationTool(new ToolSurface());
 		List<Tool.Parameter> parameters = tool.getDefinition().getInputSchema().getParameters();
 
 		assertThat(parameters).as("the validator takes one argument").hasSize(1);
@@ -184,7 +185,7 @@ class BuilderPackToolsTest {
 		// The call the old tool answered with a layout finding. A path is not a spec, so
 		// it is now the validator's parse finding instead — still a finding, and one that
 		// says what is wrong with the argument rather than with a directory.
-		assertThat(BuilderPackTools.findings("\"builder-agent-specs/builder-single-spec\"")).contains("PARSE_ERROR");
+		assertThat(BuilderPackTools.findings("\"specs/builder-single-spec\"")).contains("PARSE_ERROR");
 	}
 
 	/**
@@ -202,7 +203,7 @@ class BuilderPackToolsTest {
 		assertThat(annotation).as("the adapter still carries @LlmTool").isNotNull();
 		assertThat(BuilderPackTools.VALIDATE_PACK).as("a blank @LlmTool name means the method's own name")
 			.isEqualTo(annotation.name().isEmpty() ? method.getName() : annotation.name());
-		assertThat(BuilderPackTools.validationTool().getDefinition().getDescription())
+		assertThat(BuilderPackTools.validationTool(new ToolSurface()).getDefinition().getDescription())
 			.as("description the model reads for %s", BuilderPackTools.VALIDATE_PACK)
 			.isEqualTo(annotation.description());
 	}

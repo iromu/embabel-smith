@@ -11,11 +11,12 @@ source_paths:
   - "prod/embabel-smith-builder/src/main/java/com/embabel/smith/builder/core/Recommendation.java"
   - "prod/embabel-smith-builder/src/main/java/com/embabel/smith/builder/core/SingleShotProcessSpecGenerator.java"
   - "prod/embabel-smith-builder/src/main/java/com/embabel/smith/builder/core/ProcessRepair.java"
+  - "prod/embabel-smith-builder/src/main/java/com/embabel/smith/builder/cli/BuildCommand.java"
   - "smith-common/src/main/java/com/embabel/smith/common/model/ProcessSpec.java"
   - "smith-common/src/main/java/com/embabel/smith/common/validation/ProcessValidator.java"
   - "smith-common/src/main/java/com/embabel/smith/common/validation/ProcessValidationResult.java"
   - "docs/08-builder.md"
-updated_at: "2026-11-22"
+updated_at: "2026-11-26"
 ---
 
 # Two-candidate build (single agent vs multi-agent process)
@@ -38,7 +39,11 @@ was made rather than assumed.
 
 `SingleShotProcessSpecGenerator` asks the model for the decomposition and **throws when it returns
 fewer than two agents** — one pack is the other candidate, not a second shape of this one. The throw
-lands in the `build`'s "candidate failed to generate" note; the build continues.
+lands in the `build`'s "candidate failed to generate" note; the build continues. `smith build --flow pack`
+does not change the pair: the flow branches only in `cli/BuildCommand.generators()`, while `newService`
+wires `SingleShotProcessSpecGenerator` unconditionally (`cli/BuildCommand.java#newService`), so under `pack` the
+process candidate is still generated Java-side and still spends Java-issued model calls
+([[smith-builder]]).
 
 `ProcessValidator` (`smith-common`) is the check a single-pack validator cannot make, because it is
 about hand-offs rather than any one agent: exported goal present, goal produced by the agent's own

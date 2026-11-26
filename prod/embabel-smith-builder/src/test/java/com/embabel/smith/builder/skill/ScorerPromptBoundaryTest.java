@@ -5,6 +5,7 @@
 
 package com.embabel.smith.builder.skill;
 
+import com.embabel.smith.builder.core.BuilderPackPaths;
 import com.embabel.smith.common.io.AgentSpecReader;
 import com.embabel.smith.common.model.ActionStepSpec;
 import com.embabel.smith.common.model.AgentSpec;
@@ -36,12 +37,13 @@ import static org.assertj.core.api.Assertions.assertThat;
  * {@link SkillPrompts}: {@code grade_eval.jinja} (the LLM-as-judge verdict rule) and the
  * two eval arms {@code agent_baseline.jinja} and {@code agent_with_skill.jinja} (what the
  * judge is asked to compare). Design decision D10 keeps those three off the mutable
- * surface <em>by placement</em>: they are classpath resources under
- * {@code src/main/resources}, while the builder's flow now also lives as packs under
- * {@code builder-agent-specs/}, and a pack's step prompts are the part a generation may
- * legitimately edit. So a mutation confined to pack files cannot reach the referee —
- * unless someone copies the referee's own words into a step. This test is the offline
- * guard that they have not been.
+ * surface <em>by placement</em>: both halves are classpath resources under
+ * {@code src/main/resources} now, but in sibling folders that are not interchangeable —
+ * the three are read from {@code prompts/}, while the builder's flow lives as packs under
+ * {@code specs/}, and a pack's step prompts are the part a generation may legitimately
+ * edit. So a mutation confined to pack files cannot reach the referee — unless someone
+ * copies the referee's own words into a step. This test is the offline guard that they
+ * have not been.
  *
  * <p>
  * <b>Why the assertion is on content and not on filenames.</b> A guard that greps the
@@ -50,11 +52,11 @@ import static org.assertj.core.api.Assertions.assertThat;
  * is between text — the three resources' text as {@link SkillPrompts} reads it from the
  * classpath (its own {@code gradeEval()}, {@code agentBaseline()},
  * {@code agentWithSkill()} accessors, so this measures the bytes production sends to the
- * judge, not a second copy of them), against the concatenated step prompts of all four
+ * judge, not a second copy of them), against the concatenated step prompts of all six
  * packs, read through {@link AgentSpecReader#read(Path)} — the same reader the product
- * uses and the same path-addressed convention {@code core/BuilderAgentSpecPackTest} uses,
- * since {@code builder-agent-specs/} sits at the module root and is not on the test
- * classpath.
+ * uses, over the directory {@code core/BuilderPackPaths} resolves for each pack: the
+ * {@code specs/} classpath resource, found through the class loader rather than by being
+ * in a particular working directory.
  *
  * <p>
  * <b>The measure, and why this one.</b> Normalise both sides (drop Jinja {@code {#…#}}
@@ -72,11 +74,11 @@ import static org.assertj.core.api.Assertions.assertThat;
  * from those prompts and share their output schema and field-name lists with them. Shared
  * vocabulary is not the signal; a block of consecutive words is, so the guard asks for
  * the block. A symmetric coefficient stays the wrong instrument for the reason it always
- * was: the haystack is an order of magnitude larger than even the largest scorer (2,750
+ * was: the haystack is an order of magnitude larger than even the largest scorer (5,295
  * normalised words against 218, 49 and 13), so a Jaccard-style coefficient reads a
- * verbatim copy of {@code grade_eval} at about 0.10. Measured on this tree (42c4377),
- * over the thirteen step prompts of the four packs — 17,906 characters as this test's own
- * {@link AgentSpecReader#read(Path)} reads them, 2,750 normalised words:
+ * verbatim copy of {@code grade_eval} at about 0.04. Measured on this tree (e4ab83f),
+ * over the eighteen step prompts of the six packs — 33,189 characters as this test's own
+ * {@link AgentSpecReader#read(Path)} reads them, 5,295 normalised words:
  * {@code grade_eval} 0.037, both arms 0.000; a planted verbatim copy 1.000.
  *
  * <p>
@@ -85,7 +87,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * between the two ends it has to separate: the three scorer prompts measure 0.037, 0.000
  * and 0.000 against the pack text, a planted copy is 1.0. What changed is that the band
  * now has both edges — the builder's legitimately-related text also lands under it: 0.209
- * ({@code process_to_flow}), 0.104 ({@code process_to_flow_multi}), 0.076
+ * ({@code process_to_flow}), 0.104 ({@code process_to_flow_multi}), 0.036
  * ({@code generate_skill}), 0.028 ({@code generate_evals}), 0.000
  * ({@code business_process_discovery}) — asserted by
  * {@link #legitimatelyRelatedBuilderTextDoesNotReadAsACopy()} rather than argued here.
@@ -122,7 +124,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * <b>The controls, which are the point of the file.</b> An assertion that only ever
  * reports "no match" is worth nothing if it is comparing empty strings, so four of the
  * five tests below assert a direction rather than an absence: the three resources load
- * and are non-empty; the scan really covered the thirteen step prompts of all four packs
+ * and are non-empty; the scan really covered the eighteen step prompts of all six packs
  * and their prompts are non-blank; the measure detects a copy planted in that same
  * haystack; and builder text that is merely related to the packs does not read as a copy.
  * The planted-copy test is the positive control rather than scorer-against-itself,
@@ -141,11 +143,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ScorerPromptBoundaryTest {
 
 	/**
-	 * The packs whose step prompts form the mutable surface. Same four directories,
-	 * addressed the same way, as {@code core/BuilderAgentSpecPackTest}.
+	 * The packs whose step prompts form the mutable surface. Same directories, addressed
+	 * the same way, as {@code core/BuilderAgentSpecPackTest} — now all six that ship, the
+	 * fifth being the agentic pack whose prompts name the tools a step may call and the
+	 * sixth the harness route that reads the builder's own documents.
 	 */
 	private static final List<String> PACK_NAMES = List.of("builder-single-spec", "builder-process-composition",
-			"builder-skill-from-process", "builder-spec-one-shot");
+			"builder-skill-from-process", "builder-spec-one-shot", "builder-agentic-blueprint", "builder-harness");
 
 	/**
 	 * The evaluation instrumentation, by resource name, all read through
@@ -179,10 +183,10 @@ class ScorerPromptBoundaryTest {
 	private static final double MATCH_THRESHOLD = 0.6;
 
 	/**
-	 * The thirteen action steps the four packs hold today. A scan below this is not the
+	 * The eighteen action steps the six packs hold today. A scan below this is not the
 	 * scan this guard was written against, so it must not be allowed to pass quietly.
 	 */
-	private static final int MIN_STEPS_SCANNED = 13;
+	private static final int MIN_STEPS_SCANNED = 18;
 
 	/**
 	 * Floor on the prompt text scanned, for the same reason, in characters rather than
@@ -221,13 +225,13 @@ class ScorerPromptBoundaryTest {
 
 	/**
 	 * Every prompt-bearing step of every pack, keyed {@code <pack>/<step>}. Goals carry
-	 * no prompt ({@code GoalSpec} has no prompt field), so these thirteen strings are the
+	 * no prompt ({@code GoalSpec} has no prompt field), so these eighteen strings are the
 	 * whole prompt surface of the packs.
 	 */
 	private static Map<String, String> packStepPrompts() throws IOException {
 		Map<String, String> prompts = new LinkedHashMap<>();
 		for (String packName : PACK_NAMES) {
-			Path dir = Path.of("builder-agent-specs", packName);
+			Path dir = BuilderPackPaths.directory(packName);
 			assertThat(dir.resolve("manifest.yml")).as("pack %s is on disk at %s", packName, dir).isRegularFile();
 			AgentSpec pack = new AgentSpecReader().read(dir);
 			for (ActionStepSpec step : pack.steps()) {
@@ -316,7 +320,7 @@ class ScorerPromptBoundaryTest {
 
 		for (String scorer : SCORER_PROMPTS) {
 			assertThat(longestRunFraction(scorerText(scorer), haystack))
-				.as("text of %s found in the %s of builder-agent-specs/", scorer, describeScan(steps))
+				.as("text of %s found in the %s of specs/", scorer, describeScan(steps))
 				.isLessThan(MATCH_THRESHOLD);
 		}
 	}
@@ -339,10 +343,11 @@ class ScorerPromptBoundaryTest {
 
 	/**
 	 * The conforming direction, second half: the text the guard scans is the whole prompt
-	 * surface of all four packs and it is real. Every pack contributes steps, every step
+	 * surface of all six packs and it is real. Every pack contributes steps, every step
 	 * prompt is non-blank, and the totals clear the floor the packs hold today — so a
-	 * renamed directory, an unread {@code steps/} or a step whose prompt went missing
-	 * fails here rather than making the guard quietly green.
+	 * renamed directory, a pack dropped from {@link #PACK_NAMES}, an unread
+	 * {@code steps/} or a step whose prompt went missing fails here rather than making
+	 * the guard quietly green.
 	 */
 	@Test
 	void theScanCoversEveryPromptOfEveryBuilderPack() throws IOException {

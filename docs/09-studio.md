@@ -92,6 +92,15 @@ can offer a user. The retrieval capability that measurement recommended *is* now
 ranks a source's packs through `RetrieveController`, and the ranking is curated by each pack's
 recorded lifecycle state.
 
+Two rules decide what that ranking can and cannot find, and both are the builder's, not the pane's.
+The text a pack is matched on is built once by `retrieval/SpecEntries`: the pack's name, its goal
+description, every step description, then its **external** input type names — every step input minus
+the types the pack itself produces — and its goal output type. Name and descriptions carry the
+meaning; the type names carry the plumbing a query rarely states but a planner keys on. A pack with no
+descriptions still yields an entry, so an undocumented pack is rankable rather than invisible. And
+`k` is bounded: `dto/RetrieveRequest` defaults it to 10 and caps it at 50, so a blank or
+non-positive request asks for the default and a typo cannot ask for the whole library.
+
 ## The process workspace
 
 - **Ingestion is the builder's.** Loading documents, assembling the corpus and extracting a
@@ -123,7 +132,24 @@ recorded lifecycle state.
 ## Degradation without a model
 
 With no `OPENAI_CUSTOM_*` set, the application boots and every disk-backed pane works. Model-backed
-actions return a structured `MODEL_NOT_CONFIGURED` that the UI renders as a banner — not a 500.
+actions return a structured `MODEL_NOT_CONFIGURED` that the UI renders as a banner — not a 500. The
+message names the provider the environment resolved to and the variables still outstanding, so the
+fix is stated rather than guessed.
+
+Two endpoints tell the browser what the environment can run before a pane spends a run discovering
+it. `/api/status` (`StatusController`) says whether an endpoint resolved and which model a request
+naming none would use. `/api/models` (`ModelsController`) feeds the **model picker** every
+model-launching pane offers: for an OpenAI-compatible endpoint that is the declared
+`OPENAI_CUSTOM_MODELS` list, because a gateway that does not serve the bundled catalog would
+otherwise offer names it cannot honour; for a catalog provider (OpenAI, Anthropic) it is the LLMs
+Embabel registered.
+
+**A request that names a model runs everything it does on that model** — generation, the eval run,
+and any refinement. Every model-launching request DTO carries an optional `model`, and it is pinned
+as `llm.model` onto the step specs staged for that request rather than onto the pack: the pack on
+disk keeps exactly what it had, and a step that already named an `llm` keeps its other settings with
+only the model replaced. A request naming none behaves as it always did: the picker is clearable, its
+placeholder reads *Platform default*, and a cleared selection sends no `model` field at all.
 
 ## Loop settings
 
@@ -137,12 +163,17 @@ The `smith.studio.loop.*` properties, together with the source they publish to, 
   decision the commit-never-push rule exists to protect. A `git:` improve source with pushing off is
   refused rather than committed into a clone the publisher deletes, and the candidate stays pending.
   The reasoning is in [`10-self-improvement.md`](10-self-improvement.md).
-- `smith.studio.improve-source` (default empty) — where an approved candidate is written: a `folder:`
-  or `git:` destination, falling back to the first configured `smith.studio.sources` entry. Empty with
-  no sources configured, the loop **refuses to publish** and names this setting rather than defaulting
+- `smith.studio.improve-source` (default empty) — the source the loop watches and, when it names one,
+  where an approved candidate is written: a `folder:` or `git:` destination, falling back to the first
+  configured `smith.studio.sources` entry. Empty with no sources
+  configured, the loop **refuses to publish** and names this setting rather than defaulting
   the destination to the system temporary directory — a folder there is overwritten by the next
   iteration and may be discarded by the operating system, so a default would be a destination that
-  cannot be relied on to still hold the improvement. The candidate stays pending.
+  cannot be relied on to still hold the improvement. The candidate stays pending. What the property does
+  not decide is what the loop *reads*: with nothing set, `StudioConfiguration.improveSource` falls back
+  to `BuilderPackSurface.specSource()` — the builder's pack sources in the checkout — so an
+  unconfigured studio runs its loop over the packs that actually ship, and a studio started with no
+  checkout fails at that bean rather than booting inert. An explicit value still wins for both readings.
 
 ## Storage
 

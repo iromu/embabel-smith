@@ -59,6 +59,14 @@ import com.embabel.smith.specsource.SpecSource;
  * </ol>
  *
  * <p>
+ * <b>The surface.</b> The packs named by the {@link SpecSource} are the files this loop
+ * reads, deploys and publishes. When its subject is the builder's own packs, that source
+ * has to be {@link BuilderPackSurface} — the pack sources under
+ * {@code src/main/resources/specs} — and not {@code core/BuilderPackPaths}, whose answer
+ * is the build artefact the class loader serves and which the next build recopies from
+ * the source tree.
+ *
+ * <p>
  * The loop logic is plain Java: no web, no scheduling (change 06 wires it to a scheduler
  * and REST endpoints). Model calls (refine, re-eval) are endpoint-gated.
  *

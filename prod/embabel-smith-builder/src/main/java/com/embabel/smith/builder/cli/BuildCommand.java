@@ -15,6 +15,7 @@ import java.util.concurrent.Callable;
 
 import com.embabel.agent.api.common.Ai;
 import com.embabel.agent.core.AgentPlatform;
+import com.embabel.agent.skills.script.SkillScriptExecutionEngine;
 import com.embabel.smith.builder.BuildOptions;
 import com.embabel.smith.builder.BuildResult;
 import com.embabel.smith.builder.BuilderService;
@@ -28,14 +29,18 @@ import com.embabel.smith.builder.core.BuilderAgent;
 import com.embabel.smith.builder.core.GenerationTechnique;
 import com.embabel.smith.builder.core.SingleShotProcessSpecGenerator;
 import com.embabel.smith.builder.eval.AgentSpecInvokerFactory;
+import com.embabel.smith.builder.eval.AgenticAgentSpecGenerator;
 import com.embabel.smith.builder.eval.AiPromptRewriter;
 import com.embabel.smith.builder.eval.EvalTask;
+import com.embabel.smith.builder.eval.HarnessAgentSpecGenerator;
 import com.embabel.smith.builder.eval.InvokerFactory;
 import com.embabel.smith.builder.eval.PackDrivenAgentSpecGenerator;
 import com.embabel.smith.builder.eval.PromptRewriter;
 import com.embabel.smith.builder.publish.PublishTarget;
 import com.embabel.smith.builder.skill.SkillBuildResult;
 import com.embabel.smith.builder.skill.SkillBuilderService;
+import com.embabel.smith.builder.skill.SkillScriptHost;
+import com.embabel.smith.builder.tools.ToolSurface;
 import picocli.CommandLine;
 import picocli.CommandLine.ArgGroup;
 import picocli.CommandLine.Command;
@@ -53,10 +58,14 @@ import picocli.CommandLine.Parameters;
  * {@code --flow} says who issues the generation call: {@code java} (the default, and what
  * every build did before this flag existed) has the Java stages call the generator, while
  * {@code pack} has the builder's own {@code builder-spec-one-shot} pack issue it through
- * {@code AgentSpecInvokerFactory}. It is one flag with one branch, in
- * {@link #generators(InvokerFactory)}, with no property behind it (design D3); the
- * combination it cannot serve — {@code pack} with the Embabel technique, which has no
- * pack — is refused before anything is spent (design D4).
+ * {@code AgentSpecInvokerFactory}, {@code agentic} has {@code builder-agentic-blueprint}
+ * issue it with the checks forced in Java, and {@code harness} has
+ * {@code builder-harness} issue it over steps that read the document roots this command
+ * opened. It is one flag with one branch, in {@link #generators(InvokerFactory)}, with no
+ * property behind it (design D3); the combination no pack flow can serve — a pack flow
+ * with the Embabel technique, which has no pack — is refused before anything is spent
+ * (design D4), and the report names the flow that ran so a run is attributable from its
+ * output.
  *
  * @author Ivan Rodriguez
  */
@@ -103,9 +112,14 @@ public class BuildCommand implements Callable<Integer> {
 
 	@Option(names = "--flow", converter = FlowConverter.class,
 			description = "What drives the build: java "
-					+ "(default, the Java stages issue the generation call) or pack (the builder's own "
+					+ "(default, the Java stages issue the generation call), pack (the builder's own "
 					+ "builder-spec-one-shot pack issues it; its step declares the validate tool group, which "
-					+ "the builder registers, so the step can call the validator)")
+					+ "the builder registers, so the step can call the validator), agentic (the builder's "
+					+ "builder-agentic-blueprint pack issues it over two steps that read the build's documents "
+					+ "and library through tools, and the build runs the validator and the scanner on each "
+					+ "draft itself, re-asking with the findings when they report something), or harness (the "
+					+ "builder's own builder-harness pack issues it over three steps that decide what to read "
+					+ "next from the document roots this command opened, under the same forced checks)")
 	BuildFlow flow = BuildFlow.JAVA;
 
 	@Option(names = "--target", converter = TargetConverter.class,
@@ -117,9 +131,32 @@ public class BuildCommand implements Callable<Integer> {
 
 	private final Ai ai;
 
-	public BuildCommand(AgentPlatform platform, Ai ai) {
+	/**
+	 * What the agentic flow opens for the pack's tools to read, and it has to be
+	 * <em>this</em> instance: the tool groups are beans that received the context's
+	 * {@link ToolSurface} when the context started, so a surface built here instead would
+	 * be populated and read by nobody. Hence the constructor takes it
+	 * ({@code SmithBuilderApplication} passes the bean) rather than defaulting one.
+	 */
+	private final ToolSurface surface;
+
+	/**
+	 * The skill-script engine, present only when
+	 * {@code smith.builder.skill-scripts.enabled} installed the bean. Null is an ordinary
+	 * build: the skill path then has no script host, so its eval arms stay prompt
+	 * substitution.
+	 */
+	private final SkillScriptExecutionEngine scriptEngine;
+
+	public BuildCommand(AgentPlatform platform, Ai ai, ToolSurface surface) {
+		this(platform, ai, surface, null);
+	}
+
+	public BuildCommand(AgentPlatform platform, Ai ai, ToolSurface surface, SkillScriptExecutionEngine scriptEngine) {
 		this.platform = platform;
 		this.ai = ai;
+		this.surface = surface;
+		this.scriptEngine = scriptEngine;
 	}
 
 	/**
@@ -150,9 +187,67 @@ public class BuildCommand implements Callable<Integer> {
 	protected Map<GenerationTechnique, AgentSpecGenerator> generators(InvokerFactory invokers) {
 		if (this.flow == BuildFlow.PACK) {
 			return Map.of(GenerationTechnique.SINGLE_SHOT,
-					new PackDrivenAgentSpecGenerator(invokers, PackDrivenAgentSpecGenerator.BUILDER_PACK));
+					new PackDrivenAgentSpecGenerator(invokers, PackDrivenAgentSpecGenerator.builderPack()));
+		}
+		if (this.flow == BuildFlow.AGENTIC) {
+			openToolSurface();
+			return Map.of(GenerationTechnique.SINGLE_SHOT,
+					new AgenticAgentSpecGenerator(invokers, this.platform, AgenticAgentSpecGenerator.builderPack()));
+		}
+		if (this.flow == BuildFlow.HARNESS) {
+			openToolSurface();
+			return Map.of(GenerationTechnique.SINGLE_SHOT, new HarnessAgentSpecGenerator(invokers, this.platform));
 		}
 		return AgentSpecGenerators.production(this.ai, this.platform);
+	}
+
+	/**
+	 * Tells the tool groups what this build was given, which is the whole of a builder
+	 * tool's reach: the documents from {@code --docs}, and the library only when
+	 * {@code --out} names a {@code folder:} one — a {@code git:} source would mean the
+	 * tool clones, and cloning is a write and a network call this surface does not make.
+	 * The trace store is not wired by {@code smith build} at all, so the trace tools
+	 * answer that honestly ({@code tools/TraceToolGroup}).
+	 * <p>
+	 * Both tool-using flows call this, and the {@link ToolSurface#startRun()} that opens
+	 * it is load-bearing for the harness flow in particular: its steps re-read documents
+	 * across three of them and across the driver's re-invocations, so the run-scoped
+	 * dedupe has to be scoped to <em>this</em> build and not to whatever the process
+	 * built last.
+	 */
+	private void openToolSurface() {
+		this.surface.startRun();
+		this.surface.openedTo((this.input.docs != null) ? List.of(Path.of(this.input.docs)) : List.of());
+		this.surface.openedLibrary(libraryOf(this.out));
+	}
+
+	private static Path libraryOf(String out) {
+		try {
+			PublishTarget target = PublishTarget.parse(out);
+			return (target.type() == PublishTarget.Type.FOLDER) ? Path.of(target.location()) : null;
+		}
+		catch (IllegalArgumentException ex) {
+			// Already reported by the publish path; the library is simply nothing here.
+			return null;
+		}
+	}
+
+	/**
+	 * The pack a pack-driving flow runs, as the refusal names it. Naming it resolves it,
+	 * so the caller that prints this sits inside the command's failure handler: a pack
+	 * that cannot be resolved then reports where it was looked for instead of throwing
+	 * out of {@link #call()}.
+	 * @param flow the flow asked for, which is not {@code java}
+	 * @return the pack directory the flow deploys
+	 */
+	private static String packOf(BuildFlow flow) {
+		if (flow == BuildFlow.AGENTIC) {
+			return AgenticAgentSpecGenerator.builderPack().toString();
+		}
+		if (flow == BuildFlow.HARNESS) {
+			return HarnessAgentSpecGenerator.builderPack().toString();
+		}
+		return PackDrivenAgentSpecGenerator.builderPack().toString();
 	}
 
 	/**
@@ -168,10 +263,12 @@ public class BuildCommand implements Callable<Integer> {
 
 	/**
 	 * Test seam: allows substituting the skill build service.
-	 * @return the skill service wired with the builder's model layer and bundled prompts.
+	 * @return the skill service wired with the builder's model layer and bundled prompts,
+	 * and with a script host only when the engine bean was present.
 	 */
 	protected SkillBuilderService newSkillService() {
-		return new SkillBuilderService(new AiSpecPromptCaller(this.ai));
+		SkillScriptHost host = (this.scriptEngine != null) ? new SkillScriptHost(this.scriptEngine) : null;
+		return new SkillBuilderService(new AiSpecPromptCaller(this.ai), host);
 	}
 
 	/**
@@ -218,18 +315,21 @@ public class BuildCommand implements Callable<Integer> {
 			System.err.println("Missing required parameter for option '--extract': it applies only to --docs.");
 			return 2;
 		}
-		// Checked here, before the documents are read and before --extract spends a
-		// call: a combination with nothing to run is a refusal, not a fallback (design
-		// D4).
-		if (this.flow == BuildFlow.PACK && this.technique == GenerationTechnique.EMBABEL) {
-			System.err.println("Refusing '--flow pack --technique embabel' before any model call: the pack flow "
-					+ "runs builder-agent-specs/builder-spec-one-shot, whose one step is the single-shot prompt, "
-					+ "and there is no pack for the Embabel NL compiler. Running the single-shot prompt instead "
-					+ "would make the flow flag a lie, so nothing falls back either. Use '--flow pack' with "
-					+ "'--technique single-shot', or '--flow java --technique embabel'.");
-			return 1;
-		}
 		try {
+			// Checked here, before the documents are read and before --extract spends a
+			// call: a combination with nothing to run is a refusal, not a fallback
+			// (design D4). Inside the try because naming the pack means resolving it,
+			// and a pack that cannot be resolved is then a build failure with a message
+			// rather than a throwable escaping the command.
+			if (this.flow != BuildFlow.JAVA && this.technique == GenerationTechnique.EMBABEL) {
+				System.err.println("Refusing '--flow " + this.flow.id() + " --technique embabel' before any"
+						+ " model call: the " + this.flow.id() + " flow runs " + packOf(this.flow) + ", whose"
+						+ " steps are the single-shot prompt, and there is no pack for the Embabel NL compiler."
+						+ " Running the single-shot prompt instead would make the flow flag a lie, so nothing falls"
+						+ " back either. Use '--flow " + this.flow.id() + "' with '--technique single-shot', or"
+						+ " '--flow java --technique embabel'.");
+				return 1;
+			}
 			PublishTarget target = PublishTarget.parse(this.out);
 			BuildOptions options = new BuildOptions(this.maxRefine, BuildOptions.DEFAULT_SCORE_GATE, this.overwrite,
 					this.push, this.technique, this.target, this.minLift, null, this.maxInspect, this.fullInspection);
@@ -262,7 +362,7 @@ public class BuildCommand implements Callable<Integer> {
 			return 1;
 		}
 		try {
-			BuildResult result = newService(scratch).build(description, target, options);
+			BuildResult result = newService(scratch).build(description, target, options).withFlow(this.flow);
 			System.out.print(result.report());
 			return result.isBuilt() ? 0 : 1;
 		}
