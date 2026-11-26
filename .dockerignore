@@ -1,0 +1,68 @@
+# Build context for the images under docker/.
+#
+# The Maven build inside the image needs the poms, the Java sources and the resources. It
+# regenerates everything else — the studio's frontend assets and every target/ directory —
+# so none of it travels, and a stale artifact from the host could only mean an image that
+# ships something its own build did not produce.
+#
+# What is deliberately NOT excluded is the shipped product: smith-common/ and prod/. The
+# POC tree below poc/ is frozen evidence behind the `poc` Maven profile, which the image
+# builds never enable, so its sources are dead weight in a layer.
+
+# Version control and the local clone of the remote
+.git
+.gitattributes
+.github
+
+# Build output — regenerated inside the image
+target/
+**/target/
+*.class
+*.jar
+
+# The studio frontend's toolchain and output. frontend-maven-plugin installs its own Node and
+# `npm run build` regenerates src/main/resources/static (both are gitignored for exactly this
+# reason), so a host-built bundle must not ride along.
+**/node_modules/
+**/frontend/.quasar/
+**/frontend/node/
+prod/embabel-smith-studio/src/main/resources/static/
+
+# Developer-local configuration. application-local.yaml is gitignored and names the dev
+# Postgres endpoint and its credentials; a packaged run is meant to set its own profile, and
+# an image that inherited a developer's file would boot against a database nobody intended.
+application-local.yaml
+**/application-local.yaml
+.env
+.env.*
+**/.env
+**/.env.*
+*.pem
+*.key
+
+# Repositories and trees no shipped module reads
+poc/
+built-specs/
+graphify-out/
+.wiki/
+.wiki-*/
+docs/
+examples/
+openspec/
+.tmp/
+.tmp-qwen/
+.qwen/
+.agents/
+.idea/
+.vscode/
+.claude/
+.jbeval/
+.pi/
+.poc-runs/
+node/
+
+# Frozen evidence and scratch
+*.log
+*.zip
+skills-lock.json
+run-loop.sh

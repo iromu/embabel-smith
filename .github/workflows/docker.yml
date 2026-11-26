@@ -1,0 +1,269 @@
+name: Containers
+
+# The container leg of the pipeline: build both images from docker/Dockerfile, prove each one is
+# actually usable, scan them, and publish to the registry.
+#
+# This workflow is about the images. The reactor itself — `make build`, `make test`, `make lint` —
+# is gated by offline-verification.yml on every PR, and the builder's native binary by
+# native-image.yml. Nothing here re-runs the test suite: the images are built from the same
+# checkout those workflows already compiled, and a Dockerfile change cannot turn a failing suite
+# green.
+#
+# SCOPE — what a green run does NOT cover:
+#   * No model call. There is no endpoint and no key on a runner, so the studio is checked to the
+#     point where it serves without one (which is a real state, not a stub: its application.yml
+#     feeds inert placeholders and /api/status answers configured:false), and the runner is checked
+#     with `probe`, which reads its inputs and calls nothing. The model-backed legs — generate,
+#     eval, run a goal, answer with a skill — stay what the @Tag("live") tests and examples/
+#     cover. `docker/smoke.sh` says the same thing at the top.
+#   * No publish by default. Push happens only on a push to the default branch or a version tag,
+#     never on a pull request, which matches the project's rule that publishing commits and never
+#     pushes.
+#   * The vulnerability scan reports and does not gate. A JRE base image carries unfixed
+#     advisories in layers this repository does not control, and failing a pull request on those
+#     teaches people to ignore the report. The findings land in the step summary.
+#   * No vulnerability gate, no SBOM, no attestation, and no multi-architecture build: linux/amd64
+#     only. Adding any of those is a change to this file, not to the images.
+#   * The studio's Postgres path is not exercised. The studio is designed to run with storage
+#     unbound, and that is the state tested here.
+on:
+  pull_request:
+    # Deliberately narrow: a PR that cannot change an image does not pay for two Maven builds.
+    paths:
+      - '.github/workflows/docker.yml'
+      - 'docker/**'
+      - '.dockerignore'
+      - '**/pom.xml'
+      - '**/*.java'
+      - '**/src/main/resources/**'
+      - 'prod/embabel-smith-studio/frontend/**'
+      - 'agent-specs/**'
+  push:
+    branches: [main]
+    tags: ['v*']
+    paths:
+      - '.github/workflows/docker.yml'
+      - 'docker/**'
+      - '.dockerignore'
+      - '**/pom.xml'
+      - '**/*.java'
+      - '**/src/main/resources/**'
+      - 'prod/embabel-smith-studio/frontend/**'
+      - 'agent-specs/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: docker-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io
+  # owner/name, so the two images are <repo>-studio and <repo>-runner.
+  IMAGE_STUDIO: ${{ github.repository }}-studio
+  IMAGE_RUNNER: ${{ github.repository }}-runner
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Docker metadata for the studio image
+        id: meta-studio
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_STUDIO }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha
+
+      - name: Docker metadata for the runner image
+        id: meta-runner
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_RUNNER }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha
+
+      # Both targets come from one Dockerfile, so the build stage is identical for the two builds.
+      # A `type=gha` cache is addressed by scope, and a scope is a separate partition: a runner
+      # build that only names scope=runner cannot see the build-stage layers the studio build just
+      # exported under scope=studio. So each build reads BOTH scopes and writes its own — the shared
+      # stage gets reused, and the two different final stages don't overwrite each other's entries.
+      - name: Build the studio image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          target: studio
+          load: true
+          tags: embabel-smith-studio:ci,${{ steps.meta-studio.outputs.tags }}
+          labels: ${{ steps.meta-studio.outputs.labels }}
+          build-args: |
+            OCI_SOURCE=https://github.com/${{ github.repository }}
+            OCI_REVISION=${{ github.sha }}
+            OCI_VERSION=${{ steps.meta-studio.outputs.version }}
+          cache-from: |
+            type=gha,scope=studio
+            type=gha,scope=runner
+          cache-to: type=gha,scope=studio,mode=max
+
+      - name: Build the runner image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          target: runner
+          load: true
+          tags: embabel-smith-runner:ci,${{ steps.meta-runner.outputs.tags }}
+          labels: ${{ steps.meta-runner.outputs.labels }}
+          build-args: |
+            OCI_SOURCE=https://github.com/${{ github.repository }}
+            OCI_REVISION=${{ github.sha }}
+            OCI_VERSION=${{ steps.meta-runner.outputs.version }}
+          cache-from: |
+            type=gha,scope=runner
+            type=gha,scope=studio
+          cache-to: type=gha,scope=runner,mode=max
+
+      # The gate. Same script a developer runs, so a green run here reproduces locally with one
+      # command and no CI-specific glue. Invoked through bash so the leg does not depend on the
+      # file's exec bit surviving the checkout.
+      - name: Smoke-test both images
+        env:
+          STUDIO_IMAGE: embabel-smith-studio:ci
+          RUNNER_IMAGE: embabel-smith-runner:ci
+        run: bash docker/smoke.sh
+
+      - name: Scan the studio image
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: embabel-smith-studio:ci
+          format: table
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: 0
+
+      - name: Scan the runner image
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: embabel-smith-runner:ci
+          format: table
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: 0
+
+      - name: Record what was built
+        run: |
+          {
+            echo "## Images"
+            echo
+            echo "| image | size |"
+            echo "| --- | --- |"
+            for ref in embabel-smith-studio:ci embabel-smith-runner:ci; do
+              printf '| `%s` | %s |\n' "$ref" "$(docker image inspect -f '{{.Size}}' "$ref" | awk '{printf "%.0f MB", $1/1024/1024}')"
+            done
+            echo
+            echo "Smoke: no model endpoint, so the model-backed legs are not exercised here."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  publish:
+    # Push only from a push to the default branch or a version tag — never from a pull request.
+    if: github.event_name == 'push'
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to the registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker metadata for the studio image
+        id: meta-studio
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_STUDIO }}
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha
+
+      - name: Docker metadata for the runner image
+        id: meta-runner
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_RUNNER }}
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha
+
+      # Rebuilt rather than re-tagged from the build job: the gha cache makes it cheap, and the
+      # pushed image is built from the same checkout rather than from an artifact that has to be
+      # handed between jobs. Worth stating precisely: it is NOT byte-identical to the smoke-tested
+      # image. The studio's frontend stage runs `npm install` and `npm update`
+      # (prod/embabel-smith-studio/pom.xml, "modules install" / "modules update"), so a fresh
+      # resolution can pull a newer patch of a transitive JS dependency between the two jobs. The
+      # Java half is pinned by the reactor; the SPA bundle is not.
+      - name: Publish the studio image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          target: studio
+          push: true
+          tags: ${{ steps.meta-studio.outputs.tags }}
+          labels: ${{ steps.meta-studio.outputs.labels }}
+          build-args: |
+            OCI_SOURCE=https://github.com/${{ github.repository }}
+            OCI_REVISION=${{ github.sha }}
+            OCI_VERSION=${{ steps.meta-studio.outputs.version }}
+          cache-from: |
+            type=gha,scope=studio
+            type=gha,scope=runner
+
+      - name: Publish the runner image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          target: runner
+          push: true
+          tags: ${{ steps.meta-runner.outputs.tags }}
+          labels: ${{ steps.meta-runner.outputs.labels }}
+          build-args: |
+            OCI_SOURCE=https://github.com/${{ github.repository }}
+            OCI_REVISION=${{ github.sha }}
+            OCI_VERSION=${{ steps.meta-runner.outputs.version }}
+          cache-from: |
+            type=gha,scope=runner
+            type=gha,scope=studio

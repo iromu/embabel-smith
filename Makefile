@@ -11,7 +11,7 @@ GOAL ?= compile
 # Set POC=1 to include it (`make test POC=1`); a poc/ MODULE implies it.
 POC_FLAG := $(if $(filter poc/%,$(MODULE)),-Ppoc,$(if $(POC),-Ppoc,))
 
-.PHONY: help build test test-live test-module checkstyle checkstyle-module module run-a2a native clean install setup
+.PHONY: help build test test-live test-module checkstyle checkstyle-module module run-a2a native docker-build docker-smoke docker-demo docker-clean clean install setup
 
 help: ## List targets
 	@grep -E '^[a-zA-Z0-9_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-18s %s\n", $$1, $$2}'
@@ -71,6 +71,31 @@ run-a2a: ## Serve the A2A surface from the studio (SERVER_PORT=, SMITH_A2A_SOURC
 # Needs a GraalVM JDK with native-image on PATH — scripts/native.sh selects one with sdkman.
 native: ## Build the builder's native `smith` binary (GraalVM JDK + native-image required)
 	$(MVN) package -Pnative -DskipTests -pl :embabel-smith-builder -am
+
+# Both images come from one Dockerfile and one Maven build, so `docker build` for the second
+# target is mostly cache hits on the first. The build is a container build, not `$(MVN)`: the
+# reactor compiles inside the image, which is the point — it proves a clean checkout with no
+# host ~/.m2 and no host Node produces a working artifact.
+docker-build: ## Build the studio and runner images (docker/Dockerfile, both targets)
+	docker build -f docker/Dockerfile --target studio -t embabel-smith-studio:local .
+	docker build -f docker/Dockerfile --target runner -t embabel-smith-runner:local .
+
+# The same script .github/workflows/docker.yml runs, so a local pass and a CI pass mean one
+# thing. It makes no model call: the studio is checked to the point where it serves with no
+# endpoint, and the runner with `probe`. STUDIO_PORT moves it off a busy 8080.
+docker-smoke: ## Boot both images and check they serve (no model endpoint needed)
+	STUDIO_IMAGE=embabel-smith-studio:local RUNNER_IMAGE=embabel-smith-runner:local \
+		STUDIO_PORT=$(if $(STUDIO_PORT),$(STUDIO_PORT),18080) docker/smoke.sh
+
+# The end-to-end demonstration: the studio as a service, then the runner as a one-shot job that
+# runs a goal over the repo's agent packs and answers with the shipped skill attached. It needs a
+# model endpoint in the environment, so the endpoint variables pass through from the caller's
+# shell rather than being sourced here — this target starts no model call of its own.
+docker-demo: ## Studio up on :8080, then the runner's prove verdict (needs a model endpoint)
+	docker compose -f docker/docker-compose.yml --profile demo up --abort-on-container-exit
+
+docker-clean: ## Remove the local images
+	docker rmi embabel-smith-studio:local embabel-smith-runner:local 2>/dev/null || true
 
 clean: ## Remove build output
 	$(MVN) $(POC_FLAG) clean

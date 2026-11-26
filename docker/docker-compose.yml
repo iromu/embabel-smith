@@ -1,0 +1,146 @@
+# Author: Ivan Rodriguez
+#
+# The pipeline in containers: the studio as a long-running service, and the sample runner as a
+# one-shot job that ingests agent specs AND a skill folder and answers, which is the end-to-end
+# proof that the builder's output, the spec source and the no-code runtime work together.
+#
+#   docker compose -f docker/docker-compose.yml up -d studio      # the UI on :8080
+#   docker compose -f docker/docker-compose.yml --profile demo up --abort-on-container-exit
+#
+# The images are built from the repository root, so `context` is the parent directory — the
+# build needs the reactor, and .dockerignore at that root is what trims it.
+#
+# WHAT IS NOT WIRED ON PURPOSE
+#   * The studio's own dev convenience — spring.docker.compose — stays off. The container's
+#     profile is `container`, a name with no config file in the repo, which is what stops the
+#     studio from trying to start a Postgres container from inside a container against a
+#     repo-relative path that is not in the image.
+#   * No model endpoint is baked in. The studio serves the UI with none configured (its
+#     application.yml feeds inert placeholders); the model-backed panes and the runner's legs
+#     report "not configured" until you pass one, which is the same env contract as `make test`
+#     and run-loop.sh:
+#
+#       OPENAI_CUSTOM_BASE_URL, OPENAI_CUSTOM_API_KEY, OPENAI_CUSTOM_MODELS,
+#       EMBABEL_MODELS_DEFAULT_LLM
+#
+#     Pass them to the demo profile with an env file or a shell that already exports them.
+#   * The builder's native image is not part of this file. It is a separate artifact with its own
+#     gate — .github/workflows/native-image.yml.
+
+name: embabel-smith
+
+services:
+  studio:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: studio
+    image: embabel-smith-studio:local
+    restart: unless-stopped
+    ports:
+      # Host port is overridable because 8080 is a contested port on a developer machine.
+      - "${SMITH_STUDIO_PORT:-8080}:8080"
+    environment:
+      # The spec sources the studio's panes offer. This is the same `folder:`/`git:` grammar the
+      # studio's own Sources parser accepts, and it is how the UI gets something to list: with
+      # this unset the studio still boots and serves, and /api/sources answers [].
+      SMITH_STUDIO_SOURCES: "folder:/opt/smith/specs"
+      # Where the studio keeps its storage settings, traces and git source cache. The bind mount
+      # below is what makes them survive a recreate.
+      SMITH_STUDIO_TRACE_DIR: /home/smith/.smith/traces
+    volumes:
+      # The repo's agent packs, read-only, as the source the UI browses. Swap in a directory of
+      # published packs and the same panes drive that instead.
+      #
+      # One consequence of mounting the whole directory rather than one pack: this source contains
+      # shell-runner, which declares the `shell` tool group, and the trust gate checks every pack in
+      # a source rather than only the steps a plan selects. So a goal run against this source at the
+      # default `standard` tier is refused before any model call — the studio's Trust pane names the
+      # tier a pack needs. Browsing is unaffected. That is why the runner image bakes only explainer;
+      # its SMITH_TRUST_TIER=high (or a curated source) is the answer when the shell pack is meant
+      # to run.
+      - ../agent-specs:/opt/smith/specs:ro
+      - smith-home:/home/smith/.smith
+    healthcheck:
+      # /api/status answers 200 with no model endpoint and no key, so readiness never depends on
+      # a secret being present in this file. $$SERVER_PORT defers the expansion to the container's
+      # own environment rather than interpolating a host variable here, so the image's HEALTHCHECK
+      # and this one agree about which port to probe.
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:$$SERVER_PORT/api/status"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 90s
+
+  # The end-to-end proof. A one-shot, not a service: it runs a goal over the agent spec and
+  # answers a request with the skill folder attached, prints a verdict, and exits.
+  #
+  # It carries the same CLIs the product ships (smith run, smith skill-run), so a green container
+  # is a statement about the product, not about a harness written for this file.
+  demo:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: runner
+    image: embabel-smith-runner:local
+    profiles: ["demo"]
+    # `run` is the default mode; override to run one leg or the raw CLI.
+    command: ["prove"]
+    environment:
+      # Empty-string defaults so a shell that exports them still wins, and a shell that does not
+      # leaves the container on the same inert placeholders the studio uses.
+      OPENAI_CUSTOM_BASE_URL: "${OPENAI_CUSTOM_BASE_URL:-}"
+      OPENAI_CUSTOM_API_KEY: "${OPENAI_CUSTOM_API_KEY:-}"
+      OPENAI_CUSTOM_MODELS: "${OPENAI_CUSTOM_MODELS:-}"
+      EMBABEL_MODELS_DEFAULT_LLM: "${EMBABEL_MODELS_DEFAULT_LLM:-}"
+      SMITH_AGENT_SOURCE: "folder:/opt/smith/specs"
+      SMITH_AGENT_INPUT: "${SMITH_AGENT_INPUT:-Explain how a coffee machine works}"
+      SMITH_SKILL_REQUEST: "${SMITH_SKILL_REQUEST:-What can this skill do for me?}"
+      # The runner image already ships a skill folder at /opt/smith/samples/skills; mount the
+      # repo's agent packs as the spec source so the demo runs the same packs the UI lists.
+    volumes:
+      - ../agent-specs/explainer:/opt/smith/specs/explainer:ro
+    # A model endpoint given as a `.local` name (mDNS) does not resolve inside a container — the
+    # image has no mDNS resolver, and the run dies in the HTTP client rather than at the model.
+    # Uncomment and fill in for that endpoint, or give the URL an IP address instead.
+    # extra_hosts:
+    #   - "model-host.local:192.168.1.10"
+    # Ordering, not a dependency: the runner talks to no service in this file. It waits for the
+    # studio to be healthy so the demonstration starts from a UI that is actually serving. Note what
+    # `--abort-on-container-exit` does to the pair: when this container exits, compose stops the
+    # studio too. So the target leaves a verdict in the log and nothing running — for a UI that
+    # stays up, run `up -d studio` and then `run --rm demo prove`.
+    depends_on:
+      studio:
+        condition: service_healthy
+    # A model-backed run is a plan plus two calls; the ceiling is generous so a slow endpoint
+    # reports a failure rather than hanging the compose run.
+    mem_limit: 1g
+
+  # Optional durable storage for the studio. Under a profile because the studio is designed to run
+  # without a database — it degrades to unbound storage — and this file should not require one to
+  # come up.
+  #
+  #   docker compose -f docker/docker-compose.yml --profile storage up -d
+  #
+  # The studio reaches it at smith.studio.storage.url below, which resolves to nothing while this
+  # service is absent, and the studio treats that as unbound rather than as a boot failure.
+  postgres:
+    image: postgres:16
+    profiles: ["storage"]
+    environment:
+      POSTGRES_USER: embabel_smith
+      POSTGRES_PASSWORD: embabel_smith
+      POSTGRES_DB: embabel_smith
+    volumes:
+      - studio-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U embabel_smith -d embabel_smith"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  # The studio's $HOME/.smith: traces, storage settings, source cache.
+  smith-home:
+  studio-pgdata:
