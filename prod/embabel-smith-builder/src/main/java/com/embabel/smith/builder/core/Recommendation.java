@@ -13,23 +13,26 @@ package com.embabel.smith.builder.core;
  *
  * @param chosen the candidate the build publishes
  * @param single the single-agent candidate as scored
- * @param process the multi-agent candidate as scored, or {@code null} when none was
+ * @param agentsPack the agents-pack candidate as scored, or {@code null} when none was
  * generated
- * @param processNote what stopped the multi-agent candidate from being published — the
+ * @param agentsPackNote what stopped the agents-pack candidate from being published — the
  * generation, repair or validation failure the report should name rather than hide
  * @author Ivan Rodriguez
  */
-public record Recommendation(Candidate chosen, Candidate single, Candidate process, String processNote) {
+public record Recommendation(Candidate chosen, Candidate single, Candidate agentsPack, String agentsPackNote) {
 
 	/**
 	 * Applies the recommendation rule to the two candidates.
 	 * @param single the single-agent candidate
-	 * @param process the multi-agent candidate, or {@code null} when none was generated
-	 * @param processNote why there is no scored multi-agent candidate, when there is none
+	 * @param agentsPack the agents-pack candidate, or {@code null} when none was
+	 * generated
+	 * @param agentsPackNote why there is no scored agents-pack candidate, when there is
+	 * none
 	 * @return the recommendation
 	 */
-	public static Recommendation choose(Candidate single, Candidate process, String processNote) {
-		return new Recommendation(CandidateRecommender.recommend(single, process), single, process, processNote);
+	public static Recommendation choose(Candidate single, Candidate agentsPack, String agentsPackNote) {
+		return new Recommendation(CandidateRecommender.recommend(single, agentsPack), single, agentsPack,
+				agentsPackNote);
 	}
 
 	/** The shape of the candidate the build publishes. */
@@ -44,9 +47,9 @@ public record Recommendation(Candidate chosen, Candidate single, Candidate proce
 
 	/** Why this candidate and not the other, for the build report. */
 	public String reason() {
-		String reason = CandidateRecommender.reason(this.single, this.process, this.chosen);
-		if (this.processNote != null && !this.processNote.isBlank()) {
-			return reason + " (" + this.processNote + ")";
+		String reason = CandidateRecommender.reason(this.single, this.agentsPack, this.chosen);
+		if (this.agentsPackNote != null && !this.agentsPackNote.isBlank()) {
+			return reason + " (" + this.agentsPackNote + ")";
 		}
 		return reason;
 	}
@@ -56,9 +59,9 @@ public record Recommendation(Candidate chosen, Candidate single, Candidate proce
 	 * @return the runner-up, or {@code null} when there was only one candidate
 	 */
 	public Candidate runnerUp() {
-		if (this.process == null) {
+		if (this.agentsPack == null) {
 			return null;
 		}
-		return (this.chosen == this.process) ? this.single : this.process;
+		return (this.chosen == this.agentsPack) ? this.single : this.agentsPack;
 	}
 }

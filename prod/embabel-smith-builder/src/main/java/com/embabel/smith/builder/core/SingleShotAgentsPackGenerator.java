@@ -79,11 +79,10 @@ public class SingleShotAgentsPackGenerator implements AgentsPackGenerator {
 			throw new IllegalStateException("The model decomposed the description into no agents");
 		}
 		if (agents.size() < 2) {
-			// One pack is the other candidate, not a second shape of this one — shipping
-			// it
-			// as a "multi-agent process" would misreport the build.
+			// One pack is the other candidate, not a second shape of this one — shipping it
+			// as an agents-pack would misreport the build.
 			throw new IllegalStateException(
-					"The model decomposed the description into a single agent, which is not a multi-agent process");
+					"The model decomposed the description into a single agent, which is not an agents-pack");
 		}
 		String name = (response.process() != null && !response.process().isBlank()) ? response.process()
 				: AgentSpecNormalizer.slug(agents.get(0).name());

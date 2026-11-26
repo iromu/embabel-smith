@@ -16,8 +16,8 @@ public enum CandidateShape {
 	/** One agent spec covering the whole process. */
 	SINGLE_AGENT("single-agent spec"),
 
-	/** Several agent specs composed into a process. */
-	MULTI_AGENT("multi-agent process");
+	/** Several agent specs composed into an agents-pack. */
+	MULTI_AGENT("agents-pack");
 
 	private final String label;
 

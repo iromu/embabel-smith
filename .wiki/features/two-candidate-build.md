@@ -1,5 +1,5 @@
 ---
-title: "Two-candidate build (single agent vs multi-agent process)"
+title: "Two-candidate build (single-agent spec vs agents-pack)"
 type: "feature"
 status: "active"
 language: "default"
@@ -19,7 +19,7 @@ source_paths:
 updated_at: "2026-11-26"
 ---
 
-# Two-candidate build (single agent vs multi-agent process)
+# Two-candidate build (single-agent spec vs agents-pack)
 
 One description, two shapes. `BuilderService.build` compiles the same text twice — once into a
 single-agent pack, once into an `AgentsPack` (a named, ordered list of `AgentSpec`s) — scores both

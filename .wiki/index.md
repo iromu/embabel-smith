@@ -645,8 +645,8 @@ Three entry points matter:
 - `prod/` — the **product phase** ([[product-phase]]): `specsource` (folder/git sources +
   content hash), the `smith run` runtime (multi-pack ingest + trust tiers + the retired-pack gate +
   JSONL trace + the remote-action bridge the studio's Remote pane drives), the
-  `smith build` builder (one description → **two candidates**, a single-agent pack and a
-  multi-agent process, both scored and one recommended, behind an `AgentSpecGenerator` technique
+  `smith build` builder (one description → **two candidates**, a single-agent pack and an
+  agents-pack, both scored and one recommended, behind an `AgentSpecGenerator` technique
   seam and a `--flow` seam with four routes (`java|pack|agentic|harness`) that can hand the generation
   call to the builder's own pack — two of which let that pack decide what to read next — or a
   `SKILL.md` with `--target skill`; [[smith-builder]], [[two-candidate-build]],
@@ -729,7 +729,7 @@ Three entry points matter:
 | How does the `smith run` runtime work (CLI + trace)? | [[smith-runtime]] |
 | How does another process ask this product to run a goal (A2A)? | [[a2a-endpoint]] · `prod/embabel-smith-a2a-starter/` |
 | How does the `smith build` builder work (pipeline + publish)? | [[smith-builder]] |
-| How does the build choose between a single agent and a multi-agent process? | [[two-candidate-build]] · `builder/core/CandidateRecommender.java` |
+| How does the build choose between a single agent and an agents-pack? | [[two-candidate-build]] · `builder/core/CandidateRecommender.java` |
 | How do I build a `SKILL.md` instead of a pack? | [[skill-output-target]] · `builder/skill/` |
 | How is a drafted skill vetted before the eval is paid for? | [[skill-output-target]] · `builder/skill/SkillInspector.java` |
 | How does a spec self-improve from its traces? | [[smith-studio]] |

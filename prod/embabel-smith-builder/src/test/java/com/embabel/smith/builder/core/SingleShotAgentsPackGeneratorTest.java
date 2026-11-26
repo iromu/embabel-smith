@@ -131,8 +131,8 @@ class SingleShotAgentsPackGeneratorTest {
 
 	@Test
 	void anAnswerThatNamesASingleAgentIsAFailureRatherThanADegenerateProcess() {
-		// One pack is the single-agent candidate, not a multi-agent process. Accepting it
-		// would let the build publish a lone pack labelled "multi-agent process".
+		// One pack is the single-agent candidate, not an agents-pack. Accepting it would
+		// let the build publish a lone pack labelled "agents-pack".
 		String answer = """
 				{
 				  "process": "solo",

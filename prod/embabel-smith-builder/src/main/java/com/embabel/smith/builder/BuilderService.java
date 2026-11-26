@@ -51,7 +51,7 @@ import com.embabel.smith.common.validation.AgentsPackValidator;
 /**
  * The product builder (design D1): a thin, plain-class orchestration that the studio
  * reuses. One description, two candidates: the build compiles it once into a single-agent
- * spec and once into a multi-agent process, scores both against the same eval tasks, and
+ * spec and once into an agents-pack, scores both against the same eval tasks, and
  * publishes the one that wins — keeping both on disk so the rejected candidate stays
  * inspectable.
  *
@@ -295,8 +295,8 @@ public class BuilderService {
 		issues.add("eval score " + String.format("%.3f", recommendation.score()) + " is below the gate "
 				+ options.scoreGate() + " for the recommended " + recommendation.chosen().shape().label()
 				+ "; failing tasks: " + outcome.failingTasks());
-		if (recommendation.processNote() != null) {
-			issues.add(recommendation.processNote());
+		if (recommendation.agentsPackNote() != null) {
+			issues.add(recommendation.agentsPackNote());
 		}
 		return issues;
 	}

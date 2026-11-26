@@ -63,7 +63,7 @@ class CandidateRecommenderTest {
 
 		assertThat(recommendation.shape()).isEqualTo(CandidateShape.SINGLE_AGENT);
 		assertThat(recommendation.runnerUp()).isNull();
-		assertThat(recommendation.reason()).contains("no multi-agent candidate").contains("returned no JSON");
+		assertThat(recommendation.reason()).contains("no agents-pack candidate").contains("returned no JSON");
 	}
 
 }

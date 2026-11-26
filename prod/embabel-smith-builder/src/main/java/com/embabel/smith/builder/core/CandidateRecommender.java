@@ -9,9 +9,9 @@ package com.embabel.smith.builder.core;
  * The choice between the two candidates a build generated from one description.
  *
  * <p>
- * Decomposing a process is the better answer only when it is both sound and measurably
- * better: the process has to validate its cross-agent hand-offs and out-score the
- * single-agent spec. Anything else — an invalid process, a missing candidate, a tie —
+ * Decomposing into an agents-pack is the better answer only when it is both sound and
+ * measurably better: the pack has to validate its cross-agent hand-offs and out-score the
+ * single-agent spec. Anything else — an invalid pack, a missing candidate, a tie —
  * recommends the single-agent spec, because that candidate is the one whose soundness the
  * single-pack validator already vouched for.
  *
@@ -43,21 +43,20 @@ public final class CandidateRecommender {
 	 */
 	public static String reason(Candidate single, Candidate process, Candidate chosen) {
 		if (chosen.shape() == CandidateShape.MULTI_AGENT) {
-			return "multi-agent process out-scored the single-agent spec (" + format(process.score()) + " vs "
+			return "agents-pack out-scored the single-agent spec (" + format(process.score()) + " vs "
 					+ format(single.score()) + ")";
 		}
 		if (process == null) {
-			return chosen.shape().label() + " chosen; the model produced no multi-agent candidate";
+			return chosen.shape().label() + " chosen; the model produced no agents-pack candidate";
 		}
 		if (!process.valid()) {
-			return chosen.shape().label() + " chosen; the multi-agent process '" + process.name()
-					+ "' did not validate";
+			return chosen.shape().label() + " chosen; the agents-pack '" + process.name() + "' did not validate";
 		}
 		if (process.score() != null && process.score().equals(single.score())) {
 			return chosen.shape().label() + " chosen on the tie-break (" + format(single.score()) + " each)";
 		}
 		return chosen.shape().label() + " chosen; " + format(single.score()) + " vs " + format(process.score())
-				+ " for the multi-agent process";
+				+ " for the agents-pack";
 	}
 
 	private static String format(Double score) {

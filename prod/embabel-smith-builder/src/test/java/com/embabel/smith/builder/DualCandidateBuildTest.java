@@ -76,7 +76,7 @@ class DualCandidateBuildTest {
 		assertThat(packCalls).hasValue(1);
 		assertThat(processCalls).hasValue(1);
 		assertThat(result.recommendation().single().score()).isEqualTo(1.0);
-		assertThat(result.recommendation().process().score()).isEqualTo(1.0);
+		assertThat(result.recommendation().agentsPack().score()).isEqualTo(1.0);
 	}
 
 	@Test
@@ -92,7 +92,7 @@ class DualCandidateBuildTest {
 		assertThat(Files.isRegularFile(published.resolve("research/steps/analyze_market.yml"))).isTrue();
 		assertThat(Files.isRegularFile(published.resolve("decision/manifest.yml"))).isTrue();
 		assertThat(Files.isRegularFile(published.resolve("lifecycle.yml"))).isTrue();
-		assertThat(result.report()).contains("multi-agent process").contains("out-scored");
+		assertThat(result.report()).contains("agents-pack").contains("out-scored");
 	}
 
 	@Test

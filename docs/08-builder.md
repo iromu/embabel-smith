@@ -2,8 +2,8 @@
 
 `prod/embabel-smith-builder` turns a natural-language description into a deployable capability: it
 generates a draft, validates it, evaluates it, refines it within a bound, security-scans it, stamps
-lifecycle metadata, and publishes it. The output is a *target*: an agent spec, an Agent Skill, or a
-multi-agent process.
+lifecycle metadata, and publishes it. The output is a *target*: an agent spec, an Agent Skill, or an
+agents-pack.
 
 ## It is still an Embabel agent
 
@@ -327,7 +327,7 @@ extraction is involved, so builds are reproducible but the name tracks the descr
 last subsection. The gate differs per target, which is why they are parallel services rather than an
 overloaded `build`.
 
-Every `agent-spec` build also generates and scores a multi-agent process candidate, whatever the
+Every `agent-spec` build also generates and scores an agents-pack candidate, whatever the
 caller asked for. That is a second set of model calls per build; it is not surfaced in `--help`.
 
 ### `agent-spec` (default)
@@ -488,11 +488,11 @@ judged by an LLM is a softer instrument, so the per-scenario report is published
 verdict to make a blocked build inspectable. Both eval arms go through the builder's `Ai` —
 re-proving transport independence was POC 25's purpose, not the product's.
 
-### Process output — not a target
+### Agents-pack output — not a target
 
-A build generates **both** candidates — a single-agent spec and a multi-agent process — stores both,
+A build generates **both** candidates — a single-agent spec and an agents-pack — stores both,
 and publishes only the recommended one. `core/CandidateRecommender` prefers the valid candidate with
-the higher score; a tie or an invalid process recommends the single-agent spec.
+the higher score; a tie or an invalid pack recommends the single-agent spec.
 
 `common/validation/AgentsPackValidator` checks hand-offs: input-producer coverage, goal uniqueness,
 and cycles. `core/AgentsPackRepair` attempts a bounded reorder repair; a cycle that survives it blocks
@@ -511,11 +511,11 @@ distinct stages are given two distinct briefs and no caller has to restate the d
 The gates are the existing ones: frontmatter, inspection, eval and lift all run through `build`, and
 the seam deliberately adds none of its own, so a stage of an agents-pack is gated exactly as a hand-written
 description would be. The first stage a gate refuses stops the run and *is* the reported result,
-because a process with an unpublished stage is not a built process; a process declaring no stages is
+because a pack with an unpublished stage is not a built pack; a pack declaring no stages is
 blocked at a named `decompose` stage rather than publishing nothing silently. The seam lives in the
 builder, so a caller needs the builder and nothing that binds a port or opens a database. What is not
 done is a caller: its only invocations are in its own offline test, so no CLI flag, studio route or
-`smith skill-run` asks for a process-to-skill build today
+`smith skill-run` asks for a pack-to-skill build today
 ([`12-backlog.md`](12-backlog.md) carries that half as open).
 
 ## CLI

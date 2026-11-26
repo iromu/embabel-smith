@@ -255,9 +255,9 @@ failed candidate.
 
 ```
 BUILD OK: receive-chilled-goods
-  candidate:   single-agent spec chosen; the multi-agent process 'cold-store' did not validate
+  candidate:   single-agent spec chosen; the agents-pack 'cold-store' did not validate
                (Circular dependency between agents: market -> risk -> market)
-  candidates:  single 1.000, process not scored
+  candidates:  single 1.000, agents-pack not scored
   eval score:  1.000
   security:    SAFE (0 critical, 0 warning) at T1_COMMUNITY
   lifecycle:   INCUBATING (hash 9f2c1a…, baseline 1.000)
@@ -274,8 +274,8 @@ On success:
 
 ```
 BUILD OK: trading-desk-briefing
-  candidate:   multi-agent process out-scored the single-agent spec (1.000 vs 0.500)
-  candidates:  single 0.500, process 1.000
+  candidate:   agents-pack out-scored the single-agent spec (1.000 vs 0.500)
+  candidates:  single 0.500, agents-pack 1.000
   eval score:  1.000
   security:    SAFE (0 critical, 0 warning) at T1_COMMUNITY
   lifecycle:   INCUBATING (hash 9f2c1a…, baseline 1.000)

@@ -175,4 +175,4 @@ producer coverage across the whole pack, goal uniqueness across the members, con
 `UserInput` to the final goal, and cycle detection — and it *also* re-checks per-member basics (each
 member exports a goal, has steps, and produces its own goal output). An agents-pack that fails is
 never stored — a stored one is something someone could ingest. The builder's repair pass is
-reorder-only; see [`08-builder.md`](08-builder.md) §Process output.
+reorder-only; see [`08-builder.md`](08-builder.md) §Agents-pack output.

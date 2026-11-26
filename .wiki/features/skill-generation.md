@@ -107,8 +107,8 @@ What it does **not** do: no shortlisting — every stage buys a skill (`:151`) �
 offline test with a stand-in `SpecPromptCaller` (`skill/SkillBuilderServiceFromAgentsPackTest`). The
 `builder-skill-from-process` pack named after the seam is inventory-only: no builder main source names
 it, no JVM code parses its `SkillBriefs`. **Status: implemented, offline-tested, unwired** —
-`docs/08-builder.md` §Process output records the missing half as a caller ("what is not done is a caller"),
-and `docs/12-backlog.md` carries that half as open.
+`docs/08-builder.md` §Agents-pack output records the missing half as a caller ("what is not done is a
+caller"), and `docs/12-backlog.md` carries that half as open.
 
 ## Limits to keep in view
 

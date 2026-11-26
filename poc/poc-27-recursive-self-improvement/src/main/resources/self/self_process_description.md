@@ -3,13 +3,13 @@
 A self-description, written by hand from `docs/05-architecture.md`, `docs/08-builder.md` and
 `docs/10-self-improvement.md`. It describes the process the builder actually runs, in the order it
 runs it, with the names the code uses. It is build input for POC 27: a model is asked to turn it
-into a multi-agent process, so each stage states what it consumes, what it emits, and what stops it.
+into an agents-pack, so each stage states what it consumes, what it emits, and what stops it.
 
 ## Deliverable
 
 The deliverable is a **published, deployable capability pack**: a versioned folder an Embabel host
 ingests and runs, whose exported goal produces the output type the description names. There are
-exactly two published targets, `agent-spec` and `skill`; a multi-agent process is generated and
+exactly two published targets, `agent-spec` and `skill`; an agents-pack is generated and
 scored on every `agent-spec` build but is published only when it is the recommended candidate. The
 pack ships with a `lifecycle.yml` sidecar carrying its content hash, its baseline pass-rate and its
 lifecycle state. A build that does not reach publish produces no deliverable — a blocked or

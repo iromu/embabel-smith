@@ -20,16 +20,15 @@ package com.embabel.smith.builder.core;
 public interface AgentsPackGenerator {
 
 	/**
-	 * Generates a multi-agent process from a description.
+	 * Generates an agents-pack from a description.
 	 * @param description the natural-language description to decompose
-	 * @return the draft process, its name, and any issues the generator surfaced for
-	 * review
+	 * @return the draft pack, its name, and any issues the generator surfaced for review
 	 */
 	AgentsPackDraft generateAgentsPack(String description);
 
 	/**
-	 * Generates a multi-agent process from a description, asking for one particular LLM.
-	 * The default ignores the request, so an offline fake that answers for the configured
+	 * Generates an agents-pack from a description, asking for one particular LLM. The
+	 * default ignores the request, so an offline fake that answers for the configured
 	 * model keeps working; the production generator honours it.
 	 * @param description the natural-language description to decompose
 	 * @param model the LLM to decompose with, or empty for the configured default

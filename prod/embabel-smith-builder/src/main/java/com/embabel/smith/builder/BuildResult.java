@@ -96,12 +96,12 @@ public record BuildResult(Status status, String stage, String packName, Double s
 			appendFlow(sb);
 			if (this.recommendation != null) {
 				sb.append("  candidate:   ").append(this.recommendation.reason()).append('\n');
-				Double processScore = (null != this.recommendation.process()) ? this.recommendation.process().score()
-						: null;
+				Double agentsPackScore = (null != this.recommendation.agentsPack())
+						? this.recommendation.agentsPack().score() : null;
 				sb.append("  candidates:  single ")
 					.append(formatted(this.recommendation.single().score()))
-					.append(", process ")
-					.append(formatted(processScore))
+					.append(", agents-pack ")
+					.append(formatted(agentsPackScore))
 					.append('\n');
 			}
 			sb.append("  eval score:  ").append(String.format("%.3f", this.score)).append('\n');
