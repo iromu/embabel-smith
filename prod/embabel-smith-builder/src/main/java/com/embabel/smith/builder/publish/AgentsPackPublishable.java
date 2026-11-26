@@ -10,8 +10,8 @@ import java.nio.file.Path;
 
 import com.embabel.smith.builder.lifecycle.LifecycleMetadata;
 import com.embabel.smith.builder.lifecycle.LifecycleStamper;
-import com.embabel.smith.common.io.ProcessSpecWriter;
-import com.embabel.smith.common.model.ProcessSpec;
+import com.embabel.smith.common.io.AgentsPackWriter;
+import com.embabel.smith.common.model.AgentsPack;
 
 /**
  * A composed process as a {@link Publishable}: the process manifest with one directory
@@ -22,24 +22,24 @@ import com.embabel.smith.common.model.ProcessSpec;
  *
  * @author Ivan Rodriguez
  */
-public class ProcessPublishable implements Publishable {
+public class AgentsPackPublishable implements Publishable {
 
-	private final ProcessSpec process;
+	private final AgentsPack agentsPack;
 
 	private final LifecycleMetadata lifecycle;
 
-	private final ProcessSpecWriter writer = new ProcessSpecWriter();
+	private final AgentsPackWriter writer = new AgentsPackWriter();
 
 	private final LifecycleStamper stamper = new LifecycleStamper();
 
-	public ProcessPublishable(ProcessSpec process, LifecycleMetadata lifecycle) {
-		this.process = process;
+	public AgentsPackPublishable(AgentsPack agentsPack, LifecycleMetadata lifecycle) {
+		this.agentsPack = agentsPack;
 		this.lifecycle = lifecycle;
 	}
 
 	@Override
 	public String name() {
-		return this.process.process();
+		return this.agentsPack.process();
 	}
 
 	@Override
@@ -49,7 +49,7 @@ public class ProcessPublishable implements Publishable {
 
 	@Override
 	public void writeTo(Path directory) throws IOException {
-		this.writer.write(this.process, directory);
+		this.writer.write(this.agentsPack, directory);
 		this.stamper.write(directory, this.lifecycle);
 	}
 

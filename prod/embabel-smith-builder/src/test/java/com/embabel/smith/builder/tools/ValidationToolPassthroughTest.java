@@ -10,11 +10,11 @@ import java.util.List;
 import com.embabel.smith.common.model.ActionStepSpec;
 import com.embabel.smith.common.model.AgentSpec;
 import com.embabel.smith.common.model.AgentSpecManifest;
+import com.embabel.smith.common.model.AgentsPack;
 import com.embabel.smith.common.model.GoalStepSpec;
-import com.embabel.smith.common.model.ProcessSpec;
 import com.embabel.smith.common.samples.SampleAgentSpecs;
 import com.embabel.smith.common.validation.AgentSpecValidator;
-import com.embabel.smith.common.validation.ProcessValidator;
+import com.embabel.smith.common.validation.AgentsPackValidator;
 import com.embabel.smith.common.validation.ValidationIssue;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -23,8 +23,8 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * The adapters on {@link AgentSpecValidationTool} and {@link ProcessValidationTool} are
- * pass-throughs, so the property under test is that <em>nothing was added or
+ * The adapters on {@link AgentSpecValidationTool} and {@link AgentsPackValidationTool}
+ * are pass-throughs, so the property under test is that <em>nothing was added or
  * interpreted</em> — not that validation works, which is the services' own tests'
  * business. Each case therefore feeds the same directory to the tool and to the service
  * and compares the two results, then pins one finding so an empty-equals-empty comparison
@@ -42,11 +42,11 @@ class ValidationToolPassthroughTest {
 
 	private final AgentSpecValidationTool packTool = new AgentSpecValidationTool();
 
-	private final ProcessValidationTool processTool = new ProcessValidationTool();
+	private final AgentsPackValidationTool agentsPackTool = new AgentsPackValidationTool();
 
 	private final AgentSpecValidator validator = new AgentSpecValidator();
 
-	private final ProcessValidator processValidator = new ProcessValidator();
+	private final AgentsPackValidator agentsPackValidator = new AgentsPackValidator();
 
 	@Test
 	void aWellFormedPackIsReportedAsCarryingNoFindings() throws JsonProcessingException {
@@ -75,11 +75,9 @@ class ValidationToolPassthroughTest {
 
 	@Test
 	void aSoundProcessIsReportedAsCarryingNoFindings() throws JsonProcessingException {
-		assertThat(
-				this.processTool.validateProcess(processJson(ProcessSpec.single("solo", SampleAgentSpecs.explainer())))
-					.issues())
-			.as("tool findings")
-			.isEmpty();
+		assertThat(this.agentsPackTool
+			.validateProcess(processJson(AgentsPack.single("solo", SampleAgentSpecs.explainer())))
+			.issues()).as("tool findings").isEmpty();
 	}
 
 	/**
@@ -94,10 +92,10 @@ class ValidationToolPassthroughTest {
 		AgentSpec first = SampleAgentSpecs.explainer();
 		AgentSpec second = new AgentSpec(new AgentSpecManifest("repeater", "1.0.0"), first.goal(), first.steps(),
 				first.types());
-		ProcessSpec colliding = new ProcessSpec("colliding", List.of(first, second));
+		AgentsPack colliding = new AgentsPack("colliding", List.of(first, second));
 
-		var throughTool = this.processTool.validateProcess(processJson(colliding));
-		var fromService = this.processValidator.validate(colliding);
+		var throughTool = this.agentsPackTool.validateProcess(processJson(colliding));
+		var fromService = this.agentsPackValidator.validate(colliding);
 
 		assertThat(throughTool.issues()).isEqualTo(fromService.issues());
 		assertThat(throughTool.issues()).as("the collision is reported, not swallowed")
@@ -133,12 +131,12 @@ class ValidationToolPassthroughTest {
 	/**
 	 * The process in the form the process tool now takes: its own JSON document, which is
 	 * the aggregate as the multi-agent generator already holds it rather than as the
-	 * directory {@code io/ProcessSpecReader} reads.
-	 * @param process the process to hand to the tool
+	 * directory {@code io/AgentsPackReader} reads.
+	 * @param agentsPack the agents-pack to hand to the tool
 	 * @return the process as JSON text
 	 */
-	private static String processJson(ProcessSpec process) throws JsonProcessingException {
-		return new ObjectMapper().writeValueAsString(process);
+	private static String processJson(AgentsPack agentsPack) throws JsonProcessingException {
+		return new ObjectMapper().writeValueAsString(agentsPack);
 	}
 
 	private static List<String> codes(List<ValidationIssue> issues) {

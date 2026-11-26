@@ -16,7 +16,7 @@ import com.embabel.agent.core.ToolGroupDescription;
 import com.embabel.smith.common.model.ActionStepSpec;
 import com.embabel.smith.common.model.AgentSpec;
 import com.embabel.smith.common.model.AgentSpecManifest;
-import com.embabel.smith.common.model.ProcessSpec;
+import com.embabel.smith.common.model.AgentsPack;
 import com.embabel.smith.common.samples.SampleAgentSpecs;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Nested;
@@ -40,7 +40,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * @author Ivan Rodriguez
  */
-class ProcessValidationToolGroupTest {
+class AgentsPackValidationToolGroupTest {
 
 	private final ObjectMapper json = new ObjectMapper();
 
@@ -52,7 +52,7 @@ class ProcessValidationToolGroupTest {
 	}
 
 	private static ToolGroup group(ToolSurface surface) {
-		return new ProcessValidationToolGroup().processChecks(surface);
+		return new AgentsPackValidationToolGroup().processChecks(surface);
 	}
 
 	/**
@@ -70,7 +70,7 @@ class ProcessValidationToolGroupTest {
 		String repeat = ((Tool.Result.Text) tool.call(arguments)).getContent();
 
 		assertThat(first).as("the first call runs the body")
-			.contains(ProcessValidationToolGroup.VALIDATE_PROCESS)
+			.contains(AgentsPackValidationToolGroup.VALIDATE_PROCESS)
 			.doesNotContain("identical to an earlier call");
 		assertThat(repeat).startsWith("[identical to an earlier call in this run");
 	}
@@ -79,7 +79,7 @@ class ProcessValidationToolGroupTest {
 	void theGroupIsRegisteredUnderTheRoleAProcessStepDeclares() {
 		assertThat(group().getMetadata().getRole())
 			.as("the role a step's toolGroups entry resolves against, and the constant the bean states")
-			.isEqualTo(ProcessValidationToolGroup.ROLE)
+			.isEqualTo(AgentsPackValidationToolGroup.ROLE)
 			.isEqualTo("process");
 	}
 
@@ -88,17 +88,17 @@ class ProcessValidationToolGroupTest {
 		List<Tool> tools = group().getTools();
 
 		assertThat(tools).as("the process validator alone").hasSize(1);
-		assertThat(tools.get(0).getDefinition().getName()).isEqualTo(ProcessValidationToolGroup.VALIDATE_PROCESS);
+		assertThat(tools.get(0).getDefinition().getName()).isEqualTo(AgentsPackValidationToolGroup.VALIDATE_PROCESS);
 		assertThat(tools.get(0).getDefinition().getInputSchema().getParameters()).extracting(Tool.Parameter::getName)
-			.containsExactly(ProcessValidationToolGroup.PROCESS_JSON);
+			.containsExactly(AgentsPackValidationToolGroup.PROCESS_JSON);
 		assertThat(tools.get(0).getDefinition().getInputSchema().toJsonSchema()).doesNotContain("arg0");
 	}
 
 	@Test
 	void aSoundProcessIsReportedAsSound() throws Exception {
-		String document = this.json.writeValueAsString(ProcessSpec.single("solo", SampleAgentSpecs.explainer()));
+		String document = this.json.writeValueAsString(AgentsPack.single("solo", SampleAgentSpecs.explainer()));
 
-		assertThat(ProcessValidationToolGroup.findings(document)).contains("No findings: the process is sound")
+		assertThat(AgentsPackValidationToolGroup.findings(document)).contains("No findings: the process is sound")
 			.contains("cycle between agents: false");
 	}
 
@@ -112,31 +112,31 @@ class ProcessValidationToolGroupTest {
 		AgentSpec first = SampleAgentSpecs.explainer();
 		AgentSpec second = new AgentSpec(new AgentSpecManifest("repeater", "1.0.0"), first.goal(), first.steps(),
 				first.types());
-		String document = this.json.writeValueAsString(new ProcessSpec("colliding", List.of(first, second)));
+		String document = this.json.writeValueAsString(new AgentsPack("colliding", List.of(first, second)));
 
-		assertThat(ProcessValidationToolGroup.findings(document)).contains("Goal name").contains("repeater");
+		assertThat(AgentsPackValidationToolGroup.findings(document)).contains("Goal name").contains("repeater");
 	}
 
 	@Test
 	void aDirectoryIsNoLongerWhatThisToolTakes() {
-		assertThat(ProcessValidationToolGroup.findings(this.workDir.toString()))
+		assertThat(AgentsPackValidationToolGroup.findings(this.workDir.toString()))
 			.as("the re-shape: a path is not a process document, and saying so is the point")
 			.contains("could not read that as a process document");
 	}
 
 	@Test
 	void aCallWithNoArgumentSaysWhatItNeeded() {
-		assertThat(ProcessValidationToolGroup.findings("")).contains(ProcessValidationToolGroup.PROCESS_JSON)
+		assertThat(AgentsPackValidationToolGroup.findings("")).contains(AgentsPackValidationToolGroup.PROCESS_JSON)
 			.contains("needs the");
 	}
 
 	@Test
 	void theAdapterReportsTheSameFindingsTheServiceReportsOnTheSameDocument() throws IOException {
 		AgentSpec first = SampleAgentSpecs.explainer();
-		ProcessSpec process = new ProcessSpec("colliding", List.of(first, first));
+		AgentsPack agentsPack = new AgentsPack("colliding", List.of(first, first));
 
-		assertThat(new ProcessValidationTool().validateProcess(this.json.writeValueAsString(process)).issues())
-			.isEqualTo(new com.embabel.smith.common.validation.ProcessValidator().validate(process).issues())
+		assertThat(new AgentsPackValidationTool().validateProcess(this.json.writeValueAsString(agentsPack)).issues())
+			.isEqualTo(new com.embabel.smith.common.validation.AgentsPackValidator().validate(agentsPack).issues())
 			.isNotEmpty();
 	}
 
@@ -156,7 +156,7 @@ class ProcessValidationToolGroupTest {
 				.toList();
 
 			assertThat(roles).as("roles the platform can resolve a toolGroups entry to")
-				.contains(ProcessValidationToolGroup.ROLE);
+				.contains(AgentsPackValidationToolGroup.ROLE);
 		}
 
 	}

@@ -28,7 +28,7 @@ import com.embabel.smith.builder.security.ScanReport;
 import com.embabel.smith.builder.security.ScanVerdict;
 import com.embabel.smith.common.model.ActionStepSpec;
 import com.embabel.smith.common.model.AgentSpec;
-import com.embabel.smith.common.model.ProcessSpec;
+import com.embabel.smith.common.model.AgentsPack;
 
 /**
  * The skill output target (design D1): a build that compiles a business-process
@@ -142,16 +142,16 @@ public class SkillBuilderService {
 	 * be. The first stage a gate refuses stops the run and is the reported result: a
 	 * process with an unpublished stage is not a built process. When every stage passes,
 	 * the earlier ones are already published and the report is the final stage's.
-	 * @param process the decomposition to build skills from.
+	 * @param agentsPack the decomposition to build skills from.
 	 * @param target the destination each stage's skill publishes to.
 	 * @param options the per-build knobs, applied to every stage alike.
 	 * @return the first blocked stage, or the final stage's result when all of them
 	 * built.
 	 */
-	public SkillBuildResult buildFromProcess(ProcessSpec process, PublishTarget target, BuildOptions options) {
-		List<AgentSpec> stages = process.agents();
+	public SkillBuildResult buildFromAgentsPack(AgentsPack agentsPack, PublishTarget target, BuildOptions options) {
+		List<AgentSpec> stages = agentsPack.agents();
 		if (stages.isEmpty()) {
-			return SkillBuildResult.blocked("decompose", process.process(),
+			return SkillBuildResult.blocked("decompose", agentsPack.process(),
 					List.of("the process declares no stages, so there is no skill to build"), null, null);
 		}
 		SkillBuildResult result = null;

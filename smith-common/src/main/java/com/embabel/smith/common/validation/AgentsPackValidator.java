@@ -16,22 +16,22 @@ import java.util.Set;
 
 import com.embabel.smith.common.model.ActionStepSpec;
 import com.embabel.smith.common.model.AgentSpec;
-import com.embabel.smith.common.model.ProcessSpec;
+import com.embabel.smith.common.model.AgentsPack;
 
 /**
- * The cross-agent soundness check for a {@link ProcessSpec} — the gate a single pack's
+ * The cross-agent soundness check for an {@link AgentsPack} — the gate a single pack's
  * {@link AgentSpecValidator} cannot reach, because it is about how the agents hand off to
  * each other rather than about any one of them.
  *
  * <p>
- * Checks, per agent and process-wide:
+ * Checks, per agent and pack-wide:
  * <ol>
  * <li><b>Exported goal</b> — every agent exports a goal and has steps.</li>
  * <li><b>Goal produced</b> — an agent's goal output is produced by one of its own
  * steps.</li>
  * <li><b>Connected</b> — every agent is fed by an earlier agent (or, for the first, by
  * {@code UserInput}), and the final goal is reachable from that entry.</li>
- * <li><b>Fed</b> — every step input is produced by some agent in the process, or is
+ * <li><b>Fed</b> — every step input is produced by some agent in the pack, or is
  * {@code UserInput}.</li>
  * <li><b>Unique goals</b> — no two agents export the same goal name; the runtime rejects
  * a world where two do.</li>
@@ -46,19 +46,19 @@ import com.embabel.smith.common.model.ProcessSpec;
  *
  * @author Ivan Rodriguez
  */
-public class ProcessValidator {
+public class AgentsPackValidator {
 
 	private static final String USER_INPUT = "UserInput";
 
 	/**
-	 * Validates the cross-agent hand-offs of a process.
-	 * @param process the process to validate
+	 * Validates the cross-agent hand-offs of an agents-pack.
+	 * @param agentsPack the agents-pack to validate
 	 * @return the findings, the shared-type count, the connectivity flag and any cycle
 	 */
-	public ProcessValidationResult validate(ProcessSpec process) {
-		List<AgentSpec> agents = process.agents();
+	public AgentsPackValidationResult validate(AgentsPack agentsPack) {
+		List<AgentSpec> agents = agentsPack.agents();
 		if (agents.isEmpty()) {
-			return new ProcessValidationResult(List.of("The process has no agents."), 0, false, List.of());
+			return new AgentsPackValidationResult(List.of("The agents-pack has no agents."), 0, false, List.of());
 		}
 
 		List<String> issues = new ArrayList<>(goalNameCollisions(agents));
@@ -70,13 +70,13 @@ public class ProcessValidator {
 		if (!cycle.isEmpty()) {
 			issues.add("Circular dependency between agents: " + String.join(" -> ", cycle) + " -> " + cycle.get(0));
 		}
-		return new ProcessValidationResult(issues, sharedTypeCount(agents), flow.connected, cycle);
+		return new AgentsPackValidationResult(issues, sharedTypeCount(agents), flow.connected, cycle);
 	}
 
 	/**
 	 * The per-agent checks and the forward reachability of the final goal, walked in run
 	 * order from {@code UserInput}.
-	 * @param agents the agents of the process, in run order
+	 * @param agents the agents of the agents-pack, in run order
 	 * @return the issues found and whether the final goal was reached
 	 */
 	private static Flow checkFlow(List<AgentSpec> agents) {
@@ -104,7 +104,7 @@ public class ProcessValidator {
 
 			boolean entered = (i == 0) || consumesAvailable(agent, available);
 			if (!entered) {
-				issues.add(label + " is not connected to the process (no earlier agent feeds it).");
+				issues.add(label + " is not connected to the agents-pack (no earlier agent feeds it).");
 			}
 
 			Set<String> local = new HashSet<>(available);
@@ -125,7 +125,7 @@ public class ProcessValidator {
 			}
 			else if (goalOutput != null && entered) {
 				issues.add(label + " goal output '" + agent.goal().outputTypeName()
-						+ "' is not reachable from the process entry.");
+						+ "' is not reachable from the agents-pack entry.");
 			}
 		}
 		return new Flow(issues, connected);
@@ -154,7 +154,7 @@ public class ProcessValidator {
 	}
 
 	/**
-	 * Step inputs no agent in the process produces — a hand-off the model named but never
+	 * Step inputs no agent in the pack produces — a hand-off the model named but never
 	 * wired.
 	 * @param agents the agents to check
 	 * @return the issues, empty when every input is fed
@@ -186,7 +186,7 @@ public class ProcessValidator {
 
 	/**
 	 * The number of distinct types referenced by more than one agent — the cross-agent
-	 * glue that distinguishes a decomposed process from a set of unrelated packs.
+	 * glue that distinguishes a decomposed agents-pack from a set of unrelated packs.
 	 * @param agents the agents to inspect
 	 * @return the number of shared (cross-agent) types
 	 */
@@ -207,15 +207,15 @@ public class ProcessValidator {
 	}
 
 	/**
-	 * The circular dependency in the process, if any.
+	 * The circular dependency in the agents-pack, if any.
 	 *
 	 * <p>
 	 * The graph has a data edge from the agent that produces a type to the agent that
-	 * consumes it, and a sequence edge from each agent to the one the process declares
-	 * after it. A cycle means the declared order and the data flow contradict each other
-	 * — an agent is asked to run before the agent whose output it feeds — or that two
-	 * agents genuinely depend on each other's outputs.
-	 * @param agents the agents of the process, in run order
+	 * consumes it, and a sequence edge from each agent to the one the agents-pack
+	 * declares after it. A cycle means the declared order and the data flow contradict
+	 * each other — an agent is asked to run before the agent whose output it feeds — or
+	 * that two agents genuinely depend on each other's outputs.
+	 * @param agents the agents of the agents-pack, in run order
 	 * @return the agents of the first cycle found, in dependency order; empty when
 	 * acyclic
 	 */
@@ -226,7 +226,7 @@ public class ProcessValidator {
 
 	/**
 	 * The agent-level dependency graph: which agent must run before which.
-	 * @param agents the agents of the process, in run order
+	 * @param agents the agents of the agents-pack, in run order
 	 * @param withSequence whether to include the declared run-order edges; without them
 	 * the graph is the pure data flow, which is what a repair reorders against
 	 * @return the adjacency list, indexed by agent position

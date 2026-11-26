@@ -5,14 +5,14 @@ status: "active"
 language: "default"
 source_paths:
   - "smith-common/src/main/java/com/embabel/smith/common/model/AgentSpec.java"
-  - "smith-common/src/main/java/com/embabel/smith/common/model/ProcessSpec.java"
-  - "smith-common/src/main/java/com/embabel/smith/common/model/ProcessSpecManifest.java"
+  - "smith-common/src/main/java/com/embabel/smith/common/model/AgentsPack.java"
+  - "smith-common/src/main/java/com/embabel/smith/common/model/AgentsPackManifest.java"
   - "smith-common/src/main/java/com/embabel/smith/common/io/AgentSpecReader.java"
   - "smith-common/src/main/java/com/embabel/smith/common/io/AgentSpecWriter.java"
   - "smith-common/src/main/java/com/embabel/smith/common/io/SpecFolders.java"
-  - "smith-common/src/main/java/com/embabel/smith/common/io/ProcessSpecReader.java"
-  - "smith-common/src/main/java/com/embabel/smith/common/io/ProcessSpecWriter.java"
-  - "smith-common/src/main/java/com/embabel/smith/common/validation/ProcessValidator.java"
+  - "smith-common/src/main/java/com/embabel/smith/common/io/AgentsPackReader.java"
+  - "smith-common/src/main/java/com/embabel/smith/common/io/AgentsPackWriter.java"
+  - "smith-common/src/main/java/com/embabel/smith/common/validation/AgentsPackValidator.java"
   - "smith-common/src/main/java/com/embabel/smith/common/samples/SampleAgentSpecs.java"
 updated_at: "2026-11-25"
 ---
@@ -67,26 +67,26 @@ code never sees null collections.
   running program — in that order, so a run that can list its own classpath never consults either.
   `AgentSpecReader.readResource(String)` is the reader's use of it.
 
-## The process aggregate (`ProcessSpec`)
+## The agents-pack aggregate (`AgentsPack`)
 
 Added for the builder's second candidate, and still format-only — the composition semantics live in
 the runtime ([[spec-composer]]), the build-time use in [[two-candidate-build]].
 
-- **`ProcessSpec`** — `manifest` + `agents` (a `List<AgentSpec>` **in run order**). Accessors:
+- **`AgentsPack`** — `manifest` + `agents` (a `List<AgentSpec>` **in run order**). Accessors:
   `process()`, `version()`, `totalSteps()`, `finalOutputType()`, and `withAgents(reordered)` for the
-  cycle repair's reordered copy. `ProcessSpec.single(name, agent)` wraps one pack.
-- **`ProcessSpecManifest`** — `process`, `version`, and the agents' **pack names in run order**. The
+  cycle repair's reordered copy. `AgentsPack.single(name, agent)` wraps one pack.
+- **`AgentsPackManifest`** — `process`, `version`, and the agents' **pack names in run order**. The
   ordered names are the point: packs live one per directory and a directory listing is alphabetical,
   so the order that wires the agents together has to be recorded, not inferred.
-- **`ProcessSpecWriter.write(process, dir)`** — writes `process.yml` (the manifest) plus one
+- **`AgentsPackWriter.write(process, dir)`** — writes `process.yml` (the manifest) plus one
   agent-spec directory per agent, via the shared `AgentSpecWriter`. That layout is what makes a
-  published process directly ingestible: a source scanning for packs finds every agent of it.
-- **`ProcessSpecReader.read(dir)`** — reads `process.yml` and every immediate subdirectory holding a
+  published agents-pack directly ingestible: a source scanning for packs finds every agent of it.
+- **`AgentsPackReader.read(dir)`** — reads `process.yml` and every immediate subdirectory holding a
   `manifest.yml`, returning the agents in the manifest's run order rather than the listing's.
-- **`ProcessValidator`** — the cross-agent check no single-pack validator can make (exported goal,
+- **`AgentsPackValidator`** — the cross-agent check no single-pack validator can make (exported goal,
   goal produced by the agent's own steps, connected from `UserInput` to the final goal, every step
   input fed, unique goal names, no cycle), matching type names by **short name**. Its
-  `ProcessValidationResult` also carries `sharedTypes`, `connected` and the `cycle` the repair has to
+  `AgentsPackValidationResult` also carries `sharedTypes`, `connected` and the `cycle` the repair has to
   break.
 
 ## Canonical samples (`SampleAgentSpecs`)

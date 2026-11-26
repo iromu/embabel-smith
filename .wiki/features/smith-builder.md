@@ -40,8 +40,8 @@ source_paths:
   - "prod/embabel-smith-builder/src/main/java/com/embabel/smith/builder/tools/PackLibraryToolGroup.java"
   - "prod/embabel-smith-builder/src/main/java/com/embabel/smith/builder/tools/SecurityScanToolGroup.java"
   - "prod/embabel-smith-builder/src/main/java/com/embabel/smith/builder/tools/TraceToolGroup.java"
-  - "prod/embabel-smith-builder/src/main/java/com/embabel/smith/builder/tools/ProcessValidationToolGroup.java"
-  - "prod/embabel-smith-builder/src/main/java/com/embabel/smith/builder/tools/ProcessValidationTool.java"
+  - "prod/embabel-smith-builder/src/main/java/com/embabel/smith/builder/tools/AgentsPackValidationToolGroup.java"
+  - "prod/embabel-smith-builder/src/main/java/com/embabel/smith/builder/tools/AgentsPackValidationTool.java"
   - "prod/embabel-smith-builder/src/main/java/com/embabel/smith/builder/tools/ToolArguments.java"
   - "prod/embabel-smith-builder/src/main/java/com/embabel/smith/builder/tools/ToolOutput.java"
   - "docs/12-backlog.md"
@@ -202,7 +202,7 @@ planning tree: it landed with the harness flow, and `BuildResultFlowTest` plus t
 flow line rather than guessing `java`.
 
 The multi-agent candidate is untouched — the flag governs the shipped single-spec generation only, and
-`cli/BuildCommand.newService` wires `SingleShotProcessSpecGenerator` unconditionally
+`cli/BuildCommand.newService` wires `SingleShotAgentsPackGenerator` unconditionally
 (`BuildCommand.java:172`), so under `pack` the process candidate is still generated Java-side and still
 spends Java-issued model calls.
 
@@ -274,7 +274,7 @@ the default and `--flow pack`'s semantics are untouched.
   are registered and await a step that names them. The six are the whole of the module's contribution: six
   `ToolGroup` `@Bean` methods sit in `src/main/java/com/embabel/smith/builder/tools/` — `documentTools`
   (`BlueprintToolGroup.java:77`), `libraryTools` (`PackLibraryToolGroup.java:75`), `processChecks`
-  (`ProcessValidationToolGroup.java:51`), `securityScanTools` (`SecurityScanToolGroup.java:63`),
+  (`AgentsPackValidationToolGroup.java:51`), `securityScanTools` (`SecurityScanToolGroup.java:63`),
   `traceTools` (`TraceToolGroup.java:69`) and `validateToolGroup` (`ValidationToolGroup.java:82`) — and
   each is named for what it publishes rather than after its own class, because Spring's default bean name
   for the configuration class already occupies that slot (`ToolGroups.java:59-65`).
@@ -363,7 +363,7 @@ platform is a real `RegistryToolGroupResolver` over `tools/ToolGroups.ofTools`, 
 would be null, so the refusal fails for the right reason. `cli/BuildCommandTest` that `--flow agentic` wires
 the agentic pack alone and that `--flow agentic --technique embabel` refuses without building. Then the
 per-group trio for each new role (`BlueprintToolGroupTest`, `PackLibraryToolGroupTest`,
-`SecurityScanToolGroupTest`, `TraceToolGroupTest`, `ProcessValidationToolGroupTest`), each with a
+`SecurityScanToolGroupTest`, `TraceToolGroupTest`, `AgentsPackValidationToolGroupTest`), each with a
 body-semantics case, a booted `availableToolGroups()` case, and an identical-repeat case, and
 `tools/ExposedToolGroupsTest` for the set. `tools/PackStepFiles` is what lets a coupling test read a step's
 `toolGroups:` block as a list rather than grep the word anywhere — these prompts discuss documents and
@@ -390,7 +390,7 @@ planner's, not the reader's.
   That is the whole distinction the flow's name is about: a tool surface plus a loop that chooses its next
   reading.
 - **What did not move is the corpus handover.** `cli/BuildCommand.resolveDescription()` still assembles the
-  corpus for a `--docs` build under this flow, because `newService` wires `SingleShotProcessSpecGenerator`
+  corpus for a `--docs` build under this flow, because `newService` wires `SingleShotAgentsPackGenerator`
   unconditionally and the multi-agent candidate consumes the assembled text. So the pack's prompts tell the
   steps to work the roots through the tools and treat the inline text as a capped first reading; cutting the
   handover is, in `docs/12-backlog.md`'s words, "a change to the dual-candidate path with its own
@@ -478,11 +478,11 @@ the stage in the report. Nothing is published when a gate fails.
 3. **Eval → bounded refine** (`RefinementLoop`) on the pack; below the gate the terminal action's
    prompt is rewritten and the loop repeats, up to `--max-refine`. A rewrite that fails validation is
    discarded ([[eval-guided-refinement]]).
-4. **Score the process** (`ProcessInvokerFactory`): every pack deployed into one scope, the process's
+4. **Score the process** (`AgentsPackInvokerFactory`): every pack deployed into one scope, the process's
    entry goal run against the same eval tasks.
 5. **Recommend** between the candidates — and *then* apply the score gate, to the **recommended**
    candidate only: what must not ship below the gate is what the build ships.
-6. **Store both** candidates (`BuilderAgent.writeProcess` refuses an invalid process), then the
+6. **Store both** candidates (`BuilderAgent.writeAgentsPack` refuses an invalid process), then the
    **security gate** (`AgentSpecSecurityScanner`) over the packs about to be published — a process
    contributes all of its packs. A critical finding blocks at `security` ([[spec-security-scanning]]).
 7. **Lifecycle** (`LifecycleStamper`) on the recommended candidate: content hash, baseline eval
@@ -493,12 +493,12 @@ the stage in the report. Nothing is published when a gate fails.
 ## The publish seam
 
 `publish/Publishable` is the content-agnostic unit a publisher takes — `name()`, `baselinePassRate()`,
-`writeTo(dir)` — implemented by `AgentSpecPublishable`, `ProcessPublishable` and `SkillPublishable`.
+`writeTo(dir)` — implemented by `AgentSpecPublishable`, `AgentsPackPublishable` and `SkillPublishable`.
 `Publisher.publish(Publishable, overwrite, push)` is the single abstract method (the old 4-arg
 `AgentSpec` form is now a `default`), so every artifact shares the collision and no-push semantics
 instead of carrying its own publisher.
 
-- **`folder:<path>`** — written to `<path>/<name>/` (for a process: `process.yml` plus one directory
+- **`folder:<path>`** — written to `<path>/<name>/` (for an agents-pack: `process.yml` plus one directory
   per pack) with `lifecycle.yml`. A same-named artifact is a collision unless `--overwrite` — and the
   directory is named from `Publishable.name()` alone, so a publish that passes the flag replaces it in
   place. That collision rule is folder-only and understates the system rule: publishing a name the store
@@ -572,15 +572,15 @@ POC that measured the engine before it was ported.
 
 ## Validators as tools
 
-`tools/AgentSpecValidationTool` and `tools/ProcessValidationTool` expose the two format validators as
+`tools/AgentSpecValidationTool` and `tools/AgentsPackValidationTool` expose the two format validators as
 `@LlmTool` methods, so a drafting step can read the findings against its own draft and re-draft instead of
 waiting for the numbered repair stages `BuilderService` runs. They add nothing: the pack tool hands back
 `AgentSpecValidator`'s own `ValidationResult` — same findings, same codes, same offending file — and the
-process tool passes through `ProcessValidator`'s findings, shared-type count, connectivity flag and any
+process tool passes through `AgentsPackValidator`'s findings, shared-type count, connectivity flag and any
 cycle. No threshold, verdict or publish decision lives in either class; blocking stays where it was, in
 `GateChain` and `AgentSpecSecurityScanner`. Only the pack validator reaches a pack today: the `validate`
-group carries exactly that one tool, and `ProcessValidationTool` is now carried by the registered
-`process` group (`tools/ProcessValidationToolGroup`) — a role no shipped step declares yet, so it is
+group carries exactly that one tool, and `AgentsPackValidationTool` is now carried by the registered
+`process` group (`tools/AgentsPackValidationToolGroup`) — a role no shipped step declares yet, so it is
 registered and awaiting a step rather than inert (`tools/ExposedToolGroupsTest` records which of the
 six builder roles a shipped step actually names). The pack tool's report also gained a second half:
 `validatePack` returns `ValidationReport(issues, patchedByBuild)` — still the validator's own findings,
@@ -763,7 +763,7 @@ own comment: the polymorphic `parts` of the background type is what cost POC 27 
 
 Offline tests cover the `BuilderAgent` compile/validate/write, the `RefinementLoop`, the
 `AgentSpecSecurityScanner` verdicts, the `LifecycleStamper`, the publishers (collision, no-push), the
-dual-candidate path (`DualCandidateBuildTest`, `CandidateRecommenderTest`, `ProcessRepairTest`,
+dual-candidate path (`DualCandidateBuildTest`, `CandidateRecommenderTest`, `AgentsPackRepairTest`,
 `SingleShotProcessSpecGeneratorTest`) and the model layer on mocks (`AiPromptRewriterTest`,
 `AiSpecPromptCallerTest` — the latter proves the system prompt goes out separately and that a blank
 one is omitted) plus the `NoDirectModelRequestTest` guard. The live build (which calls the model) is

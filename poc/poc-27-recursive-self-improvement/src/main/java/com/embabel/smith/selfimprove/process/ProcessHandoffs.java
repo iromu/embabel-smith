@@ -10,36 +10,36 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.function.ToDoubleFunction;
 
+import com.embabel.smith.builder.core.AgentsPackRepair;
 import com.embabel.smith.builder.core.Candidate;
-import com.embabel.smith.builder.core.ProcessRepair;
-import com.embabel.smith.common.io.ProcessSpecReader;
-import com.embabel.smith.common.io.ProcessSpecWriter;
-import com.embabel.smith.common.model.ProcessSpec;
-import com.embabel.smith.common.validation.ProcessValidationResult;
-import com.embabel.smith.common.validation.ProcessValidator;
+import com.embabel.smith.common.io.AgentsPackReader;
+import com.embabel.smith.common.io.AgentsPackWriter;
+import com.embabel.smith.common.model.AgentsPack;
+import com.embabel.smith.common.validation.AgentsPackValidationResult;
+import com.embabel.smith.common.validation.AgentsPackValidator;
 
 /**
  * The hand-off gate for a generated process, run without a build: the process is written
  * to a pack folder with the shared writer, read back, and validated by the product's own
- * {@link ProcessValidator} — the same validator {@code BuilderService} runs on its second
- * candidate, with the same bounded reorder {@link ProcessRepair} performs.
+ * {@link AgentsPackValidator} — the same validator {@code BuilderService} runs on its
+ * second candidate, with the same bounded reorder {@link AgentsPackRepair} performs.
  *
  * <p>
  * <b>The pack folder is written directly, because {@code process} is not a build
  * target.</b> {@code docs/08-builder.md} records that {@code --target} takes exactly
  * {@code agent-spec} and {@code skill} and that {@code --target process} is a usage
  * error, so the only way to put a generated process on disk from here is the shared
- * {@link ProcessSpecWriter}. The round trip is not decoration: the hand-offs the
- * validator judges are the ones on disk, and a run order that survives only in memory is
- * not evidence about the artifact a build would carry.
+ * {@link AgentsPackWriter}. The round trip is not decoration: the hand-offs the validator
+ * judges are the ones on disk, and a run order that survives only in memory is not
+ * evidence about the artifact a build would carry.
  *
  * <p>
  * The verdict is the product's own {@link Candidate}, which is how "named and not scored"
  * is recorded rather than asserted: an unsound process comes back as the multi-agent
  * candidate with its name, {@code valid} false and no score, and the scorer is never
- * called — the rule {@code BuilderService.scoreProcess} applies, where a process that did
- * not validate is not worth a model call. Nothing here scores anything itself; the scorer
- * is passed in, so an offline test can see the call not happen.
+ * called — the rule {@code BuilderService.scoreAgentsPack} applies, where a process that
+ * did not validate is not worth a model call. Nothing here scores anything itself; the
+ * scorer is passed in, so an offline test can see the call not happen.
  *
  * <p>
  * {@code evidence/MUTABILITY.md} fixes what this may not touch: the validator and the
@@ -63,13 +63,13 @@ public final class ProcessHandoffs {
 	 * @return the verdict: the process as read back and reordered, its validation, the
 	 * reorders performed, and the candidate the build would carry
 	 */
-	public static Verdict verify(ProcessSpec draft, Path packDir, ToDoubleFunction<ProcessSpec> evalScore) {
-		ProcessSpec process = roundTrip(draft, packDir);
-		ProcessValidationResult validation = new ProcessValidator().validate(process);
+	public static Verdict verify(AgentsPack draft, Path packDir, ToDoubleFunction<AgentsPack> evalScore) {
+		AgentsPack process = roundTrip(draft, packDir);
+		AgentsPackValidationResult validation = new AgentsPackValidator().validate(process);
 		int reorders = 0;
 		if (validation.hasCycle()) {
-			ProcessRepair.Result repaired = ProcessRepair.repair(process, validation);
-			process = repaired.process();
+			AgentsPackRepair.Result repaired = AgentsPackRepair.repair(process, validation);
+			process = repaired.agentsPack();
 			validation = repaired.validation();
 			reorders = repaired.attempts();
 		}
@@ -89,10 +89,10 @@ public final class ProcessHandoffs {
 	 * @return the process as the folder declares it, in the run order its manifest
 	 * records
 	 */
-	private static ProcessSpec roundTrip(ProcessSpec draft, Path packDir) {
+	private static AgentsPack roundTrip(AgentsPack draft, Path packDir) {
 		try {
-			new ProcessSpecWriter().write(draft, packDir);
-			return new ProcessSpecReader().read(packDir);
+			new AgentsPackWriter().write(draft, packDir);
+			return new AgentsPackReader().read(packDir);
 		}
 		catch (IOException ex) {
 			throw new IllegalStateException("Failed to write and re-read the process folder at " + packDir, ex);
@@ -104,12 +104,12 @@ public final class ProcessHandoffs {
 	 *
 	 * @param process the process as read back from disk, after any reorder repair
 	 * @param validation the validation of that process, whose issues name what is unsound
-	 * @param reorders the number of reorders {@link ProcessRepair} performed
+	 * @param reorders the number of reorders {@link AgentsPackRepair} performed
 	 * @param candidate the candidate a build would carry for this process, with no score
 	 * when it did not validate
 	 * @param packDir the folder the process was written to
 	 */
-	public record Verdict(ProcessSpec process, ProcessValidationResult validation, int reorders, Candidate candidate,
+	public record Verdict(AgentsPack process, AgentsPackValidationResult validation, int reorders, Candidate candidate,
 			Path packDir) {
 
 		/**

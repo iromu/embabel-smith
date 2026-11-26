@@ -27,7 +27,7 @@ import com.embabel.smith.builder.core.AiSpecPromptCaller;
 import com.embabel.smith.builder.core.BuildTarget;
 import com.embabel.smith.builder.core.BuilderAgent;
 import com.embabel.smith.builder.core.GenerationTechnique;
-import com.embabel.smith.builder.core.SingleShotProcessSpecGenerator;
+import com.embabel.smith.builder.core.SingleShotAgentsPackGenerator;
 import com.embabel.smith.builder.eval.AgentSpecInvokerFactory;
 import com.embabel.smith.builder.eval.AgenticAgentSpecGenerator;
 import com.embabel.smith.builder.eval.AiPromptRewriter;
@@ -169,7 +169,7 @@ public class BuildCommand implements Callable<Integer> {
 		AgentSpecInvokerFactory invokers = new AgentSpecInvokerFactory(this.platform);
 		BuilderAgent agent = new BuilderAgent(generators(invokers), scratch.toString());
 		PromptRewriter rewriter = new AiPromptRewriter(this.ai);
-		return new BuilderService(agent, invokers, invokers, new SingleShotProcessSpecGenerator(this.ai), rewriter,
+		return new BuilderService(agent, invokers, invokers, new SingleShotAgentsPackGenerator(this.ai), rewriter,
 				defaultEvalTasks());
 	}
 

@@ -6,8 +6,8 @@ a portable Agent Skill (`SKILL.md`) — selected with `--target`; see
 [Output targets](#output-targets). The spec build is a deterministic pipeline — generate both
 candidates → validate → write, then score both → bounded refine, then recommend, then a static
 security gate, then lifecycle metadata — ending in a publish to a `folder:` or `git:` source (local
-commit, no push by default). One description is built twice, into a single-agent pack and into a
-multi-agent process; both are scored on the same eval tasks and only the better one is published. See
+commit, no push by default). One description is built twice, into a single-agent pack and into an
+agents-pack; both are scored on the same eval tasks and only the better one is published. See
 [The two candidates](#the-two-candidates). Generation is
 technique-selectable (single-shot by default, Embabel's NL compiler on request) and both techniques
 emit the same agent-spec format, so every later stage is identical whichever one is used. Exposes a
@@ -93,7 +93,7 @@ a published pack — but differ in what they generate and in what gates them.
 
 | Target | Flag | Produces | Gate |
 |---|---|---|---|
-| `agent-spec` (**default**) | `--target agent-spec` | The better of two candidates — a single-agent pack or a multi-agent process (see [The two candidates](#the-two-candidates)) — published as `<out>/<name>/`; both candidates stay in the build's output directory. | The **recommended** candidate's deterministic eval score must reach the score gate (default **1.0**, every task passing). |
+| `agent-spec` (**default**) | `--target agent-spec` | The better of two candidates — a single-agent pack or an agents-pack (see [The two candidates](#the-two-candidates)) — published as `<out>/<name>/`; both candidates stay in the build's output directory. | The **recommended** candidate's deterministic eval score must reach the score gate (default **1.0**, every task passing). |
 | `skill` | `--target skill` | An Agent Skill folder: `SKILL.md`, the `evals.json` it was validated against, and the `lifecycle.yml` sidecar. | The **skill lift** — with-skill pass rate minus the no-skill baseline — must strictly exceed `BuildOptions.minLift()` (default **0**, so any positive lift publishes). |
 
 ### The skill pipeline
@@ -193,28 +193,28 @@ publishes the better of them.
    references, and — only if valid — written to a scratch directory and re-validated. An invalid
    draft is **never** written (design D5). A draft with generator issues (e.g. an ambiguous
    description) blocks at `build`.
-2. **Generate the multi-agent process** (`ProcessSpecGenerator` → `ProcessValidator` →
-   `ProcessRepair`). A second model call decomposes the same description into an ordered set of packs
-   that hand off to each other, validates its cross-agent hand-offs, and reorders a detected cycle
-   within a bound. See [The two candidates](#the-two-candidates).
+2. **Generate the agents-pack** — the multi-agent candidate (`AgentsPackGenerator` →
+   `AgentsPackValidator` → `AgentsPackRepair`). A second model call decomposes the same description into
+   an ordered set of packs that hand off to each other, validates its cross-agent hand-offs, and
+   reorders a detected cycle within a bound. See [The two candidates](#the-two-candidates).
 3. **Score both candidates.** The pack runs the eval task set through the refinement loop
    (`RefinementLoop`): the score is the fraction of passing tasks, and below the gate the terminal
    action's prompt is rewritten and the loop repeats, up to `--max-refine` rounds (a rewrite that
-   fails validation is discarded). The process is scored the same way — every pack deployed into one
-   scope with the process's entry goal run against the same tasks (`ProcessInvokerFactory`). A
-   process that did not validate is not worth a model call and is left unscored.
-4. **Recommend** (`CandidateRecommender`). The process is recommended only when it is valid *and*
-   strictly out-scores the pack; a tie, an invalid process, or a process the model failed to produce
-   recommends the pack.
+   fails validation is discarded). The agents-pack is scored the same way — every pack deployed into
+   one scope with its entry goal run against the same tasks (`AgentsPackInvokerFactory`). An
+   agents-pack that did not validate is not worth a model call and is left unscored.
+4. **Recommend** (`CandidateRecommender`). The agents-pack is recommended only when it is valid
+   *and* strictly out-scores the pack; a tie, an invalid agents-pack, or one the model failed to
+   produce recommends the pack.
 5. **Score gate**, on the recommended candidate. What must not publish below the gate (default
-   **1.0**, i.e. every task passing) is what the build ships — so a strong process is never vetoed by
+   **1.0**, i.e. every task passing) is what the build ships — so a strong agents-pack is never vetoed by
    a weak pack, and nothing below the gate publishes either way. Both candidates below it → block at
    `eval`.
-6. **Store both candidates.** The pack was written at stage 1; the process is written beside it — but
-   only if it is valid, because a stored process is one someone could ingest. The rejected candidate
+6. **Store both candidates.** The pack was written at stage 1; the agents-pack is written beside it —
+   but only if it is valid, because a stored agents-pack is one someone could ingest. The rejected candidate
    stays on disk to be inspected; only one is ever published.
 7. **Security gate** (`AgentSpecSecurityScanner`). A static scan over the packs the build is about to
-   publish — for a process, every one of its packs merged into a single report taking the highest
+   publish — for an agents-pack, every one of its packs merged into a single report taking the highest
    tier. A high-severity (critical) finding — e.g. a prompt-injection marker — blocks at `security`.
 8. **Lifecycle** (`LifecycleStamper`). The recommended candidate is stamped with a content hash, the
    baseline eval pass-rate, the initial state `incubating` (the `incubating → active` promotion is a
@@ -231,26 +231,26 @@ a flag — there is no `--multi-agent` option to remember.
 | Candidate | Generated by | Scored by | Published when |
 |---|---|---|---|
 | **Single-agent spec** | the selected generation technique | its pack deployed and run against the eval tasks | it is the only candidate, or it does not lose |
-| **Multi-agent process** | one `single-shot` call returning a process JSON (`process_to_flow_multi`) | every pack deployed into one scope, the process's entry goal run against the same eval tasks | it validates **and** strictly out-scores the pack |
+| **Agents-pack** (multi-agent) | one `single-shot` call returning the agents-pack JSON (`process_to_flow_multi`) | every pack deployed into one scope, its entry goal run against the same eval tasks | it validates **and** strictly out-scores the pack |
 
-The process is the candidate that has to earn its keep, because it is the one that can fail in ways a
-lone pack cannot. `ProcessValidator` checks that each agent's exported goal is produced by that
+The agents-pack is the candidate that has to earn its keep, because it is the one that can fail in ways a
+lone pack cannot. `AgentsPackValidator` checks that each agent's exported goal is produced by that
 agent's own steps, that every agent is reachable from `UserInput`, that each agent's inputs are fed by
-another agent's output (the shared types), that goal names are unique process-wide — and that the
+another agent's output (the shared types), that goal names are unique across the agents-pack — and that the
 resulting dependency graph has no cycle. Cycles are read over the union of the data edges and the
 declared agent order, which keeps the two failure shapes distinct:
 
 - **An ordering mistake** — a producer listed after the agent it feeds — is a cycle the reorder
-  settles: `ProcessRepair` topologically reorders the packs and re-validates, bounded at
-  `ProcessRepair.MAX_ATTEMPTS`.
+  settles: `AgentsPackRepair` topologically reorders the packs and re-validates, bounded at
+  `AgentsPackRepair.MAX_ATTEMPTS`.
 - **A genuine mutual dependency** — two agents each needing the other's output — is a cycle in the
-  data graph itself. No order settles it, so the process is blocked and the single-agent spec stands
+  data graph itself. No order settles it, so the agents-pack is blocked and the single-agent spec stands
   on its own.
 
-A process that cannot be made sound is named in the report rather than hidden, while the pack goes on
-publishing — and its packs are held to the same structural validation a lone pack is, so a process
+An agents-pack that cannot be made sound is named in the report rather than hidden, while the pack goes on
+publishing — and its packs are held to the same structural validation a lone pack is, so an agents-pack
 whose pack consumes an undeclared type loses too. An answer naming fewer than two agents never becomes
-a process at all: one pack is the other candidate, so it is refused at generation and reported as a
+an agents-pack at all: one pack is the other candidate, so it is refused at generation and reported as a
 failed candidate.
 
 ```
@@ -264,7 +264,7 @@ BUILD OK: receive-chilled-goods
   published:   /path/to/agent-specs/receive-chilled-goods
 ```
 
-A published process is a directory holding `process.yml` (the named, ordered pack list) and one pack
+A published agents-pack is a directory holding `process.yml` (the named, ordered pack list) and one pack
 directory per agent — which is also a source the runtime ingests directly, since each pack keeps the
 layout a standalone pack has.
 
@@ -293,14 +293,14 @@ BUILD BLOCKED at security (malicious-spec)
 
 Both targets publish through the same `Publishable` seam — a name, a baseline pass rate and a
 `writeTo(Path)` — so the collision gate and the no-push default are shared code rather than a second
-copy: `AgentSpecPublishable` writes the pack directory, `ProcessPublishable` the process directory,
+copy: `AgentSpecPublishable` writes the pack directory, `AgentsPackPublishable` the agents-pack directory,
 `SkillPublishable` the skill directory.
 
 The target is a `folder:` or `git:` source URI (same grammar as the runtime's sources, see
 `embabel-smith-specsource`):
 
 - **`folder:<path>`** — the artifact is written to `<path>/<name>/`. A pack carries manifest, goal,
-  steps and types; a process carries `process.yml` and one pack directory per agent; a skill carries
+  steps and types; an agents-pack carries `process.yml` and one pack directory per agent; a skill carries
   `SKILL.md` and the `evals.json` it was validated against; all carry the `lifecycle.yml` sidecar. A
   same-named artifact already in the folder is a collision unless `--overwrite` replaces it.
 - **`git:<url>[@ref]`** — the source is cloned into a scratch work tree, the artifact is written as

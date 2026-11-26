@@ -9,10 +9,10 @@ import java.nio.file.Path;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.ToDoubleFunction;
 
-import com.embabel.smith.builder.core.ProcessDraft;
-import com.embabel.smith.builder.core.SingleShotProcessSpecGenerator;
+import com.embabel.smith.builder.core.AgentsPackDraft;
+import com.embabel.smith.builder.core.SingleShotAgentsPackGenerator;
 import com.embabel.smith.common.model.AgentSpec;
-import com.embabel.smith.common.model.ProcessSpec;
+import com.embabel.smith.common.model.AgentsPack;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -40,7 +40,7 @@ class ProcessHandoffsTest {
 	 */
 	private final AtomicInteger scoreCalls = new AtomicInteger();
 
-	private final ToDoubleFunction<ProcessSpec> scorer = (process) -> {
+	private final ToDoubleFunction<AgentsPack> scorer = (process) -> {
 		this.scoreCalls.incrementAndGet();
 		return 1.0;
 	};
@@ -80,9 +80,9 @@ class ProcessHandoffsTest {
 		// answer
 		// is canned, so a failure here is the generator's shape or the writer, not a
 		// model.
-		ProcessDraft draft = new SingleShotProcessSpecGenerator((system, user) -> ProcessFixtures.TWO_AGENT_ANSWER,
-				SingleShotProcessSpecGenerator.defaultPrompt())
-			.generateProcess(SelfDescription.text());
+		AgentsPackDraft draft = new SingleShotAgentsPackGenerator((system, user) -> ProcessFixtures.TWO_AGENT_ANSWER,
+				SingleShotAgentsPackGenerator.defaultPrompt())
+			.generateAgentsPack(SelfDescription.text());
 
 		ProcessHandoffs.Verdict verdict = ProcessHandoffs.verify(draft.process(), dir.resolve("generated"),
 				this.scorer);

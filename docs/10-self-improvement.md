@@ -26,9 +26,9 @@ as input. It does not regenerate the whole pack. The improvement object is there
 prompts of a pack: `Refiner.withPrompt` rebuilds an `ActionStepSpec` passing every field through from
 the step it was given except the sixth, the prompt, so the surface is drawn by that signature rather
 than by a list in a document. Two things are consequently off it, and both are worth knowing before
-either is claimed. A process's **agent order** is unreachable because the operator is handed a pack and
-a pack has no agent order to reorder — `ProcessSpec.withAgents` has one main-code caller,
-`core/ProcessRepair` on the build path, and nothing under `improve/` imports `ProcessSpec`. A step's
+either is claimed. An agents-pack's **agent order** is unreachable because the operator is handed a pack and
+a pack has no agent order to reorder — `AgentsPack.withAgents` has one main-code caller,
+`core/AgentsPackRepair` on the build path, and nothing under `improve/` imports `AgentsPack`. A step's
 `pre`/`post` condition names are unreachable too, and the reason is a failure mode rather than a rule:
 the spec validator never inspects either field and the spec source resolves no conditions, so an edited
 condition name surfaces at **deploy**, after the candidate was built and published. Reach is not off the

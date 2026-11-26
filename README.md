@@ -44,7 +44,7 @@ flowchart LR
         direction TB
         A1["Agent spec"]
         A2["Skill folder"]
-        A3["N-pack process"]
+        A3["agents-pack"]
     end
 
     subgraph RUN["The no-code runtime"]
@@ -98,7 +98,7 @@ Three invariants carry most of the design:
   broken pack never reaches disk.
 - **Zero compilation at runtime.** The runtime deploys step definitions as data and lets the planner
   chain them; adding a capability means adding a folder.
-- **One format, three kinds of pack.** An agent spec, a skill folder, and an N-pack process are
+- **One format, three kinds of pack.** An agent spec, a skill folder, and an agents-pack are
   published by the same route into a `folder:` or `git:` **spec source**, which is what the runtime and
   the UI then read.
 

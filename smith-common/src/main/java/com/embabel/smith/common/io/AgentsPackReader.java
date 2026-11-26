@@ -16,12 +16,12 @@ import java.util.Map;
 import java.util.stream.Stream;
 
 import com.embabel.smith.common.model.AgentSpec;
-import com.embabel.smith.common.model.ProcessSpec;
-import com.embabel.smith.common.model.ProcessSpecManifest;
+import com.embabel.smith.common.model.AgentsPack;
+import com.embabel.smith.common.model.AgentsPackManifest;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
- * Reads a process directory into an in-memory {@link ProcessSpec}.
+ * Reads an agents-pack directory into an in-memory {@link AgentsPack}.
  *
  * <p>
  * Locates {@code process.yml} and every pack directory beside it — any immediate
@@ -32,20 +32,23 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  *
  * @author Ivan Rodriguez
  */
-public class ProcessSpecReader {
+public class AgentsPackReader {
 
 	private final ObjectMapper yaml = Yaml.mapper();
 
 	private final AgentSpecReader packReader = new AgentSpecReader();
 
 	/**
-	 * Reads the process written under {@code dir}.
-	 * @param dir the process directory
-	 * @return the process, its agents in run order
+	 * Reads the agents-pack written under {@code dir}.
+	 * @param dir the agents-pack directory
+	 * @return the agents-pack, its agents in run order
 	 */
-	public ProcessSpec read(Path dir) throws IOException {
-		ProcessSpecManifest manifest = this.yaml.readValue(Files.readString(dir.resolve("process.yml")),
-				ProcessSpecManifest.class);
+	public AgentsPack read(Path dir) throws IOException {
+		// The manifest filename keeps its pre-agents-pack spelling: it is part of the
+		// frozen
+		// on-disk format, asserted by the round-trip test and by a frozen POC.
+		AgentsPackManifest manifest = this.yaml.readValue(Files.readString(dir.resolve("process.yml")),
+				AgentsPackManifest.class);
 
 		Map<String, AgentSpec> byName = new LinkedHashMap<>();
 		for (Path packDir : packDirectories(dir)) {
@@ -60,10 +63,11 @@ public class ProcessSpecReader {
 				ordered.add(pack);
 			}
 		}
-		// A pack on disk that the manifest does not list is still part of the process;
+		// A pack on disk that the manifest does not list is still part of the
+		// agents-pack;
 		// appending it keeps the read lossless rather than silently dropping an agent.
 		ordered.addAll(byName.values());
-		return new ProcessSpec(manifest, ordered);
+		return new AgentsPack(manifest, ordered);
 	}
 
 	private List<Path> packDirectories(Path dir) throws IOException {

@@ -13,26 +13,26 @@ import java.util.List;
 
 import com.embabel.smith.common.model.AgentSpec;
 import com.embabel.smith.common.model.AgentSpecManifest;
-import com.embabel.smith.common.model.ProcessSpec;
+import com.embabel.smith.common.model.AgentsPack;
 import com.embabel.smith.common.samples.SampleAgentSpecs;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * Offline round-trip for a process: writing it produces one directory per pack, and
- * reading it back returns the same packs in the order the process runs.
+ * Offline round-trip for an agents-pack: writing it produces one directory per pack, and
+ * reading it back returns the same packs in the order the agents-pack runs.
  *
  * @author Ivan Rodriguez
  */
-class ProcessSpecRoundTripTest {
+class AgentsPackRoundTripTest {
 
-	private final ProcessSpecWriter writer = new ProcessSpecWriter();
+	private final AgentsPackWriter writer = new AgentsPackWriter();
 
-	private final ProcessSpecReader reader = new ProcessSpecReader();
+	private final AgentsPackReader reader = new AgentsPackReader();
 
 	@Test
-	void writesOneDirectoryPerPackBesideTheProcessManifest(@TempDir Path dir) throws Exception {
-		this.writer.write(process("explainer_process", pack("research"), pack("write")), dir);
+	void writesOneDirectoryPerPackBesideThePackManifest(@TempDir Path dir) throws Exception {
+		this.writer.write(agentsPack("explainer_process", pack("research"), pack("write")), dir);
 
 		assertThat(Files.isRegularFile(dir.resolve("process.yml"))).isTrue();
 		assertThat(Files.isRegularFile(dir.resolve("research/manifest.yml"))).isTrue();
@@ -44,36 +44,36 @@ class ProcessSpecRoundTripTest {
 
 	@Test
 	void readsBackTheSamePacks(@TempDir Path dir) throws Exception {
-		ProcessSpec process = process("explainer_process", pack("research"), pack("write"));
-		this.writer.write(process, dir);
+		AgentsPack agentsPack = agentsPack("explainer_process", pack("research"), pack("write"));
+		this.writer.write(agentsPack, dir);
 
-		assertThat(this.reader.read(dir)).isEqualTo(process);
+		assertThat(this.reader.read(dir)).isEqualTo(agentsPack);
 	}
 
 	@Test
 	void readsThePacksBackInTheRunOrderNotTheDirectoryOrder(@TempDir Path dir) throws Exception {
 		// "alpha" sorts before "zebra", so the directory listing and the run order
 		// genuinely disagree: the manifest's order must win.
-		ProcessSpec process = process("trading", pack("zebra"), pack("alpha"));
-		this.writer.write(process, dir);
+		AgentsPack agentsPack = agentsPack("trading", pack("zebra"), pack("alpha"));
+		this.writer.write(agentsPack, dir);
 
 		assertThat(this.reader.read(dir).agents()).extracting(AgentSpec::name).containsExactly("zebra", "alpha");
 	}
 
 	@Test
 	void everyPublishedPackIsIngestibleOnItsOwn(@TempDir Path dir) throws Exception {
-		this.writer.write(process("explainer_process", pack("research"), pack("write")), dir);
+		this.writer.write(agentsPack("explainer_process", pack("research"), pack("write")), dir);
 
 		// A source recognises a pack by the manifest.yml in its directory: every agent of
-		// the process qualifies, so the runtime can ingest the published process whole.
+		// the pack qualifies, so the runtime can ingest the published agents-pack whole.
 		try (var subdirs = Files.list(dir)) {
 			assertThat(subdirs.filter(Files::isDirectory))
 				.allMatch((d) -> Files.isRegularFile(d.resolve("manifest.yml")));
 		}
 	}
 
-	private static ProcessSpec process(String name, AgentSpec... agents) {
-		return new ProcessSpec(name, List.of(agents));
+	private static AgentsPack agentsPack(String name, AgentSpec... agents) {
+		return new AgentsPack(name, List.of(agents));
 	}
 
 	private static AgentSpec pack(String name) {

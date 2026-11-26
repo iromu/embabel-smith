@@ -7,7 +7,7 @@ package com.embabel.smith.builder.core;
 
 /**
  * The seam for the build's multi-agent generation step: a business-process description
- * in, a draft {@link com.embabel.smith.common.model.ProcessSpec} out — the build's second
+ * in, a draft {@link com.embabel.smith.common.model.AgentsPack} out — the build's second
  * candidate beside the single-agent one produced through {@link AgentSpecGenerator}.
  *
  * <p>
@@ -17,7 +17,7 @@ package com.embabel.smith.builder.core;
  *
  * @author Ivan Rodriguez
  */
-public interface ProcessSpecGenerator {
+public interface AgentsPackGenerator {
 
 	/**
 	 * Generates a multi-agent process from a description.
@@ -25,7 +25,7 @@ public interface ProcessSpecGenerator {
 	 * @return the draft process, its name, and any issues the generator surfaced for
 	 * review
 	 */
-	ProcessDraft generateProcess(String description);
+	AgentsPackDraft generateAgentsPack(String description);
 
 	/**
 	 * Generates a multi-agent process from a description, asking for one particular LLM.
@@ -36,8 +36,8 @@ public interface ProcessSpecGenerator {
 	 * @return the draft process, its name, and any issues the generator surfaced for
 	 * review
 	 */
-	default ProcessDraft generateProcess(String description, String model) {
-		return generateProcess(description);
+	default AgentsPackDraft generateAgentsPack(String description, String model) {
+		return generateAgentsPack(description);
 	}
 
 }

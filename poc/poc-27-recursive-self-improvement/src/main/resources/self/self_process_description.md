@@ -62,13 +62,13 @@ only the emitted prompts are model-generated.
      bound without the failing step ever being touched. Below the gate after the bound, the build
      reports and stops and nothing is published. The pass-rate that clears the gate becomes the
      pack's recorded **baseline**.
-   - **process candidate** — every `agent-spec` build also generates and scores a multi-agent
-     process. `common/validation/ProcessValidator` checks hand-offs: input-producer coverage, goal
-     uniqueness, cycles. `core/ProcessRepair` attempts a bounded *reorder* repair, never a branch
+   - **agents-pack candidate** — every `agent-spec` build also generates and scores an agents-pack.
+     `common/validation/AgentsPackValidator` checks hand-offs: input-producer coverage, goal
+     uniqueness, cycles. `core/AgentsPackRepair` attempts a bounded *reorder* repair, never a branch
      restructuring; a cycle that survives repair blocks that candidate, named in the report, while
-     the build continues on the single-agent spec. An unsound process is never stored, because a
-     stored process is one someone could ingest. `core/CandidateRecommender` prefers the valid
-     candidate with the higher score; a tie or an invalid process recommends the single-agent spec,
+     the build continues on the single-agent spec. An unsound agents-pack is never stored, because a
+     stored one is one someone could ingest. `core/CandidateRecommender` prefers the valid candidate
+     with the higher score; a tie or an invalid agents-pack recommends the single-agent spec,
      which is the one published.
 5. **inspect** (the `skill` target only, and it runs *before* the eval is paid for) — after
    `skill/SkillMdValidator` has enforced the frontmatter (name 1–64 lowercase alphanumeric-or-hyphen,

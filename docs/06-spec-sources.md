@@ -68,7 +68,7 @@ reading [`10-self-improvement.md`](10-self-improvement.md).
 ## Publishing
 
 Publishing writes a pack into a source. It is shared by all three kinds of publishable unit — an
-agent spec, a skill folder, an N-pack process — because the publisher was generalized to *"a named
+agent spec, a skill folder, an agents-pack — because the publisher was generalized to *"a named
 directory of files"* rather than staying spec-specific. Only `agent-spec` and `skill` are
 selectable with `--target`; the process is generated alongside every agent-spec build, not chosen.
 That is why the collision gate and the no-push rule are stated once here instead of three times.

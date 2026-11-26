@@ -12,12 +12,12 @@ import java.util.List;
 import com.embabel.smith.common.model.ActionStepSpec;
 import com.embabel.smith.common.model.AgentSpec;
 import com.embabel.smith.common.model.AgentSpecManifest;
+import com.embabel.smith.common.model.AgentsPack;
 import com.embabel.smith.common.model.DynamicTypeDef;
 import com.embabel.smith.common.model.GoalStepSpec;
-import com.embabel.smith.common.model.ProcessSpec;
 import com.embabel.smith.common.model.PropertyDef;
-import com.embabel.smith.common.validation.ProcessValidationResult;
-import com.embabel.smith.common.validation.ProcessValidator;
+import com.embabel.smith.common.validation.AgentsPackValidationResult;
+import com.embabel.smith.common.validation.AgentsPackValidator;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -26,41 +26,41 @@ import org.junit.jupiter.api.Test;
  *
  * @author Ivan Rodriguez
  */
-class ProcessRepairTest {
+class AgentsPackRepairTest {
 
-	private final ProcessValidator validator = new ProcessValidator();
+	private final AgentsPackValidator validator = new AgentsPackValidator();
 
 	@Test
 	void aCycleAReorderCanBreakIsRepairedAndRevalidates() {
 		// The model narrated the decision agent first, yet its input is the research
 		// agent's output — the declared order asks research to run after what it feeds.
-		ProcessSpec declared = process(
+		AgentsPack declared = process(
 				agent("decision", "decision_goal", "FinalDecision",
 						step("decide", List.of("MarketReport"), "FinalDecision")),
 				agent("research", "research_goal", "MarketReport",
 						step("analyze", List.of("UserInput"), "MarketReport")));
-		ProcessValidationResult found = this.validator.validate(declared);
+		AgentsPackValidationResult found = this.validator.validate(declared);
 		assertThat(found.hasCycle()).isTrue();
 
-		ProcessRepair.Result repaired = ProcessRepair.repair(declared, found);
+		AgentsPackRepair.Result repaired = AgentsPackRepair.repair(declared, found);
 
 		assertThat(repaired.repaired()).isTrue();
-		assertThat(repaired.attempts()).isLessThanOrEqualTo(ProcessRepair.MAX_ATTEMPTS);
-		assertThat(repaired.process().agents()).extracting(AgentSpec::name).containsExactly("research", "decision");
+		assertThat(repaired.attempts()).isLessThanOrEqualTo(AgentsPackRepair.MAX_ATTEMPTS);
+		assertThat(repaired.agentsPack().agents()).extracting(AgentSpec::name).containsExactly("research", "decision");
 		assertThat(repaired.validation().isValid()).as(() -> repaired.validation().issues().toString()).isTrue();
 	}
 
 	@Test
 	void aCycleNoOrderCanBreakLeavesTheProcessBlocked() {
-		ProcessSpec mutual = process(
+		AgentsPack mutual = process(
 				agent("market", "market_goal", "MarketReport", step("analyze", List.of("UserInput"), "MarketReport"),
 						step("refine", List.of("RiskReport"), "MarketReport")),
 				agent("risk", "risk_goal", "RiskReport", step("assess", List.of("UserInput"), "RiskReport"),
 						step("check", List.of("MarketReport"), "RiskReport")));
-		ProcessValidationResult found = this.validator.validate(mutual);
+		AgentsPackValidationResult found = this.validator.validate(mutual);
 		assertThat(found.hasCycle()).isTrue();
 
-		ProcessRepair.Result repaired = ProcessRepair.repair(mutual, found);
+		AgentsPackRepair.Result repaired = AgentsPackRepair.repair(mutual, found);
 
 		assertThat(repaired.repaired()).isFalse();
 		assertThat(repaired.attempts()).isZero();
@@ -70,22 +70,22 @@ class ProcessRepairTest {
 
 	@Test
 	void aProcessWithoutACycleIsLeftAlone() {
-		ProcessSpec sound = process(
+		AgentsPack sound = process(
 				agent("research", "research_goal", "MarketReport",
 						step("analyze", List.of("UserInput"), "MarketReport")),
 				agent("decision", "decision_goal", "FinalDecision",
 						step("decide", List.of("MarketReport"), "FinalDecision")));
 
-		ProcessRepair.Result repaired = ProcessRepair.repair(sound, this.validator.validate(sound));
+		AgentsPackRepair.Result repaired = AgentsPackRepair.repair(sound, this.validator.validate(sound));
 
 		assertThat(repaired.attempts()).isZero();
 		assertThat(repaired.repaired()).isFalse();
-		assertThat(repaired.process()).isEqualTo(sound);
+		assertThat(repaired.agentsPack()).isEqualTo(sound);
 		assertThat(repaired.validation().isValid()).isTrue();
 	}
 
-	private static ProcessSpec process(AgentSpec... agents) {
-		return new ProcessSpec("trading", List.of(agents));
+	private static AgentsPack process(AgentSpec... agents) {
+		return new AgentsPack("trading", List.of(agents));
 	}
 
 	private static AgentSpec agent(String name, String goalName, String goalOutput, ActionStepSpec... steps) {

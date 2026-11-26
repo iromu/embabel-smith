@@ -121,9 +121,9 @@ six packs and eighteen steps now, the two packs added afterwards unchanged in th
 pins both halves on a pack that does name conditions, so the guard is not an absence of evidence.
 
 The same test closes the one structural claim this section does not otherwise reach: an operator cannot
-reorder the agents of a process. `ProcessSpec.withAgents` is the only method that changes an order, its sole
-main-code caller is `core/ProcessRepair.java:61` on the build path, and nothing under `improve/` imports
-`ProcessSpec` at all — `Refiner.refine` is handed a pack, and a pack has no agent order to reorder. So
+reorder the agents of an agents-pack. `AgentsPack.withAgents` is the only method that changes an order, its
+sole main-code caller is `core/AgentsPackRepair.java:61` on the build path, and nothing under `improve/`
+imports `AgentsPack` at all — `Refiner.refine` is handed a pack, and a pack has no agent order to reorder. So
 "the loop improves collaboration structure" is false by signature, not by discipline.
 
 `BuilderAgent` is not mutable, including where a pack mirrors it. `compileFromDescription`
@@ -153,7 +153,7 @@ the referee process and human control all apply to a pack mutation exactly as th
 | `referee-process` | The separate, hand-started JVM that scores. It loads no skill folder and opens no Graal `Context`, so generated code never runs where it is graded. |
 | `human-control` | Approval queue holds, auto-publish off, commit-never-push. Not a knob a generation can turn, and the held-candidate count is a reported number, not a target. |
 | `AgentSpecValidator.validate` | `smith-common/src/main/java/com/embabel/smith/common/validation/AgentSpecValidator.java`, `:86` for a pack on disk and `:107` for one in memory. It is the thing that decides whether a mutation is legal, so a candidate that could edit it could pass itself. It is also the first stage of `GateChain.gate` (`prod/embabel-smith-builder/src/main/java/com/embabel/smith/builder/improve/GateChain.java:115`) and the check behind `BuilderAgent.validateDraft` and `writeAgentSpec`, so every path a candidate travels runs it. |
-| `ProcessValidator.validate` | `smith-common/src/main/java/com/embabel/smith/common/validation/ProcessValidator.java:58`. The judge of the composition claim — the hand-offs, goal collisions and cycles between packs in one process — run by `BuilderAgent.writeProcess` (`prod/embabel-smith-builder/src/main/java/com/embabel/smith/builder/core/BuilderAgent.java:180`), by `BuilderService` (`prod/embabel-smith-builder/src/main/java/com/embabel/smith/builder/BuilderService.java:236`) and by `ProcessRepair` (`:62`). A candidate that could edit it could declare its own hand-offs sound. |
+| `AgentsPackValidator.validate` | `smith-common/src/main/java/com/embabel/smith/common/validation/AgentsPackValidator.java:58`. The judge of the composition claim — the hand-offs, goal collisions and cycles between packs in one agents-pack — run by `BuilderAgent.writeAgentsPack` (`prod/embabel-smith-builder/src/main/java/com/embabel/smith/builder/core/BuilderAgent.java:180`), by `BuilderService` (`prod/embabel-smith-builder/src/main/java/com/embabel/smith/builder/BuilderService.java:237`) and by `AgentsPackRepair` (`:62`). A candidate that could edit it could declare its own hand-offs sound. |
 | `SkillMdValidator` | `prod/embabel-smith-builder/src/main/java/com/embabel/smith/builder/skill/SkillMdValidator.java:31`, called by `SkillBuilderService` (`:186`) before a generated `SKILL.md` is eval'd. It is the published Agent Skills frontmatter constraints in one place, so a skill that could relax them could make itself publishable. |
 | `builder/publish/` | `prod/embabel-smith-builder/src/main/java/com/embabel/smith/builder/publish/`, the whole package. Publishing is where a candidate becomes a durable artifact, so its collision gate (`FolderPublisher.java:46`) and its local-commit-only default — `GitPublisher.java:66` commits, `:72` pushes only when `--push` is set — are what keep a generation's output out of the artifact store. The loop reaches it through `ApprovalQueue` (`prod/embabel-smith-builder/src/main/java/com/embabel/smith/builder/improve/ApprovalQueue.java:42`, `:89`), whose auto-publish path the `human-control` entry already fixes off. |
 

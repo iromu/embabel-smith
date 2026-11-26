@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 320" preserveAspectRatio="xMidYMid meet" role="img" aria-labelledby="p1-title p1-desc">
   <title id="p1-title">Embabel Smith pipeline: natural language in, runnable agent spec out</title>
-  <desc id="p1-desc">Left to right: a natural-language description enters embabel-smith-builder, which generates a spec, validates it before writing, and emits it. The emitted artifact is an agent spec on disk, a YAML directory holding manifest.yml, goal.yml, steps and types. The no-code embabel-smith-runtime deploys that spec, plans with GOAP and executes it, producing the exported goal output. Two side notes: the builder can also emit a skill folder or an N-pack process, and publishing writes a pack into a spec source addressed folder: or git:, which is what the runtime ingests.</desc>
+  <desc id="p1-desc">Left to right: a natural-language description enters embabel-smith-builder, which generates a spec, validates it before writing, and emits it. The emitted artifact is an agent spec on disk, a YAML directory holding manifest.yml, goal.yml, steps and types. The no-code embabel-smith-runtime deploys that spec, plans with GOAP and executes it, producing the exported goal output. Two side notes: the builder can also emit a skill folder or an agents-pack, and publishing writes a pack into a spec source addressed folder: or git:, which is what the runtime ingests.</desc>
 
   <style>
     text { font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
@@ -138,7 +138,7 @@
   <rect class="chip" x="212" y="256" width="104" height="26" rx="6"/>
   <text class="mono mono-mid" x="226" y="273">skill folder</text>
   <rect class="chip" x="324" y="256" width="124" height="26" rx="6"/>
-  <text class="mono mono-mid" x="338" y="273">N-pack process</text>
+  <text class="mono mono-mid" x="338" y="273">agents-pack</text>
 
   <!-- legend -->
   <rect class="box-builder" x="830" y="259" width="11" height="11" rx="3"/>

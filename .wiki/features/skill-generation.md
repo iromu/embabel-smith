@@ -93,9 +93,9 @@ scenarios. Ceiling compression, not weak skills.
 ## From a built process, not from prose
 
 POC 25 asks the model how many skills a process needs (*The pipeline* above); the builder's seam asks
-nothing. `SkillBuilderService.buildFromProcess(ProcessSpec, PublishTarget, BuildOptions)`
+nothing. `SkillBuilderService.buildFromAgentsPack(AgentsPack, PublishTarget, BuildOptions)`
 (`skill/SkillBuilderService.java:151`) takes a decomposed process and reads each member `AgentSpec` as
-one stage — the only place `ProcessSpec` reaches `skill/` at all (import `:31`, signature `:151`). Each
+one stage — the only place `AgentsPack` reaches `skill/` at all (import `:31`, signature `:151`). Each
 brief is assembled in Java at `:173` from fields the pack already declares: `Stage <name>`, then per
 step its name, its description, the types it consumes and the type it produces — no model call. Each
 brief then runs the same `build(String, …)` (`:194`) that a typed description takes, so the frontmatter,

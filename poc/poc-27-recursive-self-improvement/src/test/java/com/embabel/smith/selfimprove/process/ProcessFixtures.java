@@ -16,7 +16,7 @@ import com.embabel.smith.common.model.ActionStepSpec;
 import com.embabel.smith.common.model.AgentSpec;
 import com.embabel.smith.common.model.AgentSpecManifest;
 import com.embabel.smith.common.model.GoalStepSpec;
-import com.embabel.smith.common.model.ProcessSpec;
+import com.embabel.smith.common.model.AgentsPack;
 
 /**
  * Hand-authored spec sets for the offline checks, so every expectation about the
@@ -85,14 +85,14 @@ final class ProcessFixtures {
 	}
 
 	/** A two-agent process whose hand-offs are sound. */
-	static ProcessSpec soundProcess() {
+	static AgentsPack soundProcess() {
 		return process("self-build",
 				agent("compile-description", "CompiledDraft", step("compile", "UserInput", "CompiledDraft")),
 				agent("publish-pack", "PublishedPack", step("publish", "CompiledDraft", "PublishedPack")));
 	}
 
 	/** A process whose second step needs a type nothing in the process produces. */
-	static ProcessSpec uncoveredInputProcess() {
+	static AgentsPack uncoveredInputProcess() {
 		return process("self-build",
 				agent("compile-description", "CompiledDraft", step("compile", "UserInput", "CompiledDraft")),
 				agent("publish-pack", "PublishedPack", step("publish", "ReviewedDraft", "PublishedPack")));
@@ -101,7 +101,7 @@ final class ProcessFixtures {
 	/**
 	 * A process whose two agents each consume the other's output — no reorder settles it.
 	 */
-	static ProcessSpec mutualCycleProcess() {
+	static AgentsPack mutualCycleProcess() {
 		return process("self-build",
 				agent("draft", "DraftedSpec", step("draft", "UserInput", "DraftedSpec"),
 						step("mend", "ScoredSpec", "DraftedSpec")),
@@ -113,7 +113,7 @@ final class ProcessFixtures {
 	 * A process with sound data flow that the model narrated in the wrong order: the
 	 * publisher is listed before the compiler that feeds it.
 	 */
-	static ProcessSpec wrongOrderProcess() {
+	static AgentsPack wrongOrderProcess() {
 		return process("self-build",
 				agent("publish-pack", "PublishedPack", step("publish", "CompiledDraft", "PublishedPack")),
 				agent("compile-description", "CompiledDraft", step("compile", "UserInput", "CompiledDraft")));
@@ -125,7 +125,7 @@ final class ProcessFixtures {
 	 * @param names the agent names, in run order
 	 * @return a process declaring one agent per name
 	 */
-	static ProcessSpec stagesProcess(String... names) {
+	static AgentsPack stagesProcess(String... names) {
 		List<AgentSpec> agents = new ArrayList<>();
 		for (int index = 0; index < names.length; index++) {
 			String output = "StageOutput" + index;
@@ -154,8 +154,8 @@ final class ProcessFixtures {
 		}
 	}
 
-	private static ProcessSpec process(String name, AgentSpec... agents) {
-		return new ProcessSpec(name, List.of(agents));
+	private static AgentsPack process(String name, AgentSpec... agents) {
+		return new AgentsPack(name, List.of(agents));
 	}
 
 	private static AgentSpec agent(String name, String goalOutput, ActionStepSpec... steps) {

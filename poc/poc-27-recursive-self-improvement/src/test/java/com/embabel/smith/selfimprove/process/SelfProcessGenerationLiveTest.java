@@ -8,8 +8,8 @@ package com.embabel.smith.selfimprove.process;
 import java.util.stream.Stream;
 
 import com.embabel.agent.api.common.Ai;
-import com.embabel.smith.builder.core.ProcessDraft;
-import com.embabel.smith.builder.core.SingleShotProcessSpecGenerator;
+import com.embabel.smith.builder.core.AgentsPackDraft;
+import com.embabel.smith.builder.core.SingleShotAgentsPackGenerator;
 import com.embabel.smith.selfimprove.SelfImproveApp;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -59,7 +59,7 @@ class SelfProcessGenerationLiveTest {
 
 	private static ConfigurableApplicationContext context;
 
-	private static ProcessDraft draft;
+	private static AgentsPackDraft draft;
 
 	@BeforeAll
 	static void generateAMultiAgentProcessFromTheSelfDescription() {
@@ -70,7 +70,7 @@ class SelfProcessGenerationLiveTest {
 		// the
 		// technique docs/08-builder.md records as the only multi-agent one worth running.
 		Ai ai = context.getBean(Ai.class);
-		draft = new SingleShotProcessSpecGenerator(ai).generateProcess(SelfDescription.text());
+		draft = new SingleShotAgentsPackGenerator(ai).generateAgentsPack(SelfDescription.text());
 		System.out.println("poc-27 5.1: generated process '" + draft.processName() + "' with "
 				+ draft.process().agents().size() + " agent specs from " + SelfDescription.RESOURCE);
 	}

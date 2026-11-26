@@ -17,12 +17,12 @@ import com.embabel.agent.api.common.PlannerType;
 import com.embabel.agent.domain.io.UserInput;
 import com.embabel.smith.common.io.AgentSpecReader;
 import com.embabel.smith.common.io.AgentSpecWriter;
-import com.embabel.smith.common.io.ProcessSpecWriter;
+import com.embabel.smith.common.io.AgentsPackWriter;
 import com.embabel.smith.common.model.AgentSpec;
-import com.embabel.smith.common.model.ProcessSpec;
+import com.embabel.smith.common.model.AgentsPack;
 import com.embabel.smith.common.validation.AgentSpecValidator;
-import com.embabel.smith.common.validation.ProcessValidationResult;
-import com.embabel.smith.common.validation.ProcessValidator;
+import com.embabel.smith.common.validation.AgentsPackValidationResult;
+import com.embabel.smith.common.validation.AgentsPackValidator;
 import com.embabel.smith.common.validation.ValidationIssue;
 
 /**
@@ -62,9 +62,9 @@ public class BuilderAgent {
 
 	private final AgentSpecReader reader = new AgentSpecReader();
 
-	private final ProcessSpecWriter processWriter = new ProcessSpecWriter();
+	private final AgentsPackWriter agentsPackWriter = new AgentsPackWriter();
 
-	private final ProcessValidator processValidator = new ProcessValidator();
+	private final AgentsPackValidator agentsPackValidator = new AgentsPackValidator();
 
 	public BuilderAgent(Map<GenerationTechnique, AgentSpecGenerator> generators, String outputDir) {
 		this.generators = Map.copyOf(generators);
@@ -173,17 +173,17 @@ public class BuilderAgent {
 	 * build's candidates stay on disk whatever it goes on to publish. Refuses to write a
 	 * process whose cross-agent hand-offs do not validate (design D5 again: an unsound
 	 * artifact never reaches disk, because a stored process is one someone could ingest).
-	 * @param process the process to write
+	 * @param agentsPack the agents-pack to write
 	 * @return the directory the process was written to
 	 */
-	public Path writeProcess(ProcessSpec process) {
-		ProcessValidationResult result = this.processValidator.validate(process);
+	public Path writeAgentsPack(AgentsPack agentsPack) {
+		AgentsPackValidationResult result = this.agentsPackValidator.validate(agentsPack);
 		if (!result.isValid()) {
 			throw new IllegalStateException("Refusing to write an invalid process: " + result.issues());
 		}
-		Path dir = this.outputDir.resolve(process.process());
+		Path dir = this.outputDir.resolve(agentsPack.process());
 		try {
-			this.processWriter.write(process, dir);
+			this.agentsPackWriter.write(agentsPack, dir);
 		}
 		catch (IOException ex) {
 			throw new IllegalStateException("Failed to write the process at " + dir, ex);

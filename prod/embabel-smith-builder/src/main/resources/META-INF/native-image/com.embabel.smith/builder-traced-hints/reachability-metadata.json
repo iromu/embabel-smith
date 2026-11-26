@@ -3595,7 +3595,7 @@
       ]
     },
     {
-      "type": "com.embabel.smith.builder.core.ProcessRepairTest",
+      "type": "com.embabel.smith.builder.core.AgentsPackRepairTest",
       "methods": [
         {
           "name": "<init>",
@@ -3658,7 +3658,7 @@
       ]
     },
     {
-      "type": "com.embabel.smith.builder.core.SingleShotProcessSpecGenerator$MultiProcessResponse",
+      "type": "com.embabel.smith.builder.core.SingleShotAgentsPackGenerator$MultiPackResponse",
       "methods": [
         {
           "name": "<init>",
@@ -3670,7 +3670,7 @@
       ]
     },
     {
-      "type": "com.embabel.smith.builder.core.SingleShotProcessSpecGeneratorTest",
+      "type": "com.embabel.smith.builder.core.SingleShotAgentsPackGeneratorTest",
       "methods": [
         {
           "name": "<init>",
@@ -4287,7 +4287,7 @@
       ]
     },
     {
-      "type": "com.embabel.smith.builder.skill.SkillBuilderServiceFromProcessTest",
+      "type": "com.embabel.smith.builder.skill.SkillBuilderServiceFromAgentsPackTest",
       "methods": [
         {
           "name": "<init>",
@@ -4863,7 +4863,7 @@
       ]
     },
     {
-      "type": "com.embabel.smith.common.model.ProcessSpecManifest",
+      "type": "com.embabel.smith.common.model.AgentsPackManifest",
       "methods": [
         {
           "name": "<init>",
@@ -12240,7 +12240,7 @@
       "glob": "com/embabel/smith/builder/core/AgentSpecGenerator.class"
     },
     {
-      "glob": "com/embabel/smith/builder/core/ProcessSpecGenerator.class"
+      "glob": "com/embabel/smith/builder/core/AgentsPackGenerator.class"
     },
     {
       "glob": "com/embabel/smith/builder/core/SpecPromptCaller.class"
@@ -12249,7 +12249,7 @@
       "glob": "com/embabel/smith/builder/eval/InvokerFactory.class"
     },
     {
-      "glob": "com/embabel/smith/builder/eval/ProcessInvokerFactory.class"
+      "glob": "com/embabel/smith/builder/eval/AgentsPackInvokerFactory.class"
     },
     {
       "glob": "com/embabel/smith/builder/eval/PromptRewriter.class"

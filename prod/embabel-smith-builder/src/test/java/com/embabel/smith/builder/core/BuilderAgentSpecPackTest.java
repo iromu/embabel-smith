@@ -35,7 +35,7 @@ import static org.mockito.Mockito.when;
  * <p>
  * <b>Why the deploy is the assertion that matters.</b> The builder's flow is reachable
  * today only through Java — {@code core/BuilderAgent} and
- * {@code core/SingleShotProcessSpecGenerator} — so a pack that merely parses would be an
+ * {@code core/SingleShotAgentsPackGenerator} — so a pack that merely parses would be an
  * artifact no code loads, which is the exact gap this change exists to close. Each pack
  * is therefore pushed all the way through the production path: {@link AgentSpecReader}
  * reads the checked-in directory, {@link AgentSpecValidator} checks it, and

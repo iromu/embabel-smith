@@ -349,7 +349,7 @@ excluded is a verdict, a write, a model call or the referee, and the fact that t
 now forced in Java between model calls because on one measured run the step was offered the validator and
 declined it. [[trust-tiers]] carries the vocabulary decision: the allowlists are deliberately unchanged, so
 every builder role lands at `T4_PLATFORM`, and backed-ness is proved against a booted registry rather than
-by a tier. Three clauses this change falsified were rewritten rather than left standing: `ProcessValidationTool`
+by a tier. Three clauses this change falsified were rewritten rather than left standing: `AgentsPackValidationTool`
 "carried by no registered group", "the tree now has two" `ToolGroup` beans (seven now), and the `--flow pack`
 measurement's "repeats on an unchanged draft are not deduped" (every tool body now goes through the memo, the
 validator's included). Two other negative claims were re-counted against the tree rather than trusted:

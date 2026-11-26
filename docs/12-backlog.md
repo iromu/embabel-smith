@@ -425,14 +425,14 @@ script without measuring whether a model writes one.
   exactly what it predicts. A *callable* script tool inside an image still needs one built with the switch
   baked in, and stays unmeasured.
 
-- **Open — the process→skill seam has no caller outside its own test.** The seam is built and behaves:
-  `skill/SkillBuilderService.buildFromProcess` derives one stage description per member agent from that
+- **Open — the agents-pack→skill seam has no caller outside its own test.** The seam is built and behaves:
+  `skill/SkillBuilderService.buildFromAgentsPack` derives one stage description per member agent from that
   stage's own steps, runs the existing frontmatter, inspection, eval and lift gates through `build`
   rather than adding a second set, and ends the run at the first stage a gate refuses. What it does not
   have is a route: no CLI flag, no studio body and no `smith skill-run` path reaches it, and
   `builder-skill-from-process` is named nowhere in `src/main` (the pack-lifecycle item above). So the
   capability's "a named caller reaches it, not a method only its own test invokes" half is unmet while
-  its behaviour half is met. Check: `grep -rn 'buildFromProcess' prod/*/src/main` returns the
+  its behaviour half is met. Check: `grep -rn 'buildFromAgentsPack' prod/*/src/main` returns the
   declaration in `SkillBuilderService.java` and nothing else — one line, which is the whole finding.
 
 ## Builder — generation

@@ -6,7 +6,7 @@
 package com.embabel.smith.builder.lifecycle;
 
 import com.embabel.smith.common.model.AgentSpec;
-import com.embabel.smith.common.model.ProcessSpec;
+import com.embabel.smith.common.model.AgentsPack;
 
 /**
  * A deterministic content hash of a process's load-bearing surface: every pack's own
@@ -19,19 +19,19 @@ import com.embabel.smith.common.model.ProcessSpec;
  *
  * @author Ivan Rodriguez
  */
-public final class ProcessContentHash {
+public final class AgentsPackContentHash {
 
-	private ProcessContentHash() {
+	private AgentsPackContentHash() {
 	}
 
 	/**
 	 * The hash of a process as published.
-	 * @param process the process to hash
+	 * @param agentsPack the agents-pack to hash
 	 * @return the hex sha-256 of its canonical form
 	 */
-	public static String of(ProcessSpec process) {
-		StringBuilder canonical = new StringBuilder("process:").append(process.process()).append('\n');
-		for (AgentSpec pack : process.agents()) {
+	public static String of(AgentsPack agentsPack) {
+		StringBuilder canonical = new StringBuilder("process:").append(agentsPack.process()).append('\n');
+		for (AgentSpec pack : agentsPack.agents()) {
 			canonical.append("pack:").append(SpecContentHash.of(pack)).append('\n');
 		}
 		return ContentHash.sha256Hex(canonical.toString());

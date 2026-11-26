@@ -1,14 +1,14 @@
 # Embabel Smith — Documentation
 
 Documents that research, ground, synthesize, and report a GOAP-based agent builder on the Embabel
-platform (v1.5.4). Pages 01–04 are the design history and the POC record; 05–13 and the unnumbered
+platform (v1.5.4). Pages 01–04 are the design history and the POC record; 05–14 and the unnumbered
 pages are the current reference, and each claim in them is checkable against the tree. Where a
 history page and a reference page disagree, the reference page and the code win.
 
 ## Reference — how the system works now
 
 - [The agent spec format](agent-spec-format.md) — the on-disk unit of capability: a directory of pure
-  YAML, its six invariants, and the multi-pack process spec.
+  YAML, its six invariants, and the agents-pack process spec.
 - [05 — Architecture and build invariants](05-architecture.md) — module map, extract-don't-depend and
   the enforcer ban, the POC freeze, the gating taxonomy, the `Ai`-only model layer, cross-cutting
   invariants, local state, build entry points.
@@ -30,6 +30,9 @@ history page and a reference page disagree, the reference page and the code win.
 - [13 — JavaScript for skill scripts](13-skill-script-javascript.md) — the surface a generated skill's
   `scripts/*.js` is given, the portability subset that runs unchanged under both the in-JVM GraalJS
   engine and `node`, and the idioms that stay on it.
+- [14 — Containers](14-containers.md) — the two images and the pipeline that builds them: why they run
+  on a classpath rather than an executable jar, the packaging traps that follow from it, the profile a
+  container has to set, and what the container leg does not gate.
 
 ## Research and design
 

@@ -13,9 +13,9 @@ import com.embabel.smith.builder.publish.PublishTarget;
 import com.embabel.smith.common.model.ActionStepSpec;
 import com.embabel.smith.common.model.AgentSpec;
 import com.embabel.smith.common.model.AgentSpecManifest;
+import com.embabel.smith.common.model.AgentsPack;
 import com.embabel.smith.common.model.DynamicTypeDef;
 import com.embabel.smith.common.model.GoalStepSpec;
-import com.embabel.smith.common.model.ProcessSpec;
 import com.embabel.smith.common.model.PropertyDef;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -27,9 +27,9 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Offline tests for {@code SkillBuilderService.buildFromProcess}: a process is compiled
- * one skill per member agent, so the generator must be asked once per agent and — the
- * part that matters — each of those asks must be a <em>different</em> request. Both
+ * Offline tests for {@code SkillBuilderService.buildFromAgentsPack}: a process is
+ * compiled one skill per member agent, so the generator must be asked once per agent and
+ * — the part that matters — each of those asks must be a <em>different</em> request. Both
  * assertions are read off the calls the injected {@link SpecPromptCaller} actually
  * received, never off the returned {@link SkillBuildResult}, because the returned object
  * carries one stage's outcome and says nothing about how many stages were run.
@@ -49,7 +49,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * @author Ivan Rodriguez
  */
-class SkillBuilderServiceFromProcessTest {
+class SkillBuilderServiceFromAgentsPackTest {
 
 	private static final String SKILL_PROMPT = "GEN-SKILL";
 
@@ -89,29 +89,29 @@ class SkillBuilderServiceFromProcessTest {
 
 	@Test
 	void everyMemberAgentOfTheProcessBuysExactlyOneGenerationCall(@TempDir Path library) {
-		ProcessSpec process = process();
+		AgentsPack agentsPack = process();
 		// The count is asserted against the agents, not the steps: the process has three
 		// agents and four steps, so an implementation that derived one skill per step
 		// cannot satisfy this either.
-		assertThat(process.agents()).hasSize(3);
-		assertThat(process.totalSteps()).isEqualTo(4);
+		assertThat(agentsPack.agents()).hasSize(3);
+		assertThat(agentsPack.totalSteps()).isEqualTo(4);
 
-		assertThat(buildFromProcess(library, process)).isNotNull();
+		assertThat(buildFromAgentsPack(library, agentsPack)).isNotNull();
 
 		assertThat(this.generationRequests).as(() -> "systems called: " + this.systems)
-			.hasSize(process.agents().size());
+			.hasSize(agentsPack.agents().size());
 	}
 
 	@Test
 	void theGenerationRequestsForDistinctStagesAreDistinct(@TempDir Path library) {
-		buildFromProcess(library, process());
+		buildFromAgentsPack(library, process());
 
 		// The whole request, so a build that varied only the skill name it addressed —
 		// and left the description identical — is caught by the document comparison
 		// below, and one that varied nothing at all is caught here.
 		assertThat(this.generationRequests).as(() -> "requests sent: " + this.generationRequests)
 			.doesNotHaveDuplicates();
-		assertThat(this.generationRequests.stream().map(SkillBuilderServiceFromProcessTest::documentOf).toList())
+		assertThat(this.generationRequests.stream().map(SkillBuilderServiceFromAgentsPackTest::documentOf).toList())
 			.doesNotHaveDuplicates();
 	}
 
@@ -141,8 +141,8 @@ class SkillBuilderServiceFromProcessTest {
 	 * inputs is the shape the validator rejects as {@code PROMPT_IGNORES_DECLARED_INPUT},
 	 * and it is the shape that made POC 27's run invalid.
 	 */
-	private static ProcessSpec process() {
-		return new ProcessSpec("order-despatch", List.of(intake(), credit(), despatch()));
+	private static AgentsPack process() {
+		return new AgentsPack("order-despatch", List.of(intake(), credit(), despatch()));
 	}
 
 	private static AgentSpec intake() {
@@ -190,7 +190,7 @@ class SkillBuilderServiceFromProcessTest {
 	 * {@link com.embabel.smith.builder.core.PackName} truncates a slug at 40 characters,
 	 * and a slug collision must not change the call count being measured.
 	 */
-	private SkillBuildResult buildFromProcess(Path library, ProcessSpec process) {
+	private SkillBuildResult buildFromAgentsPack(Path library, AgentsPack agentsPack) {
 		SpecPromptCaller model = (system, user) -> {
 			this.systems.add(system);
 			if (system.startsWith(SKILL_PROMPT)) {
@@ -215,7 +215,7 @@ class SkillBuilderServiceFromProcessTest {
 				WITH_PROMPT, BASE_PROMPT);
 		BuildOptions options = new BuildOptions(BuildOptions.DEFAULT_MAX_REFINE, BuildOptions.DEFAULT_SCORE_GATE, true,
 				false, GenerationTechnique.SINGLE_SHOT, BuildTarget.SKILL, BuildOptions.DEFAULT_MIN_LIFT);
-		return service.buildFromProcess(process, PublishTarget.parse("folder:" + library), options);
+		return service.buildFromAgentsPack(agentsPack, PublishTarget.parse("folder:" + library), options);
 	}
 
 	/**

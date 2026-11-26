@@ -227,7 +227,7 @@ eval/AgenticAgentSpecGenerator`, differing only in which pack it deploys and the
 messages — so the forcing ceiling, the identical-call memo and the per-build window clearing are one
 implementation. Two things follow that are worth stating rather than leaving to inference. The corpus
 handover did **not** move: `BuildCommand.resolveDescription()` still assembles it for a `--docs` build
-under this flow, because `newService` wires `SingleShotProcessSpecGenerator` unconditionally and the
+under this flow, because `newService` wires `SingleShotAgentsPackGenerator` unconditionally and the
 multi-agent candidate consumes the assembled text, so the pack's prompts tell the steps to work the
 roots through the tools and treat the inline text as a capped first reading. Cutting that handover is a
 dual-candidate change with its own cost, and it is in [`12-backlog.md`](12-backlog.md) rather than
@@ -494,22 +494,22 @@ A build generates **both** candidates — a single-agent spec and a multi-agent 
 and publishes only the recommended one. `core/CandidateRecommender` prefers the valid candidate with
 the higher score; a tie or an invalid process recommends the single-agent spec.
 
-`common/validation/ProcessValidator` checks hand-offs: input-producer coverage, goal uniqueness, and
-cycles. `core/ProcessRepair` attempts a bounded reorder repair; a cycle that survives it blocks
+`common/validation/AgentsPackValidator` checks hand-offs: input-producer coverage, goal uniqueness,
+and cycles. `core/AgentsPackRepair` attempts a bounded reorder repair; a cycle that survives it blocks
 *that candidate* — named in the report — while the build continues on the single-agent spec. Repair
 is reorder-only, never branch restructuring.
 
-**An unsound process is never stored**, because a stored process is one someone could ingest. Process
-evaluation is reimplemented in the builder (the invoker generalized to N packs) rather than depending
-on the runtime module.
+**An unsound agents-pack is never stored**, because a stored one is something someone could ingest.
+Agents-pack evaluation is reimplemented in the builder (the invoker generalized to an agents-pack)
+rather than depending on the runtime module.
 
-**A process reaches the skill pipeline through one method and nothing else.**
-`skill/SkillBuilderService.buildFromProcess(ProcessSpec, …)` walks the process's member agents and
+**An agents-pack reaches the skill pipeline through one method and nothing else.**
+`skill/SkillBuilderService.buildFromAgentsPack(AgentsPack, …)` walks the pack's member agents and
 calls the ordinary `build(…)` once per stage, handing it a description assembled from that stage's own
 steps — its name, each step's description, the types it consumes and the type it produces — so two
 distinct stages are given two distinct briefs and no caller has to restate the decomposition as prose.
 The gates are the existing ones: frontmatter, inspection, eval and lift all run through `build`, and
-the seam deliberately adds none of its own, so a stage of a process is gated exactly as a hand-written
+the seam deliberately adds none of its own, so a stage of an agents-pack is gated exactly as a hand-written
 description would be. The first stage a gate refuses stops the run and *is* the reported result,
 because a process with an unpublished stage is not a built process; a process declaring no stages is
 blocked at a named `decompose` stage rather than publishing nothing silently. The seam lives in the

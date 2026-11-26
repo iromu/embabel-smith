@@ -5,7 +5,7 @@
 
 package com.embabel.smith.builder.eval;
 
-import com.embabel.smith.common.model.ProcessSpec;
+import com.embabel.smith.common.model.AgentsPack;
 
 /**
  * Produces the {@link AgentSpecInvoker} for a composed process. The production
@@ -17,25 +17,25 @@ import com.embabel.smith.common.model.ProcessSpec;
  * @author Ivan Rodriguez
  */
 @FunctionalInterface
-public interface ProcessInvokerFactory {
+public interface AgentsPackInvokerFactory {
 
 	/**
 	 * The invoker that runs a process end to end.
-	 * @param process the process to deploy and run
+	 * @param agentsPack the agents-pack to deploy and run
 	 * @return an invoker that runs the process's entry goal against its packs
 	 */
-	AgentSpecInvoker invokerFor(ProcessSpec process);
+	AgentSpecInvoker invokerFor(AgentsPack agentsPack);
 
 	/**
-	 * As {@link #invokerFor(ProcessSpec)}, running every step of every pack through one
+	 * As {@link #invokerFor(AgentsPack)}, running every step of every pack through one
 	 * particular LLM.
-	 * @param process the process to deploy and run
+	 * @param agentsPack the agents-pack to deploy and run
 	 * @param model the LLM the process's steps should run on, or empty for the configured
 	 * default
 	 * @return an invoker that runs the process's entry goal against its packs
 	 */
-	default AgentSpecInvoker invokerFor(ProcessSpec process, String model) {
-		return invokerFor(process);
+	default AgentSpecInvoker invokerFor(AgentsPack agentsPack, String model) {
+		return invokerFor(agentsPack);
 	}
 
 }

@@ -11,7 +11,7 @@ import java.util.Locale;
 
 import com.embabel.smith.common.model.ActionStepSpec;
 import com.embabel.smith.common.model.AgentSpec;
-import com.embabel.smith.common.model.ProcessSpec;
+import com.embabel.smith.common.model.AgentsPack;
 
 /**
  * The pipeline a generated process is supposed to describe: the eight stages of
@@ -27,7 +27,7 @@ import com.embabel.smith.common.model.ProcessSpec;
  * quote.
  *
  * <p>
- * {@link #coverage(ProcessSpec)} answers task 5.3's question — which stages does the
+ * {@link #coverage(AgentsPack)} answers task 5.3's question — which stages does the
  * generated process actually name — by searching the process's own declared text for the
  * stage's terms. It is a coarse, deterministic instrument on purpose: a stage counts as
  * named when the word appears anywhere in an agent, step, prompt or type the model wrote,
@@ -81,7 +81,7 @@ public final class BuilderPipelineStages {
 	 * @return the named and dropped stage names, in build order, together always the
 	 * whole set
 	 */
-	public static Coverage coverage(ProcessSpec process) {
+	public static Coverage coverage(AgentsPack process) {
 		String declared = declaredText(process);
 		List<String> named = new ArrayList<>();
 		List<String> dropped = new ArrayList<>();
@@ -119,7 +119,7 @@ public final class BuilderPipelineStages {
 	 * @param process the process to read
 	 * @return the process's own declared text
 	 */
-	private static String declaredText(ProcessSpec process) {
+	private static String declaredText(AgentsPack process) {
 		StringBuilder text = new StringBuilder(String.valueOf(process.process())).append('\n');
 		for (AgentSpec agent : process.agents()) {
 			text.append(agent.name()).append('\n');

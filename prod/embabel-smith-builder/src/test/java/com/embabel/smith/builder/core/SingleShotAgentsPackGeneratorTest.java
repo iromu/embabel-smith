@@ -9,9 +9,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.embabel.smith.common.model.AgentSpec;
-import com.embabel.smith.common.model.ProcessSpec;
-import com.embabel.smith.common.validation.ProcessValidationResult;
-import com.embabel.smith.common.validation.ProcessValidator;
+import com.embabel.smith.common.model.AgentsPack;
+import com.embabel.smith.common.validation.AgentsPackValidationResult;
+import com.embabel.smith.common.validation.AgentsPackValidator;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -21,7 +21,7 @@ import org.junit.jupiter.api.Test;
  *
  * @author Ivan Rodriguez
  */
-class SingleShotProcessSpecGeneratorTest {
+class SingleShotAgentsPackGeneratorTest {
 
 	private static final String MULTI_JSON = """
 			{
@@ -53,39 +53,39 @@ class SingleShotProcessSpecGeneratorTest {
 			}
 			""";
 
-	private final ProcessValidator validator = new ProcessValidator();
+	private final AgentsPackValidator validator = new AgentsPackValidator();
 
 	@Test
 	void theDescriptionArrivesInsideDocumentTags() {
 		String[] seen = new String[1];
-		SingleShotProcessSpecGenerator generator = new SingleShotProcessSpecGenerator((system, user) -> {
+		SingleShotAgentsPackGenerator generator = new SingleShotAgentsPackGenerator((system, user) -> {
 			seen[0] = user;
 			return MULTI_JSON;
 		}, "the multi-agent prompt");
 
-		generator.generateProcess("run the research debate and decide");
+		generator.generateAgentsPack("run the research debate and decide");
 
 		assertThat(seen[0]).contains("<document>\nrun the research debate and decide\n</document>");
 	}
 
 	@Test
 	void parsesTheAnswerIntoAnOrderedListOfPacks() {
-		ProcessDraft draft = generator(MULTI_JSON).generateProcess("a business process");
+		AgentsPackDraft draft = generator(MULTI_JSON).generateAgentsPack("a business process");
 
-		ProcessSpec process = draft.process();
+		AgentsPack agentsPack = draft.process();
 		assertThat(draft.processName()).isEqualTo("trading");
 		assertThat(draft.issues()).isEmpty();
-		assertThat(process.process()).isEqualTo("trading");
-		assertThat(process.agents()).extracting(AgentSpec::name).containsExactly("research", "decision");
-		assertThat(process.totalSteps()).isEqualTo(2);
-		assertThat(process.finalOutputType()).isEqualTo("FinalDecision");
+		assertThat(agentsPack.process()).isEqualTo("trading");
+		assertThat(agentsPack.agents()).extracting(AgentSpec::name).containsExactly("research", "decision");
+		assertThat(agentsPack.totalSteps()).isEqualTo(2);
+		assertThat(agentsPack.finalOutputType()).isEqualTo("FinalDecision");
 	}
 
 	@Test
 	void theParsedProcessValidatesItsCrossAgentHandoffs() {
-		ProcessSpec process = generator(MULTI_JSON).generateProcess("a business process").process();
+		AgentsPack agentsPack = generator(MULTI_JSON).generateAgentsPack("a business process").process();
 
-		ProcessValidationResult result = this.validator.validate(process);
+		AgentsPackValidationResult result = this.validator.validate(agentsPack);
 
 		assertThat(result.isValid()).as(() -> result.issues().toString()).isTrue();
 		assertThat(result.sharedTypes()).isEqualTo(1);
@@ -93,9 +93,9 @@ class SingleShotProcessSpecGeneratorTest {
 
 	@Test
 	void everyAgentIsNormalisedTheWayASinglePackIs() {
-		ProcessSpec process = generator(MULTI_JSON).generateProcess("a business process").process();
+		AgentsPack agentsPack = generator(MULTI_JSON).generateAgentsPack("a business process").process();
 
-		AgentSpec research = process.agents().get(0);
+		AgentSpec research = agentsPack.agents().get(0);
 		assertThat(research.manifest().version()).isEqualTo("1.0.0");
 		assertThat(research.goal().isExported()).isTrue();
 		// The model wrote the prompt var in snake_case with spaces; the runtime binds the
@@ -107,15 +107,15 @@ class SingleShotProcessSpecGeneratorTest {
 	void theProcessNameFallsBackToTheFirstAgentWhenTheModelOmitsIt() {
 		String answer = MULTI_JSON.replace("\"process\": \"trading\",", "");
 
-		ProcessDraft draft = generator(answer).generateProcess("a business process");
+		AgentsPackDraft draft = generator(answer).generateAgentsPack("a business process");
 
 		assertThat(draft.processName()).isEqualTo("research");
 	}
 
 	@Test
 	void markdownFencesAroundTheAnswerAreStripped() {
-		ProcessDraft draft = generator("Sure thing:\n```json\n" + MULTI_JSON + "\n```\nHope that helps.")
-			.generateProcess("a business process");
+		AgentsPackDraft draft = generator("Sure thing:\n```json\n" + MULTI_JSON + "\n```\nHope that helps.")
+			.generateAgentsPack("a business process");
 
 		assertThat(draft.process().agents()).hasSize(2);
 	}
@@ -124,7 +124,7 @@ class SingleShotProcessSpecGeneratorTest {
 	void anAnswerThatNamesNoAgentsIsAFailureRatherThanAnEmptyProcess() {
 		String answer = "{ \"process\": \"empty\", \"agents\": [] }";
 
-		assertThatThrownBy(() -> generator(answer).generateProcess("anything"))
+		assertThatThrownBy(() -> generator(answer).generateAgentsPack("anything"))
 			.isInstanceOf(IllegalStateException.class)
 			.hasMessageContaining("no agents");
 	}
@@ -152,26 +152,26 @@ class SingleShotProcessSpecGeneratorTest {
 				}
 				""";
 
-		assertThatThrownBy(() -> generator(answer).generateProcess("anything"))
+		assertThatThrownBy(() -> generator(answer).generateAgentsPack("anything"))
 			.isInstanceOf(IllegalStateException.class)
 			.hasMessageContaining("single agent");
 	}
 
 	@Test
 	void anAnswerWithNoJsonAtAllIsAFailure() {
-		assertThatThrownBy(() -> generator("the model apologised").generateProcess("anything"))
+		assertThatThrownBy(() -> generator("the model apologised").generateAgentsPack("anything"))
 			.isInstanceOf(IllegalStateException.class);
 	}
 
 	@Test
 	void theBundledPromptAsksForTheProcessSchemaTheParserExpects() {
-		String prompt = SingleShotProcessSpecGenerator.defaultPrompt();
+		String prompt = SingleShotAgentsPackGenerator.defaultPrompt();
 
 		assertThat(prompt).contains("MULTI-AGENT").contains("\"agents\"").contains("outputTypeName");
 	}
 
-	private static SingleShotProcessSpecGenerator generator(String answer) {
-		return new SingleShotProcessSpecGenerator((system, user) -> answer, "the multi-agent prompt");
+	private static SingleShotAgentsPackGenerator generator(String answer) {
+		return new SingleShotAgentsPackGenerator((system, user) -> answer, "the multi-agent prompt");
 	}
 
 }

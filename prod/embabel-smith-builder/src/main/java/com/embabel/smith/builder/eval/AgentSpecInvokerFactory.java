@@ -24,10 +24,10 @@ import com.embabel.agent.spec.model.BackgroundMessage;
 import com.embabel.agent.spec.yml.YmlStepSpecRepository;
 import com.embabel.smith.common.io.AgentSpecWriter;
 import com.embabel.smith.common.model.AgentSpec;
-import com.embabel.smith.common.model.ProcessSpec;
+import com.embabel.smith.common.model.AgentsPack;
 
 /**
- * The production {@link InvokerFactory} and {@link ProcessInvokerFactory}: deploys the
+ * The production {@link InvokerFactory} and {@link AgentsPackInvokerFactory}: deploys the
  * pack — or every pack of a process — and returns an invoker that runs the <em>entry</em>
  * goal to completion, the same {@code runAgentFrom} path the product runtime uses, so a
  * candidate is evaluated whatever type its goal produces. Endpoint-gated — each call
@@ -47,7 +47,7 @@ import com.embabel.smith.common.model.ProcessSpec;
  *
  * @author Ivan Rodriguez
  */
-public class AgentSpecInvokerFactory implements InvokerFactory, ProcessInvokerFactory {
+public class AgentSpecInvokerFactory implements InvokerFactory, AgentsPackInvokerFactory {
 
 	private final AgentPlatform platform;
 
@@ -73,13 +73,13 @@ public class AgentSpecInvokerFactory implements InvokerFactory, ProcessInvokerFa
 	}
 
 	@Override
-	public AgentSpecInvoker invokerFor(ProcessSpec process) {
-		return invokerFor(process.agents(), entryGoalName(process), null);
+	public AgentSpecInvoker invokerFor(AgentsPack agentsPack) {
+		return invokerFor(agentsPack.agents(), entryGoalName(agentsPack), null);
 	}
 
 	@Override
-	public AgentSpecInvoker invokerFor(ProcessSpec process, String model) {
-		return invokerFor(process.agents(), entryGoalName(process), model);
+	public AgentSpecInvoker invokerFor(AgentsPack agentsPack, String model) {
+		return invokerFor(agentsPack.agents(), entryGoalName(agentsPack), model);
 	}
 
 	private AgentSpecInvoker invokerFor(List<AgentSpec> packs, String goalName, String model) {
@@ -171,14 +171,14 @@ public class AgentSpecInvokerFactory implements InvokerFactory, ProcessInvokerFa
 	/**
 	 * The goal the process must deliver — its last agent's, which is the process's final
 	 * deliverable rather than any intermediate hand-off.
-	 * @param process the process about to be deployed
+	 * @param agentsPack the agents-pack about to be deployed
 	 * @return the name of the goal to run, or {@code null} when the process has no agents
 	 */
-	private static String entryGoalName(ProcessSpec process) {
-		if (process.agents().isEmpty()) {
+	private static String entryGoalName(AgentsPack agentsPack) {
+		if (agentsPack.agents().isEmpty()) {
 			return null;
 		}
-		AgentSpec last = process.agents().get(process.agents().size() - 1);
+		AgentSpec last = agentsPack.agents().get(agentsPack.agents().size() - 1);
 		return (last.goal() != null) ? last.goal().name() : null;
 	}
 

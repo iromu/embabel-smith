@@ -14,22 +14,22 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.embabel.smith.builder.core.AgentSpecGenerator;
+import com.embabel.smith.builder.core.AgentsPackDraft;
+import com.embabel.smith.builder.core.AgentsPackGenerator;
 import com.embabel.smith.builder.core.BuilderAgent;
 import com.embabel.smith.builder.core.CandidateShape;
 import com.embabel.smith.builder.core.CompiledDraft;
-import com.embabel.smith.builder.core.ProcessDraft;
-import com.embabel.smith.builder.core.ProcessSpecGenerator;
+import com.embabel.smith.builder.eval.AgentsPackInvokerFactory;
 import com.embabel.smith.builder.eval.EvalTask;
 import com.embabel.smith.builder.eval.InvokerFactory;
-import com.embabel.smith.builder.eval.ProcessInvokerFactory;
 import com.embabel.smith.builder.eval.PromptRewriter;
 import com.embabel.smith.builder.publish.PublishTarget;
 import com.embabel.smith.common.model.ActionStepSpec;
 import com.embabel.smith.common.model.AgentSpec;
 import com.embabel.smith.common.model.AgentSpecManifest;
+import com.embabel.smith.common.model.AgentsPack;
 import com.embabel.smith.common.model.DynamicTypeDef;
 import com.embabel.smith.common.model.GoalStepSpec;
-import com.embabel.smith.common.model.ProcessSpec;
 import com.embabel.smith.common.model.PropertyDef;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -64,12 +64,12 @@ class DualCandidateBuildTest {
 			packCalls.incrementAndGet();
 			return new CompiledDraft("trading-pack", pack(), List.of());
 		};
-		ProcessSpecGenerator processGenerator = (description) -> {
+		AgentsPackGenerator agentsPackGenerator = (description) -> {
 			processCalls.incrementAndGet();
-			return new ProcessDraft("trading", soundProcess(), List.of());
+			return new AgentsPackDraft("trading", soundProcess(), List.of());
 		};
 
-		BuildResult result = service(packGenerator, processGenerator, PASS, PASS, scratch()).build("run the process",
+		BuildResult result = service(packGenerator, agentsPackGenerator, PASS, PASS, scratch()).build("run the process",
 				PublishTarget.parse("folder:" + library()), BuildOptions.defaults());
 
 		assertThat(result.isBuilt()).as(() -> result.report()).isTrue();
@@ -81,7 +81,7 @@ class DualCandidateBuildTest {
 
 	@Test
 	void theHigherScoringProcessIsPublishedAsOneDirectoryPerPack() throws Exception {
-		BuildResult result = build(FAIL, processGenerator(DualCandidateBuildTest::soundProcess), PASS);
+		BuildResult result = build(FAIL, agentsPackGenerator(DualCandidateBuildTest::soundProcess), PASS);
 
 		assertThat(result.isBuilt()).as(() -> result.report()).isTrue();
 		assertThat(result.packName()).isEqualTo("trading");
@@ -97,7 +97,7 @@ class DualCandidateBuildTest {
 
 	@Test
 	void theSingleAgentSpecIsPublishedWhenTheProcessScoresLower() throws Exception {
-		BuildResult result = build(PASS, processGenerator(DualCandidateBuildTest::soundProcess), FAIL);
+		BuildResult result = build(PASS, agentsPackGenerator(DualCandidateBuildTest::soundProcess), FAIL);
 
 		assertThat(result.isBuilt()).as(() -> result.report()).isTrue();
 		assertThat(result.recommendation().shape()).isEqualTo(CandidateShape.SINGLE_AGENT);
@@ -110,7 +110,7 @@ class DualCandidateBuildTest {
 	@Test
 	void bothCandidatesStayOnDiskWhateverTheBuildPublishes() throws Exception {
 		Path scratch = scratch();
-		BuildResult result = service(packGenerator(), processGenerator(() -> soundProcess()), PASS, PASS, scratch)
+		BuildResult result = service(packGenerator(), agentsPackGenerator(() -> soundProcess()), PASS, PASS, scratch)
 			.build("run the process", PublishTarget.parse("folder:" + library()), BuildOptions.defaults());
 
 		assertThat(result.isBuilt()).as(() -> result.report()).isTrue();
@@ -121,8 +121,8 @@ class DualCandidateBuildTest {
 	@Test
 	void aCycleTheReorderSettlesIsRepairedStoredAndPublished() throws Exception {
 		Path scratch = scratch();
-		BuildResult result = service(packGenerator(), processGenerator(DualCandidateBuildTest::wrongOrderProcess), FAIL,
-				PASS, scratch)
+		BuildResult result = service(packGenerator(), agentsPackGenerator(DualCandidateBuildTest::wrongOrderProcess),
+				FAIL, PASS, scratch)
 			.build("run the process", PublishTarget.parse("folder:" + library()), BuildOptions.defaults());
 
 		assertThat(result.isBuilt()).as(() -> result.report()).isTrue();
@@ -137,7 +137,7 @@ class DualCandidateBuildTest {
 	void aProcessThatCannotBeMadeSoundIsNeitherStoredNorPublished() throws Exception {
 		Path scratch = scratch();
 		BuildResult result = service(packGenerator(),
-				processGenerator(DualCandidateBuildTest::mutuallyDependentProcess), PASS, PASS, scratch)
+				agentsPackGenerator(DualCandidateBuildTest::mutuallyDependentProcess), PASS, PASS, scratch)
 			.build("run the process", PublishTarget.parse("folder:" + library()), BuildOptions.defaults());
 
 		assertThat(result.isBuilt()).as(() -> result.report()).isTrue();
@@ -151,7 +151,7 @@ class DualCandidateBuildTest {
 
 	@Test
 	void aProcessThatFailsToGenerateStillDeliversTheSingleAgentSpec() {
-		ProcessSpecGenerator failing = (description) -> {
+		AgentsPackGenerator failing = (description) -> {
 			throw new IllegalStateException("the model returned no JSON");
 		};
 		BuildResult result = service(packGenerator(), failing, PASS, PASS, scratch()).build("run the process",
@@ -166,7 +166,7 @@ class DualCandidateBuildTest {
 	void theScoreGateIsAppliedToTheCandidateTheBuildRecommends() throws Exception {
 		// The pack never passes its eval, but the process does — and the process is what
 		// the build ships, so the gate is what that has to clear.
-		BuildResult result = build(FAIL, processGenerator(DualCandidateBuildTest::soundProcess), PASS);
+		BuildResult result = build(FAIL, agentsPackGenerator(DualCandidateBuildTest::soundProcess), PASS);
 
 		assertThat(result.isBuilt()).as(() -> result.report()).isTrue();
 		assertThat(result.recommendation().single().score()).isZero();
@@ -176,7 +176,7 @@ class DualCandidateBuildTest {
 	@Test
 	void bothCandidatesBelowTheGateBlocksTheBuildAndPublishesNothing() {
 		Path library = this.tmp.resolve("library");
-		BuildResult result = service(packGenerator(), processGenerator(() -> soundProcess()), FAIL, FAIL, scratch())
+		BuildResult result = service(packGenerator(), agentsPackGenerator(() -> soundProcess()), FAIL, FAIL, scratch())
 			.build("run the process", PublishTarget.parse("folder:" + library), BuildOptions.defaults());
 
 		assertThat(result.isBuilt()).isFalse();
@@ -187,26 +187,26 @@ class DualCandidateBuildTest {
 
 	// --- wiring -------------------------------------------------------------
 
-	private BuildResult build(String packOutput, ProcessSpecGenerator processGenerator, String processOutput) {
-		return service(packGenerator(), processGenerator, packOutput, processOutput, scratch()).build("run the process",
-				PublishTarget.parse("folder:" + library()), BuildOptions.defaults());
+	private BuildResult build(String packOutput, AgentsPackGenerator agentsPackGenerator, String processOutput) {
+		return service(packGenerator(), agentsPackGenerator, packOutput, processOutput, scratch())
+			.build("run the process", PublishTarget.parse("folder:" + library()), BuildOptions.defaults());
 	}
 
-	private BuilderService service(AgentSpecGenerator packGenerator, ProcessSpecGenerator processGenerator,
+	private BuilderService service(AgentSpecGenerator packGenerator, AgentsPackGenerator agentsPackGenerator,
 			String packOutput, String processOutput, Path scratch) {
 		InvokerFactory invokers = (pack) -> (input) -> packOutput;
-		ProcessInvokerFactory processInvokers = (process) -> (input) -> processOutput;
+		AgentsPackInvokerFactory agentsPackInvokers = (agentsPack) -> (input) -> processOutput;
 		PromptRewriter rewriter = (current, feedback) -> current;
-		return new BuilderService(new BuilderAgent(packGenerator, scratch.toString()), invokers, processInvokers,
-				processGenerator, rewriter, TASKS);
+		return new BuilderService(new BuilderAgent(packGenerator, scratch.toString()), invokers, agentsPackInvokers,
+				agentsPackGenerator, rewriter, TASKS);
 	}
 
 	private static AgentSpecGenerator packGenerator() {
 		return (description) -> new CompiledDraft("trading-pack", pack(), List.of());
 	}
 
-	private static ProcessSpecGenerator processGenerator(ProcessSupplier supplier) {
-		return (description) -> new ProcessDraft("trading", supplier.get(), List.of());
+	private static AgentsPackGenerator agentsPackGenerator(AgentsPackSupplier supplier) {
+		return (description) -> new AgentsPackDraft("trading", supplier.get(), List.of());
 	}
 
 	private Path library() {
@@ -218,9 +218,9 @@ class DualCandidateBuildTest {
 	}
 
 	@FunctionalInterface
-	private interface ProcessSupplier {
+	private interface AgentsPackSupplier {
 
-		ProcessSpec get();
+		AgentsPack get();
 
 	}
 
@@ -233,8 +233,8 @@ class DualCandidateBuildTest {
 		return new AgentSpec(new AgentSpecManifest("trading-pack", "1.0.0"), goal, List.of(say), List.of());
 	}
 
-	private static ProcessSpec soundProcess() {
-		return new ProcessSpec("trading",
+	private static AgentsPack soundProcess() {
+		return new AgentsPack("trading",
 				List.of(agent("research", "research_goal", "MarketReport", List.of("UserInput"), "analyze_market",
 						"Analyse {{userInput}}"),
 						agent("decision", "decision_goal", "FinalDecision", List.of("MarketReport"), "decide",
@@ -245,13 +245,13 @@ class DualCandidateBuildTest {
 	 * The same process with its agents declared the wrong way round — a reorderable
 	 * cycle.
 	 */
-	private static ProcessSpec wrongOrderProcess() {
-		ProcessSpec sound = soundProcess();
+	private static AgentsPack wrongOrderProcess() {
+		AgentsPack sound = soundProcess();
 		return sound.withAgents(List.of(sound.agents().get(1), sound.agents().get(0)));
 	}
 
 	/** Two agents that each need what the other produces — no order can satisfy them. */
-	private static ProcessSpec mutuallyDependentProcess() {
+	private static AgentsPack mutuallyDependentProcess() {
 		AgentSpec market = new AgentSpec(new AgentSpecManifest("market", "1.0.0"),
 				GoalStepSpec.exportedGoal("market_goal", "the market view", "MarketReport"),
 				List.of(ActionStepSpec.action("analyze", "a", List.of("UserInput"), "MarketReport",
@@ -266,7 +266,7 @@ class DualCandidateBuildTest {
 						ActionStepSpec.action("check", "c", List.of("MarketReport"), "RiskReport",
 								"Check against {{marketReport}}")),
 				List.of(type("MarketReport"), type("RiskReport")));
-		return new ProcessSpec("trading", List.of(market, risk));
+		return new AgentsPack("trading", List.of(market, risk));
 	}
 
 	/**

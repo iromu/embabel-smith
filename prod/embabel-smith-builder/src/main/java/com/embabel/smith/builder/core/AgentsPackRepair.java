@@ -10,9 +10,9 @@ import java.util.List;
 import java.util.PriorityQueue;
 
 import com.embabel.smith.common.model.AgentSpec;
-import com.embabel.smith.common.model.ProcessSpec;
-import com.embabel.smith.common.validation.ProcessValidationResult;
-import com.embabel.smith.common.validation.ProcessValidator;
+import com.embabel.smith.common.model.AgentsPack;
+import com.embabel.smith.common.validation.AgentsPackValidationResult;
+import com.embabel.smith.common.validation.AgentsPackValidator;
 
 /**
  * The bounded repair for a process whose validation found a cycle.
@@ -32,25 +32,25 @@ import com.embabel.smith.common.validation.ProcessValidator;
  *
  * @author Ivan Rodriguez
  */
-public final class ProcessRepair {
+public final class AgentsPackRepair {
 
 	/** The number of reorders attempted before a cycle is declared unrepairable. */
 	public static final int MAX_ATTEMPTS = 3;
 
-	private ProcessRepair() {
+	private AgentsPackRepair() {
 	}
 
 	/**
 	 * Reorders a cycled process and re-validates it until the cycle is gone or the bound
 	 * is reached.
-	 * @param process the process validation found a cycle in
+	 * @param agentsPack the agents-pack validation found a cycle in
 	 * @param validation the validation that found it
 	 * @return the process as repaired (possibly unchanged), its re-validation, and how
 	 * many reorders it took
 	 */
-	public static Result repair(ProcessSpec process, ProcessValidationResult validation) {
-		ProcessSpec current = process;
-		ProcessValidationResult currentValidation = validation;
+	public static Result repair(AgentsPack agentsPack, AgentsPackValidationResult validation) {
+		AgentsPack current = agentsPack;
+		AgentsPackValidationResult currentValidation = validation;
 		int attempts = 0;
 		while (currentValidation.hasCycle() && attempts < MAX_ATTEMPTS) {
 			List<AgentSpec> ordered = dataOrder(current.agents());
@@ -59,7 +59,7 @@ public final class ProcessRepair {
 			}
 			attempts++;
 			current = current.withAgents(ordered);
-			currentValidation = new ProcessValidator().validate(current);
+			currentValidation = new AgentsPackValidator().validate(current);
 		}
 		return new Result(current, currentValidation, attempts, attempts > 0 && !currentValidation.hasCycle());
 	}
@@ -73,7 +73,7 @@ public final class ProcessRepair {
 	 */
 	private static List<AgentSpec> dataOrder(List<AgentSpec> agents) {
 		int n = agents.size();
-		List<List<Integer>> edges = ProcessValidator.dependencyEdges(agents, false);
+		List<List<Integer>> edges = AgentsPackValidator.dependencyEdges(agents, false);
 		int[] incoming = new int[n];
 		for (List<Integer> outgoing : edges) {
 			for (int to : outgoing) {
@@ -103,13 +103,13 @@ public final class ProcessRepair {
 	/**
 	 * The outcome of a repair attempt.
 	 *
-	 * @param process the process as repaired — the input when the cycle could not be
-	 * broken
+	 * @param agentsPack the agents-pack as repaired — the input when the cycle could not
+	 * be broken
 	 * @param validation the re-validation of the repaired process
 	 * @param attempts the number of reorders performed
 	 * @param repaired whether the cycle is gone
 	 */
-	public record Result(ProcessSpec process, ProcessValidationResult validation, int attempts, boolean repaired) {
+	public record Result(AgentsPack agentsPack, AgentsPackValidationResult validation, int attempts, boolean repaired) {
 	}
 
 }

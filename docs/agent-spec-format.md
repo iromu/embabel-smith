@@ -152,27 +152,27 @@ The format is data; the runtime translates it:
 
 See `poc-1-no-code-runtime` for the ingestion path and `poc-3-builder-agent` for the emission path.
 
-## Process specs (N packs)
+## Process specs (agents-pack)
 
-A **process spec** is a manifest over several agent specs: `ProcessSpec` is a
-`ProcessSpecManifest` plus a list of `AgentSpec`s. It is written as `process.yml` beside its member
-packs, and the reader locates the manifest and then every immediate subdirectory that carries a
-`manifest.yml`.
+An **agents-pack** is a manifest over several agent specs, written in the *process spec* format:
+`AgentsPack` is an `AgentsPackManifest` plus a list of `AgentSpec`s. It is written as `process.yml`
+beside its member packs, and the reader locates the manifest and then every immediate subdirectory
+that carries a `manifest.yml`.
 
 ```
 <process>/
-  process.yml           ProcessSpecManifest — keys `process`, `version`, `agents` (member pack names in run order)
+  process.yml           AgentsPackManifest — keys `process`, `version`, `agents` (member pack names in run order)
   <member-a>/           a complete agent spec, format unchanged
   <member-b>/           a complete agent spec
 ```
 
 The manifest records the **run order explicitly**. Pack directories sort alphabetically, so an order
-inferred from the filesystem would not be the order the model produced — a process whose members are
-named `analysis` and `zeta` would run backwards.
+inferred from the filesystem would not be the order the model produced — an agents-pack whose members
+are named `analysis` and `zeta` would run backwards.
 
-`ProcessValidator` checks the hand-offs between members that no single pack can see — input
-producer coverage process-wide, goal uniqueness across the members, connectivity from `UserInput` to
-the final goal, and cycle detection — and it *also* re-checks per-member basics (each member exports a
-goal, has steps, and produces its own goal output). A process that fails is
-never stored — a stored process is one someone could ingest. The builder's repair pass is
+`AgentsPackValidator` checks the hand-offs between members that no single pack can see — input
+producer coverage across the whole pack, goal uniqueness across the members, connectivity from
+`UserInput` to the final goal, and cycle detection — and it *also* re-checks per-member basics (each
+member exports a goal, has steps, and produces its own goal output). An agents-pack that fails is
+never stored — a stored one is something someone could ingest. The builder's repair pass is
 reorder-only; see [`08-builder.md`](08-builder.md) §Process output.

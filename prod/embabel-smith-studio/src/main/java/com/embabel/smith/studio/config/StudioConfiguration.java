@@ -24,7 +24,7 @@ import com.embabel.smith.builder.core.AgentSpecGenerators;
 import com.embabel.smith.builder.core.AiSpecPromptCaller;
 import com.embabel.smith.builder.core.BuilderAgent;
 import com.embabel.smith.builder.core.GenerationTechnique;
-import com.embabel.smith.builder.core.SingleShotProcessSpecGenerator;
+import com.embabel.smith.builder.core.SingleShotAgentsPackGenerator;
 import com.embabel.smith.builder.core.SpecPromptCaller;
 import com.embabel.smith.builder.eval.AgentSpecInvokerFactory;
 import com.embabel.smith.builder.eval.AiPromptRewriter;
@@ -162,7 +162,7 @@ public class StudioConfiguration {
 		Path scratch = Files.createTempDirectory("smith-studio-builder-scratch-");
 		BuilderAgent agent = new BuilderAgent(AgentSpecGenerators.production(ai, platform), scratch.toString());
 		AgentSpecInvokerFactory invokers = new AgentSpecInvokerFactory(platform);
-		return new BuilderService(agent, invokers, invokers, new SingleShotProcessSpecGenerator(ai), promptRewriter,
+		return new BuilderService(agent, invokers, invokers, new SingleShotAgentsPackGenerator(ai), promptRewriter,
 				defaultEvalTasks());
 	}
 

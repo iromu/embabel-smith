@@ -11,7 +11,7 @@ import com.embabel.smith.builder.core.AgentSpecGenerators;
 import com.embabel.smith.builder.core.BuilderAgent;
 import com.embabel.smith.builder.core.CompiledDraft;
 import com.embabel.smith.builder.core.GenerationTechnique;
-import com.embabel.smith.builder.core.SingleShotProcessSpecGenerator;
+import com.embabel.smith.builder.core.SingleShotAgentsPackGenerator;
 import com.embabel.smith.builder.eval.AgentSpecInvokerFactory;
 import com.embabel.smith.builder.eval.AiPromptRewriter;
 import com.embabel.smith.builder.eval.EvalTask;
@@ -104,7 +104,7 @@ class LiveBuildIntegrationTest {
 		// The wiring the CLI builds with, so the live run exercises the dual-candidate
 		// pipeline rather than a configuration no product path uses.
 		AgentSpecInvokerFactory invokers = new AgentSpecInvokerFactory(this.platform);
-		return new BuilderService(agent, invokers, invokers, new SingleShotProcessSpecGenerator(this.ai),
+		return new BuilderService(agent, invokers, invokers, new SingleShotAgentsPackGenerator(this.ai),
 				new AiPromptRewriter(this.ai),
 				List.of(new EvalTask("runs-and-produces-output", "Describe your use case.", "")));
 	}

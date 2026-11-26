@@ -17,8 +17,8 @@ import com.embabel.smith.common.io.AgentSpecReader;
 import com.embabel.smith.common.model.ActionStepSpec;
 import com.embabel.smith.common.model.AgentSpec;
 import com.embabel.smith.common.model.AgentSpecManifest;
+import com.embabel.smith.common.model.AgentsPack;
 import com.embabel.smith.common.model.GoalStepSpec;
-import com.embabel.smith.common.model.ProcessSpec;
 import com.embabel.smith.common.trace.TraceRecord;
 import org.junit.jupiter.api.Test;
 
@@ -45,7 +45,7 @@ import static org.mockito.Mockito.when;
  *
  * <p>
  * <b>The two halves, and where each is decided.</b> Ordering lives in
- * {@code common/model/ProcessSpec} — {@code agents()} is an ordered list and
+ * {@code common/model/AgentsPack} — {@code agents()} is an ordered list and
  * {@code withAgents(List)} at {@code :100} is the only method that returns a process with
  * a different one. Conditions live in
  * {@code common/model/ActionStepSpec.pre}/{@code .post}. The mutation operator lives in
@@ -91,7 +91,7 @@ import static org.mockito.Mockito.when;
  *
  * <p>
  * <b>What this cannot catch.</b> It pins ordering through the operator that ships, not
- * through a hypothetical one: if a future operator takes a {@link ProcessSpec} instead of
+ * through a hypothetical one: if a future operator takes a {@link AgentsPack} instead of
  * a pack, or a future {@code Refiner} rebuilds steps from a fresh record rather than
  * copying the old one, nothing here fails — the control test is what would then read as
  * "ordering is reachable", which is the point of running it. It also cannot say the loop
@@ -146,12 +146,12 @@ class CollaborationStructureIsFixedByConstructionTest {
 	 * The three builder packs as one process, in {@link #PACK_NAMES} order — the artifact
 	 * the assertions are about.
 	 */
-	private static ProcessSpec builderProcess() throws IOException {
+	private static AgentsPack builderProcess() throws IOException {
 		List<AgentSpec> packs = new ArrayList<>();
 		for (String packName : PACK_NAMES) {
 			packs.add(load(packName));
 		}
-		return new ProcessSpec("builder-improvement", packs);
+		return new AgentsPack("builder-improvement", packs);
 	}
 
 	/**
@@ -163,13 +163,13 @@ class CollaborationStructureIsFixedByConstructionTest {
 	 * no shipped code rebuilds a process from refined packs, so the reconstruction here
 	 * is the minimal faithful one: the same packs, the same order, the parent's manifest.
 	 */
-	private static ProcessSpec mutated(ProcessSpec parent) {
+	private static AgentsPack mutated(AgentsPack parent) {
 		Refiner refiner = new Refiner((prompt, feedback) -> REWRITTEN + prompt);
 		List<AgentSpec> candidates = new ArrayList<>();
 		for (AgentSpec pack : parent.agents()) {
 			candidates.add(refiner.refine(pack, failedTraces(pack), "test-model").candidate());
 		}
-		return new ProcessSpec(parent.manifest(), candidates);
+		return new AgentsPack(parent.manifest(), candidates);
 	}
 
 	/**
@@ -192,7 +192,7 @@ class CollaborationStructureIsFixedByConstructionTest {
 	 * builder deployed, and the agent the factory narrowed and deployed. The returned
 	 * invoker is never called.
 	 */
-	private static Deployment deploy(ProcessSpec process) {
+	private static Deployment deploy(AgentsPack agentsPack) {
 		AgentPlatform platform = mock(AgentPlatform.class);
 		// The factory widens the platform with the packs' types; a double that
 		// contributes
@@ -209,7 +209,7 @@ class CollaborationStructureIsFixedByConstructionTest {
 			agents.add(invocation.getArgument(0, Agent.class));
 			return platform;
 		});
-		new AgentSpecInvokerFactory(platform).invokerFor(process);
+		new AgentSpecInvokerFactory(platform).invokerFor(agentsPack);
 		return new Deployment(scopes, agents);
 	}
 
@@ -242,8 +242,8 @@ class CollaborationStructureIsFixedByConstructionTest {
 		}
 	}
 
-	private static List<String> agentNamesOf(ProcessSpec process) {
-		return process.agents().stream().map(AgentSpec::name).toList();
+	private static List<String> agentNamesOf(AgentsPack agentsPack) {
+		return agentsPack.agents().stream().map(AgentSpec::name).toList();
 	}
 
 	private static Map<String, String> promptsOf(AgentSpec pack) {
@@ -290,14 +290,14 @@ class CollaborationStructureIsFixedByConstructionTest {
 	 */
 	@Test
 	void theThreeBuilderPacksDeployAsASingleScopeHoldingEveryStepAndGoalOfAllThree() throws IOException {
-		ProcessSpec process = builderProcess();
-		Deployment deployed = deploy(process);
+		AgentsPack agentsPack = builderProcess();
+		Deployment deployed = deploy(agentsPack);
 
 		assertThat(deployed.scopes()).as("three packs, one scope — not one agent per pack").hasSize(1);
 
 		List<String> stepNames = new ArrayList<>();
 		List<String> goalNames = new ArrayList<>();
-		for (AgentSpec pack : process.agents()) {
+		for (AgentSpec pack : agentsPack.agents()) {
 			pack.steps().forEach((step) -> stepNames.add(step.name()));
 			goalNames.add(pack.goal().name());
 		}
@@ -318,8 +318,8 @@ class CollaborationStructureIsFixedByConstructionTest {
 	 */
 	@Test
 	void theImprovementOperatorLeavesTheAgentOrderAndTheGoalTheDeployRunsUnchanged() throws IOException {
-		ProcessSpec parent = builderProcess();
-		ProcessSpec candidate = mutated(parent);
+		AgentsPack parent = builderProcess();
+		AgentsPack candidate = mutated(parent);
 
 		assertThat(agentNamesOf(candidate)).as("candidate agent order, after every pack was refined")
 			.isEqualTo(agentNamesOf(parent));
@@ -346,10 +346,10 @@ class CollaborationStructureIsFixedByConstructionTest {
 	 */
 	@Test
 	void reorderingTheProcessThroughWithAgentsIsWhatMovesTheDeployedEntryGoal() throws IOException {
-		ProcessSpec parent = builderProcess();
+		AgentsPack parent = builderProcess();
 		List<AgentSpec> reversed = new ArrayList<>(parent.agents());
 		Collections.reverse(reversed);
-		ProcessSpec reordered = parent.withAgents(reversed);
+		AgentsPack reordered = parent.withAgents(reversed);
 
 		assertThat(agentNamesOf(reordered)).as("withAgents really did reorder the process")
 			.isEqualTo(agentNamesOf(parent).reversed());
@@ -370,7 +370,7 @@ class CollaborationStructureIsFixedByConstructionTest {
 	@Test
 	void theOperatorRewritesPromptsAndCarriesPreAndPostThroughUnchanged() throws IOException {
 		AgentSpec named = packNamingConditions();
-		AgentSpec namedCandidate = mutated(new ProcessSpec("probe", List.of(named))).agents().get(0);
+		AgentSpec namedCandidate = mutated(new AgentsPack("probe", List.of(named))).agents().get(0);
 
 		assertThat(named.steps().get(0).pre()).as("control: this pack's steps do name conditions").isNotEmpty();
 		assertThat(named.steps().get(0).post()).as("control: this pack's steps do name conditions").isNotEmpty();
@@ -379,8 +379,8 @@ class CollaborationStructureIsFixedByConstructionTest {
 		assertThat(promptsOf(namedCandidate)).as("and its prompt was rewritten anyway")
 			.isEqualTo(Map.of("assemble", REWRITTEN + promptsOf(named).get("assemble")));
 
-		ProcessSpec parent = builderProcess();
-		ProcessSpec candidate = mutated(parent);
+		AgentsPack parent = builderProcess();
+		AgentsPack candidate = mutated(parent);
 		for (int i = 0; i < parent.agents().size(); i++) {
 			AgentSpec before = parent.agents().get(i);
 			AgentSpec after = candidate.agents().get(i);
@@ -403,7 +403,7 @@ class CollaborationStructureIsFixedByConstructionTest {
 	 * or an unchanged condition list is a survivor of work that was done, not the trace
 	 * of a call that did nothing.
 	 */
-	private static void assertEveryPromptRewritten(ProcessSpec parent, ProcessSpec candidate) {
+	private static void assertEveryPromptRewritten(AgentsPack parent, AgentsPack candidate) {
 		assertThat(candidate.agents()).as("one candidate per pack").hasSameSizeAs(parent.agents());
 		for (int i = 0; i < parent.agents().size(); i++) {
 			AgentSpec before = parent.agents().get(i);

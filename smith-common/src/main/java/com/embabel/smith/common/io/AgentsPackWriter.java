@@ -11,40 +11,43 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 import com.embabel.smith.common.model.AgentSpec;
-import com.embabel.smith.common.model.ProcessSpec;
+import com.embabel.smith.common.model.AgentsPack;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
- * Writes a {@link ProcessSpec} to disk as one directory per pack.
+ * Writes an {@link AgentsPack} to disk as one directory per pack.
  *
  * <p>
  * Produces {@code process.yml} (the manifest, which carries the run order) and, beside
  * it, one agent-spec directory per agent, written by the shared {@link AgentSpecWriter}.
- * That layout is what makes a published process directly ingestible: a source that scans
- * a directory for pack candidates finds every agent of the process and can compose them
- * into one world.
+ * That layout is what makes a published agents-pack directly ingestible: a source that
+ * scans a directory for pack candidates finds every agent of the agents-pack and can
+ * compose them into one world.
  *
  * @author Ivan Rodriguez
  */
-public class ProcessSpecWriter {
+public class AgentsPackWriter {
 
 	private final ObjectMapper yaml = Yaml.mapper();
 
 	private final AgentSpecWriter packWriter = new AgentSpecWriter();
 
 	/**
-	 * Writes the process under {@code dir}, creating directories as needed.
-	 * @param process the process to write
-	 * @param dir the directory to write the process under
-	 * @return the directory the process was written to
+	 * Writes the agents-pack under {@code dir}, creating directories as needed.
+	 * @param agentsPack the agents-pack to write
+	 * @param dir the directory to write the agents-pack under
+	 * @return the directory the agents-pack was written to
 	 */
-	public Path write(ProcessSpec process, Path dir) throws IOException {
+	public Path write(AgentsPack agentsPack, Path dir) throws IOException {
 		Files.createDirectories(dir);
-		Files.writeString(dir.resolve("process.yml"), this.yaml.writeValueAsString(process.manifest()),
+		// The manifest filename keeps its pre-agents-pack spelling: it is part of the
+		// frozen
+		// on-disk format, asserted by the round-trip test and by a frozen POC.
+		Files.writeString(dir.resolve("process.yml"), this.yaml.writeValueAsString(agentsPack.manifest()),
 				StandardCharsets.UTF_8);
 
 		int index = 0;
-		for (AgentSpec pack : process.agents()) {
+		for (AgentSpec pack : agentsPack.agents()) {
 			this.packWriter.write(pack, dir.resolve(packDirectoryName(pack, index++)));
 		}
 		return dir;
@@ -55,7 +58,7 @@ public class ProcessSpecWriter {
 	 * manifest declares. An unnamed pack — one the model returned without a manifest name
 	 * — falls back to its position so no pack is written into a shared directory.
 	 * @param pack the pack to name a directory for
-	 * @param index the pack's position in the process
+	 * @param index the pack's position in the agents-pack
 	 * @return the directory name
 	 */
 	private static String packDirectoryName(AgentSpec pack, int index) {

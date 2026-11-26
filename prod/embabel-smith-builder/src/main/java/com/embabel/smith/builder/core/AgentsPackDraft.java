@@ -7,21 +7,21 @@ package com.embabel.smith.builder.core;
 
 import java.util.List;
 
-import com.embabel.smith.common.model.ProcessSpec;
+import com.embabel.smith.common.model.AgentsPack;
 
 /**
- * The output of the multi-agent generation step: a draft {@link ProcessSpec} — the
- * build's second candidate beside the single-agent {@link CompiledDraft} — plus any
- * issues the generator surfaced for review.
+ * The output of the multi-agent generation step: a draft {@link AgentsPack} — the build's
+ * second candidate beside the single-agent {@link CompiledDraft} — plus any issues the
+ * generator surfaced for review.
  *
  * @param processName The name of the drafted process.
  * @param process The drafted process, its agents in run order.
  * @param issues The issues the generator surfaced for review.
  * @author Ivan Rodriguez
  */
-public record ProcessDraft(String processName, ProcessSpec process, List<String> issues) {
+public record AgentsPackDraft(String processName, AgentsPack process, List<String> issues) {
 
-	public ProcessDraft {
+	public AgentsPackDraft {
 		issues = (issues != null) ? List.copyOf(issues) : List.of();
 	}
 

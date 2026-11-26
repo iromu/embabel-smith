@@ -10,31 +10,31 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.embabel.agent.domain.io.UserInput;
+import com.embabel.smith.builder.core.AgentsPackGenerator;
+import com.embabel.smith.builder.core.AgentsPackRepair;
 import com.embabel.smith.builder.core.BuilderAgent;
 import com.embabel.smith.builder.core.Candidate;
 import com.embabel.smith.builder.core.CandidateShape;
 import com.embabel.smith.builder.core.CompiledDraft;
-import com.embabel.smith.builder.core.ProcessRepair;
-import com.embabel.smith.builder.core.ProcessSpecGenerator;
 import com.embabel.smith.builder.core.Recommendation;
 import com.embabel.smith.builder.core.ValidatedDraft;
 import com.embabel.smith.builder.eval.AgentSpecInvoker;
+import com.embabel.smith.builder.eval.AgentsPackInvokerFactory;
 import com.embabel.smith.builder.eval.EvalScorer;
 import com.embabel.smith.builder.eval.EvalTask;
 import com.embabel.smith.builder.eval.InvokerFactory;
-import com.embabel.smith.builder.eval.ProcessInvokerFactory;
 import com.embabel.smith.builder.eval.PromptRewriter;
 import com.embabel.smith.builder.eval.RefinementLoop;
 import com.embabel.smith.builder.eval.RefinementOutcome;
+import com.embabel.smith.builder.lifecycle.AgentsPackContentHash;
 import com.embabel.smith.builder.lifecycle.LifecycleMetadata;
 import com.embabel.smith.builder.lifecycle.LifecycleStamper;
-import com.embabel.smith.builder.lifecycle.ProcessContentHash;
 import com.embabel.smith.builder.lifecycle.SpecContentHash;
 import com.embabel.smith.builder.publish.AgentSpecPublishable;
+import com.embabel.smith.builder.publish.AgentsPackPublishable;
 import com.embabel.smith.builder.publish.CollisionException;
 import com.embabel.smith.builder.publish.FolderPublisher;
 import com.embabel.smith.builder.publish.GitPublisher;
-import com.embabel.smith.builder.publish.ProcessPublishable;
 import com.embabel.smith.builder.publish.PublishResult;
 import com.embabel.smith.builder.publish.PublishTarget;
 import com.embabel.smith.builder.publish.Publishable;
@@ -43,10 +43,10 @@ import com.embabel.smith.builder.security.AgentSpecSecurityScanner;
 import com.embabel.smith.builder.security.ScanReport;
 import com.embabel.smith.builder.security.ScanVerdict;
 import com.embabel.smith.common.model.AgentSpec;
-import com.embabel.smith.common.model.ProcessSpec;
+import com.embabel.smith.common.model.AgentsPack;
 import com.embabel.smith.common.validation.AgentSpecValidator;
-import com.embabel.smith.common.validation.ProcessValidationResult;
-import com.embabel.smith.common.validation.ProcessValidator;
+import com.embabel.smith.common.validation.AgentsPackValidationResult;
+import com.embabel.smith.common.validation.AgentsPackValidator;
 
 /**
  * The product builder (design D1): a thin, plain-class orchestration that the studio
@@ -57,9 +57,9 @@ import com.embabel.smith.common.validation.ProcessValidator;
  *
  * <pre>
  *   1. BuilderAgent            — compile → validate → write the single-agent draft (D5)
- *   2. ProcessSpecGenerator    — decompose → validate → (repair) the multi-agent candidate
+ *   2. AgentsPackGenerator     — decompose → validate → (repair) the multi-agent candidate
  *   3. RefinementLoop          — score the pack, rewrite prompts from failures, re-validate
- *   4. ProcessInvokerFactory   — deploy every pack of the process and score its entry goal
+ *   4. AgentsPackInvokerFactory — deploy every pack of the process and score its entry goal
  *   5. Recommendation          — publish the valid candidate with the higher score
  *   6. AgentSpecSecurityScanner — static, offline; a critical finding blocks the build
  *   7. LifecycleStamper        — content hash + baseline pass-rate + state
@@ -79,9 +79,9 @@ public class BuilderService {
 
 	private final InvokerFactory invokerFactory;
 
-	private final ProcessInvokerFactory processInvokerFactory;
+	private final AgentsPackInvokerFactory agentsPackInvokerFactory;
 
-	private final ProcessSpecGenerator processGenerator;
+	private final AgentsPackGenerator agentsPackGenerator;
 
 	private final PromptRewriter rewriter;
 
@@ -91,7 +91,7 @@ public class BuilderService {
 
 	private final LifecycleStamper stamper = new LifecycleStamper();
 
-	private final ProcessValidator processValidator = new ProcessValidator();
+	private final AgentsPackValidator agentsPackValidator = new AgentsPackValidator();
 
 	private final AgentSpecValidator packValidator = new AgentSpecValidator();
 
@@ -112,19 +112,19 @@ public class BuilderService {
 	 * A build with both candidates.
 	 * @param builder the build component that compiles, validates and writes the pack
 	 * @param invokerFactory the factory that deploys a pack for eval
-	 * @param processInvokerFactory the factory that deploys every pack of a process for
-	 * eval
-	 * @param processGenerator the generator of the multi-agent candidate
+	 * @param agentsPackInvokerFactory the factory that deploys every pack of an
+	 * agents-pack for eval
+	 * @param agentsPackGenerator the generator of the multi-agent candidate
 	 * @param rewriter the prompt rewriter the refinement loop drives
 	 * @param evalTasks the eval tasks both candidates are scored against
 	 */
 	public BuilderService(BuilderAgent builder, InvokerFactory invokerFactory,
-			ProcessInvokerFactory processInvokerFactory, ProcessSpecGenerator processGenerator, PromptRewriter rewriter,
-			List<EvalTask> evalTasks) {
+			AgentsPackInvokerFactory agentsPackInvokerFactory, AgentsPackGenerator agentsPackGenerator,
+			PromptRewriter rewriter, List<EvalTask> evalTasks) {
 		this.builder = builder;
 		this.invokerFactory = invokerFactory;
-		this.processInvokerFactory = processInvokerFactory;
-		this.processGenerator = processGenerator;
+		this.agentsPackInvokerFactory = agentsPackInvokerFactory;
+		this.agentsPackGenerator = agentsPackGenerator;
 		this.rewriter = rewriter;
 		this.evalTasks = (evalTasks != null) ? List.copyOf(evalTasks) : List.of();
 	}
@@ -148,14 +148,14 @@ public class BuilderService {
 
 		// 2. The multi-agent candidate from the same description: decompose → validate →
 		// repair a cycle → re-validate.
-		ProcessCandidate process = generateProcess(description, options.model());
+		AgentsPackCandidate agentsPack = generateAgentsPack(description, options.model());
 
 		// 3. Score both candidates against the same eval tasks.
 		RefinementOutcome outcome = refine(pack, options);
 		Candidate single = Candidate.singleAgent(pack.name(), outcome.score());
-		Candidate multi = scoreProcess(process, options.model());
+		Candidate multi = scoreAgentsPack(agentsPack, options.model());
 		Recommendation recommendation = Recommendation.choose(single, multi,
-				(process != null && !process.valid()) ? process.note() : null);
+				(agentsPack != null && !agentsPack.valid()) ? agentsPack.note() : null);
 
 		// 4. The score gate, on the candidate the build recommends.
 		double score = recommendation.score();
@@ -166,12 +166,12 @@ public class BuilderService {
 
 		// 5. Store both candidates: the pack was written above, the process lands beside
 		// it.
-		if (process != null && process.valid()) {
-			this.builder.writeProcess(process.spec());
+		if (agentsPack != null && agentsPack.valid()) {
+			this.builder.writeAgentsPack(agentsPack.spec());
 		}
 
 		// 6. Security gate (static, offline) over what the build is about to publish.
-		ScanReport scan = scan(recommendation, pack, process);
+		ScanReport scan = scan(recommendation, pack, agentsPack);
 		if (scan.verdict() == ScanVerdict.BLOCK) {
 			List<String> findings = scan.findings()
 				.stream()
@@ -182,12 +182,12 @@ public class BuilderService {
 
 		// 7. Lifecycle stamp on the recommended candidate.
 		LifecycleMetadata lifecycle = (recommendation.shape() == CandidateShape.MULTI_AGENT)
-				? this.stamper.stamp(ProcessContentHash.of(process.spec()), score)
+				? this.stamper.stamp(AgentsPackContentHash.of(agentsPack.spec()), score)
 				: this.stamper.stamp(SpecContentHash.of(pack), score);
 
 		// 8. Publish only the recommended candidate (collision gate; no push by default).
 		Publishable unit = (recommendation.shape() == CandidateShape.MULTI_AGENT)
-				? new ProcessPublishable(process.spec(), lifecycle) : new AgentSpecPublishable(pack, lifecycle);
+				? new AgentsPackPublishable(agentsPack.spec(), lifecycle) : new AgentSpecPublishable(pack, lifecycle);
 		try (Publisher publisher = publisherFor(target)) {
 			PublishResult published = publisher.publish(unit, options.overwrite(), options.push());
 			return BuildResult.built(unit.name(), score, scan, lifecycle, published, recommendation);
@@ -222,57 +222,58 @@ public class BuilderService {
 	 * @return the candidate, or {@code null} when this build has no process generator or
 	 * the model produced no process
 	 */
-	private ProcessCandidate generateProcess(String description, String model) {
-		if (this.processGenerator == null) {
+	private AgentsPackCandidate generateAgentsPack(String description, String model) {
+		if (this.agentsPackGenerator == null) {
 			return null;
 		}
-		ProcessSpec process;
+		AgentsPack agentsPack;
 		try {
-			process = this.processGenerator.generateProcess(description, model).process();
+			agentsPack = this.agentsPackGenerator.generateAgentsPack(description, model).process();
 		}
 		catch (IllegalStateException ex) {
-			return new ProcessCandidate(null, null, "the multi-agent candidate failed to generate: " + ex.getMessage());
+			return new AgentsPackCandidate(null, null,
+					"the multi-agent candidate failed to generate: " + ex.getMessage());
 		}
-		ProcessValidationResult validation = this.processValidator.validate(process);
+		AgentsPackValidationResult validation = this.agentsPackValidator.validate(agentsPack);
 		if (validation.hasCycle()) {
-			ProcessRepair.Result repaired = ProcessRepair.repair(process, validation);
-			process = repaired.process();
+			AgentsPackRepair.Result repaired = AgentsPackRepair.repair(agentsPack, validation);
+			agentsPack = repaired.agentsPack();
 			validation = repaired.validation();
 		}
 		// A process is only as publishable as its packs: each one has to pass the same
 		// structural validation a lone pack is held to, or the runtime would refuse to
 		// ingest the process the build just published.
 		List<String> issues = new ArrayList<>(validation.issues());
-		for (AgentSpec pack : process.agents()) {
+		for (AgentSpec pack : agentsPack.agents()) {
 			this.packValidator.validate(pack)
 				.issues()
 				.forEach(
 						(issue) -> issues.add("pack '" + pack.name() + "': " + issue.code() + " — " + issue.message()));
 		}
-		ProcessValidationResult merged = new ProcessValidationResult(issues, validation.sharedTypes(),
+		AgentsPackValidationResult merged = new AgentsPackValidationResult(issues, validation.sharedTypes(),
 				validation.connected(), validation.cycle());
 		String note = merged.isValid() ? null : String.join("; ", issues);
-		return new ProcessCandidate(process, merged, note);
+		return new AgentsPackCandidate(agentsPack, merged, note);
 	}
 
 	/**
 	 * The multi-agent candidate scored the same way the pack is: every pack deployed into
 	 * one scope and the process's entry goal run against each eval task. A process that
 	 * did not validate is not worth a model call.
-	 * @param process the process candidate, or {@code null}
+	 * @param agentsPack the agents-pack candidate, or {@code null}
 	 * @param model the LLM the process's steps run on, or empty for the configured
 	 * default
 	 * @return the candidate, or {@code null} when there was none
 	 */
-	private Candidate scoreProcess(ProcessCandidate process, String model) {
-		if (process == null || process.spec() == null) {
+	private Candidate scoreAgentsPack(AgentsPackCandidate agentsPack, String model) {
+		if (agentsPack == null || agentsPack.spec() == null) {
 			return null;
 		}
-		String name = process.spec().process();
-		if (!process.valid()) {
+		String name = agentsPack.spec().process();
+		if (!agentsPack.valid()) {
 			return Candidate.multiAgent(name, false, null);
 		}
-		AgentSpecInvoker invoker = this.processInvokerFactory.invokerFor(process.spec(), model);
+		AgentSpecInvoker invoker = this.agentsPackInvokerFactory.invokerFor(agentsPack.spec(), model);
 		List<String> outputs = new ArrayList<>();
 		for (EvalTask task : this.evalTasks) {
 			outputs.add(invoker.invoke(task.input()));
@@ -305,12 +306,12 @@ public class BuilderService {
 	 * whatever its shape — a process contributes every one of its packs.
 	 * @param recommendation the recommendation the build settled on
 	 * @param pack the single-agent candidate
-	 * @param process the multi-agent candidate, or {@code null}
+	 * @param agentsPack the agents-pack candidate, or {@code null}
 	 * @return the merged scan report
 	 */
-	private ScanReport scan(Recommendation recommendation, AgentSpec pack, ProcessCandidate process) {
+	private ScanReport scan(Recommendation recommendation, AgentSpec pack, AgentsPackCandidate agentsPack) {
 		if (recommendation.shape() == CandidateShape.MULTI_AGENT) {
-			return this.scanner.scanProcess(recommendation.chosen().name(), process.spec().agents());
+			return this.scanner.scanProcess(recommendation.chosen().name(), agentsPack.spec().agents());
 		}
 		return this.scanner.scan(pack);
 	}
@@ -329,7 +330,7 @@ public class BuilderService {
 	 * @param validation its validation after any repair, or {@code null}
 	 * @param note why the candidate is unusable, when it is
 	 */
-	private record ProcessCandidate(ProcessSpec spec, ProcessValidationResult validation, String note) {
+	private record AgentsPackCandidate(AgentsPack spec, AgentsPackValidationResult validation, String note) {
 
 		boolean valid() {
 			return this.spec != null && this.validation != null && this.validation.isValid();

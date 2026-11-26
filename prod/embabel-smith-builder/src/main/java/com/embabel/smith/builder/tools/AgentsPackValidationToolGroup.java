@@ -10,7 +10,7 @@ import java.util.List;
 
 import com.embabel.agent.api.tool.Tool;
 import com.embabel.agent.core.ToolGroup;
-import com.embabel.smith.common.validation.ProcessValidationResult;
+import com.embabel.smith.common.validation.AgentsPackValidationResult;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -20,17 +20,17 @@ import org.springframework.context.annotation.Configuration;
  * available to the step that wrote it.
  *
  * <p>
- * {@code tools/ProcessValidationTool} existed before this group existed, and that is the
- * pattern this change is about: an annotated adapter is not reach. {@code @LlmTool}
+ * {@code tools/AgentsPackValidationTool} existed before this group existed, and that is
+ * the pattern this change is about: an annotated adapter is not reach. {@code @LlmTool}
  * registers nothing in Embabel 1.5.4, so until a {@code ToolGroup} bean published the
  * role the step declares, nothing offered these checks to anyone. The adapter's argument
  * changed in the same breath — a directory a drafting step cannot name became the process
- * document it is holding — for the reason recorded on {@link ProcessValidationTool}.
+ * document it is holding — for the reason recorded on {@link AgentsPackValidationTool}.
  *
  * @author Ivan Rodriguez
  */
 @Configuration
-public class ProcessValidationToolGroup {
+public class AgentsPackValidationToolGroup {
 
 	/** The tool-group role a pack step declares to run the process checks. */
 	public static final String ROLE = "process";
@@ -79,9 +79,9 @@ public class ProcessValidationToolGroup {
 			return VALIDATE_PROCESS + " needs the '" + PROCESS_JSON + "' argument: the process JSON this step is "
 					+ "about to return.";
 		}
-		ProcessValidationResult result;
+		AgentsPackValidationResult result;
 		try {
-			result = new ProcessValidationTool().validateProcess(processJson);
+			result = new AgentsPackValidationTool().validateProcess(processJson);
 		}
 		catch (IllegalArgumentException ex) {
 			return VALIDATE_PROCESS + " could not read that as a process document: " + ex.getMessage();
