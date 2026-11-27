@@ -132,7 +132,7 @@ public final class AgentSpecNormalizer {
 		}
 		return new ActionStepSpec(step.stepType(), step.name(), step.description(), step.inputTypeNames(),
 				step.outputTypeName(), prompt, step.pre(), step.post(), step.cost(), step.value(), step.canRerun(),
-				step.nullable(), step.toolGroups());
+				step.nullable(), step.toolGroups(), step.references());
 	}
 
 	/**

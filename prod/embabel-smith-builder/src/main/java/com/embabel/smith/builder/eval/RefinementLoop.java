@@ -112,7 +112,8 @@ public class RefinementLoop {
 				this.model);
 		ActionStepSpec revised = new ActionStepSpec(terminal.stepType(), terminal.name(), terminal.description(),
 				terminal.inputTypeNames(), terminal.outputTypeName(), newPrompt, terminal.pre(), terminal.post(),
-				terminal.cost(), terminal.value(), terminal.canRerun(), terminal.nullable(), terminal.toolGroups());
+				terminal.cost(), terminal.value(), terminal.canRerun(), terminal.nullable(), terminal.toolGroups(),
+				terminal.references());
 		List<ActionStepSpec> steps = pack.steps()
 			.stream()
 			.map((s) -> (s.name().equals(terminal.name())) ? revised : s)

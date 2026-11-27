@@ -18,27 +18,39 @@ The POC modules map this format onto Embabel's runtime types; the format itself 
     <name>.yml          ActionStepSpec (one file per action)
   types/
     <name>.yml          DynamicTypeDef (intermediate pure-data types)
+  skills/               OPTIONAL — Agent Skills the pack carries (pure data, no code)
+    <name>/SKILL.md     front matter declares `name` and `description`
 ```
 
 `types/` may be empty (a `.gitkeep` is written to keep the directory). An agent spec exposes
 **exactly one** callable goal, and that goal *is* the exported goal.
 
+`skills/` is optional: a pack that carries none is a complete agent spec, and the directory adds no
+requirement elsewhere in the format. When several agent definitions sit side by side in one folder, a
+`skills/` directory *beside* those definitions is shared by every agent in that folder. The shared
+set is the **immediate parent only**, never a chain of ancestors — the parent is also the source root
+when a source points at a folder of packs, so a stray `skills/` higher up would otherwise be global
+to every pack under it. Where an agent carries a name the shared folder also carries, the agent's
+own copy serves the reference.
+
 ## The contract
 
-Six invariants define the format. Both sides of the system check against one schema — field names
+Seven invariants define the format. Both sides of the system check against one schema — field names
 follow Embabel's own spec YAML (`stepType`, `export`, `inputTypeNames`, `outputTypeName`,
 `ownProperties`) — because letting the producer and the consumer parse YAML independently is how the
 two drift apart.
 
 1. The directory layout above is complete: `manifest.yml`, `goal.yml`, a non-empty `steps/`, and a
-   `types/` directory.
+   `types/` directory. `skills/` is optional; where it exists, every entry is a skill folder.
 2. The spec is an exported goal — exactly one goal, marked `export: true`, with an output type.
 3. Every action step is prompt-backed: it declares its input types, one output type, and a prompt
    that references only names those inputs bind.
 4. Intermediate types are pure data — a name, a description, named typed own-properties. No compiled
    JVM class, which is what makes a spec portable and ingestible without a build.
 5. Every type reference resolves: framework-provided or declared in `types/`.
-6. The manifest declares runtime defaults — `name` and `version` required, planner and model
+6. Every declared reference resolves to a skill the pack — or the folder sharing its `skills/` —
+   actually carries.
+7. The manifest declares runtime defaults — `name` and `version` required, planner and model
    optional.
 
 ## `manifest.yml` — `AgentSpecManifest`
@@ -79,7 +91,24 @@ prompt: |
 ```
 
 Optional, all nullable: `pre`, `post` (lists of condition names), `cost`, `value`, `canRerun`,
-`nullable`, `toolGroups`.
+`nullable`, `toolGroups`, `references`.
+
+### References
+
+```yaml
+references:             # OPTIONAL — the skills this step asks to be in play
+  - repo-notes
+```
+
+`references` is Embabel's own step-spec key, and each entry is the **declared name** of a skill the
+pack carries (or the folder sharing its `skills/` carries). It is a *request* for that capability,
+not a grant of reach: it adds no trust claim of its own, and it is **not** a tool group — the tier
+gate still applies to whatever the step is allowed to call. A step that declares none is offered
+nothing from the pack's skills, whatever the pack carries.
+
+A `references:` key written in `goal.yml` is inert: upstream's `GoalSpec` carries no such field and a
+goal contributes no model call of its own, so the declaration is ignored and the pack still
+validates. Only action steps reference.
 
 ### Prompt references
 
@@ -135,11 +164,22 @@ another type name).
    it is not reported twice here. This is the guard POC 27's outer loop needed and did not have: its
    `detect` step interpolated no input, so six frozen tasks sent six byte-identical requests and no
    score could separate two candidates ([`04`](04-poc-run-results.md) §7.5).
+6. **Skill folders are skills** — `skills/` is optional, and nothing fires when it is absent. Where it
+   exists, a folder beneath it that carries no `SKILL.md` is reported *by name* as a skill the pack
+   does not carry, rather than skipped. The skill a reference names is the name its `SKILL.md` front
+   matter declares; the folder name answers only when the file declares none.
+7. **Declared references resolve** — every `references` entry names a skill the pack's own `skills/`
+   or the immediate parent's `skills/` carries, one issue per declaring step. This is the reference
+   counterpart of check 4, and it exists because upstream resolves an unmatched name with a silent
+   `map.get`/null skip: the name is then offered to no model and the run answers as though the
+   capability never existed. The same rule is why a dangling name must be caught here rather than
+   discovered at run time.
 
 Issue codes: `LAYOUT_MISSING_MANIFEST`, `LAYOUT_MISSING_GOAL`, `LAYOUT_MISSING_STEPS`,
-`LAYOUT_EMPTY_STEPS`, `LAYOUT_MISSING_TYPES`, `GOAL_MISSING`, `GOAL_NOT_EXPORTED`,
-`DANGLING_TYPE_REF`, `PROMPT_MISSING`, `PROMPT_UNDECLARED_INPUT`, `PROMPT_UNKNOWN_PROPERTY`,
-`PROMPT_IGNORES_DECLARED_INPUT`, `PARSE_ERROR`.
+`LAYOUT_EMPTY_STEPS`, `LAYOUT_MISSING_TYPES`, `SKILL_MISSING_DEFINITION`, `GOAL_MISSING`,
+`GOAL_NOT_EXPORTED`, `DANGLING_TYPE_REF`, `DANGLING_REFERENCE`, `PROMPT_MISSING`,
+`PROMPT_UNDECLARED_INPUT`, `PROMPT_UNKNOWN_PROPERTY`, `PROMPT_IGNORES_DECLARED_INPUT`,
+`PARSE_ERROR`.
 
 ## Mapping to Embabel (the runtime seam)
 

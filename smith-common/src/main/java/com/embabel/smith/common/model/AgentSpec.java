@@ -22,7 +22,11 @@ import com.fasterxml.jackson.annotation.JsonInclude.Include;
  *     goal.yml              GoalStepSpec  (export: true — the callable goal)
  *     steps/*.yml           ActionStepSpec (one file per action)
  *     types/*.yml           DynamicTypeDef (intermediate pure-data types)
- * </pre>
+ *     skills/&lt;name&gt;/SKILL.md  optional — Agent Skills the pack carries, which a step
+ *                              names from its {@code references} list
+ * </pre> A {@code skills/} directory beside the pack rather than inside it is shared by
+ * every agent in that folder; only the immediate parent is consulted, never a chain of
+ * ancestors, and the pack's own {@code skills/} shadows a shared name.
  *
  * <p>
  * This aggregate is the in-memory form of that directory; it is not itself serialized to

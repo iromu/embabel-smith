@@ -9,11 +9,11 @@
 
 ## 2. The format carries skills and references
 
-- [ ] 2.1 Add a `references` component to `smith-common/.../model/ActionStepSpec.java` (`@JsonProperty("references")`, null-to-empty like `toolGroups`), then fix every call site the new record accessor exposes — `grep -rn "ActionStepSpec(" --include=*.java prod smith-common poc` and compile the reactor, since a record arity change hides at call sites a grep-clean misses.
-- [ ] 2.2 Make `smith-common/.../io/AgentSpecWriter.java` serialize the component and add a read-write-read round-trip case beside `AgentsPackRoundTripTest`'s style; mutation-check it by deleting the writer's line for `references` and watching the round-trip fail rather than the file merely losing a key silently.
-- [ ] 2.3 Teach `smith-common/.../validation/AgentSpecValidator.java` the layout half: an optional `skills/` directory, a folder beneath it with no `SKILL.md` reported as not-carried, and the shared set read from the pack's immediate parent only; cover the four cases — no `skills/` at all, own, shared, own shadowing shared.
-- [ ] 2.4 Add the dangling-reference check with its issue code, naming both step and reference; mutation-check both directions (a correct pack stays clean, a misspelled name in one step reports that step alone).
-- [ ] 2.5 Update `docs/agent-spec-format.md` — the layout listing, the optional-keys line, the invariant list, and the issue-code list — and `smith-common`'s `AgentSpec` javadoc layout block, in the same commit as the validator change.
+- [x] 2.1 Add a `references` component to `smith-common/.../model/ActionStepSpec.java` (`@JsonProperty("references")`, null-to-empty like `toolGroups`), then fix every call site the new record accessor exposes — `grep -rn "ActionStepSpec(" --include=*.java prod smith-common poc` and compile the reactor, since a record arity change hides at call sites a grep-clean misses.
+- [x] 2.2 Make `smith-common/.../io/AgentSpecWriter.java` serialize the component and add a read-write-read round-trip case beside `AgentsPackRoundTripTest`'s style; mutation-check it by deleting the writer's line for `references` and watching the round-trip fail rather than the file merely losing a key silently.
+- [x] 2.3 Teach `smith-common/.../validation/AgentSpecValidator.java` the layout half: an optional `skills/` directory, a folder beneath it with no `SKILL.md` reported as not-carried, and the shared set read from the pack's immediate parent only; cover the four cases — no `skills/` at all, own, shared, own shadowing shared.
+- [x] 2.4 Add the dangling-reference check with its issue code, naming both step and reference; mutation-check both directions (a correct pack stays clean, a misspelled name in one step reports that step alone).
+- [x] 2.5 Update `docs/agent-spec-format.md` — the layout listing, the optional-keys line, the invariant list, and the issue-code list — and `smith-common`'s `AgentSpec` javadoc layout block, in the same commit as the validator change.
 
 ## 3. The coding tool addon
 

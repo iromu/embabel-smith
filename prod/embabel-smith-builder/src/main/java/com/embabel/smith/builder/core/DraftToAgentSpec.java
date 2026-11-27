@@ -91,7 +91,7 @@ public class DraftToAgentSpec {
 
 	private ActionStepSpec withOutput(ActionStepSpec s, String output) {
 		return new ActionStepSpec(s.stepType(), s.name(), s.description(), s.inputTypeNames(), output, s.prompt(),
-				s.pre(), s.post(), s.cost(), s.value(), s.canRerun(), s.nullable(), s.toolGroups());
+				s.pre(), s.post(), s.cost(), s.value(), s.canRerun(), s.nullable(), s.toolGroups(), s.references());
 	}
 
 	/**
@@ -117,7 +117,7 @@ public class DraftToAgentSpec {
 		return new ActionStepSpec(ActionStepSpec.STEP_TYPE, spec.getName(), spec.getDescription(),
 				new ArrayList<>(spec.getInputTypeNames()), spec.getOutputTypeName(), spec.getPrompt(), spec.getPre(),
 				spec.getPost(), spec.getCost(), spec.getValue(), spec.getCanRerun(), spec.getNullable(),
-				spec.getToolGroups());
+				spec.getToolGroups(), spec.getReferences());
 	}
 
 	private GoalStepSpec toGoal(GoalSpec spec) {
