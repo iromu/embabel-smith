@@ -11,6 +11,13 @@
 #   smith skill-run  (prod/embabel-smith-builder)   — answers one request with a published skill
 #                                                      folder's tools attached
 #
+# Both are GraalVM native images — the same binaries `make native` and the container build
+# produce — so they are invoked directly rather than through a JVM. That is the only difference a
+# caller can see: there is no JAVA_OPTS to pass, because a native program sizes itself from the
+# container's own cgroup and would read a -XX: flag as a program argument it does not understand.
+# The two programs stay separate because they are separate modules, each with its own
+# application.yml at its classpath root.
+#
 # Everything below is argument plumbing. The behaviour — which goal is exported, how the planner
 # chains the steps, what the trust tier refuses — is the product's, and running these commands on
 # a host with a checkout does the same thing.
@@ -32,13 +39,11 @@
 set -euo pipefail
 
 ROOT="${SMITH_HOME:-/opt/smith}"
-# Two launch mechanisms, one per module, because that is what each module ships: the runtime has an
-# executable jar (`repackage` with a classifier, so its library consumers still get the thin jar),
-# while the builder's packaged form is the native `smith` binary and so gets the classes-plus-lib
-# layout that `spring-boot:run` would hand a JVM.
-RUNTIME_JAR="$ROOT/bin/runtime.jar"
-BUILDER_CP="$ROOT/builder/classes:$ROOT/lib/*"
-BUILDER_MAIN="com.embabel.smith.builder.SmithBuilderApplication"
+# Two programs, one per module, because that is what each module ships: the runtime's native image
+# is `smith run`, and the builder's is the `smith` CLI. The builder's binary is renamed on the way
+# in so this entrypoint keeps the name the image's ENTRYPOINT already uses.
+RUNTIME_BIN="$ROOT/bin/runtime"
+BUILDER_BIN="$ROOT/bin/builder"
 
 SMITH_AGENT_SOURCE="${SMITH_AGENT_SOURCE:-$ROOT/samples/agents}"
 SMITH_AGENT_GOAL="${SMITH_AGENT_GOAL:-}"
@@ -46,11 +51,6 @@ SMITH_AGENT_INPUT="${SMITH_AGENT_INPUT:-Explain how a coffee machine works}"
 SMITH_SKILL_DIR="${SMITH_SKILL_DIR:-$ROOT/samples/skills}"
 SMITH_SKILL_REQUEST="${SMITH_SKILL_REQUEST:-What can this skill do for me?}"
 SMITH_TRUST_TIER="${SMITH_TRUST_TIER:-standard}"
-
-# JAVA_OPTS is a string of JVM flags, and they must reach java as separate arguments: quoted, the
-# whole string becomes ONE argument and the JVM dies with "Improperly specified VM option".
-# Splitting it once here is why nothing below has to remember that.
-read -r -a JVM_ARGS <<< "${JAVA_OPTS:--XX:MaxRAMPercentage=75.0}"
 
 # The CLI wants a source URI, not a path: `folder:` or `git:`, and it refuses a bare path with
 # "spec source URI '...' has no scheme". A bare path is also the natural thing to set from a
@@ -61,11 +61,11 @@ case "$SMITH_AGENT_SOURCE" in
 esac
 
 java_runtime() {
-	exec java "${JVM_ARGS[@]}" -jar "$RUNTIME_JAR" "$@"
+	exec "$RUNTIME_BIN" "$@"
 }
 
 java_builder() {
-	exec java "${JVM_ARGS[@]}" -cp "$BUILDER_CP" "$BUILDER_MAIN" "$@"
+	exec "$BUILDER_BIN" "$@"
 }
 
 # A model call is the only thing that can answer either leg, and the failure mode without one is
@@ -84,7 +84,7 @@ leg_agents() {
 	local -a argv=(run --source "$SMITH_AGENT_SOURCE" --input "$input" --trust-tier "$SMITH_TRUST_TIER")
 	[ -n "$SMITH_AGENT_GOAL" ] && argv+=(--goal "$SMITH_AGENT_GOAL")
 	local rc=0
-	java "${JVM_ARGS[@]}" -jar "$RUNTIME_JAR" "${argv[@]}" || rc=$?
+	"$RUNTIME_BIN" "${argv[@]}" || rc=$?
 	if [ "$rc" -eq 0 ]; then
 		echo "-- agents: ok (goal output above)"
 	else
@@ -97,8 +97,7 @@ leg_skill() {
 	local request="${1:-$SMITH_SKILL_REQUEST}"
 	echo "== skills: smith skill-run over $SMITH_SKILL_DIR"
 	local rc=0
-	java "${JVM_ARGS[@]}" -cp "$BUILDER_CP" "$BUILDER_MAIN" \
-		skill-run --skill-dir "$SMITH_SKILL_DIR" "$request" || rc=$?
+	"$BUILDER_BIN" skill-run --skill-dir "$SMITH_SKILL_DIR" "$request" || rc=$?
 	if [ "$rc" -eq 0 ]; then
 		echo "-- skills: ok"
 	else
@@ -159,8 +158,11 @@ probe() {
 	fi
 }
 
+# The header comment IS the help text, so it must not drift from it: print the leading comment
+# block and stop at the first line that is not one. A fixed line range printed the wrong lines the
+# first time the header grew.
 usage() {
-	sed -n '3,30p' "$0" | sed 's/^# \{0,1\}//'
+	awk 'NR > 2 { if ($0 !~ /^#/) exit; sub(/^# ?/, ""); print }' "$0"
 }
 
 cmd="${1:-prove}"

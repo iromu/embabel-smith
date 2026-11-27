@@ -118,7 +118,6 @@ studio works with storage unbound, so Postgres is a profile and not a requiremen
 | `SMITH_SKILL_REQUEST` | runner | the request `skill` answers |
 | `SMITH_TRUST_TIER` | runner | `standard` (default) or `high` |
 | `SPRING_PROFILES_ACTIVE` | both | defaults to `container`, a profile with no config file — see below |
-| `JAVA_OPTS` | both | extra JVM flags |
 
 Both images run as uid 10001 and write under `/home/smith/.smith` (traces, storage settings, git
 source cache). A read-only root filesystem needs that path mounted writable.
@@ -129,10 +128,18 @@ source cache). A read-only root filesystem needs that path mounted writable.
 starting a container is not what anyone wants, so both images default to a profile name that has
 no config file anywhere in the repository. Override it and you own the consequences.
 
-## How these images run Java
+## How these images run
 
-The studio runs an executable Spring Boot jar; the runner runs one jar and one classpath.
+Every program an image starts is a GraalVM native image: `/opt/smith/bin/studio`, and on the runner
+`/opt/smith/bin/runtime` and `/opt/smith/bin/builder`. There is no JVM in either image — no `java`, no
+`CLASSPATH`, no `JAVA_OPTS` — so an entrypoint execs a binary rather than assembling a command line
+around one. The memory knob is the container's own limit: a native program sizes its heap from the
+cgroup, and a `-XX:` flag handed to it as a program argument is an argument it does not understand,
+which is why the runner's entrypoint dropped that machinery rather than translating it. Startup costs
+milliseconds rather than a JVM boot; the studio's healthcheck still waits, because the Embabel platform
+scans packages and builds its decision registry before the context is ready.
 
+The three modules still build jars, and one of them is still how you would run one on a host.
 `prod/embabel-smith-studio` and `prod/embabel-smith-runtime` are packaged with `repackage` under
 `<classifier>exec</classifier>`, so `mvn package` leaves each module with both the thin jar its
 library consumers depend on and a `-exec.jar` that boots on its own:
@@ -143,22 +150,27 @@ java -jar prod/embabel-smith-runtime/target/embabel-smith-runtime-0.1.0-SNAPSHOT
     run --source folder:./my-packs --input "Explain how a coffee machine works"
 ```
 
-The classifier is what makes that safe: the runtime is a compile dependency of the studio and the
-a2a starter, and a repackaged jar's classes sit under `BOOT-INF/classes` where a normal classpath
-cannot see them. The builder is not repackaged — its packaged form is the native `smith` binary — so
-the runner image's builder leg still gets classes plus resolved `lib` and launches with `-cp`.
+That is a host command. The image runs the same module's `smith-runtime` binary, and nothing in either
+image reads an `-exec.jar`. The classifier is what makes both artifacts exist: the runtime is a compile
+dependency of the studio and the a2a starter, and a repackaged jar's classes sit under
+`BOOT-INF/classes` where a normal classpath cannot see them.
 
-Two consequences worth knowing:
+Three consequences worth knowing:
 
 - The studio's frontend is built *inside* the image. `frontend-maven-plugin` downloads Node 26 and
   runs `npm install`, `npm update` and `npm run build`; Vite writes the bundle into
-  `src/main/resources/static`, which is gitignored. That stage needs network, and the Maven base
-  image needs `libatomic1` or the downloaded Node binary fails with exit 127. The npm stage is bound
-  to `generate-resources` so the bundle is inside the jar — a bundle generated after the resources
-  copy makes a studio that boots and 404s at `/` — and the build asserts it arrived.
-- The runner's two legs stay separate: the runtime's jar and the builder's classes directory, never
-  one merged classpath. Both modules ship an `application.yml` at their classpath root, so merging
-  them would let one silently answer for the other.
+  `src/main/resources/static`, which is gitignored. That stage needs network, and the build stage needs
+  `libatomic1` or the downloaded Node binary fails with exit 127. The npm stage is bound to
+  `generate-resources` so the bundle is in `target/classes` before the image is compiled, and it then
+  has to be registered into the binary: a native image carries resources as a flat registered set with
+  no directory entries, so an asset the build did not register is missing from a studio that otherwise
+  boots and answers its API. See the 404 entry below.
+- The runner's two legs stay separate programs. Both modules ship an `application.yml` at their
+  classpath root, so one merged artifact would let one silently answer for the other.
+- A property flipped at run time selects between beans the image was compiled with and cannot add one
+  it was built without, because Spring's AOT pass decides `@ConditionalOnProperty` during the compile.
+  `docs/14-containers.md` has the packaging detail, including the traps that come with compiling three
+  binaries in one build stage.
 
 ## CI
 
@@ -172,9 +184,9 @@ call, so the model-backed legs are not covered there — those stay with the `@T
 
 **The model-backed legs fail on a DNS lookup.** A container resolves names with its own resolver, so
 an endpoint given as a `.local` name — mDNS, served on a host by `nss-mdns` and Avahi, neither of
-which is in a JRE base image — does not resolve inside it, and the run dies in the HTTP client with
-an OkHttp `Dns.lookup` stack rather than at the model. The same applies to an alias that only exists
-in the host's `/etc/hosts`.
+which the slim Debian base carries — does not resolve inside it, and the run dies in the HTTP client
+with an OkHttp `Dns.lookup` stack rather than at the model. The same applies to an alias that only
+exists in the host's `/etc/hosts`.
 
 `--network host` does **not** fix a `.local` name: shared networking still leaves the container
 without an mDNS resolver. What works is telling the container the address directly:
@@ -194,12 +206,15 @@ you cleared it to an empty value, set it (or `SMITH_STUDIO_IMPROVE_SOURCE`) to a
 studio starts.
 
 **The studio serves the UI but 404s at `/`.** The frontend is built inside the image, not stored in
-git. The build asserts that `index.html` reached the classes directory, so this state should fail
-the build rather than ship; if it ever ships, the Vite overlay step in `docker/Dockerfile` stopped
+git, and the binary has to be compiled with the bundle registered into it: a native image carries its
+resources as a flat named set rather than as directories, so an asset that reached `target/classes` and
+was not registered is simply absent. Two checks stand between that state and a shipped image — the
+build boots the studio binary and waits for it to answer `/api/status`, and `docker/smoke.sh` asks the
+running container for `/`. If the state ships anyway, the Vite step in `docker/Dockerfile` stopped
 doing its job.
 
-**`npm install` fails with exit 127** and `libatomic.so.1` in the message — the Maven base image
-needs the `libatomic1` package the build stage installs.
+**`npm install` fails with exit 127** and `libatomic.so.1` in the message — the build stage installs
+the `libatomic1` package the downloaded Node binary is linked against.
 
 ## Checking a build
 

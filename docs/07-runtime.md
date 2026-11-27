@@ -173,10 +173,14 @@ service class** (`AgentSpecRunService`) rather than holding logic itself, so the
 same capability without going through the CLI.
 
 Standalone, the module builds an executable jar beside its library jar —
-`java -jar target/embabel-smith-runtime-<version>-exec.jar run --source …` — which is what the
-container image runs. The classifier is what lets both exist: this module is a compile dependency of
-the studio and the a2a starter, and a repackaged jar's classes sit under `BOOT-INF/classes`, where a
-normal classpath cannot see them (see [14 — Containers](14-containers.md)).
+`java -jar target/embabel-smith-runtime-<version>-exec.jar run --source …`. That jar is not what the
+container image runs: the image runs this module's GraalVM native image, `target/smith-runtime`,
+which the same `package` produces when `-Pnative` is on. Keeping the jar is what makes a native
+failure diagnosable — when the binary and the jar disagree about the same argv, the jar is the
+control that says which of the two is wrong. The classifier is what lets both exist: this module is
+a compile dependency of the studio and the a2a starter, and a repackaged jar's classes sit under
+`BOOT-INF/classes`, where a normal classpath cannot see them (see
+[14 — Containers](14-containers.md)).
 
 ## A2A endpoint
 

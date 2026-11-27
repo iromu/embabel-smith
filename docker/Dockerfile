@@ -11,57 +11,107 @@
 #   docker build -f docker/Dockerfile --target studio -t embabel-smith-studio .
 #   docker build -f docker/Dockerfile --target runner -t embabel-smith-runner .
 #
-# WHY ONE BUILD STAGE FOR BOTH
-#   `mvn install -pl prod/embabel-smith-studio -am` already builds nine modules — smith-common,
-#   the prod aggregator and every shipped module, including the runtime and the builder. The
-#   runner needs two of those nine. Splitting the Dockerfile in two would pay for the same
-#   reactor twice, so the two final stages branch off one build.
-#
 # HOW THESE IMAGES LAUNCH
-#   The studio and the runtime are packaged with spring-boot-maven-plugin's `repackage` under
-#   <classifier>exec</classifier>, so each module builds two jars: the thin one it always
-#   published, which its dependents keep compiling against, and the executable one these images
-#   run. The classifier is load-bearing, not stylistic — embabel-smith-studio and
-#   embabel-smith-a2a-starter depend on embabel-smith-runtime as a library, and a repackaged jar
-#   keeps its classes under BOOT-INF/classes where an ordinary classpath cannot see them.
+#   Every process they run is a GraalVM native image: the studio's `smith-studio`, the runtime's
+#   `smith-runtime`, and the builder's `smith`. All three are compiled by the same `-Pnative`
+#   profile, and a module is only in that build if it declares the profile's three executions in
+#   its own pom (docs/08-builder.md, "As a native binary"). Nothing here runs a JVM, so there is
+#   no `java` in either final image, no CLASSPATH, and no JAVA_OPTS — a native binary reads its
+#   own memory settings from the container's cgroup and rejects a `-XX:` flag handed to it as an
+#   argument, which is why those three things were dropped rather than translated.
 #
-#   The builder is the exception, so the runner image still lays out the builder's classes plus its
-#   resolved runtime dependencies and launches that leg with -cp. The builder's packaged form is
-#   the native `smith` binary (-Pnative), not a jar, and shipping a second form of it here would
-#   be a second thing to keep honest.
+#   Going native moves three failure modes from run time to build time, and the assertions below
+#   are the ones that catch them. A native image carries resources as a flat named set with no
+#   directory entries, so a resource the build did not REGISTER is missing silently: the studio
+#   boots, answers /api, and 404s at `/` because the SPA's hashed assets were never put in. And
+#   Spring's AOT pass decides `@ConditionalOnProperty` while compiling, so a flag flipped at run
+#   time cannot add a bean the image was not built with. Both of those are asserted here rather
+#   than trusted — the studio binary is booted inside the build and probed at `/`.
 #
-#   The studio's frontend is built inside the image: frontend-maven-plugin
-#   (prod/embabel-smith-studio/pom.xml) installs Node v26.13.1 and runs npm install, npm update and
-#   npm run build, and Vite writes the SPA into src/main/resources/static
-#   (prod/embabel-smith-studio/frontend/vite.config.ts:22-25), which .gitignore:14 keeps out of
-#   git. So the npm stage needs network, and it is bound to generate-resources — before
-#   maven-resources-plugin copies that directory into target/classes — because a bundle generated
-#   after the copy is a jar that boots and 404s at /. The assertions below check the bundle reached
-#   BOOT-INF/classes/static rather than trusting the ordering.
+# WHY ONE BUILD STAGE FOR BOTH
+#   `./mvnw -Pnative package -pl prod/embabel-smith-studio -am` already builds nine modules —
+#   smith-common, the prod aggregator and every shipped module, including the runtime and the
+#   builder. The runner needs two of those nine. Splitting the Dockerfile in two would pay for the
+#   same reactor twice, so the two final stages branch off one build.
 #
 # BUILD CONTEXT
 #   .dockerignore at the repo root drops target/, node_modules, the host-built static bundle, the
 #   frozen POC tree, and the gitignored application-local.yaml — a developer's file naming the
 #   dev Postgres and its credentials, which must not ride into an image. Dropping the host's static
-#   bundle is also what makes the SPA assertion mean something: inside the image only the npm stage
-#   can produce that directory.
+#   bundle is also what makes the SPA probe mean something: inside the image only the npm stage can
+#   produce that directory, and only the native build can put it inside the binary.
+
+# ---------------------------------------------------------------------------
+# build: the reactor, compiled to native images
+# ---------------------------------------------------------------------------
+FROM debian:12-slim AS build
+
+# The GraalVM the images are compiled with, as a version rather than a base-image tag.
 #
-# The run commands, the variables that point them at a spec source, and how to tell a healthy
-# container from a booted one are in docker/README.md.
-
-# ---------------------------------------------------------------------------
-# build: the reactor, two executable jars, and the builder's classpath layout
-# ---------------------------------------------------------------------------
-FROM maven:3.9-eclipse-temurin-21 AS build
-
-# Node needs libatomic, and the Maven image does not carry it. Without this the studio's npm stage
-# fails at `npm install` with exit 127 and
-# "node: error while loading shared libraries: libatomic.so.1", because frontend-maven-plugin
-# downloads a Node 26 binary that is linked against it — a build-time dependency of the frontend
-# toolchain only, so it stays in this stage and never reaches either final image.
+# There is no usable GraalVM image for this: `ghcr.io/graalvm/jdk-community:25` carries no
+# `native-image` at all (its bin is the JDK's tools), and there is no `native-community:25` tag to
+# pull instead. So the compiler comes from the same artifact .github/workflows/native-image.yml
+# downloads and checksums — the graalvm-ce-builds `jdk-<version>` release — which keeps the
+# container's compiler and the CI's on one line. `--strip-components=1` is required, not tidy:
+# the archive's top-level directory is `graalvm-community-openjdk-<version>+<build>`, a name that
+# carries a build number no Dockerfile can write down, so naming it directly fails with a bare
+# "not found" after a perfectly good download.
+#
+# build-essential and zlib1g-dev are not optional. GraalVM's analysis runs to completion and the
+# LAST step shells out to `gcc` to link, so a slim stage can fail in two ways that both read as a
+# broken GraalVM and are nothing of the kind. Without a compiler the message is "Default
+# native-compiler executable 'gcc' not found via environment variable PATH"; with a compiler but
+# without zlib's development symlink, the link reaches collect2 and dies at
+# "/usr/bin/ld: cannot find -lz" — native-image always passes -lz, and only the -dev package
+# answers that bare name. GitHub runners ship both, so the CI path never shows either. They stay in
+# this stage: a native binary is self-contained, so no final image needs them.
+#
+# libatomic1 is for the studio's frontend stage: frontend-maven-plugin downloads a Node 26 binary
+# linked against it, and without the package `npm install` dies with exit 127 and
+# "error while loading shared libraries: libatomic.so.1".
+#
+# linux-x64 is hard-coded because the pipeline is linux/amd64 only (docs/14-containers.md). On an
+# arm64 builder the asset name needs the aarch64 suffix, which is what native-image.yml derives
+# from `uname -m`; nothing here builds a multi-architecture manifest.
+ARG GRAAL_VERSION=25.0.2
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends libatomic1 \
-    && rm -rf /var/lib/apt/lists/*
+    && apt-get install -y --no-install-recommends \
+        build-essential ca-certificates curl libatomic1 zlib1g-dev \
+    && rm -rf /var/lib/apt/lists/* \
+    && mkdir -p /opt/graalvm \
+    && curl -fsSL --retry 3 \
+        "https://github.com/graalvm/graalvm-ce-builds/releases/download/jdk-${GRAAL_VERSION}/graalvm-community-jdk-${GRAAL_VERSION}_linux-x64_bin.tar.gz" \
+        | tar -xz --strip-components=1 -C /opt/graalvm \
+    && /opt/graalvm/bin/native-image --version \
+    && /opt/graalvm/bin/java -version
+
+# `./mvnw` rather than a Maven install: the repository pins its own Maven in
+# .mvn/wrapper/maven-wrapper.properties, and a build stage that installs a second Maven would be a
+# second version to keep honest. JAVA_HOME has to be the JDK itself — native-image is a symlink
+# into lib/svm/bin, and resolving it to its real path yields a directory that is not a JDK.
+ENV JAVA_HOME=/opt/graalvm \
+    PATH=/opt/graalvm/bin:$PATH
+
+# The compiler's own heap. This cannot be set from outside the image the way it is in
+# .github/workflows/native-image.yml, where `NATIVE_IMAGE_OPTIONS` is a step env: inside an image
+# build, an environment variable on the workflow job never reaches the RUN, so the value has to be
+# carried by the build. It is an ARG rather than a hard-coded ENV for exactly that reason — CI and a
+# developer can both override it without editing this file.
+#
+# It matters because the launcher sizes a heap at a quarter of the machine's memory, and on a
+# 16 GB GitHub runner that quarter is 4 GB — below what a Spring Boot image of this reachability
+# wants. Without a cap the compiler is killed at the cgroup limit, which arrives as a compiler
+# crash rather than as an out-of-memory error; .github/workflows/docker.yml adds swap alongside this
+# so the peak costs time instead of the build.
+#
+# The number is the studio's, not the builder's. At 10 GB the studio's analysis ran seventeen
+# minutes and then reported `Error: Java heap space` — a compiler out-of-memory, not a code fault —
+# while the builder and the runtime were already finished and on their way into the image. This
+# module pulls in Tomcat, JPA and Hibernate on top of everything the runtime has, so it is the one
+# that sets the ceiling for all three. Override it downward on a machine that cannot hold it; the
+# failure mode of an override that is too low is the same heap-space error, late in the build.
+ARG NATIVE_IMAGE_OPTIONS=-J-Xmx14g
+ENV NATIVE_IMAGE_OPTIONS=$NATIVE_IMAGE_OPTIONS
 
 WORKDIR /src
 
@@ -69,52 +119,69 @@ WORKDIR /src
 # enumerating module internals here would duplicate a list the build already owns.
 COPY . .
 
-# -DskipTests: the offline suite is the CI gate's job (make build && make test), not an image
-# build's. The cache mount keeps ~/.m2 warm across builds without baking it into a layer — locally,
-# where the mount directory persists on the BuildKit daemon. It is worth knowing that a cache mount
-# is NOT part of what `type=gha` exports, so on a hosted runner with an ephemeral daemon this mount
-# starts empty and Maven resolves the reactor's dependencies from scratch; the layer cache below is
-# what CI actually reuses.
+# -DskipTests: the offline suite is the CI gate's job (`make build && make test`), not an image
+# build's, and process-aot rewrites the classes the tests would run against. The cache mount keeps
+# ~/.m2 warm across builds without baking it into a layer — locally, where the mount directory
+# persists on the BuildKit daemon. A cache mount is NOT part of what `type=gha` exports, so on a
+# hosted runner with an ephemeral daemon this mount starts empty and Maven resolves the reactor
+# from scratch; the layer cache is what CI actually reuses.
 #
-# dependency:copy-dependencies -DincludeScope=runtime is what turns "the builder's classpath" into
-# files — the same graph spring-boot:run would resolve, minus test-scope jars. Only the builder
-# needs it now: the studio and the runtime arrive as executable jars.
+# The four assertions are the part that keeps this honest, and the last one is the interesting one.
 #
-# The plugin is named by fully-qualified coordinates, not by the `dependency:` prefix. Prefix
-# resolution reads plugin-group metadata from the repository, and inside a clean image that
-# metadata is not in ~/.m2 yet, so the short form dies with "No plugin found for prefix
-# 'dependency'" — and -o makes it unrecoverable. The version is pinned for the same reason: an
-# unpinned prefix resolves to whatever a cache happens to hold.
-#
-# The three assertions are the part that keeps this honest. The studio one is the interesting one:
-# a jar can be perfectly well-formed and still have no UI in it, because Vite's output is a
-# generated directory that maven-resources-plugin has to copy *after* it exists — an npm stage bound
-# after that copy produces a studio that boots and 404s at /, serving only its /api routes. A
-# developer's tree hides that (the second build copies what the first generated), and the host's
-# stale bundle is excluded by .dockerignore, so inside this image the assertion is the only thing
-# standing between a mis-ordered frontend stage and a shipped image.
+#   1. Each binary exists and is a native ELF executable rather than a launcher script.
+#   2. `smith-runtime run --help` must print its options. The builder's CI smoke runs the binary
+#      with no subcommand, and the root path never builds a subcommand's ArgSpecs — so an image
+#      whose picocli options were never registered still passes a banner grep. Asserting the
+#      subcommand is the assertion that actually proves the CLI is wired.
+#   3. The builder binary answers for the skill leg the runner image is going to ask it about.
+#   4. The studio binary is BOOTED here and probed at `/`, because that is the only way to see
+#      whether the SPA's assets were registered into the image. A jar can be inspected with
+#      `jar tf`; a native image's resource set has no listing a script could grep.
 RUN --mount=type=cache,target=/root/.m2 \
-    mvn -B -ntp -DskipTests install \
+    ./mvnw -B -ntp -Pnative -DskipTests package \
         -pl prod/embabel-smith-studio,prod/embabel-smith-runtime,prod/embabel-smith-builder -am \
-    && mkdir -p /staging/studio /staging/runtime /staging/builder/classes \
-    && cp prod/embabel-smith-studio/target/embabel-smith-studio-*-exec.jar /staging/studio/app.jar \
-    && cp prod/embabel-smith-runtime/target/embabel-smith-runtime-*-exec.jar /staging/runtime/app.jar \
-    && mvn -B -ntp -q -pl prod/embabel-smith-builder \
-        org.apache.maven.plugins:maven-dependency-plugin:3.8.1:copy-dependencies \
-        -DoutputDirectory=/staging/builder/lib -DincludeScope=runtime \
-    && cp -a prod/embabel-smith-builder/target/classes/. /staging/builder/classes/ \
-    && echo "studio $(du -h /staging/studio/app.jar | cut -f1), runtime $(du -h /staging/runtime/app.jar | cut -f1), builder $(find /staging/builder/classes -type f | wc -l) class files + $(ls /staging/builder/lib | wc -l) jars" \
-    && ( jar tf /staging/studio/app.jar | grep -q '^BOOT-INF/classes/static/index.html$' \
-        || { echo "no frontend bundle inside the studio jar — the npm build did not run before the resources copy"; exit 1; } ) \
-    && ( jar tf /staging/runtime/app.jar | grep -q '^org/springframework/boot/loader/launch/JarLauncher.class$' \
-        || { echo "the runtime jar is not executable — repackage did not run"; exit 1; } ) \
-    && test -f /staging/builder/classes/skills/skill-card-generator/SKILL.md \
-        || { echo "the builder shipped no skill folder to sample"; exit 1; }
+    && mkdir -p /staging/studio/bin /staging/runner/bin \
+    && cp prod/embabel-smith-studio/target/smith-studio /staging/studio/bin/studio \
+    && cp prod/embabel-smith-runtime/target/smith-runtime /staging/runner/bin/runtime \
+    && cp prod/embabel-smith-builder/target/smith /staging/runner/bin/builder \
+    && for b in /staging/studio/bin/studio /staging/runner/bin/runtime /staging/runner/bin/builder; do \
+           head -c 4 "$b" | grep -q ELF || { echo "$b is not a native executable"; exit 1; }; \
+       done \
+    && echo "binaries: studio $(du -h /staging/studio/bin/studio | cut -f1), runtime $(du -h /staging/runner/bin/runtime | cut -f1), builder $(du -h /staging/runner/bin/builder | cut -f1)" \
+    && ( prod/embabel-smith-runtime/target/smith-runtime run --help 2>&1 | grep -q -- '--source' \
+        || { echo "the runtime binary does not expose its run options — picocli wiring is missing"; exit 1; } ) \
+    && ( prod/embabel-smith-builder/target/smith --help 2>&1 | grep -q 'Usage: smith' \
+        || { echo "the builder binary does not print its usage"; exit 1; } ) \
+    && ( mkdir -p /tmp/probe-specs \
+        && SPRING_PROFILES_ACTIVE=container SMITH_STUDIO_SOURCES=folder:/tmp/probe-specs \
+           prod/embabel-smith-studio/target/smith-studio --server.port=18099 \
+           > /tmp/studio-probe.log 2>&1 & \
+           studio_pid=$!; \
+           ready=1; \
+           for _ in $(seq 1 90); do \
+               curl -fsS -o /dev/null http://127.0.0.1:18099/api/status 2>/dev/null && { ready=0; break; }; \
+               sleep 1; \
+           done; \
+           if [ "$ready" -ne 0 ]; then \
+               echo "the native studio did not become ready"; tail -30 /tmp/studio-probe.log; \
+               kill "$studio_pid" 2>/dev/null; exit 1; \
+           fi; \
+           asset=$(curl -fsS http://127.0.0.1:18099/ 2>/dev/null \
+                   | grep -oE '/assets/[A-Za-z0-9._-]+\.js' | head -1); \
+           if [ -z "$asset" ]; then \
+               echo "the studio binary served no index.html naming a bundle — its SPA assets were not registered into the image"; \
+               kill "$studio_pid" 2>/dev/null; exit 1; \
+           fi; \
+           curl -fsS -o /dev/null "http://127.0.0.1:18099$asset" \
+               || { echo "the studio binary serves an index.html whose $asset it cannot serve"; \
+                    kill "$studio_pid" 2>/dev/null; exit 1; }; \
+           kill "$studio_pid" 2>/dev/null; \
+           echo "studio binary answered /api/status and serves $asset" )
 
 # ---------------------------------------------------------------------------
 # studio: the UI
 # ---------------------------------------------------------------------------
-FROM eclipse-temurin:21-jre-jammy AS studio
+FROM debian:12-slim AS studio
 
 # OCI labels so an inspected image says where it came from. The workflow passes these; a plain
 # docker build leaves them empty, which is honest. The ARG names are deliberately undotted:
@@ -132,31 +199,38 @@ LABEL org.opencontainers.image.title="$OCI_TITLE" \
       org.opencontainers.image.description="Embabel Smith studio: one browser surface over the builder, the no-code runtime and the spec sources" \
       org.opencontainers.image.licenses="Apache-2.0"
 
+# curl is for the HEALTHCHECK below, and nothing else — the application itself needs no package,
+# because what it runs is a compiled binary rather than a JVM plus a jar.
+#
 # A non-root uid, and a home it owns. The studio writes three places under $HOME — the JSONL
 # trace store (~/.smith/traces), its storage settings (~/.smith/studio) and the git source cache
 # (~/.smith/spec-sources) — so a read-only root filesystem still needs one of those mounted
 # writable; see docker/docker-compose.yml.
-RUN groupadd --gid 10001 smith \
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --gid 10001 smith \
     && useradd --uid 10001 --gid 10001 --create-home --home-dir /home/smith --shell /usr/sbin/nologin smith \
     && mkdir -p /opt/smith /opt/smith/specs /home/smith/.smith \
     && chown -R smith:smith /opt/smith /home/smith
 
-COPY --from=build --chown=smith:smith /staging/studio/app.jar /opt/smith/app.jar
+COPY --from=build --chown=smith:smith /staging/studio/bin/studio /opt/smith/bin/studio
 
 WORKDIR /opt/smith
 USER smith
 
 # SERVER_PORT is the property the studio's own application.yml:2 reads, so the port is
-# operator-controlled without a rebuild.
+# operator-controlled without a rebuild — an environment variable reaches a native image the same
+# way it reaches a JVM one, through Spring's binding rather than through reflection.
 #
 # SMITH_STUDIO_SOURCES has a non-empty default here for a reason that is easy to trip over. With
 # both smith.studio.sources and smith.studio.improve-source empty, StudioConfiguration's
 # improveSource falls back to BuilderPackSurface.specSource(), which walks the filesystem for a
 # CHECKOUT of this repository and refuses when it finds none — deliberately, because the improvement
-# loop rewrites the builder's own packs in place and must never be handed the target/classes copy
-# that the next build recopies. An image has no checkout, so that refusal is a context-startup
-# failure rather than a degraded loop. Naming any source at all takes the other branch, and an empty
-# directory is inert: the loop schedule is off until someone starts it from the UI.
+# loop rewrites the builder's own packs in place and must never be handed a build output copy.
+# An image has no checkout, so that refusal is a context-startup failure rather than a degraded
+# loop. Naming any source at all takes the other branch, and an empty directory is inert: the loop
+# schedule is off until someone starts it from the UI.
 #
 # SPRING_PROFILES_ACTIVE names a profile that has no config file anywhere in the repo — the same
 # trick the Makefile uses for the A2A run (Makefile:69). It matters because the studio's DEFAULT
@@ -164,32 +238,30 @@ USER smith
 # repo-relative path ./docker/docker-compose-infra.yml, which does not exist in this image.
 # Overriding the default profile is what stops a container from trying to start a container.
 #
-# MaxRAMPercentage lets the container's memory limit size the heap rather than the host's RAM.
-# There is no CLASSPATH here: this is an executable jar, and `-jar` takes its classpath from
-# BOOT-INF/lib inside the file, so a CLASSPATH env var would be silently ignored rather than
-# misleading.
+# There is deliberately no JAVA_OPTS here. This is a compiled program, not a JVM: a -XX: flag would
+# arrive as a program argument, and the heap sizes itself from the container's memory limit.
 ENV SERVER_PORT=8080 \
     SPRING_PROFILES_ACTIVE=container \
-    SMITH_STUDIO_SOURCES="folder:/opt/smith/specs" \
-    JAVA_OPTS="-XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom"
+    SMITH_STUDIO_SOURCES="folder:/opt/smith/specs"
 
 EXPOSE 8080
 
 # /api/status answers 200 with no model endpoint and no key configured — StatusController reports
 # configured:false rather than failing — so the probe never depends on a secret being present.
-# start-period is generous: the Embabel platform scans packages and builds its decision registry
-# during boot (about 5s warm on a host, longer on a loaded runner).
+# start-period is generous for a JVM boot and generous for this one too: a native image starts in
+# well under a second, but the Embabel platform still scans packages and builds its decision
+# registry before the context is ready.
 HEALTHCHECK --interval=15s --timeout=3s --start-period=90s --retries=5 \
     CMD curl -fsS "http://127.0.0.1:${SERVER_PORT}/api/status" || exit 1
 
-# Exec form, with the JVM re-execed so it becomes PID 1 and receives SIGTERM: Spring Boot then
+# Exec form, with the program re-execed so it becomes PID 1 and receives SIGTERM: Spring Boot then
 # closes its context instead of being killed at the grace period.
-ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS -jar /opt/smith/app.jar \"$@\""]
+ENTRYPOINT ["sh", "-c", "exec /opt/smith/bin/studio \"$@\""]
 
 # ---------------------------------------------------------------------------
 # runner: the same product, pointed at a sample of itself
 # ---------------------------------------------------------------------------
-FROM eclipse-temurin:21-jre-jammy AS runner
+FROM debian:12-slim AS runner
 
 ARG OCI_TITLE=embabel-smith-runner
 ARG OCI_SOURCE=
@@ -202,27 +274,22 @@ LABEL org.opencontainers.image.title="$OCI_TITLE" \
       org.opencontainers.image.description="Embabel Smith sample runner: ingests agent specs and skill folders with no compiler and answers a request" \
       org.opencontainers.image.licenses="Apache-2.0"
 
-RUN groupadd --gid 10001 smith \
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --gid 10001 smith \
     && useradd --uid 10001 --gid 10001 --create-home --home-dir /home/smith --shell /usr/sbin/nologin smith \
     && mkdir -p /opt/smith /home/smith/.smith \
     && chown -R smith:smith /opt/smith /home/smith
 
-# Two classpaths, not one merged classpath. Both the runtime and the builder ship an
-# application.yml at their classpath root, so merging their classes directories would let one
-# silently answer for the other; the lib directory is shared because the reactor resolves one
-# version of every artifact, so a shared filename is the same bytes.
-# Two launch mechanisms in one image, and each is the product's own artifact rather than a
-# container invention. The agents leg runs the runtime's executable jar; the builder leg has no
-# executable jar to run — its packaged form is the native `smith` binary — so it gets the same
-# layout spring-boot:run would hand the JVM: the builder's classes plus its resolved runtime
-# dependencies, launched with -cp.
-#
-# They were never merged into one classpath even when both legs were -cp: the runtime and the
-# builder each ship an application.yml at their classpath root, so a merged classes directory would
-# let one silently answer for the other.
-COPY --from=build --chown=smith:smith /staging/runtime/app.jar /opt/smith/bin/runtime.jar
-COPY --from=build --chown=smith:smith /staging/builder/lib/ /opt/smith/lib/
-COPY --from=build --chown=smith:smith /staging/builder/classes/ /opt/smith/builder/classes/
+# Two binaries, and each is the product's own artifact rather than a container invention: the
+# agents leg is `smith run` from prod/embabel-smith-runtime, the skills leg is `smith skill-run`
+# from prod/embabel-smith-builder. They are separate programs, exactly as they are separate modules
+# on a host — and they stay separate here for the same reason the JVM layout kept them apart: each
+# ships an application.yml at its own classpath root, and one merged artifact would let one
+# silently answer for the other.
+COPY --from=build --chown=smith:smith /staging/runner/bin/runtime /opt/smith/bin/runtime
+COPY --from=build --chown=smith:smith /staging/runner/bin/builder /opt/smith/bin/builder
 # --chmod rather than trusting the context's mode: COPY preserves the file's mode as sent, and a
 # checkout with core.fileMode=false (or a Windows one) would deliver an entrypoint the kernel refuses
 # to exec, which surfaces as an image that cannot start rather than as a build error.
@@ -254,7 +321,6 @@ WORKDIR /opt/smith
 USER smith
 
 ENV SPRING_PROFILES_ACTIVE=container \
-    JAVA_OPTS="-XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom" \
     SMITH_AGENT_SOURCE="folder:/opt/smith/samples/agents" \
     SMITH_AGENT_GOAL="" \
     SMITH_AGENT_INPUT="Explain how a coffee machine works" \

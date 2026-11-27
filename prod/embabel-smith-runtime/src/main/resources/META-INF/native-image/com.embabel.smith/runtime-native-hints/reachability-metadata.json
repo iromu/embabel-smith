@@ -1,0 +1,54 @@
+{
+  "comment": "Reachability gaps the Spring AOT pass cannot see, for the `smith-runtime` native binary. Same method as builder-native-hints: Embabel binds @ConfigurationProperties Kotlin data classes through kotlin-reflect (invisible to static analysis) and loads its provider model catalogues as classpath resources by name. Add an entry here when the image reports a MissingReflectionRegistrationError or a resource that resolves on the JVM but not in the binary. The models/ globs are the provider catalogues shipped INSIDE the Embabel jars -- embabel-agent-anthropic-autoconfigure holds models/anthropic-models.yml and embabel-agent-openai-autoconfigure holds models/openai-models.yml, and AnthropicModelLoader/OpenAiModelLoader open each one by name at context startup. Unregistered, the binary boots and logs 'Configuration file classpath:models/anthropic-models.yml not found, using empty model list' twice, registers 0 + 0 LLMs where the JVM jar logs 'Loaded 9 Anthropic model definitions' and 'Loaded 25 OpenAI model definitions', and then the context dies before picocli ever runs: ConfigurableModelProvider.<init> rejects the framework's own default model because nothing registered it, printing 'Default LLM <name> is neither a registered model nor a configured role'. That failure is silent at build time and is not a CLI bug, so it also poisons every other check -- `--help` exits 1 with a stack trace instead of printing usage. Registering the two files is what makes the model list real; the OpenAI-Custom provider needs no glob because its models come from OPENAI_CUSTOM_MODELS, not from a resource. com.embabel.agent.spi.support.LlmDataBindingProperties: the retry/timeout binding the LLM layer reads through kotlin-reflect -- it is the identical entry the builder needed for the identical MissingReflectionRegistrationError ('Cannot reflectively invoke constructor LlmDataBindingProperties(int,long,boolean,String,int,DefaultConstructorMarker)'), reached from the same auto-configuration rather than from any builder-specific call site, so it is carried over on that measurement and not guessed. The tracing agent does record it here, because the JVM binds it on every boot, so this line is deliberate redundancy against a regeneration that loses it -- which is how the builder came to need it -- and it costs one entry. The runtime has no specs/ or prompts/ globs because nothing in it or in its dependencies (smith-common, embabel-smith-specsource) opens a classpath resource by name: a run reads its packs from the filesystem through SpecSource, assembles step specs into a temp directory, and the goal's prompts come from the YAML it read there. Unlike the builder, this binary therefore has no classpath-directory listing to fail on, so no disk fallback of the kind SpecFolders provides is needed. com.embabel.agent.api.annotation.{Agent,Action,AchievesGoal,Condition,Export,LlmTool,LlmTool.Meta}: the annotation types the platform's structure validators name as class literals while the context starts -- DefaultAgentStructureValidator.afterPropertiesSet calls getBeansWithAnnotation(Agent.class) and reads Action and Condition off the beans it finds, and AchievableGoalValidator does the same with AchievesGoal. Unregistered, the image prints no MissingReflectionRegistrationError at all: it segfaults inside sun.reflect.annotation.AnnotationParser.parseAnnotation2 on the getDeclaredAnnotations() call underneath Spring's findAnnotationOnBean, exiting 99 with a register dump, so the advice the method normally gets from the binary is absent and the entry came from a control measurement instead. The control is the builder's own binary: it runs the identical validator on the identical Embabel version and boots, and the only api.annotation types registered anywhere in the repo are the five in builder-traced-hints, which its own @Agent class made the tracing agent record. This module has no @Agent class -- it deploys YAML step specs -- so nothing on its JVM side ever touches those annotations reflectively, and a tracer cannot report a registration the JVM never performed. Same class of gap as the builder's ToolGroupMetadata$Companion entry: live on a startup path, invisible to a trace.",
+  "reflection": [
+    {
+      "type": "com.embabel.agent.api.annotation.Agent",
+      "allDeclaredMethods": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.embabel.agent.api.annotation.Action",
+      "allDeclaredMethods": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.embabel.agent.api.annotation.AchievesGoal",
+      "allDeclaredMethods": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.embabel.agent.api.annotation.Condition",
+      "allDeclaredMethods": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.embabel.agent.api.annotation.Export",
+      "allDeclaredMethods": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.embabel.agent.api.annotation.LlmTool",
+      "allDeclaredMethods": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.embabel.agent.api.annotation.LlmTool$Meta",
+      "allDeclaredMethods": true,
+      "allDeclaredFields": true
+    },
+    {
+      "type": "com.embabel.agent.spi.support.LlmDataBindingProperties",
+      "allDeclaredConstructors": true,
+      "allDeclaredMethods": true,
+      "allDeclaredFields": true
+    }
+  ],
+  "resources": [
+    {
+      "glob": "models/*.yml"
+    },
+    {
+      "glob": "models/**/*.yml"
+    }
+  ]
+}

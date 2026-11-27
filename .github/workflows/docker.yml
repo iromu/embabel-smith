@@ -16,12 +16,18 @@ name: Containers
 #     with `probe`, which reads its inputs and calls nothing. The model-backed legs — generate,
 #     eval, run a goal, answer with a skill — stay what the @Tag("live") tests and examples/
 #     cover. `docker/smoke.sh` says the same thing at the top.
+#   * No JVM run of any of the three programs. Every process an image starts is a GraalVM native
+#     image compiled inside the build stage, so this workflow is the container's native gate —
+#     reachability metadata and AOT hints that go missing fail the build rather than the smoke. What
+#     it cannot catch is a native-only failure that needs a model call to surface, which is the same
+#     gap as the first bullet.
 #   * No publish by default. Push happens only on a push to the default branch or a version tag,
 #     never on a pull request, which matches the project's rule that publishing commits and never
 #     pushes.
-#   * The vulnerability scan reports and does not gate. A JRE base image carries unfixed
-#     advisories in layers this repository does not control, and failing a pull request on those
-#     teaches people to ignore the report. The findings land in the step summary.
+#   * The vulnerability scan reports and does not gate. What ships in these images is a slim Debian
+#     userland around a compiled binary, and the advisories that remain are in layers this repository
+#     does not control; failing a pull request on those teaches people to ignore the report. The
+#     findings land in the step summary.
 #   * No vulnerability gate, no SBOM, no attestation, and no multi-architecture build: linux/amd64
 #     only. Adding any of those is a change to this file, not to the images.
 #   * The studio's Postgres path is not exercised. The studio is designed to run with storage
@@ -69,11 +75,32 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # Three native compiles plus the SPA's npm install, in one build stage. The compile is the long
+    # part, not the packaging, and a cold cache means paying for all three.
+    timeout-minutes: 60
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Add swap
+        # The build stage compiles three native images, and an analysis peaks past the runner's
+        # 16 GB — the cgroup answers with an OOM kill that reads as a compiler crash. Swap turns the
+        # peak into a slow step instead of a failure. A container build inherits the host's memory,
+        # so this is the same step native-image.yml adds for the host build, and the Dockerfile's
+        # NATIVE_IMAGE_OPTIONS is its other half. Best-effort: a runner that forbids swapon should
+        # still get to try the build, so this reports rather than fails.
+        run: |
+          if sudo fallocate -l 6G /swapfile \
+             && sudo chmod 600 /swapfile \
+             && sudo mkswap /swapfile \
+             && sudo swapon /swapfile; then
+            echo "swap: added 6G" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::warning::could not add swap -- the native compiles run on RAM alone"
+            echo "swap: unavailable" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          free -h
 
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3

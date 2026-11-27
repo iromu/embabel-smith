@@ -67,6 +67,18 @@
             <groupId>info.picocli</groupId>
             <artifactId>picocli</artifactId>
         </dependency>
+        <!-- ChatClientAutoConfiguration's @AutoConfiguration names ToolCallingAutoConfiguration.
+             Spring AI marks that jar optional, so it is absent here and the reference dangles: on
+             the JVM that is a swallowed TypeNotPresentException, but in the native image the
+             dangling class makes annotation parsing fault — a raw segfault, no Java exception —
+             while Embabel's structure validator scans the bean annotations of every bean during
+             its own afterPropertiesSet. The builder carries the same jar for the same reason; this
+             module needs it in its own right because it does not depend on the builder. -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-autoconfigure-model-tool</artifactId>
+            <version>${spring-ai.version}</version>
+        </dependency>
 
         <dependency>
             <groupId>org.junit.jupiter</groupId>
@@ -118,4 +130,78 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <!--
+            The native `smith-runtime` binary, on the same opt-in the builder uses: the root pom's
+            `native` profile holds the shared defaults (the reachability metadata repository and
+            the no-fallback build arg), and a module declares the three executions that make an
+            image. Without this section the module is untouched by -Pnative.
+        -->
+        <profile>
+            <id>native</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.springframework.boot</groupId>
+                        <artifactId>spring-boot-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>process-aot</id>
+                                <goals>
+                                    <goal>process-aot</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <!-- process-aot writes its generated classes and reachability metadata to
+                         target/spring-aot/main and cleans that directory first, so the two trees are
+                         folded into target/classes here — the one place native-image already has on
+                         its classpath. Pointing process-aot's own output at target/classes deletes
+                         the module's compiled classes instead. -->
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-resources-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>fold-aot-output</id>
+                                <phase>prepare-package</phase>
+                                <goals>
+                                    <goal>copy-resources</goal>
+                                </goals>
+                                <configuration>
+                                    <outputDirectory>${project.build.outputDirectory}</outputDirectory>
+                                    <resources>
+                                        <resource>
+                                            <directory>${project.build.directory}/spring-aot/main/classes</directory>
+                                        </resource>
+                                        <resource>
+                                            <directory>${project.build.directory}/spring-aot/main/resources</directory>
+                                        </resource>
+                                    </resources>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.graalvm.buildtools</groupId>
+                        <artifactId>native-maven-plugin</artifactId>
+                        <configuration>
+                            <imageName>smith-runtime</imageName>
+                            <mainClass>com.embabel.smith.runtime.SmithRuntimeApplication</mainClass>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <id>build-native</id>
+                                <goals>
+                                    <goal>compile-no-fork</goal>
+                                </goals>
+                                <phase>package</phase>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>
