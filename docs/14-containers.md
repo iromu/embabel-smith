@@ -200,9 +200,11 @@ metadata or AOT hints that go missing fail the build rather than the smoke. The 
 a native-only failure that needs a model call to surface, which is the same gap as the first bullet.
 Two settings make the compile survivable on a hosted runner, and they travel together: the workflow
 adds a 6 GB swapfile before building and the Dockerfile carries
-`ARG NATIVE_IMAGE_OPTIONS=-J-Xmx10g`, because three native compiles in one build stage peak past a
+`ARG NATIVE_IMAGE_OPTIONS=-J-Xmx14g`, because three native compiles in one build stage peak past a
 runner's 16 GB and a cgroup kill arrives looking like a compiler crash rather than an out-of-memory
-error. It is the same pairing `native-image.yml` uses for the host build.
+error. It is the same pairing `native-image.yml` uses for the host build, with a higher cap: that one
+compiles the builder alone at 10 GB, and the studio alone exhausted a 10 GB heap during analysis, so
+the ceiling here is set by the studio rather than by the builder.
 
 The reactor is gated by `offline-verification.yml` and the builder's native binary by
 `native-image.yml`; this leg does not re-run either, though it compiles the same three binaries from

@@ -561,8 +561,9 @@ the patch `native-image.yml` pins as `GRAAL_VERSION` — 25.0.2, the patch the p
 to — falling back to the rolling `25-graalce` with a printed note when that candidate is not installed
 locally, because asking sdkman for a version it lacks hangs a build script with no network. The wiring is the `native` profile of the module's pom —
 `spring-boot-maven-plugin:process-aot` at `prepare-package`, its output folded into
-`target/classes`, then `native-image` at `package`. Other modules are untouched by `-Pnative`
-until they declare the same two plugins, so the profile is opt-in per shipped module.
+`target/classes`, then `native-image` at `package`. The profile is opt-in per shipped module rather
+than builder-only: the studio and runtime now declare the same wiring for their own binaries, and
+the build that compiles all three is [`14-containers.md`](14-containers.md).
 
 What static analysis cannot see is carried in two directories under
 `src/main/resources/META-INF/native-image/com.embabel.smith/`. `builder-native-hints/` is
