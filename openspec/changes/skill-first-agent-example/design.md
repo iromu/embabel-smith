@@ -181,6 +181,30 @@ change, and `web` is already inside `STANDARD`'s allowlist. That is the stronges
 pinned-set requirement: reach can widen through machine configuration alone, and the build is the only
 place left that can notice.
 
+Measured on 1.5.4 by `runtime/core/ResolvedToolGroupsTest`, which boots the runtime rather than reading
+jars, the probe's open questions close as follows.
+
+A plain boot resolves exactly `[math]`; `file`, `shell`, `search`, `web`, `chat`, `AppleScript`,
+`validate` and the five remaining builder roles each answer `No tool group matching role`, and the MCP
+flip adds exactly `browser_automation`, `github`, `maps`, `web`. Every positive claim above is therefore
+confirmed rather than inferred.
+
+The builder discrepancy this decision flagged is a packaging fact, not a silent registration failure.
+`embabel-smith-builder` and `embabel-smith-runtime` have no dependency edge in either direction, so the
+builder's six `@Configuration` classes are absent from a runtime boot's classpath; and all six are
+unconditional, with no `AutoConfiguration.imports` in that module, so the only route to them is
+`SmithBuilderApplication`'s `@ComponentScan` — which reaches all six equally. "Only `validate` resolved"
+was a property of that probe's context. The worry behind the question does not transfer to the runtime's
+default-on group: a group is absent exactly when no bean of that type is in the context, and
+`availableToolGroups()` says so in one line — which is what the boot report of D2 prints.
+
+One collision to resolve before group 3 builds on a name. `file` and `shell` are free at the bean level in
+both boots — no upstream group bean claims either. They are not free at the property level:
+`embabel.agent.platform.tools.includes.shell.tools=anything` registers a working `shell` group in an
+otherwise untouched boot, through upstream's own role-keyed map. So the precedence rule of D10 has to be
+tested against `includes.shell` as well as `includes.file`, and the role that collides is the one the
+`HIGH` tier gates.
+
 ### D4 — Skill scripts run through the platform's own engines, off by default
 
 This reverses the decision this change first made, and the reversal is cheap because the engines are not
