@@ -571,3 +571,18 @@ that is what the report line is for.
   product boundary.
 - Whether the A2A card should advertise a pack's carried skills, which needs a loader-side answer to what
   a card entry means for a spec-sourced pack.
+
+## Apply-phase coordination notes
+
+- **7.3 landed (`ea55f9f`); 7.7 window is open on the RASR side.** Packs owns `ReferenceAwareStepSpecRepository.java`
+  (a `formOffer` set, a `formsOffered()` accessor, one guarded line in `wrap()`) and the additive half of
+  `RuntimeCore.report()` until they close the window. The 6.3 step-side intersection belongs in a new helper
+  file for exactly this reason — it was ruled there to keep RASR collision-free; anyone who finds it cannot
+  live outside RASR states that to the lead and is sequenced after the window closes. `attached()` stays
+  byte-identical either way, so the 4.5 arrow assertions and the repository test's pinned formats are not
+  touched by 7.7.
+- **The 6.8 disclosures are owed as two strokes in two files**: the `PackSkills.environment()` line (corrected
+  allowlist wording plus the 6.4 output-cap on the state line, one stroke) and the `docs/07-runtime.md`
+  environment paragraph (replacement text supplied by the interpreter, plus the two-limit sentence). The
+  shipped engine no longer inherits the host environment — anything still saying "the host's in full" is
+  stale as of `3f5c942`.
