@@ -1034,14 +1034,24 @@ a no-op.
   runtime cannot — the starter depends on it), and
   `grep -n 'Non-goal: protocol 1.0' prod/embabel-smith-a2a-starter/README.md` finds the open half.
 
-- **Open — jython-slim as a skill-script Python interpreter.** The process engine resolves each
-  language to interpreter commands, so a JVM-resident Python is one map entry away; `jython-slim`
-  (the pip-distributed Jython build) is the candidate, and where a host has no CPython on PATH it
-  would make `python` skill scripts runnable on the JVM alone. The caveat that shapes the authoring
-  rule: Jython tops out at **Python 2.7 syntax**, so a skill's `.py` script that uses f-strings,
-  walrus assignments, or `pathlib` runs under CPython and dies under jython-slim — publishing such
-  a script to a jython-capable host is a silent portability cliff. The wiring decision is which
-  interpreters the language map lists per host and whether scripts are linted against the 2.7
+- **Open — a JVM-resident Python for skill scripts.** The process engine resolves each language to
+  interpreter commands, so a Python that lives inside the JVM is one map entry away; where a host has
+  no CPython on PATH, either candidate below makes `python` skill scripts runnable on the JVM alone.
+  The two candidates are opposite in shape. **jython-slim** (the pip-distributed Jython build) is one
+  small jar and no machinery, but Jython tops out at **Python 2.7 syntax**: a skill's `.py` script
+  that uses f-strings, walrus assignments, or `pathlib` runs under CPython and dies under jython-slim,
+  so publishing such a script to a jython-capable host is a silent portability cliff and the authoring
+  rule becomes 2.7-safe (`.format()`, `os.path`, `print` as a function).
+  **`org.graalvm.polyglot:python`** (GraalPy, pom-type; 25.6.5.1 is on Central) runs
+  Python-3.11-class syntax, so that cliff disappears — and its costs are elsewhere. The pom pulls the
+  graalpy + truffle dependency set into whichever module declares it, a second embedded language
+  beside the GraalJS the builder and studio already carry at a pinned `graalvm.polyglot.version`
+  (25.0.2 in both poms), and that cohabitation carries a measured warning: GraalJS 25.4.4.1.1 broke
+  `make native` where 25.0.2 builds. A GraalPy line therefore has to move **together with** the
+  existing pin, as one polyglot version set, and re-pass the native gauntlet — it cannot sit beside
+  the 25.0.2 pin at 25.6.x. A new embedded language also needs its own native-image reachability work
+  beyond what GraalJS needed. The wiring decision is the same either way: which interpreters the
+  language map lists per host, and whether scripts are linted against the chosen interpreter's
   ceiling before that choice matters. Check:
   `javap -p -cp ~/.m2/repository/com/embabel/agent/embabel-agent-skills/1.5.4/embabel-agent-skills-1.5.4.jar com.embabel.agent.skills.script.ScriptLanguage`
   names the languages the map keys over.
