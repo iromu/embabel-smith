@@ -46,7 +46,7 @@ embabel-smith/
 │   │       ├── main/java/com/embabel/smith/runtime/
 │   │       │   ├── core/RuntimeCore.java                      ~  one line at the scope-builder seam uses the wrapper; passes configured ProcessOptions where it passes DEFAULT today
 │   │       │   ├── core/ReferenceAwareStepSpecRepository.java +  wraps findAll(); emit(ctx) delegates with ctx.copy(..., refs)
-│   │       │   ├── core/PackSkills.java                       +  Skills per agent definition plus the folder's shared set; the reading surface built with SkillFilter.WITHOUT_SCRIPTS
+│   │       │   ├── core/PackSkills.java                       +  Skills per agent definition plus the folder's shared set; the reading surface built with no script engine (SkillFilter is inert in 1.5.4)
 │   │       │   ├── core/PackReferences.java                   +  the carried set: skills/ folders plus an optional references.yml (directory, document, brief), built through the platform's own reference types
 │   │       │   ├── core/ScriptEngineConfig.java               +  smith.tools.scripts.engine → none / the platform's process, docker, podman engines; the process one via confinedTo(root); a container choice with no daemon refuses at start-up
 │   │       │   ├── core/RunGuardrails.java                    +  one guardrail class, registered through the platform's global registry by property; bounds come from ProcessOptions, not here
@@ -60,7 +60,7 @@ embabel-smith/
 │   │           ├── core/PackSkillsTest.java                   +  own, shared, shadowing, refused folder named
 │   │           ├── core/PackReferencesTest.java               +  directory/document/brief resolve; a fourth kind refused; dangling name refused; prefix collision refused
 │   │           ├── core/ScriptExecutionTest.java              +  off by default offers nothing; engine named; non-zero exit returned as data; sleep past the limit stopped and later steps run; runaway output truncated and stated; path outside the root refused
-│   │           ├── core/ScriptSurfaceTest.java                +  WITHOUT_SCRIPTS on the reading step, mutation-checked by removing the filter
+│   │           ├── core/ScriptSurfaceTest.java                +  the two surfaces differ by the script tool through the engine binding; the SkillFilter inertness is stated, a filter mutation check would be vacuous
 │   │           ├── core/GuardrailWiringTest.java              +  a blocking intervention is an intervention, retries visible, not slow steps
 │   │           ├── core/BoundTerminationTest.java             +  a run ended by a budget or the tool-loop ceiling names the bound
 │   │           ├── core/BlockedForDecisionTest.java           +  the stop carries question, evidence, continuation command; nothing beyond the block executed

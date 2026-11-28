@@ -245,8 +245,8 @@ The engines are upstream's, which is why this is a property and a report line ra
 subsystem. Two upstream facts shape what can be promised: a script's callable name is
 `<skill>_<file-basename>` with **no** sanitization, so the name on the wire and the file it came from are
 both recorded; and `Skills.tools()` lists the script tools of every loaded skill, activated or not, so the
-reading step and the executing step cannot share one `Skills` object — `SkillFilter.WITHOUT_SCRIPTS` is what
-separates them.
+reading step and the executing step cannot share one `Skills` object — what separates them is whether a
+script execution engine is attached, not `SkillFilter`, which 1.5.4 never consults.
 
 ## References that are not skills
 

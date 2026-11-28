@@ -228,11 +228,12 @@ Two upstream facts shape the spec rather than the code. A script's callable name
 `<skill>_<file-basename>` formed **without** sanitization, so a hyphenated file name survives into the tool
 name and then gains the reference prefix on the wire; and `Skills.tools()` includes the script tools of
 **every loaded skill, activated or not**, because the prompt runner captures the tool list at start-up. That
-second fact is why a reading step and an executing step cannot share one attached `Skills` object and why
-`SkillFilter.WITHOUT_SCRIPTS` is load-bearing. SKILL.md itself cannot help: the loader declares no script
+second fact is why a reading step and an executing step cannot share one attached `Skills` object, and the
+lever that separates them is the script execution engine, not `SkillFilter`: in 1.5.4 nothing in the jar
+calls `SkillFilter.accept`, so `WITHOUT_SCRIPTS` filters nothing and the surface is decided solely by
+whether an engine is attached. SKILL.md itself cannot help: the loader declares no script
 metadata, the input schema is fixed at `args`/`stdin`/`inputFiles`, and language comes from the file
-extension — so any per-script policy is authored here, on top of whole-skill filtering and the engine's
-`validate()` hook.
+extension — so any per-script policy is authored here, on top of the engine's `validate()` hook.
 
 One dependency fact comes with this: `embabel-agent-skills` is declared only by the builder's pom, so the
 runtime gains it here. The jar ships no auto-configuration and no `AutoConfiguration.imports`, so
@@ -490,11 +491,18 @@ and changing it is a stated decision, not a side effect.
   a deploy test asserts a declared reference actually reaches a `PromptRunner.withReference`-shaped
   offer; if a bump changes the shape the test fails at the wrapper, not inside a live run.
 - **A reference that resolves to nothing is invisible** → validation refuses a dangling name, and the run
-  reports the reference names it could not serve, mirroring the role report.
+  reports the reference names it could not serve. The report is a reference report — what a step declared as
+  a role does not appear in it, which is the asymmetry the next bullet states as a gap rather than as parity.
 - **Three states read as one** (registered by default, switched, tier-allowed) → the boot report prints the
   state it acted on for each role, and a disabled group is named as disabled rather than unknown, so the
-  silence that once stood for "nothing registered" now has three different sentences to say. A tier
-  refusal already names the pack and an unresolvable role already names the role.
+  silence that once stood for "nothing registered" now has three different sentences to say. A tier refusal
+  already names the pack and the role it refused. **Corrected as box 3.16 closed it: an unresolvable role is
+  not named by the run.** That claim was measured and does not hold — a declared role name is a pass-through
+  that reaches the platform's resolver only when the step prompts, and the run report carries skill notes
+  and reference outcomes. The naming does exist one level down, in the resolver's failure message, which says
+  the role; `RuntimeCoreTest` pins both halves, including that a role which resolved reports no failure
+  either. So the delta's "an unresolved declaration is visible" is met by the resolver and not yet by the
+  report, and closing it in the report is a runtime change rather than a test.
 - **Registering `shell` turns a declaration into command execution** → the tier is unchanged and already
   refuses `shell` at `STANDARD`; the pinned role test plus the existing `aHighTrustStepIsBlockedUnderThe
   StandardTier` case are the guards, and the default enable state is off.
