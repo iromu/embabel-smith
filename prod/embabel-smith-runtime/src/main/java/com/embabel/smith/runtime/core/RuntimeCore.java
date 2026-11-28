@@ -177,8 +177,9 @@ public class RuntimeCore {
 		this.platform.deploy(agent);
 		// Read after the deploy: the scope builder is what asks the repository for its
 		// steps, so a declaration that resolved to nothing is only known once it has.
-		return new IngestedSource(source, packs, excluded, agent, report(source.warnings(), referencesByStep,
-				steps.attached(), steps.unresolved(), steps.scriptsOffered(), unresolvedRoles(packs)));
+		return new IngestedSource(source, packs, excluded, agent,
+				report(source.warnings(), referencesByStep, steps.attached(), steps.unresolved(),
+						steps.scriptsOffered(), steps.formsOffered(), unresolvedRoles(packs)));
 	}
 
 	/**
@@ -230,18 +231,22 @@ public class RuntimeCore {
 	 * @param scriptOffer which step was handed a script it could call, as read from the
 	 * wrapper, which is the per-step half of a statement the pack-level line makes only
 	 * once
+	 * @param formOffer which shape each reference a step was given was offered in, as
+	 * read from the wrapper — the record of a listing decision that is otherwise visible
+	 * only by asking the platform what it listed, which a deployed scope does not say
 	 * @param unresolvedRoles the tool-group roles a step declares that this platform
 	 * answers with nothing, stated per declaring step
 	 * @return the report to print with the run
 	 */
 	private RunReport report(List<String> dropped, Map<String, PackReferences> referencesByStep, List<String> attached,
-			List<String> unresolved, List<String> scriptOffer, List<String> unresolvedRoles) {
+			List<String> unresolved, List<String> scriptOffer, List<String> formOffer, List<String> unresolvedRoles) {
 		List<String> lines = new ArrayList<>(dropped);
 		for (PackReferences references : referencesByStep.values().stream().distinct().toList()) {
 			lines.addAll(references.notes());
 		}
 		lines.addAll(attached);
 		lines.addAll(scriptOffer);
+		lines.addAll(formOffer);
 		lines.addAll(unresolved);
 		lines.addAll(unresolvedRoles);
 		return new RunReport(lines);

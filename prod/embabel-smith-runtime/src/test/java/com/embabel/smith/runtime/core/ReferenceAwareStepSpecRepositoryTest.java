@@ -142,6 +142,32 @@ class ReferenceAwareStepSpecRepositoryTest {
 	}
 
 	@Test
+	void aReferenceThePackAskedToBeUnfoldedIsReportedInTheFormItWasGiven() throws IOException {
+		ReferenceAwareStepSpecRepository repository = formsRepository(formsPack(true));
+		repository.findAll();
+
+		// The pair to the test below, and the one that makes the other non-vacuous: a
+		// line that always said "direct" would pass a pack that asked for nothing. The
+		// names here are the ones the step declared, not the containers they resolved to
+		// — the skill is asked about as `repo-map` even though it is attached as
+		// `survey-skills`, because the shape is a property of the declaration.
+		assertThat(repository.formsOffered()).containsExactly("locate forms [repo-map direct, notes-dir unfolding]");
+	}
+
+	@Test
+	void aPackThatAskedForNothingReportsEveryReferenceItGaveAsDirect() throws IOException {
+		ReferenceAwareStepSpecRepository repository = formsRepository(formsPack(false));
+		repository.findAll();
+
+		// Absent means direct, and the run says so for every name rather than naming only
+		// the unusual case, which is what makes the line a statement about the whole
+		// step.
+		// The attachment line is the shape the live tests pin, untouched by any of this.
+		assertThat(repository.formsOffered()).containsExactly("locate forms [repo-map direct, notes-dir direct]");
+		assertThat(repository.attached()).containsExactly("locate -> [survey-skills, notes-dir]");
+	}
+
+	@Test
 	void bothHoldersReachTheCallUnderTheirOwnPrefixesWithTheirOwnDescriptions() throws IOException {
 		PackReferences refs = PackReferences.at(twoKindPack(true), "survey");
 		StepSpecContext context = context();
@@ -251,6 +277,39 @@ class ReferenceAwareStepSpecRepositoryTest {
 					""");
 		}
 		return packDir;
+	}
+
+	/**
+	 * The pack of {@link #pack(String)}, additionally carrying a folder that a directory
+	 * reference resolves against — the kind that lists tools, and so the kind a shape
+	 * question can actually be asked about.
+	 * @param asks whether {@code references.yml} adds {@code unfolding: true} to the
+	 * entry
+	 * @return the pack directory
+	 */
+	private Path formsPack(boolean asks) throws IOException {
+		Path packDir = pack("repo-map");
+		Files.createDirectories(packDir.resolve("notes"));
+		Files.writeString(packDir.resolve("notes/one.md"), "One note.\n");
+		Files.writeString(packDir.resolve(PackReferences.REFERENCES_FILE), """
+				references:
+				  - name: notes-dir
+				    kind: directory
+				    path: notes
+				%s""".formatted(asks ? "    unfolding: true\n" : ""));
+		return packDir;
+	}
+
+	/**
+	 * The wrapper over one step declaring both kinds, over a pack that either asks for
+	 * the folder to be unfolded or asks for nothing at all.
+	 * @param packDir the pack whose references stand for the definition
+	 * @return the wrapper
+	 */
+	private ReferenceAwareStepSpecRepository formsRepository(Path packDir) throws IOException {
+		return new ReferenceAwareStepSpecRepository(
+				new YmlStepSpecRepository(steps(List.of("repo-map", "notes-dir")).toString(), List.of()),
+				Map.of("locate", PackReferences.at(packDir, "survey")));
 	}
 
 	/**

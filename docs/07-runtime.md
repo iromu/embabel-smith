@@ -68,6 +68,14 @@ and a role an operator switched off look identical to the runtime, because both 
 answering nothing; what separates them is the addon's boot line, which names the property that decided
 it, so the run's line says that nothing answers the name rather than guessing why.
 
+Each reference a step was given is also reported in the **shape** it was offered in, as
+`step forms [name direct, name unfolding]`. A reference can sit behind the platform's unfolding
+facade — one tool listed where its whole surface would be listed — and from outside a deployed scope
+the two shapes are the same silence. The names on this line are the ones the step declared rather
+than the containers the line above names, because the shape is a property of a declaration: a pack's
+`notes` skill is attached as `ask-skills` and asked to unfold as `notes`. A pack that asked for
+nothing says `direct` for every name it gave, which is the control the facade case is read against.
+
 Scripts are **off by default**: a pack whose skill ships a `scripts/` folder offers no script tool,
 and the run says so and names the switch — `smith.tools.scripts.engine` — rather than leaving the
 absence to be mistaken for a tier refusal. Installing `embabel-agent-skills` changes none of this:

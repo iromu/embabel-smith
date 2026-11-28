@@ -374,6 +374,32 @@ class RuntimeCoreTest {
 	}
 
 	@Test
+	void aReferenceThePackAskedToBeUnfoldedIsReportedInThatForm(@TempDir Path tmp) throws Exception {
+		IngestedSource ingested = core().ingest(formsPack(tmp, true));
+
+		// What the step was given, in which shape, on the record rather than in the
+		// platform's internals: the pack asked for one of its two references to sit
+		// behind
+		// the unfolding facade, and the run says which of the two it did. The name is the
+		// one the step declared, so this line reads against the pack's own file and not
+		// against the container names the line above it uses.
+		assertThat(ingested.report().lines())
+			.anyMatch((line) -> line.contains("read forms [notes direct, notes-dir unfolding]"));
+	}
+
+	@Test
+	void aPackThatAskedForNothingReportsEveryReferenceItGaveAsDirect(@TempDir Path tmp) throws Exception {
+		IngestedSource ingested = core().ingest(formsPack(tmp, false));
+
+		// The control, and the reason the test above is not a tautology: the same pack
+		// with the switch omitted reports both names direct. A report line that printed
+		// "unfolding" whenever it saw a facade, or one that never said anything at all,
+		// reddens one of these two and not neither.
+		assertThat(ingested.report().lines())
+			.anyMatch((line) -> line.contains("read forms [notes direct, notes-dir direct]"));
+	}
+
+	@Test
 	void aRoleSpelledWronglyIsNamedByTheRunAsWellAsByTheResolver(@TempDir Path tmp) throws Exception {
 		IngestedSource ingested = core().ingest(rolePack(tmp, MISSPELLED_ROLE));
 
@@ -707,6 +733,52 @@ class RuntimeCoreTest {
 				    kind: document
 				    path: docs/domain.md
 				""");
+		return SpecSource.parse("folder:" + tmp.toAbsolutePath()).resolve();
+	}
+
+	/**
+	 * A pack whose one step is given two references of different kinds — the skill folder
+	 * and a directory its own {@code references.yml} declares — with the option of asking
+	 * that the directory be offered behind the unfolding facade.
+	 * @param tmp where to write the pack
+	 * @param asks whether the entry adds {@code unfolding: true}; the same pack without
+	 * the switch is the control the report has to tell apart from this one
+	 * @return the resolved source, ready to ingest
+	 */
+	private ResolvedSpecSource formsPack(Path tmp, boolean asks) throws IOException {
+		Path pack = Files.createDirectories(tmp.resolve("ask"));
+		Files.writeString(pack.resolve("manifest.yml"), "name: ask\nversion: 0.1.0\n");
+		Files.createDirectories(pack.resolve("types"));
+		Files.writeString(pack.resolve("goal.yml"), """
+				stepType: goal
+				name: answered
+				description: "Answered from the pack's folder"
+				outputTypeName: com.embabel.agent.spec.model.BackgroundMessage
+				export: true
+				""");
+		Files.createDirectories(pack.resolve("steps"));
+		Files.writeString(pack.resolve("steps/read.yml"), """
+				stepType: action
+				name: read
+				description: "Read the folder and answer"
+				inputTypeNames:
+				  - com.embabel.agent.domain.io.UserInput
+				outputTypeName: com.embabel.agent.spec.model.BackgroundMessage
+				references:
+				  - notes
+				  - notes-dir
+				prompt: |
+				  Name one file. {{userInput.content}}
+				""");
+		writeSkill(Files.createDirectories(pack.resolve("skills/notes")), "notes", "carried by the pack");
+		Files.createDirectories(pack.resolve("docs"));
+		Files.writeString(pack.resolve("docs/one.md"), "One file in the folder.\n");
+		Files.writeString(pack.resolve(PackReferences.REFERENCES_FILE), """
+				references:
+				  - name: notes-dir
+				    kind: directory
+				    path: docs
+				%s""".formatted(asks ? "    unfolding: true\n" : ""));
 		return SpecSource.parse("folder:" + tmp.toAbsolutePath()).resolve();
 	}
 

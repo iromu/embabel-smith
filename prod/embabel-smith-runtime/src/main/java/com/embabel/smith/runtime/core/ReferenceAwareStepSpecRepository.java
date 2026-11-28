@@ -62,6 +62,8 @@ public final class ReferenceAwareStepSpecRepository implements StepSpecRepositor
 
 	private final Set<String> scriptOffer = new LinkedHashSet<>();
 
+	private final Set<String> formOffer = new LinkedHashSet<>();
+
 	/**
 	 * Wraps a repository so each emitted step also carries the references its own pack
 	 * can answer with.
@@ -140,6 +142,30 @@ public final class ReferenceAwareStepSpecRepository implements StepSpecRepositor
 	}
 
 	/**
+	 * Which shape each reference a step was actually given ended up in, as
+	 * {@code step forms names-and-shapes}.
+	 *
+	 * <p>
+	 * <b>Why its own line and not a suffix on {@link #attached()}.</b> The two lines
+	 * answer in different vocabularies: {@code attached} names the <em>container</em> a
+	 * declaration resolved to, which is what upstream's lookup keys on, while this names
+	 * what the step <em>declared</em>, which is what the shape was asked of —
+	 * {@code ask-skills} and {@code notes} are the same reference under the two names,
+	 * and only the declared one is a name {@code references.yml} can put behind a facade.
+	 * The attachment line is also pinned by tests this change has no business repricing,
+	 * so the shape is stated beside it rather than inside it.
+	 * <p>
+	 * The shape is read from {@link PackReferences#forms()} rather than inferred from
+	 * whether a facade exists, and that map covers every carried name — a reference
+	 * nobody asked about is {@code direct}, which is a fact about it and not a default
+	 * standing in for an unanswered question.
+	 * @return the per-reference shapes, in the order the steps were read
+	 */
+	public List<String> formsOffered() {
+		return List.copyOf(this.formOffer);
+	}
+
+	/**
 	 * Rewrite one step to name the containers that hold its declarations.
 	 * @param stepSpec the step as the delegate returned it
 	 * @return the step to deploy, unchanged when it declares nothing and nothing resolved
@@ -151,6 +177,7 @@ public final class ReferenceAwareStepSpecRepository implements StepSpecRepositor
 		PackReferences carried = this.byStepName.get(action.getName());
 		List<LlmReference> attached = new ArrayList<>();
 		List<String> containers = new ArrayList<>();
+		List<String> forms = new ArrayList<>();
 		for (String declared : action.getReferences()) {
 			LlmReference holder = (carried != null) ? carried.carried().get(declared) : null;
 			if (holder == null) {
@@ -161,12 +188,14 @@ public final class ReferenceAwareStepSpecRepository implements StepSpecRepositor
 			if (!attached.contains(holder)) {
 				attached.add(holder);
 				containers.add(holder.getName());
+				forms.add(declared + " " + carried.forms().get(declared));
 			}
 		}
 		if (containers.isEmpty()) {
 			return stepSpec;
 		}
 		this.attached.add(action.getName() + " -> " + containers);
+		this.formOffer.add(action.getName() + " forms " + forms);
 		this.scriptOffer.add(action.getName() + " " + callableScripts(attached));
 		return new ResolvedAction(namesContainers(action, containers), List.copyOf(attached));
 	}
