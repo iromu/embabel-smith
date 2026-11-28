@@ -66,6 +66,14 @@ public class RunCommand implements Callable<Integer> {
 					: JsonlTraceStore.defaultPath();
 			AgentSpecRunService.RunResult result = newService(traceFile).run(this.source, this.goal, this.input,
 					this.planner, this.trustTier);
+			// What the ingest noticed goes to stderr, ahead of the result: a run that
+			// offered
+			// nothing because a skill folder was refused looks like a run that was asked
+			// for nothing,
+			// and the goal's own output stays the only thing on stdout.
+			for (String note : result.notes()) {
+				System.err.println("[smith] " + note);
+			}
 			if (result.success()) {
 				System.out.println(result.output());
 				return 0;

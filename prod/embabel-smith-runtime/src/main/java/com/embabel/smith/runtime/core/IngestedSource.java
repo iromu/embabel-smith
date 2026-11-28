@@ -27,14 +27,29 @@ import com.embabel.smith.specsource.ResolvedSpecSource;
  * @param excluded the packs read from the source but not deployed, named and with the
  * goal each would have exported
  * @param agent the deployed agent holding all of the packs' goals
+ * @param report what the ingest noticed about the skills and references the packs carry,
+ * which a run prints alongside its result rather than leaving to a log
  * @author Ivan Rodriguez
  */
-public record IngestedSource(ResolvedSpecSource source, List<AgentSpec> packs, List<ExcludedPack> excluded,
-		Agent agent) {
+public record IngestedSource(ResolvedSpecSource source, List<AgentSpec> packs, List<ExcludedPack> excluded, Agent agent,
+		RunReport report) {
 
 	public IngestedSource {
 		packs = List.copyOf(packs);
 		excluded = List.copyOf(excluded);
+		report = (report != null) ? report : RunReport.none();
+	}
+
+	/**
+	 * An ingest with nothing to report: the shape a source whose packs carry no skills
+	 * takes, and the one a call site with no findings to pass uses.
+	 * @param source the resolved spec source the packs came from
+	 * @param packs the loaded agent specs
+	 * @param excluded the packs left out
+	 * @param agent the deployed agent
+	 */
+	public IngestedSource(ResolvedSpecSource source, List<AgentSpec> packs, List<ExcludedPack> excluded, Agent agent) {
+		this(source, packs, excluded, agent, RunReport.none());
 	}
 
 	/** The goal names exported by the ingested packs. */

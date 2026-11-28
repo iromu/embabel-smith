@@ -69,6 +69,16 @@
             <groupId>com.embabel.agent</groupId>
             <artifactId>embabel-agent-spec</artifactId>
         </dependency>
+        <!-- The skill loader the runtime stands a pack's skills on: a step's references
+             resolve against a Skills reference, and this module builds one per definition
+             from the skills/ folder the pack carries. Declared rather than inherited
+             because it changes nothing by itself — the jar ships no auto-configuration,
+             so a Skills object exists only where PackSkills constructs one, and a script
+             tool appears only when a script engine is switched on. -->
+        <dependency>
+            <groupId>com.embabel.agent</groupId>
+            <artifactId>embabel-agent-skills</artifactId>
+        </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>

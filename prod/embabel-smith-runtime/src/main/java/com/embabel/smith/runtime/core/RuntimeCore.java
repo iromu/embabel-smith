@@ -34,6 +34,7 @@ import com.embabel.plan.common.condition.ConditionDetermination;
 import com.embabel.plan.common.condition.ConditionStep;
 import com.embabel.plan.common.condition.ConditionWorldState;
 import com.embabel.smith.common.io.AgentSpecReader;
+import com.embabel.smith.common.model.ActionStepSpec;
 import com.embabel.smith.common.model.AgentSpec;
 import com.embabel.smith.specsource.ResolvedSpec;
 import com.embabel.smith.specsource.ResolvedSpecSource;
@@ -139,12 +140,62 @@ public class RuntimeCore {
 		}
 
 		String suffix = Long.toHexString(System.nanoTime());
+		Map<String, PackSkills> skillsByStep = skillsOf(packs, deployed);
+		ReferenceAwareStepSpecRepository steps = new ReferenceAwareStepSpecRepository(
+				new YmlStepSpecRepository(stepsDir.toString(), List.of()), skillsByStep);
 		StepSpecAgentScopeBuilder builder = new StepSpecAgentScopeBuilder("smith-spec-scope-" + suffix, this.platform,
-				new YmlStepSpecRepository(stepsDir.toString(), List.of()), types, List.of(), List.of());
+				steps, types, List.of(), List.of());
 		Agent agent = builder.deploy()
 			.createAgent("smith-spec-agent-" + suffix, "spec", "agent specs from " + source.origin().uri());
 		this.platform.deploy(agent);
-		return new IngestedSource(source, packs, excluded, agent);
+		// Read after the deploy: the scope builder is what asks the repository for its
+		// steps, so a declaration that resolved to nothing is only known once it has.
+		return new IngestedSource(source, packs, excluded, agent,
+				report(skillsByStep, steps.attached(), steps.unresolved()));
+	}
+
+	/**
+	 * The skills each step can be offered, keyed by step name so a declaration resolves
+	 * against the definition that wrote it and not against whatever else shares the
+	 * source.
+	 *
+	 * <p>
+	 * The key is the step's name because that is the only handle the step repository
+	 * offers back; a name written by two packs resolves to the first of them, which is
+	 * the same order the source lists its packs in.
+	 * @param packs the packs being deployed, in source order
+	 * @param deployed their directories, in the same order
+	 * @return step name to the skills of the definition that owns it
+	 */
+	private Map<String, PackSkills> skillsOf(List<AgentSpec> packs, List<ResolvedSpec> deployed) {
+		Map<String, PackSkills> byStep = new LinkedHashMap<>();
+		for (int i = 0; i < packs.size(); i++) {
+			AgentSpec pack = packs.get(i);
+			PackSkills skills = PackSkills.at(deployed.get(i).root(), pack.name());
+			for (ActionStepSpec step : pack.steps()) {
+				byStep.putIfAbsent(step.name(), skills);
+			}
+		}
+		return byStep;
+	}
+
+	/**
+	 * What the ingest saw: the skills it could not load, what it attached to each step,
+	 * the declarations that resolved to nothing, and the script state in force.
+	 * @param skillsByStep the per-step skill sets, whose notes name refused folders
+	 * @param attached what each step was attached to, as read from the wrapper
+	 * @param unresolved the declarations that resolved to nothing, as read from the
+	 * wrapper
+	 * @return the report to print with the run
+	 */
+	private RunReport report(Map<String, PackSkills> skillsByStep, List<String> attached, List<String> unresolved) {
+		List<String> lines = new ArrayList<>();
+		for (PackSkills skills : skillsByStep.values().stream().distinct().toList()) {
+			lines.addAll(skills.notes());
+		}
+		lines.addAll(attached);
+		lines.addAll(unresolved);
+		return new RunReport(lines);
 	}
 
 	/**

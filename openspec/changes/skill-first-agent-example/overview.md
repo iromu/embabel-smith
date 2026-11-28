@@ -184,7 +184,10 @@ agent-specs/arithmetic/
 │                                   toolGroups: [math]     <- no references, no addon, no property
 └── types/
 
-  smith run --source folder:agent-specs/arithmetic --trust-tier high --input "..."
+  smith run --source folder:agent-specs --goal arithmeticAnswered --trust-tier high --input "..."
+       |     (the source is the parent folder: FolderSpecSource reads the root's immediate
+       |      subdirectories and keeps those holding a manifest.yml, so a pack-named folder
+       |      resolves zero packs — as docs/07-runtime.md already states)
        |
        +-- default tier -> blocked before execution: STANDARD allows search, web, file. math is not one
        +-- high tier    -> the group resolves, because upstream's own mathToolGroup() bean is already
@@ -255,7 +258,9 @@ silent about all three: a dangling name (its `emit` resolves through a `map.get`
 that sanitizes to one tool prefix (a silent `Map.put` overwrite), and — the one that matters most — a step
 key the format does not implement, since `FAIL_ON_UNKNOWN_PROPERTIES` is disabled and a written safety wish
 would otherwise read as a configured control. `GoalSpec` has no references field at all, so a goal-level
-declaration is refused rather than dropped.
+declaration cannot reach the model in the first place: it is reported under its own issue code as a
+declaration that will be ignored, and the pack still validates — refusing it would fail this change's own
+spec, which states the case as inert rather than invalid (design D14).
 
 ## What guards a run, and where it is written
 

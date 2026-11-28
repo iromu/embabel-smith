@@ -6,6 +6,7 @@
 package com.embabel.smith.runtime;
 
 import java.nio.file.Path;
+import java.util.List;
 
 import com.embabel.agent.core.AgentPlatform;
 import com.embabel.smith.common.trace.TraceRecord;
@@ -123,7 +124,8 @@ public class AgentSpecRunService {
 		}
 
 		TraceRecord record = safeRecord(sourceUri, resolved, ingested, effectiveGoal, effectiveInput, tier, outcome);
-		return new RunResult(outcome.success(), outcome.output(), outcome.error(), record);
+		return new RunResult(outcome.success(), outcome.output(), outcome.error(), record,
+				(ingested != null) ? ingested.report().lines() : List.of());
 	}
 
 	/**
@@ -159,15 +161,35 @@ public class AgentSpecRunService {
 	}
 
 	/**
-	 * The outcome of a run: success, the goal output, the failure reason, and the emitted
-	 * trace.
+	 * The outcome of a run: success, the goal output, the failure reason, the emitted
+	 * trace, and what the ingest noticed about the packs it stood on.
 	 *
 	 * @param success whether the goal was achieved
 	 * @param output the goal output on success
 	 * @param error the failure reason
 	 * @param trace the emitted trace record
+	 * @param notes the lines the ingest has to state — refused skill folders, references
+	 * that resolved to nothing, the script state in force — which the CLI prints apart
+	 * from the goal's own output
 	 */
-	public record RunResult(boolean success, String output, String error, TraceRecord trace) {
+	public record RunResult(boolean success, String output, String error, TraceRecord trace, List<String> notes) {
+
+		public RunResult {
+			notes = List.copyOf(notes);
+		}
+
+		/**
+		 * A result with nothing for the ingest to add: the shape a caller that
+		 * synthesizes a result — a test double standing in for the service — has to hand
+		 * over.
+		 * @param success whether the goal was achieved
+		 * @param output the goal output on success
+		 * @param error the failure reason
+		 * @param trace the emitted trace record
+		 */
+		public RunResult(boolean success, String output, String error, TraceRecord trace) {
+			this(success, output, error, trace, List.of());
+		}
 	}
 
 }

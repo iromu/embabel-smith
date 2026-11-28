@@ -21,6 +21,45 @@ ingests every pack into one platform, selects the goal, and executes a GOAP plan
 - **Plan structure is deterministic.** The planner is not a model, so the same pack and goal produce
   the same step sequence every time. Only the action bodies vary, because those are model calls.
 
+## References and skills
+
+A step's `references:` entry names a skill the pack carries. `core/RuntimeCore` hands the scope
+builder a `core/ReferenceAwareStepSpecRepository` over the step repository, and that wrapper does two
+things nothing else in the deploy path can: the scope builder takes tool groups and tools but no
+references, so the context a step is emitted against would otherwise carry none, and upstream resolves
+a declared name against that list with a plain map lookup whose miss is silent.
+
+- **One container per definition.** `core/PackSkills` builds a `Skills` reference named
+  `<agent>-skills` from the definition's own `skills/`, and `shared-skills` from the `skills/` of its
+  **immediate parent** — the directory the definitions in a folder share. Ancestors higher up are
+  never consulted, because the parent is also the source root, so a stray `skills/` above it would
+  silently be global to every pack in the source.
+- **Own shadows shared.** A name the agent's own folder carries is served by that copy, and the run
+  names the folder that answered.
+- **The names are the wire.** Embabel prefixes every callable name with the sanitized reference name,
+  so a skill's activation tool reaches the model as `ask_skills_notes_activate_skill`, not as
+  `notes_activate_skill`. Skill text points at paths inside the folder rather than at tool names for
+  that reason. The names are pinned by test.
+- **Resolution is per definition.** A name carried only by a sibling definition, or by an unrelated
+  folder, does not resolve; it is reported as dangling rather than resolving through a neighbour.
+  Ahead of that, the pack validator refuses a step that declares a skill no folder its pack can reach
+  carries — naming the step, the declared name, and the names actually carried — so the pack is
+  dropped at the source and never reaches a run. The wrapper's dangling line is the backstop for a
+  path that bypasses validation, not the ordinary route.
+- **A reference never changes the plan.** It alters what a selected step's model call can reach, not
+  which steps the planner selects.
+
+What an ingest decided goes to **stderr**, ahead of the result, so the goal's own output stays the
+only thing on stdout: which step was attached to which container, every skill folder the loader
+refused (by path), every declared name that resolved to nothing (naming the step and the name), and
+the script state in force. A silent absence and a policy block look identical otherwise.
+
+Scripts are **off by default**: a pack whose skill ships a `scripts/` folder offers no script tool,
+and the run says so and names the switch — `smith.tools.scripts.engine` — rather than leaving the
+absence to be mistaken for a tier refusal. Installing `embabel-agent-skills` changes none of this:
+the jar ships no auto-configuration, so a `Skills` reference exists only where this module constructs
+one.
+
 ## Trust tiers
 
 `core/TrustTier` and `core/TrustTierPolicy` gate which **packs** may run. The check is per pack, over
