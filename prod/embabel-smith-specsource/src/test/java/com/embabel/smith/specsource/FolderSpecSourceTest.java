@@ -103,11 +103,7 @@ class FolderSpecSourceTest {
 	void theCheckedInCorpusIsDiscoveredOnlyOneLevelDeep() {
 		Path specs = repositoryAgentSpecs();
 
-		List<String> discovered = new FolderSpecSource("folder:" + specs, specs).resolve()
-			.packs()
-			.stream()
-			.map((pack) -> relativeTo(specs, pack.root()))
-			.toList();
+		List<String> discovered = discoveredUnder(specs);
 
 		assertThat(discovered).as("nothing a folder source finds is a definition the deeper scan misses")
 			.isSubsetOf(deepDefinitions(specs));
@@ -117,6 +113,43 @@ class FolderSpecSourceTest {
 			.doesNotContain("coding-agent/change", "skill-interpreter/plan");
 	}
 
+	/**
+	 * The other direction of the claim above, and the miss a reader hits first: a pack
+	 * pointed at instead of the folder that contains it. Only children are listed, so a
+	 * root that is itself a pack contributes nothing — and not because it failed
+	 * validation, which would at least name it, but because its own {@code manifest.yml}
+	 * is never read. The result is the empty set with a warning, not a failure; the
+	 * refusal a user of the CLI reads comes later, from the run that had nothing to
+	 * deploy, and {@code docs/07-runtime.md} states that message for {@code --source}.
+	 * Asserted against the repository's own {@code arithmetic} pack rather than a fixture
+	 * because that is the name the documented commands use, and the corpus's shape is the
+	 * reason the case is worth a test at all.
+	 * <p>
+	 * The last assertion is the control that makes the emptiness mean something: the same
+	 * pack is found when its parent is the root, so what is being denied is about where
+	 * the source looks rather than about the pack being broken.
+	 */
+	@Test
+	void aPackPointedAtRatherThanItsFolderResolvesToNothingWithoutAnError() {
+		Path specs = repositoryAgentSpecs();
+		Path pack = specs.resolve("arithmetic");
+
+		ResolvedSpecSource resolved = new FolderSpecSource("folder:" + pack, pack).resolve();
+
+		assertThat(resolved.packs()).as("a root that is itself a pack yields no candidate, so nothing deploys")
+			.isEmpty();
+		assertThat(resolved.warnings()).as("and the source says empty rather than throwing").hasSize(1);
+		assertThat(resolved.warnings().get(0))
+			.as("the empty-source warning, not a validation refusal — the"
+					+ " distinction that shows the pack was never examined")
+			.contains("no valid agent specs")
+			.doesNotContain("failed validation");
+		assertThat(discoveredUnder(specs))
+			.as("the control: one level up the same pack is found, so the"
+					+ " emptiness above is a fact about where the source looks")
+			.contains("arithmetic");
+	}
+
 	@Test
 	void missingRootFailsWithAnErrorNamingThePath() {
 		Path missing = root.resolve("does-not-exist");
@@ -124,6 +157,21 @@ class FolderSpecSourceTest {
 		assertThatThrownBy(() -> new FolderSpecSource("folder:" + missing, missing).resolve())
 			.isInstanceOf(SpecSourceException.class)
 			.hasMessageContaining(missing.toString());
+	}
+
+	/**
+	 * What a folder source rooted at a directory finds in it, named the way the corpus
+	 * names it. Used by both directions of the corpus claim so the two cannot disagree
+	 * about what "discovered" means.
+	 * @param root the directory to point the source at
+	 * @return the discovered pack directories, relative to {@code root}
+	 */
+	private static List<String> discoveredUnder(Path root) {
+		return new FolderSpecSource("folder:" + root, root).resolve()
+			.packs()
+			.stream()
+			.map((pack) -> relativeTo(root, pack.root()))
+			.toList();
 	}
 
 	/**

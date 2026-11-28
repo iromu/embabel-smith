@@ -24,6 +24,17 @@ import com.embabel.smith.common.validation.ValidationResult;
  * {@link AgentSpecValidator} structure validation to be included.
  *
  * <p>
+ * Being a library is the root's only role, so a directory that is itself a pack is not
+ * read as one: the root's own {@code manifest.yml} is never consulted, only its children
+ * are listed. A pack addressed directly rather than through the folder that contains it
+ * therefore contributes nothing and is not even named — the first way a documented run
+ * command comes up empty. The run built on the empty source is what refuses, with the
+ * message {@code docs/07-runtime.md} documents for {@code --source}; the runtime's own
+ * README states the habit — a source of the packs you mean to run. The
+ * {@code FolderSpecSourceTest} pins both directions of the reading: a pack is
+ * discoverable through the folder that contains it, and a pack pointed at directly is not
+ * discovered at all.
+ * <p>
  * Deeper nesting is not scanned, and nothing warns about what that skips. The
  * repository's own corpus exercises the limit: its examples are authored both ways, some
  * directly in {@code agent-specs/} and some one level inside a folder of definitions, so
