@@ -206,6 +206,85 @@ class PackReferencesTest {
 	}
 
 	@Test
+	void anEntryAskingToBeUnfoldedIsOfferedBehindTheFacadeWithoutAnyoneElseAsking() throws IOException {
+		Path packDir = pack("""
+				references:
+				  - name: docs
+				    kind: directory
+				    path: docs
+				  - name: notes
+				    kind: directory
+				    path: notes
+				    unfolding: true
+				""");
+
+		// Nothing is passed to at(), so the only thing that could hide a reference is the
+		// entry itself — which is what the field buys: the request travels with the pack
+		// rather than with whoever happens to be deploying it that run.
+		PackReferences refs = PackReferences.at(packDir, "survey");
+
+		assertThat(refs.forms()).containsEntry("notes", PackReferences.FACADE);
+		assertThat(refs.forms()).containsEntry("docs", PackReferences.DIRECT);
+		assertThat(listed(refs.carried().get("notes"))).as("one tool where the folder lists several")
+			.containsExactly("notes");
+		assertThat(listed(refs.carried().get("docs"))).hasSizeGreaterThan(1);
+	}
+
+	@Test
+	void thePackAndTheCallerAnswerOneQuestionAboutWhichReferencesToHide() throws IOException {
+		Path packDir = pack("""
+				references:
+				  - name: docs
+				    kind: directory
+				    path: docs
+				  - name: notes
+				    kind: directory
+				    path: notes
+				    unfolding: true
+				""");
+
+		// The caller names docs, the file names notes, and neither answer cancels the
+		// other: a request that expires with the run and a request written into the pack
+		// are the same request, so an entry asking is not a veto against the caller.
+		Map<String, String> forms = PackReferences.at(packDir, "survey", Set.of("docs")).forms();
+
+		assertThat(forms).containsEntry("docs", PackReferences.FACADE).containsEntry("notes", PackReferences.FACADE);
+	}
+
+	@Test
+	void anUnfoldingValueThatIsNotABooleanIsNamedAndReadAsOff() throws IOException {
+		PackReferences refs = PackReferences.at(pack("""
+				references:
+				  - name: docs
+				    kind: directory
+				    path: docs
+				    unfolding: "true"
+				"""), "survey");
+
+		assertThat(refs.forms()).as("a quoted switch is not a switch").containsEntry("docs", PackReferences.DIRECT);
+		assertThat(refs.notes())
+			.anyMatch((line) -> line.contains("unfolding: true") && line.contains("neither true nor false"));
+	}
+
+	@Test
+	void anEntryAskingToBeUnfoldedThatListsNoToolsIsSaidRatherThanDone() throws IOException {
+		PackReferences refs = PackReferences.at(pack("""
+				references:
+				  - name: house-style
+				    kind: brief
+				    path: briefs/style.md
+				    unfolding: true
+				"""), "survey");
+
+		// The same shape as the caller asking: a facade over a brief would list nothing
+		// at
+		// all, so the entry stays listed directly and the author is told why rather than
+		// finding the reference unreachable.
+		assertThat(refs.forms()).containsEntry("house-style", PackReferences.DIRECT);
+		assertThat(refs.notes()).anyMatch((line) -> line.contains("no tools to hide"));
+	}
+
+	@Test
 	void aKindWithNoRecipeIsRefusedAndNamedRatherThanBuiltByGuesswork() throws IOException {
 		PackReferences refs = PackReferences.at(pack("""
 				references:

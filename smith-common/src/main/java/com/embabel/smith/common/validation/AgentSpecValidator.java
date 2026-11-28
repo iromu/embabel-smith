@@ -100,6 +100,16 @@ public class AgentSpecValidator {
 	private static final Set<String> PATH_BACKED_KINDS = Set.of("skills", "directory", "document");
 
 	/**
+	 * Kinds that end up listing tools to a step. A {@code skills} folder lists its
+	 * activation tools and a {@code directory} its read tools; a {@code document}
+	 * contributes its content and a {@code brief} its text, and neither hands out a tool
+	 * for a facade to stand in place of. This is a different question from
+	 * {@link #PATH_BACKED_KINDS}, which asks only whether a path is needed — a document
+	 * needs one and lists nothing — so the two sets are not one set with a second name.
+	 */
+	private static final Set<String> TOOL_LISTING_KINDS = Set.of("skills", "directory");
+
+	/**
 	 * The keys an action-step file may carry: the components of {@link ActionStepSpec},
 	 * which is the model the writer emits.
 	 */
@@ -376,10 +386,10 @@ public class AgentSpecValidator {
 	 * are not skills — and checks what it declares. Each entry is a name, a kind and a
 	 * path, and the kinds are limited to the ones the runtime can construct through the
 	 * platform's own reference types, so neither a property nor this file can nominate a
-	 * class. The one switch an entry may add is {@code scripts: true}, accepted because
-	 * it names nothing beyond the folder the entry already gave — and refused on a kind
-	 * that hands out no script tools, since a declaration the runtime would quietly
-	 * ignore is worse than one it rejects.
+	 * class. An entry may add two switches, {@code scripts: true} and
+	 * {@code unfolding: true}, each accepted because it names nothing beyond what the
+	 * entry already gave the runtime — and each refused on a kind that cannot honour it,
+	 * since a declaration the runtime would quietly ignore is worse than one it rejects.
 	 * @param packDir the pack's directory
 	 * @param carriedSkills the skill names the pack already answers to, which count
 	 * towards a name being taken
@@ -448,6 +458,12 @@ public class AgentSpecValidator {
 						"REFERENCE_SCRIPTS_UNSUPPORTED", "reference '" + name + "' asks for scripts, which kind '"
 								+ kind + "' does not offer; only a skills folder hands out script tools",
 						REFERENCES_FILE));
+			}
+			if (Boolean.TRUE.equals(entry.get("unfolding")) && !TOOL_LISTING_KINDS.contains(kind)) {
+				issues.add(ValidationIssue.of("REFERENCE_UNFOLDING_UNSUPPORTED", "reference '" + name
+						+ "' asks for unfolding, which kind '" + kind
+						+ "' does not offer; a facade lists one tool in place of the tools a reference would list, and "
+						+ "this kind lists none", REFERENCES_FILE));
 			}
 
 			String prefix = toolPrefix(name);

@@ -134,6 +134,64 @@ class AgentSpecPackReferenceTest {
 		assertThat(issues.get(0).message()).contains("notes-dir").contains("directory").contains("scripts");
 	}
 
+	// --- the unfolding switch -----------------------------------------------
+
+	@Test
+	void acceptsUnfoldingOnAReferenceThatListsTools(@TempDir Path dir) throws Exception {
+		// The second switch a references.yml entry may add, and the same argument for it:
+		// it names no class and no property, only the form the reference the entry
+		// already
+		// gave the runtime is offered in. A directory lists file tools, so a facade
+		// standing in place of that listing is a thing the runtime can do.
+		write(packDeclaring(List.of("notes-dir")), dir);
+		Files.createDirectories(dir.resolve("notes"));
+		referencesYml(dir, "- name: notes-dir\n  kind: directory\n  path: notes\n  unfolding: true\n");
+
+		ValidationResult result = validator.validate(dir);
+
+		assertThat(apartFromRewriteNote(result)).isEmpty();
+		assertThat(result.issuesWithCode("REFERENCE_UNFOLDING_UNSUPPORTED")).isEmpty();
+		assertThat(result.isValid()).isTrue();
+	}
+
+	@Test
+	void refusesUnfoldingOnAReferenceThatListsNoTools(@TempDir Path dir) throws Exception {
+		// A brief contributes its text and lists nothing, so a facade over it would list
+		// nothing either and the step would be left unable to reach the reference it was
+		// given — the switch read as a control that was configured while doing nothing.
+		write(packDeclaring(List.of("run-brief")), dir);
+		referencesYml(dir, "- name: run-brief\n  kind: brief\n  unfolding: true\n");
+
+		ValidationResult result = validator.validate(dir);
+
+		assertThat(result.isValid()).isFalse();
+		List<ValidationIssue> issues = result.issuesWithCode("REFERENCE_UNFOLDING_UNSUPPORTED");
+		assertThat(issues).hasSize(1);
+		assertThat(issues.get(0).message()).contains("run-brief").contains("brief").contains("unfolding");
+	}
+
+	@Test
+	void refusesUnfoldingOnADocumentThatListsNoToolsEither(@TempDir Path dir) throws Exception {
+		// The kind the path check accepts and the tool check refuses, which is why they
+		// are
+		// two sets rather than one: a document needs a file to exist and still hands out
+		// no
+		// tool, so a facade over it would stand in place of a listing that never existed.
+		// Naming it here rather than leaving it to the runtime's note is the point — the
+		// entry reads as a control that was configured while doing nothing.
+		write(packDeclaring(List.of(DOC)), dir);
+		referencesYml(dir, "- name: " + DOC + "\n  kind: document\n  path: references/domain.md\n  unfolding: true\n");
+		Files.createDirectories(dir.resolve("references"));
+		Files.writeString(dir.resolve("references/domain.md"), "# The guide\n");
+
+		ValidationResult result = validator.validate(dir);
+
+		assertThat(result.isValid()).isFalse();
+		List<ValidationIssue> issues = result.issuesWithCode("REFERENCE_UNFOLDING_UNSUPPORTED");
+		assertThat(issues).hasSize(1);
+		assertThat(issues.get(0).message()).contains(DOC).contains("document").contains("unfolding");
+	}
+
 	// --- a backing path that is gone ------------------------------------------
 
 	@Test

@@ -73,7 +73,11 @@ import com.embabel.smith.common.io.Yaml;
  * the reference's whole surface and reveals the inner tools when it is called. It is off
  * by default — a direct listing is what a step normally wants, and the facade costs a
  * round-trip — and the switch exists for that timeout, not as a general preference about
- * how many tools a prompt should show.
+ * how many tools a prompt should show. A pack asks for it per entry as
+ * {@code unfolding: true} in {@code references.yml}, which is the durable form of the
+ * same request — a deployment flag is gone by the next run, the entry travels with the
+ * pack — and the names {@link #at(Path, String, Set)} takes are merged with it rather
+ * than overriding it.
  *
  * @author Ivan Rodriguez
  */
@@ -138,9 +142,11 @@ public final class PackReferences {
 	 * behind the unfolding facade.
 	 *
 	 * <p>
-	 * The default is direct, and naming a reference here is the only way to change it. A
-	 * name that matches a skills container changes the container, which is what the tools
-	 * are attached to, so every skill in it is offered behind the same facade.
+	 * The default is direct, and a reference leaves it either by being named here or by
+	 * asking in the pack's own {@code references.yml}; the two answers are merged rather
+	 * than weighed. A name that matches a skills container changes the container, which
+	 * is what the tools are attached to, so every skill in it is offered behind the same
+	 * facade.
 	 * @param packDir the definition's directory
 	 * @param agentName the definition's name, from its manifest
 	 * @param unfolded reference names to offer behind a facade, as the pack writes them;
@@ -177,6 +183,7 @@ public final class PackReferences {
 		Map<String, LlmReference> carried = new LinkedHashMap<>(skills.carried());
 		Map<String, String> owners = new LinkedHashMap<>();
 		Set<String> scripted = new LinkedHashSet<>();
+		Set<String> fileUnfolded = new LinkedHashSet<>();
 		carried.keySet().forEach((name) -> owners.put(prefixOf(name), "skill '" + name + "'"));
 		for (Declared declared : read(packDir, notes)) {
 			LlmReference value = construct(declared, packDir, notes, scriptEngine);
@@ -194,11 +201,19 @@ public final class PackReferences {
 			if (honoursScripts(declared)) {
 				scripted.add(declared.name());
 			}
+			if (declared.unfolding()) {
+				fileUnfolded.add(declared.name());
+			}
 		}
+		// The caller's set and the pack's own declarations are one question — which
+		// references to hide behind a facade — and the file is the durable answer to it:
+		// a deployment flag is gone by the next run, the entry travels with the pack.
+		Set<String> askedForFacade = new LinkedHashSet<>(unfolded);
+		askedForFacade.addAll(fileUnfolded);
 		Map<LlmReference, LlmReference> facaded = new IdentityHashMap<>();
 		Set<String> chosen = new LinkedHashSet<>();
 		for (Map.Entry<String, LlmReference> held : carried.entrySet()) {
-			if (!unfolded.contains(held.getKey()) || facaded.containsKey(held.getValue())) {
+			if (!askedForFacade.contains(held.getKey()) || facaded.containsKey(held.getValue())) {
 				continue;
 			}
 			chosen.add(held.getKey());
@@ -212,7 +227,7 @@ public final class PackReferences {
 			notes.add("reference '" + held.getValue().getName() + "' offered behind its unfolding facade: one tool "
 					+ "listed where " + listed + " would be listed directly");
 		}
-		for (String asked : new TreeSet<>(unfolded)) {
+		for (String asked : new TreeSet<>(askedForFacade)) {
 			if (!chosen.contains(asked) && !carried.containsKey(asked)) {
 				notes.add("unfolding asked for '" + asked + "', which this definition carries nothing under");
 			}
@@ -317,31 +332,35 @@ public final class PackReferences {
 				notes.add(REFERENCES_FILE + " lists a reference that is not a name, kind and path");
 				continue;
 			}
-			declared.add(new Declared(text(fields.get("name")), text(fields.get("kind")), text(fields.get("path")),
-					asksForScripts(fields.get("scripts"), text(fields.get("name")), notes)));
+			String name = text(fields.get("name"));
+			declared.add(new Declared(name, text(fields.get("kind")), text(fields.get("path")),
+					switchOf(fields.get("scripts"), "scripts", name, "scripts are not asked for", notes), switchOf(
+							fields.get("unfolding"), "unfolding", name, "the reference stays listed directly", notes)));
 		}
 		return declared;
 	}
 
 	/**
-	 * The optional {@code scripts} switch of an entry. Absent is false, which is the
-	 * whole default; a value that is neither true nor false is said rather than read as
-	 * false, because a quoted {@code "true"} is the one way to ask for scripts and
-	 * quietly not get them.
+	 * One of an entry's optional switches. Absent is false, which is the whole default
+	 * for both of them; a value that is neither true nor false is said rather than read
+	 * as false, because a quoted {@code "true"} is the one way to ask for a switch and
+	 * quietly not get it.
 	 * @param value the field as the file writes it, or {@code null} when absent
+	 * @param field the field's name, as the pack wrote it
 	 * @param name the entry's name, for the note
+	 * @param consequence what happens to the entry without the switch, for the note
 	 * @param notes where to record a value that is not a switch
-	 * @return whether this entry asks for the script-bearing shape of what it names
+	 * @return whether this entry asks for the switch
 	 */
-	private static boolean asksForScripts(Object value, String name, List<String> notes) {
+	private static boolean switchOf(Object value, String field, String name, String consequence, List<String> notes) {
 		if (value == null) {
 			return false;
 		}
-		if (value instanceof Boolean flag) {
-			return flag;
+		if (value instanceof Boolean switchValue) {
+			return switchValue;
 		}
-		notes.add("reference '" + name + "' declares scripts: " + value
-				+ ", which is neither true nor false, so scripts are not asked for");
+		notes.add("reference '" + name + "' declares " + field + ": " + value + ", which is neither true nor false, so "
+				+ consequence);
 		return false;
 	}
 
@@ -517,8 +536,10 @@ public final class PackReferences {
 	 * @param path what to build it from, relative to the pack
 	 * @param scripts whether the entry asked for the script-bearing shape of what it
 	 * names, which only a skills kind can mean
+	 * @param unfolding whether the entry asked to be offered behind the platform's
+	 * unfolding facade, which the caller's own names are merged with
 	 */
-	private record Declared(String name, String kind, String path, boolean scripts) {
+	private record Declared(String name, String kind, String path, boolean scripts, boolean unfolding) {
 	}
 
 }

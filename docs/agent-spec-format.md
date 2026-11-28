@@ -68,8 +68,8 @@ two drift apart.
 7. The manifest declares runtime defaults — `name` and `version` required, planner and model
    optional.
 8. A reference the pack declares in `references.yml` is of a kind the runtime can construct, its
-   backing path is present in the pack, its `scripts` switch appears only on a kind that hands out
-   script tools, and its name is still unique once the platform sanitizes it
+   backing path is present in the pack, its `scripts` and `unfolding` switches appear only on kinds
+   that hand out what they switch, and its name is still unique once the platform sanitizes it
    into a tool prefix. Two names collapsing to one prefix is a silent overwrite of one reference's
    tools by the other's, and a name resolving to nothing is a silent skip — neither is discoverable
    at run time.
@@ -150,6 +150,15 @@ script declares the same folder twice, once plain and once with the switch, unde
 under invariant 8 as long as the two names sanitize to different tool prefixes. Asking for scripts on
 a `directory`, `document` or `brief` is refused, because those kinds hand out no script tools and the
 switch would then read as a capability that was configured while doing nothing.
+
+An entry of a kind that lists tools may add `unfolding: true`, which asks for the reference to be
+offered behind the platform's unfolding facade — one tool listed in place of its whole surface, with
+the inner tools revealed when that tool is called. Absent means `false`, listed directly. The switch
+exists for Embabel's roughly sixty-second interaction ceiling, which counts the tool round-trips a
+step spends, so a wide tool surface listed beside a step's other work can spend that step's whole
+budget on the reference; it is not a general view about how many tools a prompt should show. Asking
+for it on a `brief` or `document` is refused, because those kinds contribute their text and hand out
+no tool for a facade to stand in place of.
 
 A `references:` key written in `goal.yml` is inert: upstream's `GoalSpec` carries no such field and a
 goal contributes no model call of its own, so the declaration is ignored and the pack still
