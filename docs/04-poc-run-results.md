@@ -786,6 +786,46 @@ is now built (POC 20)** — what remains is wiring it (and the other POCs) into 
   | 4 | Goal never returned / plan STUCK | Degenerate goal output (`void`, scalar, or input type) | `normalizeGoalOutput()` remaps goal + feeding action to `BackgroundMessage` |
 - **Environment:** LiteLLM proxy at `http://spark.local:4000/v1`, model `Qwen-instruct`
   (the `35b-a3b` backend was down; the proxy key is the machine's `OPENAI_API_KEY`).
+- **The shipped CLI reads files from a pack folder, run by hand (2026-11-28, 05:17 UTC): GREEN at
+  the high tier, refused at the default one.** One source, one working directory. The working
+  directory was a scratch tree outside the repository — six files across three directories
+  (`README.md`, `notes.txt`, `todo.md`, `notes/todo.txt`, `src/main.py`, `src/app.py`) — chosen so
+  that a live `change` step could not reach tracked files:
+
+  ```
+  java -jar prod/embabel-smith-runtime/target/embabel-smith-runtime-<version>-exec.jar \
+      run --source folder:$PWD/agent-specs/coding-agent --goal codebaseMapped \
+      [--trust-tier high] --input "Report which files exist in this working directory and what each one is for."
+  ```
+
+  With `--trust-tier high`: `goal codebaseMapped achieved in PT45.97S`, `readFile` called seven
+  times and `findFile` once, and the answer described each file by its actual bytes —
+  `src/main.py` as the entry script whose `main()` prints `hello`, `notes/todo.txt` as a single
+  todo line — together with its own account of the route: listing the root and the two
+  subdirectories, then opening `README.md` and `src/main.py` only. The `file` role came from the
+  addon rather than from a skill; the boot line says which is which —
+  `[smith-tools] coding addon: ours by default [file], ours switched on [none], ours disabled by
+  configuration [none], ours off by default [shell]`.
+
+  With nothing set at all the same command **refused before any step ran**: `Run blocked by trust
+  tier: pack 'coding-agent-verify' declares tool group(s) [shell] that require a higher trust tier
+  (granted: standard)`. The refusal names the definition, which is the shape the spec asks for, but
+  it refuses the run rather than routing around the definition — `codebaseMapped` is reachable from
+  `survey` alone and the planner did not take that route. Left open as a question against the
+  reader-at-the-default-tier path rather than written up as intended behaviour.
+
+  Both runs printed the attribution the reference-resolution report owes: `[smith] locate ->
+  [shared-skills]` and `[smith] patch -> [shared-skills, coding-agent-change-skills]`, so the
+  container that answered each declaration is named, and the definition-local one is named after
+  its definition. A misspelled reference reaches neither run: `AgentSpecSkillReferenceTest` refuses
+  a reference to a skill the pack does not carry and reports a declaration with no `skills/` folder
+  as dangling, so the typo is a validation finding and not a run-time discovery.
+
+  One caveat fixes the leg's shelf life: it holds only against an executable jar built after the
+  runtime pom moved the coding addon from `optional` to `provided` (2026-11-28). `spring-boot-maven-plugin`
+  leaves optional dependencies out of `BOOT-INF/lib`, so an earlier jar booted the CLI with no file
+  tools whatever, and the same command then "achieved" the goal while reporting that no files could
+  be read — a green outcome on top of a false claim about what was offered.
 
 ---
 

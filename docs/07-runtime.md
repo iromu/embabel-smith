@@ -221,6 +221,75 @@ a compile dependency of the studio and the a2a starter, and a repackaged jar's c
 `BOOT-INF/classes`, where a normal classpath cannot see them (see
 [14 — Containers](14-containers.md)).
 
+### Run paths for the shipped example
+
+`agent-specs/coding-agent` is run three ways rather than one, because a run can fail in three ways
+and a reader who only ever sees the succeeding one cannot tell them apart. Each is the whole command
+against the executable jar above, and each outcome was measured by hand on 2026-11-28.
+
+```
+# 1 — the reader, nothing configured at all. This is the default tool set doing its job.
+java -jar target/embabel-smith-runtime-<version>-exec.jar run \
+    --source folder:$SRC --goal codebaseMapped --input "Report which files exist…"
+
+# 2 — the changer, with the write switch named on the line, in a working directory it may edit.
+java -Dsmith.tools.coding.writes=true -jar target/…-exec.jar run \
+    --source folder:$SRC --goal codeChangeApplied --input "Append a line to notes/todo.txt"
+
+# 3 — the verifier, where the shell group is both switched on and tier-granted…
+java -Dsmith.tools.shell.enabled=true -jar target/…-exec.jar run \
+    --source folder:$SRC --goal buildVerified --trust-tier high --input "…"
+# …and the same command at the default tier, which refuses before executing anything.
+java -jar target/…-exec.jar run --source folder:$SRC --goal buildVerified --input "…"
+```
+
+Path 1 achieved `codebaseMapped` in PT3M11 with `readFile` called 42 times and no property set
+anywhere; the boot line for that run reads `ours by default [file] … decided by {file=no switch set
+(documented default)}`, which is the sentence that distinguishes it from paths 2 and 3. Path 2
+achieved `codeChangeApplied` in PT35.4S and the proof is the file, not the log: `notes/todo.txt`
+gained the requested line. Path 3 at the high tier achieved `buildVerified` in PT16.2S with
+`runCommand` called three times and the report reading `ours switched on [shell]`; the same command
+at the default tier printed `Run blocked by trust tier: pack 'coding-agent-verify' declares tool
+group(s) [shell] that require a higher trust tier (granted: standard)` and ran nothing.
+
+The tier refusal is **scope-wide, not plan-wide**: `RuntimeCore.checkTier` is handed every ingested
+pack, so a source that carries a shell-declaring definition refuses the run even when the requested
+goal is reachable without it. That is why path 1 is shown against a source holding the reader alone:
+pointed at the whole `coding-agent` folder, `--goal codebaseMapped` refuses at the default tier for a
+step it never needed. Whether the gate should instead consider only the planned steps is an open
+question, recorded against the example's task list rather than decided here.
+
+Three facts about `--source` that the commands above depend on and that no error message states.
+`folder:` resolves the **children** of the directory it is given, so pointing it at a pack rather
+than at a folder of packs yields `spec source '…' contains no agent specs` — `arithmetic` is
+addressable through its parent, `coding-agent`'s definitions through `coding-agent`. Shared skills
+are read from the source root's own `skills/` directory, so lifting one definition out of
+`coding-agent` without that directory leaves its `references: [repo-map]` unresolvable, and the
+result is the same empty-source line with nothing naming the pack or the name — the run report that
+names unresolved references applies to a deployed pack's steps and never gets the chance to fire for
+a pack that never arrived. And `--trust-tier` gates on tool-group role names only, so it cannot
+restrict a capability that registers no role.
+
+`agent-specs/arithmetic` shows the tier from the other side, since its single step declares `math`,
+which registers from upstream rather than from this project's switches. At the default tier it
+refuses before execution naming both: `pack 'arithmetic' declares tool group(s) [math] that require
+a higher trust tier (granted: standard)`. At `--trust-tier high` with no tool property set it
+achieved `arithmeticAnswered` in PT2.8S. No switch is involved in either half, and that is the one
+default this project inherits rather than chooses. On the offered names: `RunCommand` prints no
+`offered=` line — that surface exists in the runtime module's live test, not in the CLI — so what a
+CLI run shows instead is the calls themselves, `calling tool math` and then `multiply`, alongside
+the boot's `2 tool groups: file, math`. A first attempt at that leg reached the same two tools and
+then aborted on an empty-content model return, which is the endpoint's flake family rather than a
+wiring fault, and the clean run above is the one being cited.
+
+The third way a declaration fails is an operator switching a group off, and it is deliberately not
+shaped like a tier. With `-Dsmith.tools.file.enabled=false` at the high tier against the same
+example, the run printed **no** tier refusal at all; the boot line read `ours by default [none],
+ours switched on [none], ours disabled by configuration [file], … decided by {file=switch
+'smith.tools.file.enabled'}`, and the run's own answer said no file-listing tool was available. A
+reader can tell the three apart from the report alone: a tier refusal names the pack and the granted
+tier, a switch-off names the property that decided it, and a missing capability names neither.
+
 ## A2A endpoint
 
 The A2A surface — the starter library `prod/embabel-smith-a2a-starter`, hosted by
