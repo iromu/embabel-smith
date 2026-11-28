@@ -13,6 +13,7 @@ import java.util.Set;
 
 import com.embabel.agent.api.reference.LlmReference;
 import com.embabel.agent.core.Action;
+import com.embabel.agent.skills.script.ScriptTool;
 import com.embabel.agent.spec.model.ActionSpec;
 import com.embabel.agent.spec.model.PromptedActionSpec;
 import com.embabel.agent.spec.model.StepSpec;
@@ -58,6 +59,8 @@ public final class ReferenceAwareStepSpecRepository implements StepSpecRepositor
 	private final Set<String> unresolved = new LinkedHashSet<>();
 
 	private final Set<String> attached = new LinkedHashSet<>();
+
+	private final Set<String> scriptOffer = new LinkedHashSet<>();
 
 	/**
 	 * Wraps a repository so each emitted step also carries the references its own pack
@@ -119,6 +122,24 @@ public final class ReferenceAwareStepSpecRepository implements StepSpecRepositor
 	}
 
 	/**
+	 * Which step was handed a script it could call, as {@code step -> what it can call}.
+	 *
+	 * <p>
+	 * This is the per-step half of a statement the run otherwise makes only once, for the
+	 * whole pack: {@link PackSkills} says whether a definition carries scripts and
+	 * whether the selected engine offers them, which is true of the pack and not of any
+	 * step in it. Whether <em>this</em> step could reach a script is decided here,
+	 * because this is where a declaration becomes a reference handed to a step — and it
+	 * is decided by asking the attached reference what it offers, not by inferring it
+	 * from the engine, so a script the engine refused (see {@link PackSkills}) is not
+	 * counted as offered.
+	 * @return the per-step script offers, in the order the steps were read
+	 */
+	public List<String> scriptsOffered() {
+		return List.copyOf(this.scriptOffer);
+	}
+
+	/**
 	 * Rewrite one step to name the containers that hold its declarations.
 	 * @param stepSpec the step as the delegate returned it
 	 * @return the step to deploy, unchanged when it declares nothing and nothing resolved
@@ -146,7 +167,22 @@ public final class ReferenceAwareStepSpecRepository implements StepSpecRepositor
 			return stepSpec;
 		}
 		this.attached.add(action.getName() + " -> " + containers);
+		this.scriptOffer.add(action.getName() + " " + callableScripts(attached));
 		return new ResolvedAction(namesContainers(action, containers), List.copyOf(attached));
+	}
+
+	/**
+	 * What the attached references actually offer a step in the way of scripts, asked of
+	 * the references rather than inferred from the engine that was selected.
+	 * @param attached the references this step is being given
+	 * @return the phrase that completes the step's line
+	 */
+	private static String callableScripts(List<LlmReference> attached) {
+		List<String> offering = attached.stream()
+			.filter((reference) -> reference.tools().stream().anyMatch(ScriptTool.class::isInstance))
+			.map(LlmReference::getName)
+			.toList();
+		return offering.isEmpty() ? "offers no script tool" : "can call a script via " + offering;
 	}
 
 	/**

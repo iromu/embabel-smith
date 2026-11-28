@@ -9,6 +9,7 @@ import com.embabel.agent.core.AgentPlatform;
 import com.embabel.agent.skills.script.SkillScriptExecutionEngine;
 import com.embabel.smith.runtime.cli.RunCommand;
 import com.embabel.smith.runtime.cli.SmithCommand;
+import com.embabel.smith.runtime.core.ScriptCallLog;
 import picocli.CommandLine;
 
 import org.springframework.boot.WebApplicationType;
@@ -40,8 +41,11 @@ public class SmithRuntimeApplication {
 			// refresh. Nothing here means nothing was selected, which is `none`.
 			SkillScriptExecutionEngine scripts = context.getBeanProvider(SkillScriptExecutionEngine.class)
 				.getIfAvailable();
+			// The same boot's log, not a new one: the engine bean was handed this very
+			// object, so whatever the run's scripts wrote is what the command prints.
+			ScriptCallLog scriptCalls = context.getBeanProvider(ScriptCallLog.class).getIfAvailable(ScriptCallLog::new);
 			CommandLine smith = new CommandLine(new SmithCommand());
-			smith.addSubcommand(new RunCommand(platform, scripts));
+			smith.addSubcommand(new RunCommand(platform, scripts, scriptCalls));
 			exitCode = smith.execute(args);
 		}
 		catch (Exception ex) {

@@ -100,6 +100,14 @@ it was given, so a script the engine refused is not counted as offered. A pack c
 and a pack whose scripts are switched off are told differently: the first says none are carried and
 names no skill, the second names the skill and the switch.
 
+Two limits come with the engine rather than with this runtime, and they differ. A script that runs
+too long is **stopped and named as such** — the engine kills it at its limit and the step is told it
+timed out, not that it failed. A script that prints too much is not stopped at all: the platform
+returns the captured output whole, with no cap and no marker, so a runaway printer reaches the
+model entire. Putting a ceiling on that would be work authored here rather than a behaviour
+observed upstream, and it cannot be done at the engine seam, because the success a wrapper would
+have to hand back cannot be constructed by a Java caller.
+
 ## Trust tiers
 
 `core/TrustTier` and `core/TrustTierPolicy` gate which **packs** may run. The check is per pack, over

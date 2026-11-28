@@ -138,15 +138,55 @@ public class ScriptEngineConfig {
 	 * are read
 	 * @param containers the container probe, replaceable by a deployment that wants the
 	 * availability question answered differently
-	 * @return the selected engine
+	 * @param scriptCalls where each script call of this boot is written down
+	 * @return the selected engine, recording its calls
 	 * @throws IllegalStateException when the value names none of the four, or names a
 	 * container this host cannot run
 	 */
 	@Bean
 	public SkillScriptExecutionEngine skillScriptExecutionEngine(Environment environment,
-			ObjectProvider<ContainerAvailability> containers) {
-		return choose(choice(environment), scriptRoot(environment),
-				containers.getIfAvailable(() -> PLATFORM_CONTAINERS));
+			ObjectProvider<ContainerAvailability> containers, ScriptCallLog scriptCalls) {
+		return recorded(choose(choice(environment), scriptRoot(environment),
+				containers.getIfAvailable(() -> PLATFORM_CONTAINERS)), scriptCalls);
+	}
+
+	/**
+	 * The log one boot's script calls are recorded in.
+	 * @return an empty log, filled as the run calls scripts
+	 */
+	@Bean
+	public ScriptCallLog scriptCallLog() {
+		return new ScriptCallLog();
+	}
+
+	/**
+	 * The engine with its calls recorded, which is the engine the boot hands out.
+	 *
+	 * <p>
+	 * The no-op engine is left unwrapped: it claims no language, so it is offered no
+	 * script and there is no call to record. That keeps the default boot handing out the
+	 * platform's own object, identity intact, which is what lets a test say that
+	 * {@value #NONE} installs nothing.
+	 * @param engine the engine the selection installed
+	 * @param calls the log to write
+	 * @return the engine, wrapped unless it runs nothing at all
+	 */
+	static SkillScriptExecutionEngine recorded(SkillScriptExecutionEngine engine, ScriptCallLog calls) {
+		return (engine == NoOpExecutionEngine.INSTANCE) ? engine : new RecordingScriptExecutionEngine(engine, calls);
+	}
+
+	/**
+	 * The engine a boot really runs scripts in, past the recording wrapper.
+	 *
+	 * <p>
+	 * The claims worth seeing through a wrapper for are the ones about the engine itself
+	 * — which engine the environment disclosure in {@link PackSkills} is speaking for.
+	 * Asking the wrapper would name our class where the fact belongs to the platform's.
+	 * @param engine the engine a run was handed, possibly wrapped
+	 * @return the engine underneath
+	 */
+	public static SkillScriptExecutionEngine underlying(SkillScriptExecutionEngine engine) {
+		return (engine instanceof RecordingScriptExecutionEngine recording) ? recording.delegate() : engine;
 	}
 
 	/**

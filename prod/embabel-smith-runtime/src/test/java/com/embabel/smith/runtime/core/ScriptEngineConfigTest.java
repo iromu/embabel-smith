@@ -92,7 +92,10 @@ class ScriptEngineConfigTest {
 	void processIsThePlatformsOwnProcessEngine() {
 		choosing(ScriptEngineConfig.PROCESS)
 			.withBean(ScriptEngineConfig.ContainerAvailability.class, () -> containers(false, false))
-			.run((context) -> assertThat(context.getBean(SkillScriptExecutionEngine.class))
+			.run((context) -> assertThat(
+					ScriptEngineConfig.underlying(context.getBean(SkillScriptExecutionEngine.class)))
+				.as("the boot records its calls, which is a wrapper and not an engine, so the claim is about what is"
+						+ " underneath it")
 				.isInstanceOf(ProcessSkillScriptExecutionEngine.class));
 	}
 
@@ -100,7 +103,8 @@ class ScriptEngineConfigTest {
 	void dockerIsThePlatformsOwnDockerEngineWhereTheHostCanRunContainers() {
 		choosing(ScriptEngineConfig.DOCKER)
 			.withBean(ScriptEngineConfig.ContainerAvailability.class, () -> containers(true, false))
-			.run((context) -> assertThat(context.getBean(SkillScriptExecutionEngine.class))
+			.run((context) -> assertThat(
+					ScriptEngineConfig.underlying(context.getBean(SkillScriptExecutionEngine.class)))
 				.isInstanceOf(DockerSkillScriptExecutionEngine.class));
 	}
 
@@ -108,7 +112,8 @@ class ScriptEngineConfigTest {
 	void podmanIsThePlatformsOwnPodmanEngineWhereTheHostCanRunContainers() {
 		choosing(ScriptEngineConfig.PODMAN)
 			.withBean(ScriptEngineConfig.ContainerAvailability.class, () -> containers(false, true))
-			.run((context) -> assertThat(context.getBean(SkillScriptExecutionEngine.class))
+			.run((context) -> assertThat(
+					ScriptEngineConfig.underlying(context.getBean(SkillScriptExecutionEngine.class)))
 				.isInstanceOf(PodmanSkillScriptExecutionEngine.class));
 	}
 

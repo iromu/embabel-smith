@@ -11,6 +11,7 @@ import java.util.concurrent.Callable;
 import com.embabel.agent.core.AgentPlatform;
 import com.embabel.agent.skills.script.SkillScriptExecutionEngine;
 import com.embabel.smith.runtime.AgentSpecRunService;
+import com.embabel.smith.runtime.core.ScriptCallLog;
 import com.embabel.smith.runtime.core.TrustTier;
 import com.embabel.smith.runtime.trace.JsonlTraceStore;
 import picocli.CommandLine.Command;
@@ -49,6 +50,8 @@ public class RunCommand implements Callable<Integer> {
 
 	private final SkillScriptExecutionEngine scriptEngine;
 
+	private final ScriptCallLog scriptCalls;
+
 	public RunCommand(AgentPlatform platform) {
 		this(platform, null);
 	}
@@ -60,8 +63,21 @@ public class RunCommand implements Callable<Integer> {
 	 * or {@code null} for none
 	 */
 	public RunCommand(AgentPlatform platform, SkillScriptExecutionEngine scriptEngine) {
+		this(platform, scriptEngine, new ScriptCallLog());
+	}
+
+	/**
+	 * The command over a boot that also remembers its script calls.
+	 * @param platform the booted agent platform
+	 * @param scriptEngine the engine the switch selected at boot, or {@code null} for
+	 * none
+	 * @param scriptCalls the log the engine wrote its calls to, which is the same object
+	 * the boot handed the engine
+	 */
+	public RunCommand(AgentPlatform platform, SkillScriptExecutionEngine scriptEngine, ScriptCallLog scriptCalls) {
 		this.platform = platform;
 		this.scriptEngine = scriptEngine;
+		this.scriptCalls = scriptCalls;
 	}
 
 	/**
@@ -87,6 +103,12 @@ public class RunCommand implements Callable<Integer> {
 			// and the goal's own output stays the only thing on stdout.
 			for (String note : result.notes()) {
 				System.err.println("[smith] " + note);
+			}
+			// Script calls come after the ingest's lines because they are the one thing
+			// the ingest could not know: they are whatever the run left in the log the
+			// engine was writing to, and a run that called nothing adds nothing here.
+			for (String call : this.scriptCalls.lines()) {
+				System.err.println("[smith] " + call);
 			}
 			if (result.success()) {
 				System.out.println(result.output());

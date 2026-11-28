@@ -6,14 +6,17 @@
 package com.embabel.smith.runtime.core;
 
 import java.io.IOException;
+import java.lang.reflect.Constructor;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 
 import com.embabel.agent.api.tool.Tool;
 import com.embabel.agent.skills.Skills;
 import com.embabel.agent.skills.script.ProcessSkillScriptExecutionEngine;
+import com.embabel.agent.skills.script.SkillScriptExecutionEngine;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -41,13 +44,18 @@ import static org.assertj.core.api.Assertions.assertThat;
  * path outside the root arrives as an {@code Error} naming the path it refused and the
  * root it refused against; the root it names is the per-call staging directory the
  * platform stages artifacts into, not the run root the engine was confined to, and the
- * case says so rather than implying a confinement the platform does not claim. Two of the
- * spec's outcomes are deliberately not here. A script that prints too much is <i>not</i>
+ * case says so rather than implying a confinement the platform does not claim. One of the
+ * spec's outcomes is deliberately not here. A script that prints too much is <i>not</i>
  * truncated: measured against this platform version, megabytes of standard output are
  * returned whole, with no cap and no marker, so truncation-with-the-truncation-stated
- * needs a wrapper of our own. And a timeout is not exercised: the platform's execution
- * timeout is a constant thirty seconds with no knob to shorten it, so the case would add
- * that wait to every run of the suite for an outcome already measured by hand.
+ * needs a wrapper of our own. A timeout <i>is</i> here, by shortening the engine's own
+ * limit rather than waiting out its default: the limit is a constructor parameter, but
+ * the leading {@code Duration} makes the deeper overloads synthetic — the platform says
+ * so in its own comment on {@code confinedTo} — so the engine is reached by reflection.
+ * What the engine makes of the number it is handed is not asserted, only that it stops
+ * well inside the script's own twenty-second sleep; the alternative was a script that
+ * sleeps past the thirty-second default, which would add that wait to every run of the
+ * suite.
  *
  * <p>
  * <b>The name is aimable as built, and traceable as offered.</b> The callable is
@@ -106,6 +114,30 @@ class ScriptExecutionTest {
 	}
 
 	@Test
+	void aScriptThatOutlivesTheEnginesLimitIsStoppedAndSaysItTimedOut() throws IOException {
+		Path pack = scriptedPack();
+		script(this.tmp.resolve("pack/skills/counter/scripts"), "slow.sh", "sleep 20\necho never\n");
+		ScriptCallLog calls = new ScriptCallLog();
+		Tool slow = tool(
+				skillsOf(pack, new RecordingScriptExecutionEngine(engineTimingOutAfter(Duration.ofSeconds(1)), calls)),
+				"counter_slow");
+
+		long started = System.nanoTime();
+		Tool.Result answer = slow.call(CALL_WITH_NOTHING);
+		long secondsRun = Duration.ofNanos(System.nanoTime() - started).toSeconds();
+
+		assertThat(answer).as("a stopped script is an error the step survives, not a step that failed")
+			.isInstanceOf(Tool.Result.Error.class);
+		assertThat(((Tool.Result.Error) answer).getMessage()).as("and the error says the reason was the limit")
+			.contains("timed out");
+		assertThat(secondsRun).as("it was stopped rather than run out: the script sleeps twenty seconds")
+			.isLessThan(10);
+		assertThat(calls.lines()).as("the call record says the same thing, so a timeout is not a plain exit code")
+			.singleElement()
+			.satisfies((line) -> assertThat(line).contains("counter_slow").contains("timed out"));
+	}
+
+	@Test
 	void theCallableIsNamedFromTheScriptFileWithoutSanitization() throws IOException {
 		Skills skills = skillsOf(scriptedPack());
 
@@ -128,9 +160,39 @@ class ScriptExecutionTest {
 	 * @return the skills reference its steps would be given
 	 */
 	private Skills skillsOf(Path pack) {
-		PackSkills carried = PackSkills.at(pack, "exec",
-				ProcessSkillScriptExecutionEngine.confinedTo(this.tmp.toString()));
+		return skillsOf(pack, ProcessSkillScriptExecutionEngine.confinedTo(this.tmp.toString()));
+	}
+
+	/**
+	 * Read the staged pack with a given engine, which is how a run reads it.
+	 * @param pack the definition's directory
+	 * @param engine the engine the boot selected
+	 * @return the skills reference its steps would be given
+	 */
+	private static Skills skillsOf(Path pack, SkillScriptExecutionEngine engine) {
+		PackSkills carried = PackSkills.at(pack, "exec", engine);
 		return (Skills) carried.carried().values().iterator().next();
+	}
+
+	/**
+	 * The process engine with a shortened execution limit. The limit is a constructor
+	 * parameter, but the leading {@code Duration} value-class argument makes the deeper
+	 * overloads synthetic — {@code confinedTo}'s own comment says a Java caller cannot
+	 * reach them — so the one-argument form is asked for by reflection. Nothing else is
+	 * changed: languages, interpreters and staging stay at their defaults.
+	 * @param timeout how long a script may run before the engine kills it
+	 * @return an engine that stops scripts after that long
+	 */
+	private static SkillScriptExecutionEngine engineTimingOutAfter(Duration timeout) {
+		try {
+			Constructor<?> limit = ProcessSkillScriptExecutionEngine.class.getDeclaredConstructor(long.class);
+			limit.setAccessible(true);
+			return (ProcessSkillScriptExecutionEngine) limit.newInstance(timeout.toNanos());
+		}
+		catch (ReflectiveOperationException ex) {
+			throw new IllegalStateException("the engine's timeout is no longer reachable the way this test reads "
+					+ "it, so the timeout case needs the thirty-second default instead", ex);
+		}
 	}
 
 	/**
