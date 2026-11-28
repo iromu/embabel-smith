@@ -594,3 +594,11 @@ that is what the report line is for.
   mutation-checking the wording, per the 4.5 lineage's warning about name-matched absence assertions.
   `RuntimeCore` lines for 9.5, 8.1's posture print and 8.3's `ProcessOptions` belong to the interpreter now
   that the 7.7 window (`f4b1b59`) is closed.
+- **9.5's step-level clause, ruled.** The gap is data, not assertion: `RuntimeCore:138` records an excluded
+  pack as name-plus-goal only, so a retired producer of an intermediate type falls through to the
+  "unmet precondition(s)" sentence at `:453-456`, which blames the run's *input* — the wrong-place reader
+  send the box exists to close. Both lines (`:138` recording produced-type names into `ExcludedPack`, the
+  `:453-456` attribution branch) are the interpreter's, under one constraint: the input-blame sentence
+  stays intact for the genuinely-absent case — an additive branch, not a reword — with the goal-level
+  message's cross-module prefix contract (`Detector.LIFECYCLE_BLOCK_PREFIX`) untouched. 6.6's live leg is a
+  standing GO; no further permission is needed for anything in this paragraph or the last.
