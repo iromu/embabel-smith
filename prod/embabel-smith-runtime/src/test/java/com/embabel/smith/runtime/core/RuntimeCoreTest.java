@@ -16,8 +16,11 @@ import com.embabel.smith.common.model.AgentSpec;
 import com.embabel.smith.runtime.TestPacks;
 import com.embabel.smith.specsource.ResolvedSpecSource;
 import com.embabel.smith.specsource.SpecSource;
+import com.embabel.smith.tools.coding.CodingToolsBootReport;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -371,7 +374,7 @@ class RuntimeCoreTest {
 	}
 
 	@Test
-	void aRoleSpelledWronglyIsNamedByTheResolverRatherThanByTheReport(@TempDir Path tmp) throws Exception {
+	void aRoleSpelledWronglyIsNamedByTheRunAsWellAsByTheResolver(@TempDir Path tmp) throws Exception {
 		IngestedSource ingested = core().ingest(rolePack(tmp, MISSPELLED_ROLE));
 
 		// The declaration is a pass-through. Nothing reads a tool-group name before the
@@ -380,43 +383,130 @@ class RuntimeCoreTest {
 		assertThat(ingested.goalNames()).as("the pack deploys").contains("roleDone");
 		assertThat(roles(ingested)).as("with the misspelling intact on the deployed action").contains(MISSPELLED_ROLE);
 
-		// The naming the design notes attribute to the run lives one level down, in the
-		// answer the platform gives when the step asks. It is a real answer and it names
-		// the role, which is why a misspelling is findable — from the resolver, not from
-		// anything the ingest prints.
+		// The platform's own answer is unchanged by anything here: a null group whose
+		// failure message names the role. It is what a step discovers when it runs, and
+		// the reason a misspelling is findable at all.
 		ToolGroupResolution resolution = resolve(MISSPELLED_ROLE);
 		assertThat(resolution.getResolvedToolGroup()).as("nothing answers the misspelling").isNull();
 		assertThat(resolution.getFailureMessage()).as("and the answer says so, by name").contains(MISSPELLED_ROLE);
 
-		// The ingest has lines to print for this pack — the skill it carries is there to
-		// guarantee that — so what the report does not say is about roles rather than
-		// about a report that never said anything at all.
+		// The delta's first case: the RUN names it too, rather than leaving the naming to
+		// an answer nobody prints. The skill folder guarantees the report is not empty
+		// for
+		// other reasons, so a line naming the role is the seam speaking, not noise.
 		assertThat(ingested.report().lines()).as("the report is not empty").isNotEmpty();
-		assertThat(ingested.report().lines()).as("and no line of it names the role that resolved to nothing")
-			.noneMatch((line) -> line.contains(MISSPELLED_ROLE));
+		assertThat(ingested.report().lines()).as("and one line of it names the role that resolved to nothing")
+			.anyMatch((line) -> line.contains(MISSPELLED_ROLE) && line.contains("registered nothing from"));
 	}
 
 	@Test
-	void aResolvedRoleIsReportedAsNoFailureAndTheTwoSpellingsReadAlike(@TempDir Path resolvesDir,
+	void aResolvedRoleIsReportedAsNoFailureAndTheMisspellingIsTheOneNamed(@TempDir Path resolvesDir,
 			@TempDir Path missesDir) throws Exception {
 		IngestedSource resolved = core().ingest(rolePack(resolvesDir, "file"));
 		IngestedSource spelledWrong = core().ingest(rolePack(missesDir, MISSPELLED_ROLE));
 
 		// The resolver is alive here and the two declarations genuinely differ at it, so
-		// the equality below is about the report rather than about a dead resolver.
+		// what the reports say about them is about the reports rather than a dead
+		// resolver.
 		assertThat(resolve("math").getResolvedToolGroup()).as("upstream's own role resolves here").isNotNull();
 		assertThat(resolve("file").getResolvedToolGroup()).as("and so does the addon's").isNotNull();
 		assertThat(resolve(MISSPELLED_ROLE).getResolvedToolGroup()).isNull();
 
-		// What a step was offered, and whether a model called any of it, is settled when
-		// the step runs. A role that resolved reports no failure at ingest, which is the
-		// delta's second case: an ignored group must not read as a broken one.
+		// The delta's second case: a role that resolved and was offered is not named as a
+		// failure anywhere, so an empty tool loop from a model that simply did not use
+		// the
+		// tool cannot read as a resolution failure.
 		assertThat(resolved.report().lines()).as("a resolved role is not named as a failure anywhere")
-			.noneMatch((line) -> line.contains("file"));
-		assertThat(resolved.report().lines())
-			.as("and the report reads the same whichever way the declaration was spelled, which is the gap the "
-					+ "delta's first case is about: a role that resolved to nothing is not named here either")
-			.isEqualTo(spelledWrong.report().lines());
+			.noneMatch((line) -> line.contains("file") && line.contains("registered nothing"));
+
+		// And the two reports no longer read alike, which is the whole point of the run
+		// line: the misspelling is named and the resolved declaration is silent.
+		assertThat(spelledWrong.report().lines()).anyMatch((line) -> line.contains(MISSPELLED_ROLE));
+		assertThat(resolved.report().lines()).noneMatch((line) -> line.contains(MISSPELLED_ROLE));
+	}
+
+	@Test
+	void anUnresolvedRoleAndATierDenialAreTwoDifferentSentences(@TempDir Path tmp) throws Exception {
+		IngestedSource ingested = core().ingest(rolePack(tmp, MISSPELLED_ROLE, "shell"));
+
+		// One pack, two failures of the same kind of declaration: a role nothing answers,
+		// and a role that answers but the granted tier will not run. They arrive on
+		// different lines and in different words, because the fixes differ — one is a
+		// typo or a group nobody registers, the other is a tier the operator chose.
+		assertThat(ingested.report().lines()).anyMatch((line) -> line.contains(MISSPELLED_ROLE));
+		assertThat(ingested.report().lines()).as("the ingest line says nothing about tiers")
+			.noneMatch((line) -> line.contains("trust tier"));
+
+		assertThatThrownBy(() -> core().run(ingested, ingested.goalNames().get(0), "answer", null, TrustTier.STANDARD))
+			.isInstanceOf(TrustTierBlockedException.class)
+			.hasMessageContaining("Run blocked by trust tier")
+			.hasMessageContaining("shell");
+	}
+
+	/**
+	 * The boot with upstream's own includes map also claiming {@code file} — the case
+	 * that keeps the run's new line from firing on a role that genuinely resolves. This
+	 * project's addon shadows the includes-built group, so a step declaring {@code file}
+	 * is answered; a report that compared declarations against a list of expected names,
+	 * rather than against what the resolver answers with, would call it unresolved.
+	 */
+	@SpringBootTest(properties = { "OPENAI_CUSTOM_API_KEY=test", "OPENAI_CUSTOM_MODELS=test-model",
+			"embabel.models.default-llm=test-model", "embabel.agent.platform.tools.includes.file.tools=anything",
+			"embabel.agent.platform.action-qos.default.max-attempts=1" })
+	@Nested
+	@DisplayName("with upstream's includes map also claiming file")
+	class UpstreamAlsoClaimsFile {
+
+		@Autowired
+		private AgentPlatform shadowed;
+
+		@Test
+		void theShadowedRoleIsNotReportedAsUnresolved(@TempDir Path tmp) throws Exception {
+			assertThat(this.shadowed.getToolGroupResolver()
+				.resolveToolGroup(new ToolGroupRequirement("file", Set.of(), null))
+				.getResolvedToolGroup()).as("the role resolves, through the shadowing group").isNotNull();
+
+			IngestedSource ingested = new RuntimeCore(this.shadowed).ingest(rolePack(tmp, "file"));
+
+			assertThat(ingested.report().lines()).as("so the run does not call it a role that registered nothing")
+				.noneMatch((line) -> line.contains("registered nothing"));
+		}
+
+	}
+
+	/**
+	 * The boot with the {@code file} group switched off by the operator, which is the
+	 * third way a declaration fails and is not the same finding as a name nothing
+	 * answers.
+	 */
+	@SpringBootTest(properties = { "OPENAI_CUSTOM_API_KEY=test", "OPENAI_CUSTOM_MODELS=test-model",
+			"embabel.models.default-llm=test-model", "smith.tools.file.enabled=false",
+			"embabel.agent.platform.action-qos.default.max-attempts=1" })
+	@Nested
+	@DisplayName("with the file group switched off")
+	class FileGroupSwitchedOff {
+
+		@Autowired
+		private AgentPlatform switched;
+
+		@Autowired
+		private CodingToolsBootReport boot;
+
+		@Test
+		void theRunNamesTheGapAndTheAddonNamesTheDecision(@TempDir Path tmp) throws Exception {
+			IngestedSource ingested = new RuntimeCore(this.switched).ingest(rolePack(tmp, "file"));
+
+			// What the runtime is entitled to say, and no more: the name is there and
+			// nothing answers it. It does not claim a typo it cannot see.
+			assertThat(ingested.report().lines())
+				.anyMatch((line) -> line.contains("file") && line.contains("registered nothing from"));
+
+			// Which is why the switch's own account has to be on the same run: the addon
+			// owns the property, so the sentence that says an operator decided this is
+			// its boot line rather than the ingest's.
+			assertThat(this.boot.registeredNothing()).contains("file: disabled by configuration");
+		}
+
 	}
 
 	/**
@@ -425,10 +515,10 @@ class RuntimeCoreTest {
 	 * whatever the role says. The skill is the control: without it, a report that named
 	 * no role would be indistinguishable from a report that said nothing.
 	 * @param tmp the directory that becomes the folder source
-	 * @param role the single role the first step declares
+	 * @param roles the roles the first step declares, one or more
 	 * @return the resolved source, ready to ingest
 	 */
-	private ResolvedSpecSource rolePack(Path tmp, String role) throws IOException {
+	private ResolvedSpecSource rolePack(Path tmp, String... roles) throws IOException {
 		Path pack = Files.createDirectories(tmp.resolve("roles"));
 		Files.writeString(pack.resolve("manifest.yml"), "name: roles\nversion: 0.1.0\n");
 		Files.createDirectories(pack.resolve("types"));
@@ -451,7 +541,7 @@ class RuntimeCoreTest {
 				  - %s
 				prompt: |
 				  Use what you were given. {{userInput.content}}
-				""".formatted(role));
+				""".formatted(String.join("\n  - ", roles)));
 		Files.writeString(pack.resolve("steps/undeclared.yml"), """
 				stepType: action
 				name: undeclared

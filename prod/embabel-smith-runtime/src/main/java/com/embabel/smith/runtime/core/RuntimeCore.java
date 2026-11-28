@@ -26,6 +26,7 @@ import com.embabel.agent.core.DynamicType;
 import com.embabel.agent.core.Goal;
 import com.embabel.agent.core.JvmType;
 import com.embabel.agent.core.ProcessOptions;
+import com.embabel.agent.core.ToolGroupDescription;
 import com.embabel.agent.domain.io.UserInput;
 import com.embabel.agent.skills.script.SkillScriptExecutionEngine;
 import com.embabel.agent.spec.StepSpecAgentScopeBuilder;
@@ -176,8 +177,8 @@ public class RuntimeCore {
 		this.platform.deploy(agent);
 		// Read after the deploy: the scope builder is what asks the repository for its
 		// steps, so a declaration that resolved to nothing is only known once it has.
-		return new IngestedSource(source, packs, excluded, agent,
-				report(source.warnings(), referencesByStep, steps.attached(), steps.unresolved()));
+		return new IngestedSource(source, packs, excluded, agent, report(source.warnings(), referencesByStep,
+				steps.attached(), steps.unresolved(), steps.scriptsOffered(), unresolvedRoles(packs)));
 	}
 
 	/**
@@ -226,17 +227,72 @@ public class RuntimeCore {
 	 * @param attached what each step was attached to, as read from the wrapper
 	 * @param unresolved the declarations that resolved to nothing, as read from the
 	 * wrapper
+	 * @param scriptOffer which step was handed a script it could call, as read from the
+	 * wrapper, which is the per-step half of a statement the pack-level line makes only
+	 * once
+	 * @param unresolvedRoles the tool-group roles a step declares that this platform
+	 * answers with nothing, stated per declaring step
 	 * @return the report to print with the run
 	 */
 	private RunReport report(List<String> dropped, Map<String, PackReferences> referencesByStep, List<String> attached,
-			List<String> unresolved) {
+			List<String> unresolved, List<String> scriptOffer, List<String> unresolvedRoles) {
 		List<String> lines = new ArrayList<>(dropped);
 		for (PackReferences references : referencesByStep.values().stream().distinct().toList()) {
 			lines.addAll(references.notes());
 		}
 		lines.addAll(attached);
+		lines.addAll(scriptOffer);
 		lines.addAll(unresolved);
+		lines.addAll(unresolvedRoles);
 		return new RunReport(lines);
+	}
+
+	/**
+	 * The roles a step declares that nothing answers on this platform.
+	 *
+	 * <p>
+	 * <b>Why the run has to say it.</b> A declared role is a pass-through: nothing reads
+	 * the name before the prompt asks the resolver for it, and a name nothing answers
+	 * leaves the step with an empty tool loop — which looks exactly like a model that
+	 * chose not to use a tool, and the two call for different fixes. The addon's boot
+	 * line accounts for the roles that addon owns; a name that is nobody's, a typo among
+	 * them, is in no addon's account, so this is the line that names it.
+	 *
+	 * <p>
+	 * <b>Computed against what resolves, not against a list of names.</b> The comparison
+	 * is the resolver's own {@code availableToolGroups()}, so a role this project's addon
+	 * shadows — {@code file}, which upstream also builds from its includes map — reads as
+	 * resolving, because it does. The reason is the addon's phrasing,
+	 * {@code role: reason}, rather than a new one; what a switch took away is stated by
+	 * the addon's boot line, which knows the property that decided it, and this line says
+	 * what it knows: nothing answers the name.
+	 * @param packs the packs being deployed
+	 * @return one line per step declaring a role nothing answers, in source order
+	 */
+	private List<String> unresolvedRoles(List<AgentSpec> packs) {
+		List<String> available = this.platform.getToolGroupResolver()
+			.availableToolGroups()
+			.stream()
+			.map(ToolGroupDescription::getRole)
+			.toList();
+		List<String> lines = new ArrayList<>();
+		for (AgentSpec pack : packs) {
+			for (ActionStepSpec step : pack.steps()) {
+				List<String> unanswered = step.toolGroups()
+					.stream()
+					.filter((role) -> !available.contains(role))
+					.toList();
+				if (!unanswered.isEmpty()) {
+					String line = "step '" + step.name() + "' declares " + unanswered + ", registered nothing from "
+							+ unanswered.stream().map((role) -> role + ": no tool group answers the role").toList()
+							+ "; the roles this platform resolves are " + available;
+					if (!lines.contains(line)) {
+						lines.add(line);
+					}
+				}
+			}
+		}
+		return lines;
 	}
 
 	/**

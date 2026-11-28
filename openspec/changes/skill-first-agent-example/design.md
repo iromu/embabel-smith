@@ -491,18 +491,23 @@ and changing it is a stated decision, not a side effect.
   a deploy test asserts a declared reference actually reaches a `PromptRunner.withReference`-shaped
   offer; if a bump changes the shape the test fails at the wrapper, not inside a live run.
 - **A reference that resolves to nothing is invisible** → validation refuses a dangling name, and the run
-  reports the reference names it could not serve. The report is a reference report — what a step declared as
-  a role does not appear in it, which is the asymmetry the next bullet states as a gap rather than as parity.
+  reports the reference names it could not serve. The report is no longer only a reference report — what a
+  step declared as a role is stated there too, which is the asymmetry the next bullet used to call a gap.
 - **Three states read as one** (registered by default, switched, tier-allowed) → the boot report prints the
   state it acted on for each role, and a disabled group is named as disabled rather than unknown, so the
   silence that once stood for "nothing registered" now has three different sentences to say. A tier refusal
-  already names the pack and the role it refused. **Corrected as box 3.16 closed it: an unresolvable role is
-  not named by the run.** That claim was measured and does not hold — a declared role name is a pass-through
-  that reaches the platform's resolver only when the step prompts, and the run report carries skill notes
-  and reference outcomes. The naming does exist one level down, in the resolver's failure message, which says
-  the role; `RuntimeCoreTest` pins both halves, including that a role which resolved reports no failure
-  either. So the delta's "an unresolved declaration is visible" is met by the resolver and not yet by the
-  report, and closing it in the report is a runtime change rather than a test.
+  already names the pack and the role it refused. **Closed as box 3.16 landed it: an unresolvable role is
+  named by the run.** The claim this bullet first carried — that the runtime already named it — was measured
+  and did not hold when it was written: a declared role name is a pass-through that reaches the platform's
+  resolver only when the step prompts, and the run report carried skill notes and reference outcomes and
+  nothing about roles. It holds now by construction rather than by assertion: `RuntimeCore.unresolvedRoles`
+  compares each step's declared roles against the resolver's own `availableToolGroups()` and states the gap
+  per declaring step in the addon's `role: reason` shape, so a name nobody registers is named by the run and
+  not only by the resolver's failure message one level down. A role that resolved reports no failure either,
+  and a role this project's addon shadows is not called unresolved, because the comparison is against what
+  answers rather than against a list of expected names. What the runtime cannot see is *why* nothing answers:
+  a group an operator switched off is indistinguishable from a typo at the resolver, so the reason stays the
+  addon's boot line's, which names the property that decided it.
 - **Registering `shell` turns a declaration into command execution** → the tier is unchanged and already
   refuses `shell` at `STANDARD`; the pinned role test plus the existing `aHighTrustStepIsBlockedUnderThe
   StandardTier` case are the guards, and the default enable state is off.

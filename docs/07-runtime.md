@@ -61,7 +61,12 @@ What an ingest decided goes to **stderr**, ahead of the result, so the goal's ow
 only thing on stdout: which step was attached to which container, every skill folder the loader
 refused (by path), every `references.yml` entry it declined to construct (by name, and naming the
 kind it has no recipe for), every declared name that resolved to nothing (naming the step and the
-name), and the script state in force. A silent absence and a policy block look identical otherwise.
+name), every tool-group role a step declares that no tool group on this platform answers (naming the
+step, the role, and the roles that do resolve, in the addon's `role: reason` shape), and the script
+state in force. A silent absence and a policy block look identical otherwise. A role nobody registers
+and a role an operator switched off look identical to the runtime, because both leave the resolver
+answering nothing; what separates them is the addon's boot line, which names the property that decided
+it, so the run's line says that nothing answers the name rather than guessing why.
 
 Scripts are **off by default**: a pack whose skill ships a `scripts/` folder offers no script tool,
 and the run says so and names the switch — `smith.tools.scripts.engine` — rather than leaving the
@@ -81,6 +86,19 @@ others — but applies it only to an engine constructed with host inheritance sw
 constructor that carries that switch is invisible to a Java caller, so the confined root confines
 paths and not variables. `docker` and `podman` are the choices that keep a host variable away from a
 script, because the container starts with no environment but the engine's own.
+
+A script that runs is **written down**. The platform's own hook for watching tool calls is an
+argument of an object it builds for itself when a step calls the model, so a Java host embedding
+the platform has nothing to register; what a script call unavoidably passes through is the engine.
+The boot therefore hands the selected engine wrapped, and the run prints one line per call: the
+skill it came from, the callable the model reached for, the engine that answered, the status it
+exited with, and how long it took. `none` is left unwrapped — a boot that runs nothing still hands
+out the platform's own object, identity intact. Two lines make the same fact legible before
+anything runs: the pack-level one names which skills carry scripts, and the per-step one says
+whether the step in front of the model was handed a script it could call — asked of the reference
+it was given, so a script the engine refused is not counted as offered. A pack carrying no scripts
+and a pack whose scripts are switched off are told differently: the first says none are carried and
+names no skill, the second names the skill and the switch.
 
 ## Trust tiers
 
