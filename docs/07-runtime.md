@@ -69,6 +69,19 @@ absence to be mistaken for a tier refusal. Installing `embabel-agent-skills` cha
 the jar ships no auto-configuration, so a `Skills` reference exists only where this module constructs
 one.
 
+A script the selected engine will not run is **named rather than dropped**. The platform decides on one
+test — whether the engine claims the script's language — and skips the script in silence; the hook that
+would explain the refusal runs only when a script executes, and a file whose extension is no language at
+all is never examined. So the ingest report carries a line for each refused script naming the file, the
+skill that carries it and the language it is in, and the tool list is the smaller by exactly those.
+
+When the switch does select `process`, the same line says what a script can read: **the host's
+environment in full**. The platform's process engine has an allowlist — `PATH`, `HOME` and a dozen
+others — but applies it only to an engine constructed with host inheritance switched off, and every
+constructor that carries that switch is invisible to a Java caller, so the confined root confines
+paths and not variables. `docker` and `podman` are the choices that keep a host variable away from a
+script, because the container starts with no environment but the engine's own.
+
 ## Trust tiers
 
 `core/TrustTier` and `core/TrustTierPolicy` gate which **packs** may run. The check is per pack, over
@@ -268,23 +281,30 @@ pointed at the whole `coding-agent` folder, `--goal codebaseMapped` refuses at t
 step it never needed. Whether the gate should instead consider only the planned steps is an open
 question, recorded against the example's task list rather than decided here.
 
-Four facts about `--source` that the commands above depend on and that no error message states.
+Four facts about `--source` that the commands above depend on and that the error messages do not
+explain.
 `folder:` resolves the **children** of the directory it is given, so pointing it at a pack rather
 than at a folder of packs yields `spec source '…' contains no agent specs` — `arithmetic` is
 addressable through its parent, `coding-agent`'s definitions through `coding-agent`. Shared skills
 are read from the source root's own `skills/` directory, so lifting one definition out of
 `coding-agent` without that directory leaves its `references: [repo-map]` unresolvable, and the
-result is the same empty-source line with nothing naming the pack or the name — the run report that
-names unresolved references applies to a deployed pack's steps and never gets the chance to fire for
-a pack that never arrived. The third cause of that same line is layout: a pack needs a `types/`
+result is the empty-source line — and that line now carries the source's refusal with it, since an
+ingest that resolves to nothing appends the warnings the source reported to the message that ends
+the run, so the pack and the declared name do get said
+(`refused by the source: pack '…' failed validation: [action '…' declares reference 'repo-map' …]`).
+The run report that names unresolved references still applies to a deployed pack's steps, so it does
+not fire for a pack that never arrived; what names it is the note on the exception that ends the run.
+The third cause of that same line is layout: a pack needs a `types/`
 directory to survive validation at all, even an empty one, which is why `agent-specs/arithmetic`
 carries a `types/.gitkeep` that no step reads. The rule is `smith-common`'s own, under the code
 `LAYOUT_MISSING_TYPES`, and `FolderSpecSource` keeps only the candidates that validate — measured
 2026-11-28 against two staging directories that differed in that one directory alone, where the one
 with `types/` deployed the pack and printed the tier refusal below, and the one without it printed
-the empty-source line and named nothing. A validation failure does leave a warning on the resolved
-source, but nothing on the terminal prints it, so the three causes are indistinguishable from the
-output. And `--trust-tier` gates on tool-group role names only, so it cannot restrict a capability
+the empty-source line. A validation failure leaves a warning on the resolved source, and the
+empty-source message now prints it, so the causes are no longer indistinguishable: a pack the
+validator turned away is named together with the rule that refused it, while a root holding no
+candidate at all leaves only the generic `no valid agent specs found in folder source …`, which
+names the root rather than a pack. And `--trust-tier` gates on tool-group role names only, so it cannot restrict a capability
 that registers no role.
 
 `agent-specs/arithmetic` shows the tier from the other side, since its single step declares `math`,

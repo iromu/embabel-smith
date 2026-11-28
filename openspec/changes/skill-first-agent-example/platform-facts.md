@@ -251,6 +251,29 @@ LC_CTYPE, TMPDIR, TERM, TZ, SystemRoot, SystemDrive, TEMP, TMP, USERPROFILE, PAT
 `defaultInterpreters` (python3, bash, node, kotlin) are **private statics** with only synthetic
 `access$get…$cp()` accessors — not settable from Java.
 
+**Measured: that allowlist is not applied by any engine a Java caller can construct.** The filter is
+`ProcessSkillScriptExecutionEngine.kt:276-286` — `val env = processBuilder.environment()`,
+`if (!inheritEnvironment) { env keeps only keys in environmentAllowlist }`, then
+`env.putAll(environment)` — and `inheritEnvironment` defaults to `true` (`:63`). Switching it off is a
+constructor parameter, and `javap -v -p` shows every multi-argument constructor carrying it is
+`flags: (0x1001) ACC_PUBLIC, ACC_SYNTHETIC` — invisible to `javac`, for the same leading-`Duration`
+reason the `confinedTo` factory exists. The only forms Java can name are `ProcessSkillScriptExecutionEngine()`
+and `confinedTo(String)`, and `confinedTo` passes `fileTools` and nothing else.
+
+Measured on this build by an out-of-repo probe running one script that prints
+`env | sed 's/=.*//' | sort`, twice, differing only in how the engine was constructed: through
+`confinedTo(root)` the child printed **140** names, and they contained **all 134** names this JVM holds
+outside the allowlist — `OPENAI_CUSTOM_API_KEY`, `GEMINI_API_KEY`, `HF_TOKEN`, `ANTHROPIC_AUTH_TOKEN`,
+`LITELLM_APIKEY`, `SSH_AUTH_SOCK` among them. The same script through an engine built by reflection with
+`inheritEnvironment = false` printed **9** (`HOME, INPUT_DIR, LANG, OUTPUT_DIR, PATH, PWD, SHLVL, TERM, _`
+— the last three set by bash itself, not inherited). So D8's root confinement is a *path* confinement,
+and the environment claim the run makes is "the host's in full", which `PackSkills` prints on the same
+line that says scripts are offered and `ScriptEnvironmentTest` pins by asserting the containment — so a
+platform release that starts applying the allowlist fails a test rather than quietly falsifying prose.
+The container engines take no host environment at all (`AbstractContainerSkillScriptExecutionEngine.kt:245`
+passes only its own `environment` map, `emptyMap()` by default), which is why `docker`/`podman` are the
+isolating choices.
+
 ### 5.3 How a script's callable tool name is formed
 
 `…script/SkillScript.kt`:

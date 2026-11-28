@@ -19,8 +19,13 @@ import java.util.stream.Stream;
 import com.embabel.agent.api.reference.LlmReference;
 import com.embabel.agent.skills.Skills;
 import com.embabel.agent.skills.script.NoOpExecutionEngine;
+import com.embabel.agent.skills.script.ProcessSkillScriptExecutionEngine;
+import com.embabel.agent.skills.script.ScriptExecutionResult;
+import com.embabel.agent.skills.script.ScriptLanguage;
+import com.embabel.agent.skills.script.SkillScript;
 import com.embabel.agent.skills.script.SkillScriptExecutionEngine;
 import com.embabel.agent.skills.support.LoadedSkill;
+import com.embabel.agent.skills.support.ResourceType;
 
 /**
  * The skills one agent definition can answer a {@code references} declaration with, as
@@ -243,6 +248,12 @@ public final class PackSkills {
 				notes.add("skill folder refused by the loader: " + candidate);
 			}
 		}
+		// Only once an engine is claiming languages: with none selected the state line
+		// already says scripts do not run, and naming every script in the pack would read
+		// as a list of refusals for a run that was never offered any.
+		if (scriptEngine != null && !scriptEngine.supportedLanguages().isEmpty()) {
+			scriptsTheEngineWillNotRun(skills, scriptEngine, notes);
+		}
 		// The twin is the same container with the platform's no-op engine, which is the
 		// only way this version of Skills offers a skill without offering its scripts:
 		// the loaded list and the reference name both survive, so the wire prefix does
@@ -278,6 +289,62 @@ public final class PackSkills {
 	}
 
 	/**
+	 * Name the carried scripts this engine will not run, so their absence from the tool
+	 * list is a sentence the run states rather than a capability the reader infers.
+	 *
+	 * <p>
+	 * <b>Why the asking is ours to make.</b> The platform decides whether a script
+	 * becomes a tool by testing one thing —
+	 * {@code language in engine.supportedLanguages()} — and drops the script in silence
+	 * when that fails; its {@code validate} hook, which is the one that explains itself,
+	 * runs only when a script is actually executed, by which point no tool existed to
+	 * execute. So this asks the engine the same question the tool-list build asks,
+	 * through {@code validate} so the reason comes from the engine rather than from a
+	 * guess here, and says the answer out loud. A script whose extension is not a
+	 * language at all is named too: the platform has no hook that ever learns of it, so
+	 * without this it is a file in a folder that simply never appears anywhere.
+	 * <p>
+	 * design.md D4 settles the placement: the loader declares no script metadata, the
+	 * input schema is fixed and language comes from the file extension, "so any
+	 * per-script policy is authored here, on top of the engine's {@code validate()}
+	 * hook".
+	 * @param skills the container as loaded, before any tool list was taken from it
+	 * @param scriptEngine the engine this run selected, which is the one being asked
+	 * @param notes where to record what it refused
+	 */
+	private static void scriptsTheEngineWillNotRun(Skills skills, SkillScriptExecutionEngine scriptEngine,
+			List<String> notes) {
+		for (LoadedSkill skill : skills.getSkills()) {
+			for (String fileName : skill.listResources(ResourceType.SCRIPTS)) {
+				ScriptLanguage language = ScriptLanguage.Companion.fromFileName(fileName);
+				if (language == null) {
+					notes.add("script '" + fileName + "' of skill '" + skill.getName() + "' (extension '"
+							+ extension(fileName)
+							+ "') is no language the platform knows, so it is offered as no tool");
+					continue;
+				}
+				ScriptExecutionResult.Denied refusal = scriptEngine
+					.validate(new SkillScript(skill.getName(), fileName, language, skill.getBasePath()));
+				if (refusal != null) {
+					notes.add("script '" + fileName + "' of skill '" + skill.getName() + "' (" + language.name()
+							+ ") is refused by the engine, so it is offered as no tool: " + refusal.getReason());
+				}
+			}
+		}
+	}
+
+	/**
+	 * The extension of a script file name, as the way to name a language the platform's
+	 * own table does not contain.
+	 * @param fileName the file as the loader listed it
+	 * @return the part after the last dot, or the empty string when there is none
+	 */
+	private static String extension(String fileName) {
+		int dot = fileName.lastIndexOf('.');
+		return (dot < 0) ? "" : fileName.substring(dot + 1);
+	}
+
+	/**
 	 * The script state in force, named as a switch rather than left as an absence a
 	 * reader would otherwise attribute to the trust tier.
 	 *
@@ -302,7 +369,40 @@ public final class PackSkills {
 		boolean offered = (scriptEngine != null) && !scriptEngine.supportedLanguages().isEmpty();
 		String state = (offered) ? "offered as tools by the engine " + SCRIPT_ENGINE_PROPERTY + " selects"
 				: "not executed (switch " + SCRIPT_ENGINE_PROPERTY + " selects an engine)";
-		return "skill scripts: " + (scripts ? "this pack carries them" : "none carried") + ", " + state;
+		return "skill scripts: " + (scripts ? "this pack carries them" : "none carried") + ", " + state
+				+ environment(scriptEngine, offered);
+	}
+
+	/**
+	 * The environment a script will actually see, said on the same line as the script
+	 * state, because a reader told that scripts are offered is owed what the script can
+	 * read.
+	 *
+	 * <p>
+	 * <b>Why the leak is stated rather than the boundary promised.</b> The platform's
+	 * process engine ships an allowlist and applies it only to an engine constructed with
+	 * host inheritance switched off; the forms of that constructor that carry the switch
+	 * are marked synthetic, so a Java caller reaches the no-argument engine and
+	 * {@code confinedTo(root)}, both of which leave inheritance on. Measured, a script
+	 * run through the engine this switch installs prints every variable the JVM was
+	 * started with, API keys among them. So the line names the allowlist as what the
+	 * engine <em>would</em> have applied rather than saying <em>confined</em>, which here
+	 * would be false, and it says so on the run's own line rather than in a document an
+	 * operator need not have read. The container selections are the ones that do isolate;
+	 * see {@link ScriptEngineConfig}.
+	 * @param scriptEngine the engine this run selected, since the claim is the process
+	 * engine's and no other engine's
+	 * @param offered whether scripts execute at all, as the environment of a script that
+	 * never runs is not a fact about this run
+	 * @return the clause, empty when nothing runs or when it is not the process engine
+	 */
+	private static String environment(SkillScriptExecutionEngine scriptEngine, boolean offered) {
+		if (!offered || !(scriptEngine instanceof ProcessSkillScriptExecutionEngine)) {
+			return "";
+		}
+		return "; script environment: the host's in full — the engine's own allowlist ["
+				+ String.join(", ", ProcessSkillScriptExecutionEngine.Companion.getSAFE_ENV_ALLOWLIST())
+				+ "] is applied only to an engine constructed with inheritance off, which Java cannot ask for";
 	}
 
 	/**

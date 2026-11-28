@@ -72,6 +72,19 @@ import org.springframework.core.env.Environment;
  * tools confine to — the value of {@value #RUN_ROOT_PROPERTY} — rather than a second
  * location a pack could escape by knowing the difference.
  *
+ * <p>
+ * <b>Why that is a path confinement and not an environment one.</b> {@code confinedTo}
+ * sets the {@code FileTools} argument and nothing else, and the platform's own
+ * environment switch — construct the engine with inheritance off and it keeps only its
+ * allowlist, a dozen or so entries like {@code PATH} — is a constructor parameter that no
+ * Java-visible form of this engine carries: every multi-argument constructor is marked
+ * synthetic, because the leading {@code Duration} is a Kotlin value class, which is the
+ * same reason the factory exists. So a script run by the {@value #PROCESS} engine sees
+ * the environment the JVM was started with. That is stated on the run's own line rather
+ * than fixed here, and the choices that do keep a host variable away from a script are
+ * {@value #DOCKER} and {@value #PODMAN}, which run it in an image that was never given
+ * that environment.
+ *
  * @author Ivan Rodriguez
  */
 @Configuration(proxyBeanMethods = false)
