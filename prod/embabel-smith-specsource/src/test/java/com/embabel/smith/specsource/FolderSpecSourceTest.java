@@ -11,8 +11,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -87,6 +90,33 @@ class FolderSpecSourceTest {
 		assertThat(resolved.warnings()).hasSize(2);
 	}
 
+	/**
+	 * The parity claim between this source and the repository's own examples: what a
+	 * folder source finds is exactly the flat half of what a deeper scan finds. Written
+	 * against the checked-in corpus rather than a fixture because the gap is a property
+	 * of the corpus's shape — the examples are authored both ways, some directly in
+	 * {@code agent-specs/} and some inside a folder of definitions — and a fixture would
+	 * have to be authored in that shape to say anything, at which point it would be this
+	 * directory.
+	 */
+	@Test
+	void theCheckedInCorpusIsDiscoveredOnlyOneLevelDeep() {
+		Path specs = repositoryAgentSpecs();
+
+		List<String> discovered = new FolderSpecSource("folder:" + specs, specs).resolve()
+			.packs()
+			.stream()
+			.map((pack) -> relativeTo(specs, pack.root()))
+			.toList();
+
+		assertThat(discovered).as("nothing a folder source finds is a definition the deeper scan misses")
+			.isSubsetOf(deepDefinitions(specs));
+		assertThat(discovered).as("the flat packs are found, so the claim above is not vacuous")
+			.contains("arithmetic", "explainer");
+		assertThat(discovered).as("a definition one level deeper is not scanned, whatever else is right about it")
+			.doesNotContain("coding-agent/change", "skill-interpreter/plan");
+	}
+
 	@Test
 	void missingRootFailsWithAnErrorNamingThePath() {
 		Path missing = root.resolve("does-not-exist");
@@ -94,6 +124,54 @@ class FolderSpecSourceTest {
 		assertThatThrownBy(() -> new FolderSpecSource("folder:" + missing, missing).resolve())
 			.isInstanceOf(SpecSourceException.class)
 			.hasMessageContaining(missing.toString());
+	}
+
+	/**
+	 * Every directory under the repository's {@code agent-specs/} carrying a
+	 * {@code manifest.yml}, to a depth this source does not reach. The same scan
+	 * {@code CheckedInAgentSpecsValidateTest} runs over the examples, so the two tests
+	 * disagree about nothing but depth.
+	 * @param root the corpus to scan
+	 * @return the definitions found, in path order
+	 */
+	private static List<String> deepDefinitions(Path root) {
+		try (Stream<Path> walk = Files.walk(root, 3)) {
+			return walk.filter(Files::isDirectory)
+				.filter((dir) -> Files.isRegularFile(dir.resolve("manifest.yml")))
+				.map((dir) -> relativeTo(root, dir))
+				.sorted()
+				.toList();
+		}
+		catch (IOException ex) {
+			throw new UncheckedIOException("cannot walk " + root, ex);
+		}
+	}
+
+	/**
+	 * Locates {@code agent-specs/} by walking up from the working directory, which is the
+	 * module directory under Maven. The twin of the locator in
+	 * {@code CheckedInAgentSpecsValidateTest}, kept local so the two tests cannot fail to
+	 * compile against each other.
+	 * @return the directory holding the repository's example packs
+	 */
+	private static Path repositoryAgentSpecs() {
+		for (Path dir = Path.of("").toAbsolutePath(); dir != null; dir = dir.getParent()) {
+			Path candidate = dir.resolve("agent-specs");
+			if (Files.isDirectory(candidate.resolve("explainer"))) {
+				return candidate;
+			}
+		}
+		throw new IllegalStateException("Could not locate the repository's agent-specs directory");
+	}
+
+	/**
+	 * A pack directory as the corpus names it, with forward slashes on every platform.
+	 * @param root the corpus root
+	 * @param pack a directory under it
+	 * @return the relative path
+	 */
+	private static String relativeTo(Path root, Path pack) {
+		return root.relativize(pack).toString().replace('\\', '/');
 	}
 
 }

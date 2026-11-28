@@ -24,9 +24,16 @@ import com.embabel.smith.common.validation.ValidationResult;
  * {@link AgentSpecValidator} structure validation to be included.
  *
  * <p>
- * Deeper nesting is not scanned. Candidates that fail validation are excluded and named
- * in the result's warnings; a root with no valid packs resolves to an empty pack set plus
- * a warning (not an error).
+ * Deeper nesting is not scanned, and nothing warns about what that skips. The
+ * repository's own corpus exercises the limit: its examples are authored both ways, some
+ * directly in {@code agent-specs/} and some one level inside a folder of definitions, so
+ * a source pointed at that directory finds the flat packs and passes the nested ones by
+ * without a word — a pack that exists and is deployable, absent from a run that could
+ * have used it. {@code FolderSpecSourceTest} pins the gap against a deeper scan of the
+ * same directory, so the limit stays a stated one rather than a discovery.
+ * <p>
+ * Candidates that fail validation are excluded and named in the result's warnings; a root
+ * with no valid packs resolves to an empty pack set plus a warning (not an error).
  *
  * @author Ivan Rodriguez
  */
