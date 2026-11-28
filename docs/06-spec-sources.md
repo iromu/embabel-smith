@@ -57,7 +57,11 @@ them apart avoids cache and write races when the studio runs both sides of the l
 
 `PackContentHasher` computes a SHA-256 over the pack's format-owned files in sorted order, so the
 hash is independent of directory listing order and changes only when content changes. The same value
-is exposed on `ResolvedSpec`.
+is exposed on `ResolvedSpec`. The files it counts are `manifest.yml`, `goal.yml`, `references.yml`
+and the YAML under `steps/` and `types/`. That third one is the reason to consult this hash rather
+than assume the other covers everything: the reference *definitions* never reach the parsed model —
+the model carries only which references a step declares — so a file-level hash is the only drift
+detector that can see an edit confined to them, such as a retargeted path or a narrowed file list.
 
 **This is not the hash the lifecycle's drift detection consumes.** Drift is assessed against the
 builder's `SpecContentHash`, a semantic hash over the parsed model (goal, steps, types). The two
