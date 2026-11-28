@@ -33,8 +33,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  * then pack default, then the platform's GOAP. Ranking is not the whole of the promise,
  * though. A run that printed only the strategy would leave a reader holding two files and
  * guessing which one won, so the resolver reports the winner alongside the answer and the
- * run's notes say so in one line. The cases below pin all four shapes of that line, and
- * the last one follows a real run through the service to show the line reaches the notes
+ * run's notes say so in one line. The cases below pin all four shapes of that line, pin
+ * the algorithm note a line carries when the strategy name is not an algorithm, and the
+ * last one follows a real run through the service to show the line reaches the notes
  * rather than staying inside the resolver.
  *
  * <p>
@@ -67,6 +68,17 @@ class PlannerReportTest {
 			.contains("overriding the pack's default GOAP");
 		assertThat(this.resolver.resolve("SUPERVISOR", pack("GOAP"))).as("and the planner a run gets is unchanged")
 			.isEqualTo(PlannerType.SUPERVISOR);
+	}
+
+	@Test
+	void aSupervisorLineNamesTheAlgorithmThatActuallyPlans() {
+		assertThat(this.resolver.decide("SUPERVISOR", pack("GOAP")).describe())
+			.as("SUPERVISOR is a name the factory routes to A* GOAP, not a fourth algorithm")
+			.contains("SUPERVISOR")
+			.contains("A* GOAP");
+		assertThat(this.resolver.decide("GOAP", pack("GOAP")).describe())
+			.as("and a planner that is what it sounds like gains nothing")
+			.isEqualTo("planner: GOAP (the run's choice, overriding the pack's default GOAP)");
 	}
 
 	@Test

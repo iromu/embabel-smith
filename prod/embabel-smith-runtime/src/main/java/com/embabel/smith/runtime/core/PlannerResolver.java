@@ -127,17 +127,23 @@ public class PlannerResolver {
 				return describeRunChoice();
 			}
 			if (this.origin == Origin.PACK_DEFAULT) {
-				return "planner: " + this.planner.name() + " (the pack manifest's defaultPlanner)";
+				return "planner: " + strategy() + " (the pack manifest's defaultPlanner)";
 			}
-			return "planner: " + this.planner.name() + " (neither the run nor the pack named one)";
+			return "planner: " + strategy() + " (neither the run nor the pack named one)";
 		}
 
 		private String describeRunChoice() {
 			if (isBlank(this.packDefault)) {
-				return "planner: " + this.planner.name() + " (the run's choice; the pack named no default)";
+				return "planner: " + strategy() + " (the run's choice; the pack named no default)";
 			}
-			return "planner: " + this.planner.name() + " (the run's choice, overriding the pack's default "
+			return "planner: " + strategy() + " (the run's choice, overriding the pack's default "
 					+ this.packDefault.trim() + ")";
+		}
+
+		private String strategy() {
+			// The 1.5.4 DefaultPlannerFactory maps SUPERVISOR to AStarGoapPlanner.
+			// The name is not a fourth algorithm, so the line names the one that ran.
+			return (this.planner == PlannerType.SUPERVISOR) ? this.planner.name() + " [A* GOAP]" : this.planner.name();
 		}
 
 	}
