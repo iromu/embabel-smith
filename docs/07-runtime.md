@@ -18,6 +18,10 @@ ingests every pack into one platform, selects the goal, and executes a GOAP plan
 - **A missing goal is not a stack trace.** `GoalNotFoundException` lists the goals that *are*
   available.
 - **The planner is selectable per run** (`core/PlannerResolver`), defaulting to GOAP.
+- **The report names the planner setting that won.** A run's notes carry one
+  `planner: <NAME> (the run's choice, overriding the pack's default <X>)` line — or the pack-manifest
+  or neither-named form — because `defaultPlanner` and `--planner` are both live settings and a
+  report printing only the strategy would leave the reader to diff the two files.
 - **Plan structure is deterministic.** The planner is not a model, so the same pack and goal produce
   the same step sequence every time. Only the action bodies vary, because those are model calls.
 
