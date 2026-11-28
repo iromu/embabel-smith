@@ -6,6 +6,7 @@
 package com.embabel.smith.runtime;
 
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 
 import com.embabel.agent.core.AgentPlatform;
@@ -149,7 +150,27 @@ public class AgentSpecRunService {
 
 		TraceRecord record = safeRecord(sourceUri, resolved, ingested, effectiveGoal, effectiveInput, tier, outcome);
 		return new RunResult(outcome.success(), outcome.output(), outcome.error(), record,
-				(ingested != null) ? ingested.report().lines() : List.of());
+				reportLines(ingested, outcome));
+	}
+
+	/**
+	 * The lines a reader of this run gets: what the ingest noticed, plus the one line the
+	 * run itself owes — which planner it used and which of the two settings named it. A
+	 * pack's {@code manifest.defaultPlanner} and a run's {@code --planner} are both live
+	 * settings, and a report that prints only the strategy leaves the reader to diff the
+	 * two files to learn which one won.
+	 * @param ingested the ingested packs, or {@code null} when ingestion failed
+	 * @param outcome the run outcome, whose planner choice may be absent
+	 * @return the report lines
+	 */
+	private static List<String> reportLines(IngestedSource ingested, RunOutcome outcome) {
+		List<String> noticed = (ingested != null) ? ingested.report().lines() : List.of();
+		if (outcome.plannerChoice() == null) {
+			return noticed;
+		}
+		List<String> lines = new ArrayList<>(noticed);
+		lines.add(outcome.plannerChoice().describe());
+		return List.copyOf(lines);
 	}
 
 	/**
