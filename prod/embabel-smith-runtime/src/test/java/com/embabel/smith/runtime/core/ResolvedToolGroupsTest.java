@@ -299,7 +299,7 @@ class ResolvedToolGroupsTest {
 		void theReportSaysBothHowOursArrivedAndWhatItShadowed() {
 			assertThat(this.report.registeredByDefault()).contains(CodingToolGroups.FILE_ROLE);
 			assertThat(this.report.shadowedByUs()).containsKey(CodingToolGroups.FILE_ROLE);
-			assertThat(this.report.notOurs()).contains("math");
+			assertThat(this.report.notOurs()).containsExactly("math");
 		}
 
 	}
