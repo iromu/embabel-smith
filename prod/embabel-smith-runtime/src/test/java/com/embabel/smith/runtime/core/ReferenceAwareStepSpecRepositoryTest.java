@@ -75,8 +75,8 @@ class ReferenceAwareStepSpecRepositoryTest {
 	@Test
 	void theDelegateIsAskedForEveryReadAndNothingIsDroppedOnTheWayOut() throws IOException {
 		RecordingDelegate delegate = new RecordingDelegate(
-				new YmlStepSpecRepository(steps("repo-map").toString(), List.of()));
-		new ReferenceAwareStepSpecRepository(delegate, Map.of("locate", PackSkills.at(pack("repo-map"), "survey")))
+				new YmlStepSpecRepository(steps(names("repo-map")).toString(), List.of()));
+		new ReferenceAwareStepSpecRepository(delegate, Map.of("locate", PackReferences.at(pack("repo-map"), "survey")))
 			.findAll();
 
 		assertThat(delegate.findAllCalls).isEqualTo(1);
@@ -87,8 +87,9 @@ class ReferenceAwareStepSpecRepositoryTest {
 		ReferenceAwareStepSpecRepository repository = repository("typo-map");
 		repository.findAll();
 
-		assertThat(repository.unresolved()).containsExactly(
-				"step 'locate' declares reference 'typo-map' that no skill folder its definition can reach carries");
+		assertThat(repository.unresolved())
+			.containsExactly("step 'locate' declares reference 'typo-map' that neither its definition's skills nor"
+					+ " its references file carries");
 		// Nothing attached, so the step is emitted as authored rather than rewritten to
 		// name a container that holds nothing.
 		assertThat(repository.attached()).isEmpty();
@@ -106,33 +107,110 @@ class ReferenceAwareStepSpecRepositoryTest {
 	@Test
 	void aStepDeclaringNoReferenceIsNeitherRewrittenNorReported() throws IOException {
 		ReferenceAwareStepSpecRepository repository = new ReferenceAwareStepSpecRepository(
-				new YmlStepSpecRepository(steps(null).toString(), List.of()),
-				Map.of("locate", PackSkills.at(pack("repo-map"), "survey")));
+				new YmlStepSpecRepository(steps(List.of()).toString(), List.of()),
+				Map.of("locate", PackReferences.at(pack("repo-map"), "survey")));
 		repository.findAll();
 
 		assertThat(repository.attached()).isEmpty();
 		assertThat(repository.unresolved()).isEmpty();
 	}
 
+	@Test
+	void aStepDeclaringASkillAndADocumentIsAttachedToBothHolders() throws IOException {
+		ReferenceAwareStepSpecRepository repository = twoKindRepository(List.of("repo-map", "domain-doc"), true);
+		repository.findAll();
+
+		// One step, two kinds, one line: the container its skill folder belongs to, and
+		// the document its references file declares.
+		assertThat(repository.attached()).containsExactly("locate -> [survey-skills, domain-doc]");
+		assertThat(repository.unresolved()).isEmpty();
+	}
+
+	@Test
+	void theSameStepOnAPackWithoutTheReferencesFileAttachesTheSkillAndNamesTheOther() throws IOException {
+		ReferenceAwareStepSpecRepository repository = twoKindRepository(List.of("repo-map", "domain-doc"), false);
+		repository.findAll();
+
+		// The pair to the test above, and the shape of the mistake it rules out: a run
+		// that read only skill folders would present this pack's step exactly as it
+		// presents the other one. Here the skill still attaches, so the line is not
+		// vacuous, and the name that went missing is stated rather than left to the
+		// upstream skip.
+		assertThat(repository.attached()).containsExactly("locate -> [survey-skills]");
+		assertThat(repository.unresolved()).containsExactly("step 'locate' declares reference 'domain-doc' that"
+				+ " neither its definition's skills nor its references file carries");
+	}
+
+	@Test
+	void bothHoldersReachTheCallUnderTheirOwnPrefixesWithTheirOwnDescriptions() throws IOException {
+		PackReferences refs = PackReferences.at(twoKindPack(true), "survey");
+		StepSpecContext context = context();
+
+		StepSpecContext carried = ReferenceAwareStepSpecRepository.carrying(context,
+				List.of(refs.carried().get("repo-map"), refs.carried().get("domain-doc")));
+
+		List<LlmReference> holders = carried.getAvailableReferences();
+		assertThat(holders).extracting(LlmReference::getName).containsExactly("survey-skills", "domain-doc");
+		// Each under its own prefix: the two prefixes differ, and every tool the skill
+		// container lists sits behind the one that belongs to it.
+		assertThat(holders.get(0).toolPrefix()).isNotEqualTo(holders.get(1).toolPrefix());
+		assertThat(listed(holders.get(0))).isNotEmpty().allMatch((name) -> name.startsWith("survey_skills_"));
+		// Both descriptions visible: each reference says what it is, in its own
+		// contribution, and the two say different things.
+		assertThat(holders.get(0).getDescription()).contains("Skills carried by");
+		assertThat(holders.get(1).getDescription()).contains("Document domain.md");
+		assertThat(holders.get(0).contribution()).contains("survey-skills").isNotEqualTo(holders.get(1).contribution());
+	}
+
+	/**
+	 * The tool names a reference is listed under, as the naming strategy it carries would
+	 * rename them.
+	 * @param reference the value to list
+	 * @return the names, in listing order
+	 */
+	private static List<String> listed(LlmReference reference) {
+		return LlmReference.prefixedTools(reference).stream().map((tool) -> tool.getDefinition().getName()).toList();
+	}
+
 	/**
 	 * The wrapper over a staged directory holding one action step.
 	 * @param declared the name the step declares, or {@code null} for a step that
 	 * declares no {@code references} key at all
-	 * @return the wrapper, its skills standing for the definition named {@code survey}
+	 * @return the wrapper, its references standing for the definition named
+	 * {@code survey}
 	 */
 	private ReferenceAwareStepSpecRepository repository(String declared) throws IOException {
+		return new ReferenceAwareStepSpecRepository(
+				new YmlStepSpecRepository(steps(names(declared)).toString(), List.of()),
+				Map.of("locate", PackReferences.at(pack("repo-map"), "survey")));
+	}
+
+	/**
+	 * The wrapper over the same step declaring two names, standing for a definition that
+	 * carries one of them as a skill and the other as a document.
+	 * @param declared the names the step declares, in order
+	 * @param referencesFile whether the pack writes {@code references.yml} at all — the
+	 * variant without it is the pack that can only ever attach the skill
+	 * @return the wrapper
+	 */
+	private ReferenceAwareStepSpecRepository twoKindRepository(List<String> declared, boolean referencesFile)
+			throws IOException {
 		return new ReferenceAwareStepSpecRepository(new YmlStepSpecRepository(steps(declared).toString(), List.of()),
-				Map.of("locate", PackSkills.at(pack("repo-map"), "survey")));
+				Map.of("locate", PackReferences.at(twoKindPack(referencesFile), "survey")));
+	}
+
+	private static List<String> names(String declared) {
+		return (declared == null) ? List.of() : List.of(declared);
 	}
 
 	/**
 	 * Write a staged step directory with the one step under test.
-	 * @param declared the {@code references} entry to write, or {@code null} to omit the
+	 * @param declared the {@code references} entries to write; an empty list omits the
 	 * key
 	 * @return the directory a {@code YmlStepSpecRepository} reads
 	 */
-	private Path steps(String declared) throws IOException {
-		Path dir = Files.createDirectories(this.tmp.resolve("steps-" + declared));
+	private Path steps(List<String> declared) throws IOException {
+		Path dir = Files.createDirectories(this.tmp.resolve("steps-" + String.join("+", declared)));
 		StringBuilder step = new StringBuilder("""
 				stepType: action
 				name: locate
@@ -143,12 +221,36 @@ class ReferenceAwareStepSpecRepositoryTest {
 				toolGroups:
 				  - file
 				""");
-		if (declared != null) {
-			step.append("references:\n  - ").append(declared).append('\n');
+		if (!declared.isEmpty()) {
+			step.append("references:\n");
+			for (String name : declared) {
+				step.append("  - ").append(name).append('\n');
+			}
 		}
 		step.append("prompt: |\n  Find the files. {{userInput.content}}\n");
 		Files.writeString(dir.resolve("0-locate.yml"), step.toString());
 		return dir;
+	}
+
+	/**
+	 * The pack of {@link #pack(String)}, additionally carrying the folder and the file a
+	 * document reference resolves against.
+	 * @param referencesFile whether to write {@code references.yml} declaring that file
+	 * @return the pack directory
+	 */
+	private Path twoKindPack(boolean referencesFile) throws IOException {
+		Path packDir = pack("repo-map");
+		Files.createDirectories(packDir.resolve("docs"));
+		Files.writeString(packDir.resolve("docs/domain.md"), "The domain of the survey pack.\n");
+		if (referencesFile) {
+			Files.writeString(packDir.resolve(PackReferences.REFERENCES_FILE), """
+					references:
+					  - name: domain-doc
+					    kind: document
+					    path: docs/domain.md
+					""");
+		}
+		return packDir;
 	}
 
 	/**

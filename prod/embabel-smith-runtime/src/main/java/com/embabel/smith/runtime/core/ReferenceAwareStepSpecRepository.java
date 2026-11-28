@@ -41,10 +41,11 @@ import com.embabel.agent.spec.persistence.StepSpecRepository;
  * which is what its test pins.
  *
  * <p>
- * <b>A name nothing carries is refused, by name.</b> Resolution is per definition — own
- * skills, then the folder's shared set — so a name held only by a sibling definition does
- * not resolve, and the miss is recorded for the run report instead of being left to the
- * upstream skip that would hide it.
+ * <b>A name nothing carries is refused, by name.</b> Resolution is per definition: the
+ * references {@link PackReferences} reads for it, which are its own skill folders, the
+ * folder's shared set, and what its {@code references.yml} declares — so a name held only
+ * by a sibling definition does not resolve, and the miss is recorded for the run report
+ * instead of being left to the upstream skip that would hide it.
  *
  * @author Ivan Rodriguez
  */
@@ -52,7 +53,7 @@ public final class ReferenceAwareStepSpecRepository implements StepSpecRepositor
 
 	private final StepSpecRepository delegate;
 
-	private final Map<String, PackSkills> byStepName;
+	private final Map<String, PackReferences> byStepName;
 
 	private final Set<String> unresolved = new LinkedHashSet<>();
 
@@ -63,10 +64,11 @@ public final class ReferenceAwareStepSpecRepository implements StepSpecRepositor
 	 * can answer with.
 	 * @param delegate the repository that actually loads the steps, consulted for every
 	 * read and write
-	 * @param byStepName each step name to the skills its own definition can answer with;
-	 * a step missing from it is emitted with an unchanged reference list
+	 * @param byStepName each step name to the references its own definition can answer
+	 * with — its skill folders and whatever its {@code references.yml} declares; a step
+	 * missing from it is emitted with an unchanged reference list
 	 */
-	public ReferenceAwareStepSpecRepository(StepSpecRepository delegate, Map<String, PackSkills> byStepName) {
+	public ReferenceAwareStepSpecRepository(StepSpecRepository delegate, Map<String, PackReferences> byStepName) {
 		this.delegate = delegate;
 		this.byStepName = Map.copyOf(byStepName);
 	}
@@ -125,14 +127,14 @@ public final class ReferenceAwareStepSpecRepository implements StepSpecRepositor
 		if (!(stepSpec instanceof PromptedActionSpec action) || action.getReferences().isEmpty()) {
 			return stepSpec;
 		}
-		PackSkills skills = this.byStepName.get(action.getName());
+		PackReferences carried = this.byStepName.get(action.getName());
 		List<LlmReference> attached = new ArrayList<>();
 		List<String> containers = new ArrayList<>();
 		for (String declared : action.getReferences()) {
-			LlmReference holder = (skills != null) ? skills.carried().get(declared) : null;
+			LlmReference holder = (carried != null) ? carried.carried().get(declared) : null;
 			if (holder == null) {
 				this.unresolved.add("step '" + action.getName() + "' declares reference '" + declared
-						+ "' that no skill folder its definition can reach carries");
+						+ "' that neither its definition's skills nor its references file carries");
 				continue;
 			}
 			if (!attached.contains(holder)) {

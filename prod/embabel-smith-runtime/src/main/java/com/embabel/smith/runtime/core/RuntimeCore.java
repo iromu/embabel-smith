@@ -27,6 +27,7 @@ import com.embabel.agent.core.Goal;
 import com.embabel.agent.core.JvmType;
 import com.embabel.agent.core.ProcessOptions;
 import com.embabel.agent.domain.io.UserInput;
+import com.embabel.agent.skills.script.SkillScriptExecutionEngine;
 import com.embabel.agent.spec.StepSpecAgentScopeBuilder;
 import com.embabel.agent.spec.model.BackgroundMessage;
 import com.embabel.agent.spec.yml.YmlStepSpecRepository;
@@ -66,8 +67,29 @@ public class RuntimeCore {
 
 	private final TrustTierPolicy tierPolicy = new TrustTierPolicy();
 
+	/**
+	 * The engine a pack's skill scripts run in, or {@code null} for none. It is a
+	 * constructor argument rather than a reading of the switch because an ingest runs
+	 * wherever it was built — the studio and an A2A host embed this class without ever
+	 * booting the CLI, and a host that wants scripts running says so by passing an engine
+	 * here. {@link ScriptEngineConfig} is what turns {@code smith.tools.scripts.engine}
+	 * into one.
+	 */
+	private final SkillScriptExecutionEngine scriptEngine;
+
 	public RuntimeCore(AgentPlatform platform) {
+		this(platform, null);
+	}
+
+	/**
+	 * Over the same platform, with the engine a pack's skill scripts run in.
+	 * @param platform the booted agent platform
+	 * @param scriptEngine the engine this core's ingests offer scripts to, or
+	 * {@code null} to leave them unoffered
+	 */
+	public RuntimeCore(AgentPlatform platform, SkillScriptExecutionEngine scriptEngine) {
 		this.platform = platform;
+		this.scriptEngine = scriptEngine;
 	}
 
 	/**
@@ -140,9 +162,9 @@ public class RuntimeCore {
 		}
 
 		String suffix = Long.toHexString(System.nanoTime());
-		Map<String, PackSkills> skillsByStep = skillsOf(packs, deployed);
+		Map<String, PackReferences> referencesByStep = referencesOf(packs, deployed);
 		ReferenceAwareStepSpecRepository steps = new ReferenceAwareStepSpecRepository(
-				new YmlStepSpecRepository(stepsDir.toString(), List.of()), skillsByStep);
+				new YmlStepSpecRepository(stepsDir.toString(), List.of()), referencesByStep);
 		StepSpecAgentScopeBuilder builder = new StepSpecAgentScopeBuilder("smith-spec-scope-" + suffix, this.platform,
 				steps, types, List.of(), List.of());
 		Agent agent = builder.deploy()
@@ -151,47 +173,59 @@ public class RuntimeCore {
 		// Read after the deploy: the scope builder is what asks the repository for its
 		// steps, so a declaration that resolved to nothing is only known once it has.
 		return new IngestedSource(source, packs, excluded, agent,
-				report(skillsByStep, steps.attached(), steps.unresolved()));
+				report(referencesByStep, steps.attached(), steps.unresolved()));
 	}
 
 	/**
-	 * The skills each step can be offered, keyed by step name so a declaration resolves
-	 * against the definition that wrote it and not against whatever else shares the
-	 * source.
+	 * The references each step can be offered, keyed by step name so a declaration
+	 * resolves against the definition that wrote it and not against whatever else shares
+	 * the source.
 	 *
+	 * <p>
+	 * A step's {@code references} entry is answered by whatever its definition carries
+	 * under that name, and a skill folder is only one of the four things that can hold
+	 * it: {@link PackReferences} also reads the pack's {@code references.yml}, so a step
+	 * declaring a document and a step declaring a skill go through this one seam and are
+	 * resolved by the same lookup. Reading only the skill folders would answer every
+	 * single-reference step correctly and drop a non-skill reference from a step that
+	 * declares two, which is the mistake this shape cannot make.
 	 * <p>
 	 * The key is the step's name because that is the only handle the step repository
 	 * offers back; a name written by two packs resolves to the first of them, which is
 	 * the same order the source lists its packs in.
 	 * @param packs the packs being deployed, in source order
 	 * @param deployed their directories, in the same order
-	 * @return step name to the skills of the definition that owns it
+	 * @return step name to the references of the definition that owns it
 	 */
-	private Map<String, PackSkills> skillsOf(List<AgentSpec> packs, List<ResolvedSpec> deployed) {
-		Map<String, PackSkills> byStep = new LinkedHashMap<>();
+	private Map<String, PackReferences> referencesOf(List<AgentSpec> packs, List<ResolvedSpec> deployed) {
+		Map<String, PackReferences> byStep = new LinkedHashMap<>();
 		for (int i = 0; i < packs.size(); i++) {
 			AgentSpec pack = packs.get(i);
-			PackSkills skills = PackSkills.at(deployed.get(i).root(), pack.name());
+			PackReferences references = PackReferences.at(deployed.get(i).root(), pack.name(), Set.of(),
+					this.scriptEngine);
 			for (ActionStepSpec step : pack.steps()) {
-				byStep.putIfAbsent(step.name(), skills);
+				byStep.putIfAbsent(step.name(), references);
 			}
 		}
 		return byStep;
 	}
 
 	/**
-	 * What the ingest saw: the skills it could not load, what it attached to each step,
-	 * the declarations that resolved to nothing, and the script state in force.
-	 * @param skillsByStep the per-step skill sets, whose notes name refused folders
+	 * What the ingest saw: the references it could not construct, what it attached to
+	 * each step, the declarations that resolved to nothing, and the script state in
+	 * force.
+	 * @param referencesByStep the per-step reference sets, whose notes name refused
+	 * folders and refused entries
 	 * @param attached what each step was attached to, as read from the wrapper
 	 * @param unresolved the declarations that resolved to nothing, as read from the
 	 * wrapper
 	 * @return the report to print with the run
 	 */
-	private RunReport report(Map<String, PackSkills> skillsByStep, List<String> attached, List<String> unresolved) {
+	private RunReport report(Map<String, PackReferences> referencesByStep, List<String> attached,
+			List<String> unresolved) {
 		List<String> lines = new ArrayList<>();
-		for (PackSkills skills : skillsByStep.values().stream().distinct().toList()) {
-			lines.addAll(skills.notes());
+		for (PackReferences references : referencesByStep.values().stream().distinct().toList()) {
+			lines.addAll(references.notes());
 		}
 		lines.addAll(attached);
 		lines.addAll(unresolved);
@@ -225,7 +259,8 @@ public class RuntimeCore {
 		checkLifecycle(ingested, goalName);
 		AgentSpec goalPack = ingested.packForGoal(goalName);
 		checkTier(ingested.packs(), tier);
-		PlannerType planner = this.plannerResolver.resolve(plannerOverride, goalPack);
+		PlannerResolver.Decision choice = this.plannerResolver.decide(plannerOverride, goalPack);
+		PlannerType planner = choice.planner();
 
 		Goal goal = findGoal(ingested.agent(), goalName);
 		Agent goalAgent = ingested.agent().withSingleGoal(goal);
@@ -234,11 +269,11 @@ public class RuntimeCore {
 		try {
 			AgentProcess process = this.platform.runAgentFrom(goalAgent,
 					ProcessOptions.DEFAULT.withPlannerType(planner), Map.of("userInput", new UserInput(input)));
-			return outcome(process, goal, planner);
+			return outcome(process, goal, planner, choice);
 		}
 		catch (RuntimeException ex) {
 			return new RunOutcome(null, false, null, "Goal '" + goalName + "' run aborted: " + ex.getMessage(),
-					planner.name());
+					planner.name(), choice);
 		}
 	}
 
@@ -321,16 +356,16 @@ public class RuntimeCore {
 							+ agent.getGoals().stream().map(Goal::getName).toList()));
 	}
 
-	private RunOutcome outcome(AgentProcess process, Goal goal, PlannerType planner) {
+	private RunOutcome outcome(AgentProcess process, Goal goal, PlannerType planner, PlannerResolver.Decision choice) {
 		if (process.getStatus() == AgentProcessStatusCode.COMPLETED) {
 			Object last = process.lastResult();
 			if (last != null) {
 				String output = (last instanceof BackgroundMessage message) ? message.getContent()
 						: String.valueOf(last);
-				return new RunOutcome(process, true, output, null, planner.name());
+				return new RunOutcome(process, true, output, null, planner.name(), choice);
 			}
 		}
-		return new RunOutcome(process, false, null, failureMessage(process, goal), planner.name());
+		return new RunOutcome(process, false, null, failureMessage(process, goal), planner.name(), choice);
 	}
 
 	private String failureMessage(AgentProcess process, Goal goal) {

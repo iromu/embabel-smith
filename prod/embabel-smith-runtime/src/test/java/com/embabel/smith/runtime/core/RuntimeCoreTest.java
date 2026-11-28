@@ -10,6 +10,7 @@ import com.embabel.agent.core.AgentPlatform;
 import com.embabel.agent.core.DomainType;
 import com.embabel.agent.core.IoBinding;
 import com.embabel.agent.core.ToolGroupRequirement;
+import com.embabel.agent.core.ToolGroupResolution;
 import com.embabel.plan.common.condition.ConditionDetermination;
 import com.embabel.smith.common.model.AgentSpec;
 import com.embabel.smith.runtime.TestPacks;
@@ -277,7 +278,9 @@ class RuntimeCoreTest {
 		// The report is the whole offline claim: a deployed AgentScope publishes no tool
 		// list, so the alternative to saying what was attached is saying nothing at all.
 		assertThat(ingested.report().lines()).anyMatch((line) -> line.contains("read -> [ask-skills]"));
-		assertThat(ingested.report().lines()).noneMatch((line) -> line.contains("no skill folder"));
+		// The unresolved wording, whatever it says, is what the control below looks for:
+		// a declaration that failed to resolve has to leave a line saying so.
+		assertThat(ingested.report().lines()).noneMatch((line) -> line.contains("declares reference"));
 	}
 
 	@Test
@@ -333,8 +336,163 @@ class RuntimeCoreTest {
 		// The pack carries the skill on disk and the container has tools to offer, so the
 		// silence here is the pack's own declaration rather than an absent folder.
 		assertThat(ingested.report().lines()).noneMatch((line) -> line.contains("read ->"));
-		assertThat(ingested.report().lines()).noneMatch((line) -> line.contains("no skill folder"));
+		assertThat(ingested.report().lines()).noneMatch((line) -> line.contains("declares reference"));
 	}
+
+	@Test
+	void aStepGivenASkillAndADocumentIsAttachedToBoth(@TempDir Path tmp) throws Exception {
+		IngestedSource ingested = core().ingest(twoKindPack(tmp, "notes", "domain-doc"));
+
+		assertThat(ingested.goalNames()).as("the pack deployed").contains("answered");
+		// Two kinds, one step, one line: the container the skill folder holds and the
+		// document the pack's references file declares. Every case above declares a
+		// single name, and a single-name step resolves whichever kind the run happens to
+		// read — a run that kept only skills would pass all of them. This is the case
+		// where the two doors have to be open at once.
+		assertThat(ingested.report().lines()).anyMatch((line) -> line.contains("read -> [ask-skills, domain-doc]"));
+		assertThat(ingested.report().lines()).as("nothing declared failed to resolve")
+			.noneMatch((line) -> line.contains("declares reference"));
+	}
+
+	@Test
+	void eachKindResolvesOnItsOwnThroughTheSameSeam(@TempDir Path skillDir, @TempDir Path documentDir)
+			throws Exception {
+		IngestedSource skill = core().ingest(twoKindPack(skillDir, "notes"));
+		IngestedSource document = core().ingest(twoKindPack(documentDir, "domain-doc"));
+
+		// The pair that keeps the test above from passing by accident: the pack is the
+		// same pack either way, so each name really is carried and each resolves alone.
+		assertThat(skill.report().lines()).anyMatch((line) -> line.contains("read -> [ask-skills]"));
+		assertThat(document.report().lines()).anyMatch((line) -> line.contains("read -> [domain-doc]"));
+	}
+
+	@Test
+	void aRoleSpelledWronglyIsNamedByTheResolverRatherThanByTheReport(@TempDir Path tmp) throws Exception {
+		IngestedSource ingested = core().ingest(rolePack(tmp, MISSPELLED_ROLE));
+
+		// The declaration is a pass-through. Nothing reads a tool-group name before the
+		// prompt asks the resolver for it, so the pack deploys carrying the misspelling
+		// verbatim rather than being refused for it.
+		assertThat(ingested.goalNames()).as("the pack deploys").contains("roleDone");
+		assertThat(roles(ingested)).as("with the misspelling intact on the deployed action").contains(MISSPELLED_ROLE);
+
+		// The naming the design notes attribute to the run lives one level down, in the
+		// answer the platform gives when the step asks. It is a real answer and it names
+		// the role, which is why a misspelling is findable — from the resolver, not from
+		// anything the ingest prints.
+		ToolGroupResolution resolution = resolve(MISSPELLED_ROLE);
+		assertThat(resolution.getResolvedToolGroup()).as("nothing answers the misspelling").isNull();
+		assertThat(resolution.getFailureMessage()).as("and the answer says so, by name").contains(MISSPELLED_ROLE);
+
+		// The ingest has lines to print for this pack — the skill it carries is there to
+		// guarantee that — so what the report does not say is about roles rather than
+		// about a report that never said anything at all.
+		assertThat(ingested.report().lines()).as("the report is not empty").isNotEmpty();
+		assertThat(ingested.report().lines()).as("and no line of it names the role that resolved to nothing")
+			.noneMatch((line) -> line.contains(MISSPELLED_ROLE));
+	}
+
+	@Test
+	void aResolvedRoleIsReportedAsNoFailureAndTheTwoSpellingsReadAlike(@TempDir Path resolvesDir,
+			@TempDir Path missesDir) throws Exception {
+		IngestedSource resolved = core().ingest(rolePack(resolvesDir, "file"));
+		IngestedSource spelledWrong = core().ingest(rolePack(missesDir, MISSPELLED_ROLE));
+
+		// The resolver is alive here and the two declarations genuinely differ at it, so
+		// the equality below is about the report rather than about a dead resolver.
+		assertThat(resolve("math").getResolvedToolGroup()).as("upstream's own role resolves here").isNotNull();
+		assertThat(resolve("file").getResolvedToolGroup()).as("and so does the addon's").isNotNull();
+		assertThat(resolve(MISSPELLED_ROLE).getResolvedToolGroup()).isNull();
+
+		// What a step was offered, and whether a model called any of it, is settled when
+		// the step runs. A role that resolved reports no failure at ingest, which is the
+		// delta's second case: an ignored group must not read as a broken one.
+		assertThat(resolved.report().lines()).as("a resolved role is not named as a failure anywhere")
+			.noneMatch((line) -> line.contains("file"));
+		assertThat(resolved.report().lines())
+			.as("and the report reads the same whichever way the declaration was spelled, which is the gap the "
+					+ "delta's first case is about: a role that resolved to nothing is not named here either")
+			.isEqualTo(spelledWrong.report().lines());
+	}
+
+	/**
+	 * A two-step pack whose first step declares exactly one tool-group role and whose
+	 * second declares none, carrying one skill so the ingest has something to report
+	 * whatever the role says. The skill is the control: without it, a report that named
+	 * no role would be indistinguishable from a report that said nothing.
+	 * @param tmp the directory that becomes the folder source
+	 * @param role the single role the first step declares
+	 * @return the resolved source, ready to ingest
+	 */
+	private ResolvedSpecSource rolePack(Path tmp, String role) throws IOException {
+		Path pack = Files.createDirectories(tmp.resolve("roles"));
+		Files.writeString(pack.resolve("manifest.yml"), "name: roles\nversion: 0.1.0\n");
+		Files.createDirectories(pack.resolve("types"));
+		Files.writeString(pack.resolve("goal.yml"), """
+				stepType: goal
+				name: roleDone
+				description: "Reached from a step that declares one tool group"
+				outputTypeName: com.embabel.agent.spec.model.BackgroundMessage
+				export: true
+				""");
+		Files.createDirectories(pack.resolve("steps"));
+		Files.writeString(pack.resolve("steps/declared.yml"), """
+				stepType: action
+				name: declared
+				description: "Declares one tool group and answers"
+				inputTypeNames:
+				  - com.embabel.agent.domain.io.UserInput
+				outputTypeName: com.embabel.agent.spec.model.BackgroundMessage
+				toolGroups:
+				  - %s
+				prompt: |
+				  Use what you were given. {{userInput.content}}
+				""".formatted(role));
+		Files.writeString(pack.resolve("steps/undeclared.yml"), """
+				stepType: action
+				name: undeclared
+				description: "Declares no tool group"
+				inputTypeNames:
+				  - com.embabel.agent.domain.io.UserInput
+				outputTypeName: com.embabel.agent.spec.model.BackgroundMessage
+				prompt: |
+				  Summarise the answer. {{userInput.content}}
+				""");
+		writeSkill(Files.createDirectories(pack.resolve("skills/notes")), "notes",
+				"carried so the ingest has a line to print");
+		return SpecSource.parse("folder:" + pack.toAbsolutePath().getParent()).resolve();
+	}
+
+	/**
+	 * The roles the deployed actions ask for, across every step.
+	 * @param ingested the ingest to read
+	 * @return the declared role names
+	 */
+	private static List<String> roles(IngestedSource ingested) {
+		return ingested.agent()
+			.getActions()
+			.stream()
+			.flatMap((action) -> action.getToolGroups().stream())
+			.map(ToolGroupRequirement::getRole)
+			.toList();
+	}
+
+	/**
+	 * What the platform's own resolver answers for a role, which is the answer a step
+	 * gets when it runs.
+	 * @param role the role to ask about
+	 * @return the resolution, group or failure message
+	 */
+	private ToolGroupResolution resolve(String role) {
+		return this.platform.getToolGroupResolver().resolveToolGroup(new ToolGroupRequirement(role, Set.of(), null));
+	}
+
+	/**
+	 * A tool-group role that resolves to nothing by construction: the addon's {@code
+	 * shell} role with one letter doubled, so it cannot match a registered group and
+	 * cannot be mistaken for a name this repo chose on purpose.
+	 */
+	private static final String MISSPELLED_ROLE = "shelll";
 
 	/**
 	 * A two-step pack in a folder source, with the skill placed in the pack, in the
@@ -396,6 +554,65 @@ class RuntimeCoreTest {
 			writeSkill(Files.createDirectories(tmp.resolve("skills/" + sharedSkill)), sharedSkill,
 					"carried by the source root");
 		}
+		return SpecSource.parse("folder:" + tmp.toAbsolutePath()).resolve();
+	}
+
+	/**
+	 * A pack that carries two kinds of reference and a step that declares some of them: a
+	 * skill in its own {@code skills/} folder, and a document its {@code references.yml}
+	 * declares. The pack is one pack in both cases — only the declaration varies — so a
+	 * run that could answer one kind and not the other shows up as a difference in the
+	 * report rather than as two packs that differ in more than the thing under test.
+	 * @param tmp the directory that becomes the folder source
+	 * @param declared the names the step declares, in the order it declares them
+	 * @return the resolved source, ready to ingest
+	 */
+	private ResolvedSpecSource twoKindPack(Path tmp, String... declared) throws IOException {
+		Path pack = Files.createDirectories(tmp.resolve("ask"));
+		Files.writeString(pack.resolve("manifest.yml"), "name: ask\nversion: 0.1.0\n");
+		Files.createDirectories(pack.resolve("types"));
+		Files.writeString(pack.resolve("goal.yml"), """
+				stepType: goal
+				name: answered
+				description: "Answered with the pack's own document"
+				outputTypeName: com.embabel.agent.spec.model.BackgroundMessage
+				export: true
+				""");
+		Files.createDirectories(pack.resolve("steps"));
+		StringBuilder references = new StringBuilder();
+		for (String name : declared) {
+			references.append("  - ").append(name).append('\n');
+		}
+		Files.writeString(pack.resolve("steps/read.yml"), """
+				stepType: action
+				name: read
+				description: "Read the document and answer"
+				inputTypeNames:
+				  - com.embabel.agent.domain.io.UserInput
+				outputTypeName: com.embabel.agent.spec.model.BackgroundMessage
+				references:
+				%sprompt: |
+				  Name one file. {{userInput.content}}
+				""".formatted(references));
+		Files.writeString(pack.resolve("steps/answer.yml"), """
+				stepType: action
+				name: answer
+				description: "Answer from the request"
+				inputTypeNames:
+				  - com.embabel.agent.domain.io.UserInput
+				outputTypeName: com.embabel.agent.spec.model.BackgroundMessage
+				prompt: |
+				  Summarise the reading. {{userInput.content}}
+				""");
+		writeSkill(Files.createDirectories(pack.resolve("skills/notes")), "notes", "carried by the pack");
+		Files.createDirectories(pack.resolve("docs"));
+		Files.writeString(pack.resolve("docs/domain.md"), "The domain of the ask pack, carried by the pack.\n");
+		Files.writeString(pack.resolve(PackReferences.REFERENCES_FILE), """
+				references:
+				  - name: domain-doc
+				    kind: document
+				    path: docs/domain.md
+				""");
 		return SpecSource.parse("folder:" + tmp.toAbsolutePath()).resolve();
 	}
 
