@@ -1033,3 +1033,15 @@ a no-op.
   declaring module (`embabel-smith-a2a-starter`; the studio declares that starter itself, and the
   runtime cannot — the starter depends on it), and
   `grep -n 'Non-goal: protocol 1.0' prod/embabel-smith-a2a-starter/README.md` finds the open half.
+
+- **Open — jython-slim as a skill-script Python interpreter.** The process engine resolves each
+  language to interpreter commands, so a JVM-resident Python is one map entry away; `jython-slim`
+  (the pip-distributed Jython build) is the candidate, and where a host has no CPython on PATH it
+  would make `python` skill scripts runnable on the JVM alone. The caveat that shapes the authoring
+  rule: Jython tops out at **Python 2.7 syntax**, so a skill's `.py` script that uses f-strings,
+  walrus assignments, or `pathlib` runs under CPython and dies under jython-slim — publishing such
+  a script to a jython-capable host is a silent portability cliff. The wiring decision is which
+  interpreters the language map lists per host and whether scripts are linted against the 2.7
+  ceiling before that choice matters. Check:
+  `javap -p -cp ~/.m2/repository/com/embabel/agent/embabel-agent-skills/1.5.4/embabel-agent-skills-1.5.4.jar com.embabel.agent.skills.script.ScriptLanguage`
+  names the languages the map keys over.
