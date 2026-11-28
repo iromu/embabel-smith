@@ -1,0 +1,5 @@
+stepType: goal
+name: arithmeticAnswered
+description: "The arithmetic asked for has been worked out and stated"
+outputTypeName: com.embabel.agent.spec.model.BackgroundMessage
+export: true

@@ -1,0 +1,5 @@
+stepType: goal
+name: runBriefEstablished
+description: "The task and what it asks for have been established, along with what the working folder offers"
+outputTypeName: RunBrief
+export: true

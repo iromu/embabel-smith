@@ -1,0 +1,14 @@
+name: WorkLog
+description: "What the run actually did, what it touched, and what it could not do"
+ownProperties:
+  - name: performed
+    type: string
+    description: "What was done, in order"
+  - name: changed
+    type: string
+    description: "What was looked at and what was changed"
+  - name: obstacles
+    type: string
+    description: "Every obstacle, each naming the capability it needed"
+parents: []
+creationPermitted: true

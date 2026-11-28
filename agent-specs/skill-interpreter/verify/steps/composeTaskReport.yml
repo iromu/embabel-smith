@@ -1,0 +1,16 @@
+stepType: action
+name: composeTaskReport
+description: "Write the report of the run: the outcome, what it produced, and what it could not do"
+inputTypeNames:
+  - Verification
+outputTypeName: TaskReport
+prompt: |
+  Write the report of this run.
+
+  What was checked and found met: {{verification.evidence}}
+  What is not met: {{verification.gaps}}
+
+  Say the outcome as one of three — done, partly done, not done — then what the task
+  actually produced. Name anything it could not do together with the capability that was
+  missing, in the words the earlier steps used for it, and say what a person should do
+  next. Do not claim an outcome the check above does not support.

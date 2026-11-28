@@ -1,0 +1,5 @@
+stepType: goal
+name: buildVerified
+description: "The working directory's own check has been run and its verdict reported"
+outputTypeName: BuildReport
+export: true

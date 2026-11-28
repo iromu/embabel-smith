@@ -1,0 +1,20 @@
+stepType: action
+name: plan
+description: "Write the intentions to carry out and copy the acceptance criteria the skill itself states"
+inputTypeNames:
+  - SkillDirective
+outputTypeName: ActionPlan
+prompt: |
+  Write the plan for the task, following the skill recorded below.
+
+  Skill: {{skillDirective.skill}}
+  What it says to do: {{skillDirective.instructions}}
+  What it requires: {{skillDirective.capabilities}}
+
+  Write a short list of intentions — things to bring about, not tool calls — in the sequence
+  the skill asks for them, and no more of them than the task needs. Where the skill says
+  how to tell the work is good, copy that into the criteria as it stated it; do not invent
+  criteria the skill did not state, and do not add criteria of your own.
+
+  Note what could stop the plan, and name any capability the plan depends on that the
+  deployment may not provide.

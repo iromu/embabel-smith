@@ -1,0 +1,14 @@
+name: Verification
+description: "Whether each criterion the skill stated is met, and what was checked for it"
+ownProperties:
+  - name: met
+    type: boolean
+    description: "Whether every criterion is met"
+  - name: evidence
+    type: string
+    description: "Which criteria are met and what was checked for each"
+  - name: gaps
+    type: string
+    description: "Which criteria are not met, and what was missing for them"
+parents: []
+creationPermitted: true

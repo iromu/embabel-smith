@@ -1,0 +1,3 @@
+name: coding-agent-change
+version: 1.0.0
+defaultPlanner: GOAP

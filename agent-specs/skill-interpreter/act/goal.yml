@@ -1,0 +1,5 @@
+stepType: goal
+name: workPerformed
+description: "The plan has been carried out and what actually happened has been recorded"
+outputTypeName: WorkLog
+export: true

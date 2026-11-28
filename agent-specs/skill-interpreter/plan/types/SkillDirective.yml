@@ -1,0 +1,17 @@
+name: SkillDirective
+description: "The skill chosen for the task and what that skill asks of the run"
+ownProperties:
+  - name: skill
+    type: string
+    description: "The skill chosen, or that none fitted"
+  - name: instructions
+    type: string
+    description: "What the skill says to do, in the run's own words"
+  - name: capabilities
+    type: string
+    description: "What the skill requires — tools, scripts, files, or a decision"
+  - name: leftOpen
+    type: string
+    description: "What the skill leaves for someone else to decide"
+parents: []
+creationPermitted: true

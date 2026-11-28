@@ -1,0 +1,17 @@
+name: ActionPlan
+description: "The intentions to carry out and the criteria the skill itself states"
+ownProperties:
+  - name: intentions
+    type: string
+    description: "What to bring about, in the order the skill asks for it"
+  - name: criteria
+    type: string
+    description: "How the skill says to tell good work, copied as it stated it"
+  - name: risks
+    type: string
+    description: "What could stop the plan"
+  - name: dependsOn
+    type: string
+    description: "Capabilities the plan needs that the deployment may not provide"
+parents: []
+creationPermitted: true

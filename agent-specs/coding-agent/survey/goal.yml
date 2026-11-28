@@ -1,0 +1,5 @@
+stepType: goal
+name: codebaseMapped
+description: "The files bearing on the request have been located and named"
+outputTypeName: RepoMap
+export: true

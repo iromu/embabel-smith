@@ -1,0 +1,14 @@
+name: OpenQuestion
+description: "The decision the run cannot make, the evidence for it, and how to continue"
+ownProperties:
+  - name: question
+    type: string
+    description: "The decision, as one question a person can answer"
+  - name: evidence
+    type: string
+    description: "What has already been gathered for it"
+  - name: continuation
+    type: string
+    description: "How to run it again with the decision given"
+parents: []
+creationPermitted: true

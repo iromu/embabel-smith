@@ -1,0 +1,5 @@
+stepType: goal
+name: decisionEscalated
+description: "The blocked decision has been named with its evidence and the command to continue with"
+outputTypeName: OpenQuestion
+export: true

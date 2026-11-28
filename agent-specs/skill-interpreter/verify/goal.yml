@@ -1,0 +1,5 @@
+stepType: goal
+name: taskReported
+description: "The task has been carried out as far as the deployment allows and reported, with what remains named"
+outputTypeName: TaskReport
+export: true

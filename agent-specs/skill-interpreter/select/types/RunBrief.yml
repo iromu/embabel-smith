@@ -1,0 +1,17 @@
+name: RunBrief
+description: "What the task asks for and what the working folder offers, before any work is done"
+ownProperties:
+  - name: task
+    type: string
+    description: "The task in one sentence"
+  - name: askedFor
+    type: string
+    description: "The result the task asks for"
+  - name: folderOffered
+    type: string
+    description: "What the working folder contains, or that listing was not available"
+  - name: unknowns
+    type: string
+    description: "What is not yet known about the task or the folder"
+parents: []
+creationPermitted: true

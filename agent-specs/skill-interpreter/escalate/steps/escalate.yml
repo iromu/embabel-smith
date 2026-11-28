@@ -1,0 +1,18 @@
+stepType: action
+name: escalate
+description: "Name the decision a run cannot make for itself, with the evidence for it and how to continue"
+inputTypeNames:
+  - WorkLog
+outputTypeName: OpenQuestion
+prompt: |
+  Something in this work is blocked and needs a decision the run cannot make.
+
+  What happened: {{workLog.performed}}
+  Obstacles: {{workLog.obstacles}}
+
+  Write the block as one question a person can answer in a sentence, with the evidence
+  already gathered for it. Then write how to continue: the same run, again, with the task
+  unchanged and the decision given as part of the task.
+
+  Do not work around the block and do not choose the answer yourself. This step exists to
+  stop cleanly, not to improvise past it.

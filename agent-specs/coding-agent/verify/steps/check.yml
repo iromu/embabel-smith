@@ -1,0 +1,16 @@
+stepType: action
+name: check
+description: "Run the working directory's own check once and report its verdict"
+inputTypeNames:
+  - com.embabel.agent.domain.io.UserInput
+outputTypeName: BuildReport
+toolGroups:
+  - shell
+prompt: |
+  Run one command in the working directory and report what it returned. Running a
+  command is all this step can do — it reads no files — so decide what to run from the
+  request itself: if the request names a check command, run that; if it names none, run
+  the conventional check for the toolchain the request implies. State the command run,
+  whether it passed, and the first line that explains a failure. Run nothing else.
+
+  User request: {{userInput.content}}

@@ -1,0 +1,17 @@
+name: TaskReport
+description: "The report of the run — the outcome, what it produced, and what it could not do"
+ownProperties:
+  - name: outcome
+    type: string
+    description: "done, partly done, or not done"
+  - name: produced
+    type: string
+    description: "What the task actually produced"
+  - name: notDone
+    type: string
+    description: "What could not be done, naming the capability that was missing"
+  - name: nextStep
+    type: string
+    description: "What a person should do next"
+parents: []
+creationPermitted: true

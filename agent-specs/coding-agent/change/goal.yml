@@ -1,0 +1,5 @@
+stepType: goal
+name: codeChangeApplied
+description: "The asked-for change has been made in the working directory"
+outputTypeName: ChangeSet
+export: true

@@ -1,0 +1,5 @@
+stepType: goal
+name: intentionsPlanned
+description: "The intentions to carry out and the criteria the skill itself states have been written down"
+outputTypeName: ActionPlan
+export: true

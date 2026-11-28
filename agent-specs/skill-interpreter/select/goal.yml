@@ -1,0 +1,5 @@
+stepType: goal
+name: skillChosen
+description: "One skill has been chosen for the task and what it asks for has been recorded"
+outputTypeName: SkillDirective
+export: true

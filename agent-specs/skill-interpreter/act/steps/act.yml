@@ -1,0 +1,22 @@
+stepType: action
+name: act
+description: "Carry out the plan and record what actually happened, including what could not be done"
+inputTypeNames:
+  - ActionPlan
+outputTypeName: WorkLog
+toolGroups:
+  - file
+  - shell
+prompt: |
+  Carry out the plan below. One thing at a time, and stop when the intentions are done.
+
+  Intentions: {{actionPlan.intentions}}
+  Criteria to meet: {{actionPlan.criteria}}
+
+  Work with the files: look before you change, and change only what an intention needs.
+  Use a command only when one is actually offered to you and the run allows it; when it is
+  not offered, record that instead of finding another way to do it.
+
+  Record: what you did, first to last; what you looked at and what you changed; and every
+  obstacle you hit. When a step was impossible, name the capability you needed — a tool
+  group, a script, a permission — rather than saying the step failed.

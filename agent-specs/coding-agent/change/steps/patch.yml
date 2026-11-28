@@ -1,0 +1,21 @@
+stepType: action
+name: patch
+description: "Make the change the request asks for in the working directory"
+inputTypeNames:
+  - com.embabel.agent.domain.io.UserInput
+  - RepoMap
+outputTypeName: ChangeSet
+toolGroups:
+  - file
+references:
+  - repo-map
+  - patch-notes
+prompt: |
+  Make the change asked for below in the working directory. Start from the paths
+  located earlier rather than hunting for them again; read a file before editing it, and
+  change no more than the request asks. The repo-map skill says where things live, the
+  patch-notes skill says how to edit them. List the paths you touched.
+
+  Paths located earlier: {{repoMap.paths}}
+
+  User request: {{userInput.content}}

@@ -1,0 +1,23 @@
+stepType: action
+name: script
+description: "Obtain the figures a script from a skill would produce for the task, or record that no script was available"
+inputTypeNames:
+  - ActionPlan
+outputTypeName: ScriptEvidence
+toolGroups:
+  - file
+references:
+  - workspace-inventory
+prompt: |
+  Get the figures for this task from a script, if a script is available.
+
+  Intentions: {{actionPlan.intentions}}
+
+  If a script tool is offered to you, call it once, passing the files it should examine as
+  its input files. Do not call it twice for the same files, and do not rework the numbers
+  it printed — quote them.
+
+  Record: which script you used, whether one ran at all, and what it printed. When nothing
+  ran, say which of these it was — the skill carries no script, script execution is
+  switched off in this deployment, or the run's tier does not allow it — and what you got
+  by reading instead.

@@ -1,0 +1,22 @@
+stepType: action
+name: select
+description: "Choose the one skill to follow for the task and record what that skill asks for"
+inputTypeNames:
+  - RunBrief
+outputTypeName: SkillDirective
+references:
+  - workspace-inventory
+prompt: |
+  Below is the brief for a task. Choose the skill to follow for it.
+
+  Task: {{runBrief.task}}
+  Result asked for: {{runBrief.askedFor}}
+
+  Look at the skills available to you, then activate the one whose description fits the
+  task. If none fits, say that and continue without one; never invent a skill or follow a
+  description you did not read.
+
+  Record: the skill you activated and why, what its instructions say to do in your own
+  words, what it requires — tools, scripts, files, or a decision someone else has to make —
+  and anything it leaves open. Name a requirement you cannot see a way to satisfy rather
+  than leaving it out.

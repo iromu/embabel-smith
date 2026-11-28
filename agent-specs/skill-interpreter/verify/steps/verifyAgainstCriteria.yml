@@ -1,0 +1,24 @@
+stepType: action
+name: verifyAgainstCriteria
+description: "Compare what happened against the criteria the skill stated, criterion by criterion"
+inputTypeNames:
+  - ActionPlan
+  - WorkLog
+  - ScriptEvidence
+outputTypeName: Verification
+toolGroups:
+  - file
+prompt: |
+  Decide whether the criteria are met. This is the step the run is judged on, so judge it
+  against the criteria and nothing else.
+
+  Criteria as the skill stated them: {{actionPlan.criteria}}
+  What was done: {{workLog.performed}}
+  What was changed: {{workLog.changed}}
+  What a script reported: {{scriptEvidence.output}}
+
+  Take each criterion in turn and say whether it is met. Where a criterion is about a file,
+  look at the file rather than trusting the account of it; one look per criterion is enough.
+
+  Record: which criteria are met and what you checked for each, and which are not met with
+  the reason. A criterion you could not check is not met — say what was missing.

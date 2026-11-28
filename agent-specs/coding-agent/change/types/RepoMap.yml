@@ -1,0 +1,14 @@
+name: RepoMap
+description: "The working-directory paths that bear on the request, and what each holds"
+ownProperties:
+  - name: paths
+    type: string
+    description: "The relevant paths, one per line, relative to the working directory"
+  - name: entryPoint
+    type: string
+    description: "The one path to read first, if a single one stands out"
+  - name: notes
+    type: string
+    description: "What each path holds, in one line per path"
+parents: []
+creationPermitted: true

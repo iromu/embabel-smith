@@ -1,0 +1,14 @@
+stepType: action
+name: compute
+description: "Work out the arithmetic the user asks for and state the answer"
+inputTypeNames:
+  - com.embabel.agent.domain.io.UserInput
+outputTypeName: com.embabel.agent.spec.model.BackgroundMessage
+toolGroups:
+  - math
+prompt: |
+  Work out the arithmetic asked for below and state the answer.
+
+  User request: {{userInput.content}}
+
+  Reply with the number, then one sentence naming the operation that produced it.

@@ -1,0 +1,5 @@
+stepType: goal
+name: figuresFromScript
+description: "The figures a script would produce for the task have been obtained, or their absence recorded"
+outputTypeName: ScriptEvidence
+export: true

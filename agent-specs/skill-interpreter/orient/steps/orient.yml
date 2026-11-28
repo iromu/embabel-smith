@@ -1,0 +1,19 @@
+stepType: action
+name: orient
+description: "Establish what the task asks for and what the working folder offers, before anything is attempted"
+inputTypeNames:
+  - com.embabel.agent.domain.io.UserInput
+outputTypeName: RunBrief
+toolGroups:
+  - file
+prompt: |
+  A task arrives below. Establish what it asks for. Do not begin it.
+
+  Task: {{userInput.content}}
+
+  If the deployment offers a way to list files, use it once to see what the working folder
+  contains. Do not open the files and do not change anything.
+
+  Report: the task in one sentence, the result it asks for, what the folder appears to
+  offer, and what is not yet known. If listing was not available, say so and leave the
+  folder blank in the report rather than guessing at it.

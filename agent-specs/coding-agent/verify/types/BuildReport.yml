@@ -1,0 +1,14 @@
+name: BuildReport
+description: "The check that was run and what it said"
+ownProperties:
+  - name: command
+    type: string
+    description: "The command run, verbatim"
+  - name: outcome
+    type: string
+    description: "passed, failed or blocked, in one word"
+  - name: evidence
+    type: string
+    description: "The exit code and the first line that explains it"
+parents: []
+creationPermitted: true

@@ -1,0 +1,17 @@
+name: ScriptEvidence
+description: "What a script from a skill produced for the task, or why none ran"
+ownProperties:
+  - name: script
+    type: string
+    description: "The script used, or that none was offered"
+  - name: ran
+    type: boolean
+    description: "Whether a script actually ran"
+  - name: output
+    type: string
+    description: "What the script printed, quoted"
+  - name: missing
+    type: string
+    description: "Why nothing ran, and what was gathered by reading instead"
+parents: []
+creationPermitted: true

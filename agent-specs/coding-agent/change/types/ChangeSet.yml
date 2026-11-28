@@ -1,0 +1,14 @@
+name: ChangeSet
+description: "What was changed in the working directory and why"
+ownProperties:
+  - name: paths
+    type: string
+    description: "The paths written to, one per line, relative to the working directory"
+  - name: summary
+    type: string
+    description: "What each edit does, in one line per path"
+  - name: leftUndone
+    type: string
+    description: "Anything the request asked for that this change did not do"
+parents: []
+creationPermitted: true

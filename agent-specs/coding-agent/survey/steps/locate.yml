@@ -1,0 +1,16 @@
+stepType: action
+name: locate
+description: "Locate the files in the working directory that the request bears on"
+inputTypeNames:
+  - com.embabel.agent.domain.io.UserInput
+outputTypeName: RepoMap
+toolGroups:
+  - file
+references:
+  - repo-map
+prompt: |
+  Locate, do not change, the files in the working directory that the request below
+  bears on. The repo-map skill says where to look first. Open at most two files, and
+  list the paths you relied on rather than their contents.
+
+  User request: {{userInput.content}}
