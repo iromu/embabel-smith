@@ -252,6 +252,14 @@ long, List`, `setAccessible`), never by the mangled string; if resolution ever f
 through and the report says the cap could not be applied. A pin-test asserts the shape resolves against
 the pinned jar, so a platform upgrade trips at build time.
 
+A third ruling closes 6.3's split: the field-reading half is landed in `PackReferences` (strict parse,
+`scriptsAskedFor()` for the step side, validator refusal of `scripts:` on any kind but `skills` — the
+switch is dead wherever no script tool is handed out); the consumer half belongs to the step side, where
+the intersection attaches the engine-bound twin to asking names and `scriptFree()` to the rest, with the
+offering test's fixture gaining the declaration in the same stroke. The interpreter pack's own
+`references.yml` experiment stays reverted: its twin demonstration lives in the reference test, the
+offline staging design is 9.2's, and the file map lists that file as optional.
+
 ### D5 — One reference per agent definition, named from the agent
 
 Each agent definition contributes a `Skills` reference named `<agent>-skills`; a folder's shared
