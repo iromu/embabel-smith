@@ -58,6 +58,23 @@ class PackContentHasherTest {
 	}
 
 	@Test
+	void hashChangesWhenTheReferencesFileIsEdited() throws IOException {
+		Path pack = writer.write(SampleAgentSpecs.explainer(), temp.resolve("pack"));
+		String before = PackContentHasher.hash(pack);
+
+		Files.writeString(pack.resolve("references.yml"),
+				"references:\n  - name: guide\n    kind: directory\n    path: references\n");
+		String declared = PackContentHasher.hash(pack);
+		assertThat(declared).as("a pack that grows a references.yml is not the pack it was").isNotEqualTo(before);
+
+		Files.writeString(pack.resolve("references.yml"),
+				"references:\n  - name: guide\n    kind: directory\n    path: references/archive\n");
+
+		assertThat(PackContentHasher.hash(pack)).as("an edit inside the file moves it too, as nothing else can")
+			.isNotEqualTo(declared);
+	}
+
+	@Test
 	void hashIgnoresNonFormatFiles() throws IOException {
 		Path pack = writer.write(SampleAgentSpecs.singleStep(), temp.resolve("pack"));
 		String before = PackContentHasher.hash(pack);

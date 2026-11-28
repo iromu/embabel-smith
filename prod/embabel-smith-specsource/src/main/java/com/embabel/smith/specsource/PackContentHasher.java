@@ -19,9 +19,19 @@ import java.util.List;
 
 /**
  * Computes a agent spec's content hash: SHA-256 over the sorted relative paths and bytes
- * of the pack's format-owned files — {@code manifest.yml}, {@code goal.yml}, and the YAML
- * files under {@code steps/} and {@code types/} (the same files {@code smith-common}
- * reads; everything else is ignored).
+ * of the pack's format-owned files — {@code manifest.yml}, {@code goal.yml},
+ * {@code references.yml}, and the YAML files under {@code steps/} and {@code types/}.
+ * Everything else in the folder is ignored.
+ *
+ * <p>
+ * <b>Why {@code references.yml} is in the list and the parsed model is not.</b> The first
+ * three of those are read by {@code smith-common} into the model; the reference
+ * definitions are not — they are read at run time, by the runtime's reference reader, and
+ * never reach an {@code AgentSpec}. So this hash is the only drift detector that can see
+ * an edit confined to that file: the builder's semantic {@code SpecContentHash} walks
+ * model fields and cannot see what the model never holds. Excluding it here would leave a
+ * pack whose only change was a reference definition — a path retargeted, a file list
+ * narrowed — identical by both measures, which is the silence this file exists to remove.
  *
  * <p>
  * The hash is stable for identical content and changes when any format-owned file changes
@@ -47,7 +57,7 @@ public final class PackContentHasher {
 
 	private static List<Path> formatFiles(Path packRoot) {
 		List<Path> files = new ArrayList<>();
-		for (String name : List.of("manifest.yml", "goal.yml")) {
+		for (String name : List.of("manifest.yml", "goal.yml", "references.yml")) {
 			Path file = packRoot.resolve(name);
 			if (Files.isRegularFile(file)) {
 				files.add(file);
