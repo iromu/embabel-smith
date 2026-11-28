@@ -286,12 +286,18 @@ then aborted on an empty-content model return, which is the endpoint's flake fam
 wiring fault, and the clean run above is the one being cited.
 
 The third way a declaration fails is an operator switching a group off, and it is deliberately not
-shaped like a tier. With `-Dsmith.tools.file.enabled=false` at the high tier against the same
-example, the run printed **no** tier refusal at all; the boot line read `ours by default [none],
-ours switched on [none], ours disabled by configuration [file], … decided by {file=switch
-'smith.tools.file.enabled'}`, and the run's own answer said no file-listing tool was available. A
-reader can tell the three apart from the report alone: a tier refusal names the pack and the granted
-tier, a switch-off names the property that decided it, and a missing capability names neither.
+shaped like a tier — or like a failure. With `-Dsmith.tools.file.enabled=false` at the high tier against
+the same example, the run printed **no** tier refusal at all and still achieved its goal,
+`goal codebaseMapped achieved in PT2M16.1S`, answering through the skill rather than the disabled group:
+34 activation calls, 9 `listResources`, 9 `readResource`, and no `listFiles` anywhere in the run. The
+degradation shows in two places, neither of them the exit code. The boot line reads
+`ours by default [none], ours switched on [none], ours disabled by configuration [file], … decided by
+{file=switch 'smith.tools.file.enabled'}`, and the answer's own payload says
+`paths=Unable to determine — no file-listing or shell execution tool is available in this environment,
+so the working directory could not be listed or inspected.` So the three are still distinguishable from
+the report alone — a tier refusal names the pack and the granted tier, a switch-off names the property
+that decided it, a missing capability names neither — but a switch-off has to be read off the boot line,
+because the run reports itself as having succeeded.
 
 ### The generic pack and the concrete instance
 
