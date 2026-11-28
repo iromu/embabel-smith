@@ -586,3 +586,11 @@ that is what the report line is for.
   environment paragraph (replacement text supplied by the interpreter, plus the two-limit sentence). The
   shipped engine no longer inherits the host environment — anything still saying "the host's in full" is
   stale as of `3f5c942`.
+- **9.5's re-plan clause lands as printed lines, not a schema change.** `TraceRecordJson` is strict — one
+  record per run, extra fields rejected — and it stays that way; the re-plan becomes a run line emitted by
+  a listener of ours (`ReplanRequestedEvent`, precedent in the builder's own test listener). The
+  excluded-versus-absent clause is a new test against the existing pack-level surface
+  (`IngestedSource.excludedPackForGoal`, `LifecycleBlockedException`), naming both sides and
+  mutation-checking the wording, per the 4.5 lineage's warning about name-matched absence assertions.
+  `RuntimeCore` lines for 9.5, 8.1's posture print and 8.3's `ProcessOptions` belong to the interpreter now
+  that the 7.7 window (`f4b1b59`) is closed.
