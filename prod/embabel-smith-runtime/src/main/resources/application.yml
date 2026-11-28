@@ -15,6 +15,22 @@ embabel:
             models: ${OPENAI_CUSTOM_MODELS:smith-no-endpoint}
         anthropic:
           api-key: ${ANTHROPIC_API_KEY:sk-smith-no-endpoint}
+    # Global guardrails. The platform's registry is a @Component that the platform's own
+    # component scan reaches, so there is no bean to declare here: naming a class below is
+    # the whole installation, and a boot with these three lines removed is a boot with no
+    # guardrails at all rather than one that quietly kept a default.
+    guardrails:
+      # The class is instantiated reflectively once per boot, so it needs a no-argument
+      # constructor and cannot take anything from the context.
+      user-input: com.embabel.smith.runtime.guardrails.PromptInjectionGuardRail
+      # No assistant-message guardrail is authored. An empty value is stated rather than
+      # left out so that "nothing checks the model's output" is a decision on the page.
+      assistant-message: ""
+      # A class name that cannot be loaded or instantiated is otherwise swallowed: the
+      # registry logs it and carries on with an empty list, so the run would report the
+      # guardrail as configured while checking nothing. With this set, a typo fails the
+      # boot instead. See GuardRailRegistrationTest for both halves.
+      fail-on-error: true
 spring:
   main:
     web-application-type: none
