@@ -24,6 +24,14 @@ ingests every pack into one platform, selects the goal, and executes a GOAP plan
   report printing only the strategy would leave the reader to diff the two files.
 - **Plan structure is deterministic.** The planner is not a model, so the same pack and goal produce
   the same step sequence every time. Only the action bodies vary, because those are model calls.
+- **Nothing pauses for a human.** The interpreter pack's `escalate` step declares `OpenQuestion` as
+  its output, and a run that reaches it finishes rather than waiting: the question travels out with the
+  run, and the continuation is a *new* run that carries the answer as its input. The runtime contains no
+  `resume`, no `ProcessStore` and no `checkpoint` — nothing holds a process between invocations — so
+  durable resume would need both a process store this module never references and a way to re-attach the
+  same process with its blackboard. The absence is a stated boundary rather than an omission: a
+  blocked-for-decision run is a completed run whose report carries what it could not decide, and there
+  is no `--resume` to reach for.
 
 ## References and skills
 
