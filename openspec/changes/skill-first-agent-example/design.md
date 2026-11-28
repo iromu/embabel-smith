@@ -240,6 +240,18 @@ runtime gains it here. The jar ships no auto-configuration and no `AutoConfigura
 installing it activates nothing on its own — a `Skills` reference exists only because this repo constructs
 it from a folder.
 
+Two rulings landed during apply, written here because apply-phase channels cross: **6.3** — the twin a
+step gets is selected by a `scripts: true` **field on the pack's `references.yml` entry** (kinds stay
+directory/document/brief, same pattern as 7.3's `unfolding: true`); the step's own `references:` names
+intersect the marked entries, and only the engine attachment differs between the two surfaces, since
+`SkillFilter` is inert. A scripts/-directory marker is rejected because the platform scans it pack-wide,
+which cannot pass the box's negative leg. **6.4** — the output cap (`smith.tools.scripts.output-cap`,
+default 16000) lives in the recording engine, constructing the truncated `Success` through its public
+name-mangled `copy` method resolved by shape (return type `Success`, parameters `String, String, int,
+long, List`, `setAccessible`), never by the mangled string; if resolution ever fails the engine passes
+through and the report says the cap could not be applied. A pin-test asserts the shape resolves against
+the pinned jar, so a platform upgrade trips at build time.
+
 ### D5 — One reference per agent definition, named from the agent
 
 Each agent definition contributes a `Skills` reference named `<agent>-skills`; a folder's shared
