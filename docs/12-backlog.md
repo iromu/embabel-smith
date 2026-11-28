@@ -612,6 +612,33 @@ no longer wraps `PocOnlyPane.vue`.
   `grep -n "String.valueOf" prod/embabel-smith-runtime/src/main/java/com/embabel/smith/runtime/{core/RuntimeCore,trace/TraceRecorder}.java`
   still prints three lines — the rendering is unchanged, and the counts are the unreachability.
 
+- **Open — the CLI never says which planner ran.** The runtime resolves one on every run
+  (`core/PlannerResolver.java:25`: the run's override, else the pack's `manifest.defaultPlanner`, else
+  GOAP) and carries the resolved name on `RunOutcome.plannerName` into the trace record
+  (`trace/TraceRecorder.java:128-130`), so precedence *is* recorded. It is not printed:
+  `cli/RunCommand.java` emits only the run's output or its error, which leaves a `--planner` flag
+  indistinguishable from the pack's default in stdout. Measured 2026-11-28 on the generic pack: the
+  four-strategy sweep contains one `[smith-tools]` line per leg — the addon's boot line — and the only
+  planner text anywhere in the logs is the platform's own logger names, and a `--planner HYBRID` leg
+  against a pack whose manifest named a `defaultPlanner` behaved exactly like that strategy's other
+  legs without saying the override had applied. Check:
+  `grep -rn "plannerName" prod/embabel-smith-runtime/src/main --include=*.java` prints four lines, all
+  producers (the record's javadoc, its component, the trace call), and
+  `grep -n "System.out\|System.err" prod/embabel-smith-runtime/src/main/java/com/embabel/smith/runtime/cli/RunCommand.java`
+  prints four lines, none of them naming a planner — the name exists to be printed and never is.
+
+- **Open — a run stopped by a wall clock prints no report at all.** The report is emitted after the
+  run returns (`cli/RunCommand.java:75-85` prints the output, the notes, or the error), so a process
+  ended by `timeout` leaves nothing behind. Measured 2026-11-28: the per-pack note that a pack
+  `carries scripts, not executed` appears seven times — once per definition — in every leg that
+  terminated, including the leg that refused on its trust tier before executing anything, and zero
+  times in the three legs the 420 s cap killed. The most expensive failure the runtime has — a step's
+  tool loop burning its 60 s interaction timeout ten times — is the failure the CLI documents least.
+  The shape is visible without the logs: `grep -n "System.out\|System.err" prod/embabel-smith-runtime/src/main/java/com/embabel/smith/runtime/cli/RunCommand.java`
+  prints four lines, all of them reached only after `AgentSpecRunService.run` returns, and
+  `grep -rn "Runtime.addShutdownHook\|addShutdownHook" prod/embabel-smith-runtime/src/main --include=*.java`
+  prints nothing — no hook writes a partial report when the process is signalled.
+
 ## Format and sources
 
 - **Open — nothing checks that a declared `toolGroups` entry resolves to anything.**
