@@ -177,7 +177,8 @@ class ScriptEngineConfigTest {
 		}
 		assertThat(found)
 			.as("every key this module reads is one of these, and each of these binds (see the cases above)")
-			.containsExactlyInAnyOrder(PackSkills.SCRIPT_ENGINE_PROPERTY, ScriptEngineConfig.RUN_ROOT_PROPERTY);
+			.containsExactlyInAnyOrder(PackSkills.SCRIPT_ENGINE_PROPERTY, ScriptEngineConfig.RUN_ROOT_PROPERTY,
+					ScriptEngineConfig.OUTPUT_CAP_PROPERTY);
 		assertThat(found)
 			.as("nothing here is shaped like an addon group switch, whose boot report would otherwise own it")
 			.noneMatch((key) -> key.endsWith(".enabled"));

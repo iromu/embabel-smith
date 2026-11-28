@@ -114,6 +114,17 @@ public class ScriptEngineConfig {
 	 */
 	public static final String RUN_ROOT_PROPERTY = "smith.tools.coding.root";
 
+	/**
+	 * The property that says how much one script call may hand over. Read as a key rather
+	 * than as a bound field for the same reason the engine switch is read: a native image
+	 * would freeze a {@code @ConditionalOnProperty} at build time, and this is meant to
+	 * be a deployment-time choice. Unset means
+	 * {@link RecordingScriptExecutionEngine#DEFAULT_OUTPUT_CAP}; zero or less leaves
+	 * output uncapped, which is the platform's own behaviour and is said rather than
+	 * implied.
+	 */
+	public static final String OUTPUT_CAP_PROPERTY = "smith.tools.scripts.output-cap";
+
 	/** The probe nobody has to name: the platform's own two availability checks. */
 	private static final ContainerAvailability PLATFORM_CONTAINERS = new ContainerAvailability() {
 
@@ -147,7 +158,7 @@ public class ScriptEngineConfig {
 	public SkillScriptExecutionEngine skillScriptExecutionEngine(Environment environment,
 			ObjectProvider<ContainerAvailability> containers, ScriptCallLog scriptCalls) {
 		return recorded(choose(choice(environment), scriptRoot(environment),
-				containers.getIfAvailable(() -> PLATFORM_CONTAINERS)), scriptCalls);
+				containers.getIfAvailable(() -> PLATFORM_CONTAINERS)), scriptCalls, outputCap(environment));
 	}
 
 	/**
@@ -172,7 +183,31 @@ public class ScriptEngineConfig {
 	 * @return the engine, wrapped unless it runs nothing at all
 	 */
 	static SkillScriptExecutionEngine recorded(SkillScriptExecutionEngine engine, ScriptCallLog calls) {
-		return (engine == NoOpExecutionEngine.INSTANCE) ? engine : new RecordingScriptExecutionEngine(engine, calls);
+		return recorded(engine, calls, RecordingScriptExecutionEngine.DEFAULT_OUTPUT_CAP);
+	}
+
+	/**
+	 * The engine with its calls recorded and its output bounded, which is the engine the
+	 * boot hands out.
+	 * @param engine the engine the selection installed
+	 * @param calls the log to write
+	 * @param outputCap how much one call may hand over
+	 * @return the engine, wrapped unless it runs nothing at all
+	 */
+	static SkillScriptExecutionEngine recorded(SkillScriptExecutionEngine engine, ScriptCallLog calls, int outputCap) {
+		return (engine == NoOpExecutionEngine.INSTANCE) ? engine
+				: new RecordingScriptExecutionEngine(engine, calls, outputCap);
+	}
+
+	/**
+	 * How much one script call may hand over, as the boot wrote it.
+	 * @param environment the boot's environment
+	 * @return the configured ceiling, or the default when unset
+	 */
+	static int outputCap(Environment environment) {
+		return environment
+			.getProperty(OUTPUT_CAP_PROPERTY, Integer.class, RecordingScriptExecutionEngine.DEFAULT_OUTPUT_CAP)
+			.intValue();
 	}
 
 	/**

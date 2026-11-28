@@ -40,6 +40,8 @@ public final class ScriptCallLog {
 
 	private final List<Call> calls = new CopyOnWriteArrayList<>();
 
+	private final List<String> notes = new CopyOnWriteArrayList<>();
+
 	/**
 	 * Remember one script call.
 	 * @param skill the skill that carried the script
@@ -54,19 +56,33 @@ public final class ScriptCallLog {
 	}
 
 	/**
-	 * The calls as lines, in the order they were made.
-	 * @return one line per call, empty when nothing ran
+	 * Say that an output ceiling was asked for and could not be honoured, which is the
+	 * one case where a run has to retract something it promised.
+	 * @param printed how many characters were handed over anyway
 	 */
-	public List<String> lines() {
-		return this.calls.stream().map(Call::line).toList();
+	public void outputUncapped(int printed) {
+		String line = "script output: " + printed + " characters printed and all of them handed over"
+				+ " — the ceiling was not applied, because this platform version offers no way to"
+				+ " rewrite a printed result";
+		if (!this.notes.contains(line)) {
+			this.notes.add(line);
+		}
 	}
 
 	/**
-	 * Whether the run made no script call at all.
+	 * The calls as lines, in the order they were made, after any note about them.
+	 * @return one line per call, empty when nothing ran
+	 */
+	public List<String> lines() {
+		return java.util.stream.Stream.concat(this.notes.stream(), this.calls.stream().map(Call::line)).toList();
+	}
+
+	/**
+	 * Whether the run made no script call and left no note about one.
 	 * @return true when nothing was recorded
 	 */
 	public boolean isEmpty() {
-		return this.calls.isEmpty();
+		return this.calls.isEmpty() && this.notes.isEmpty();
 	}
 
 	/**
