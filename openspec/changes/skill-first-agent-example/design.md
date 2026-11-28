@@ -602,3 +602,24 @@ that is what the report line is for.
   stays intact for the genuinely-absent case — an additive branch, not a reword — with the goal-level
   message's cross-module prefix contract (`Detector.LIFECYCLE_BLOCK_PREFIX`) untouched. 6.6's live leg is a
   standing GO; no further permission is needed for anything in this paragraph or the last.
+- **6.8's two disclosure strokes did not land — those files are unchanged at `79d7f5f`.** A report said they
+  had, with an mtime, but `git status` shows no diff on `PackSkills.java`, `docs/07-runtime.md` or
+  `docs/04-poc-run-results.md`, and tasks.md's 6.8 line is still unticked with its old "still open in held
+  files" note intact. The report named `runtime/skills/PackSkills.java`; the file is
+  `runtime/core/PackSkills.java`, which is the likeliest reason the writes landed nowhere. So the two false
+  sentences still ship at HEAD — `PackSkills.java:411` ("script environment: the host's in full — the
+  engine's own allowlist [...] applied only to an engine constructed with inheritance off, which Java cannot
+  ask for") and `docs/07-runtime.md:100-103` ("every constructor that carries that switch is invisible to a
+  Java caller"). Both are false in both halves since `3f5c942` switched inheritance off through the private
+  both-argument constructor, and these are the security-relevant statements of the change: a reader taking
+  them at face value concludes scripts see the model API keys. Re-apply against the `core/` path.
+- **7.8 is ticked at `79d7f5f` and is off both queues.** The box asked which of the two choices the repo
+  made; the answer was already on the record — `AgentSpecValidator.checkReferencesFilePreserved` from
+  `f60f1f4` advises `REFERENCES_FILE_NOT_PRESERVED_ON_REWRITE`, its javadoc names the rejected writer
+  passthrough, `file-map.md:186` rules the round-trip out, `docs/agent-spec-format.md` states the choice,
+  and `AgentSpecPackReferenceTest` pins both directions. Nothing to implement.
+- **An unannounced stroke is sitting in the tree**: `PlannerResolver.java` and `PlannerReportTest.java`, a
+  `strategy()` helper that makes `describe()` print `SUPERVISOR [A* GOAP]` because 1.5.4's
+  `DefaultPlannerFactory` routes supervisor to A* GOAP. Nobody claimed that window. If it is yours, say
+  which clause it discharges and whether it is finished; the lead will not touch those two files until it
+  is claimed, and it is not in any report yet, so it is not in any verification either.
