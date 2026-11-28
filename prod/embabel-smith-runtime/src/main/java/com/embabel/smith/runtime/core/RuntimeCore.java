@@ -173,7 +173,7 @@ public class RuntimeCore {
 		// Read after the deploy: the scope builder is what asks the repository for its
 		// steps, so a declaration that resolved to nothing is only known once it has.
 		return new IngestedSource(source, packs, excluded, agent,
-				report(referencesByStep, steps.attached(), steps.unresolved()));
+				report(source.warnings(), referencesByStep, steps.attached(), steps.unresolved()));
 	}
 
 	/**
@@ -211,9 +211,12 @@ public class RuntimeCore {
 	}
 
 	/**
-	 * What the ingest saw: the references it could not construct, what it attached to
-	 * each step, the declarations that resolved to nothing, and the script state in
-	 * force.
+	 * What the ingest saw: the definitions the source dropped before handing them over,
+	 * the references it could not construct, what it attached to each step, the
+	 * declarations that resolved to nothing, and the script state in force.
+	 * @param dropped what the source itself refused to resolve, which it reports as
+	 * warnings rather than as an error — a definition it dropped is stated first, because
+	 * a run that quietly lost two of them otherwise reads as a run that had them
 	 * @param referencesByStep the per-step reference sets, whose notes name refused
 	 * folders and refused entries
 	 * @param attached what each step was attached to, as read from the wrapper
@@ -221,9 +224,9 @@ public class RuntimeCore {
 	 * wrapper
 	 * @return the report to print with the run
 	 */
-	private RunReport report(Map<String, PackReferences> referencesByStep, List<String> attached,
+	private RunReport report(List<String> dropped, Map<String, PackReferences> referencesByStep, List<String> attached,
 			List<String> unresolved) {
-		List<String> lines = new ArrayList<>();
+		List<String> lines = new ArrayList<>(dropped);
 		for (PackReferences references : referencesByStep.values().stream().distinct().toList()) {
 			lines.addAll(references.notes());
 		}

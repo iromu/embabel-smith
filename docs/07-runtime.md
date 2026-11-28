@@ -334,6 +334,27 @@ merely ordered, since the format has no ordering to test. A grep for domain noun
 prompts is empty once word boundaries are used; a boundary-free grep chases ghosts, because `folder`
 contains `order` and `reported` contains `repo`.
 
+**What subtraction says about that chain.** `InterpreterPackOfflineTest` runs the pack with no
+endpoint, and the claim it settles is the one a flow test would make in another format. With all seven
+definitions in one source, the exported goal `taskReported` is reachable — the run fails at the model,
+not at the plan. Delete the only step of any of the five definitions that feed it (`orient`, `select`,
+`plan`, `act`, `script`) and it stops being reachable: the run names `taskReport:TaskReport` as the
+goal's unmet precondition and the ingest names the definition it lost. Delete `escalate`, which feeds
+nothing the goal needs, and the goal stays reachable — the control that keeps the five from passing on
+any failure whatsoever. The goal under test belongs to `verify`, and that is forced rather than
+preferred: a folder source validates each definition before handing it over, and a definition whose
+only step was deleted fails that check for an empty `steps/`, so it is dropped and its own goal is
+never exported at all.
+
+The same file settles the degradation path. With the pack's `skills/` folder removed, the two
+definitions that declare a reference — `select` and `script` — are refused by the source, which says
+so and names both the definition and the name it could not answer; the other five deploy and stay
+plannable, and a goal upstream of the missing skill still gets as far as the model. Offline nothing can
+"complete", so what the box means by *still runs* is that the missing skill changes which goals are
+plannable rather than breaking the run. It is stated rather than implied because the run report now
+carries what the source refused to resolve: until now a run that had quietly lost two definitions
+looked exactly like one that had them.
+
 **The attribution rule between them.** A failure in one pack is not a failure of the channel. If the
 generic pack produces a poor report for the subject it was handed, that is the pack's prompt quality
 and it says nothing about whether skill-following works. The converse holds and matters more: the
