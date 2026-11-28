@@ -5,9 +5,13 @@
 
 package com.embabel.smith.runtime.core;
 
+import java.lang.reflect.Constructor;
 import java.nio.file.Paths;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 import java.util.function.BooleanSupplier;
 import java.util.function.Function;
 
@@ -15,7 +19,9 @@ import com.embabel.agent.skills.script.DockerSkillScriptExecutionEngine;
 import com.embabel.agent.skills.script.NoOpExecutionEngine;
 import com.embabel.agent.skills.script.PodmanSkillScriptExecutionEngine;
 import com.embabel.agent.skills.script.ProcessSkillScriptExecutionEngine;
+import com.embabel.agent.skills.script.ScriptLanguage;
 import com.embabel.agent.skills.script.SkillScriptExecutionEngine;
+import com.embabel.agent.tools.file.FileTools;
 
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
@@ -68,22 +74,30 @@ import org.springframework.core.env.Environment;
  *
  * <p>
  * <b>Why the script root is the run root.</b> D8's rule is one root per run, so the
- * process engine is constructed through {@code confinedTo(root)} with the root the file
- * tools confine to — the value of {@value #RUN_ROOT_PROPERTY} — rather than a second
- * location a pack could escape by knowing the difference.
+ * process engine gets a {@code FileTools} confined to the root the file tools confine to
+ * — the value of {@value #RUN_ROOT_PROPERTY}, through the same factory
+ * {@code confinedTo(root)} itself calls — rather than a second location a pack could
+ * escape by knowing the difference.
  *
  * <p>
- * <b>Why that is a path confinement and not an environment one.</b> {@code confinedTo}
- * sets the {@code FileTools} argument and nothing else, and the platform's own
- * environment switch — construct the engine with inheritance off and it keeps only its
- * allowlist, a dozen or so entries like {@code PATH} — is a constructor parameter that no
- * Java-visible form of this engine carries: every multi-argument constructor is marked
- * synthetic, because the leading {@code Duration} is a Kotlin value class, which is the
- * same reason the factory exists. So a script run by the {@value #PROCESS} engine sees
- * the environment the JVM was started with. That is stated on the run's own line rather
- * than fixed here, and the choices that do keep a host variable away from a script are
- * {@value #DOCKER} and {@value #PODMAN}, which run it in an image that was never given
- * that environment.
+ * <b>Why the host environment is filtered even though the root already confines
+ * paths.</b> {@code confinedTo} sets the {@code FileTools} argument and nothing else, and
+ * the platform's own environment switch — construct the engine with inheritance off and
+ * it keeps only its allowlist, a dozen or so entries like {@code PATH} — defaults to on
+ * in every factory, so an engine built by that factory hands a script the environment the
+ * JVM was started with, API keys among it. The switch is reachable but not nameable: the
+ * constructors a Java caller can see stop before the pair wanted here — the public forms
+ * that carry {@code inheritEnvironment} take no {@code FileTools} root, and the one that
+ * takes both is private — so the engine is built by naming that constructor to the JVM,
+ * with every other argument read from the platform rather than copied here.
+ * {@code ScriptEnvironmentTest} is what keeps that a dependency on a shape rather than a
+ * guess at one. Nothing a script relies on is lost: the platform adds {@code INPUT_DIR}
+ * and {@code OUTPUT_DIR} <em>after</em> filtering, which that test pins too, because a
+ * script that cannot find its output directory fails in a way that looks unrelated to
+ * this choice. The two container choices keep a host variable away from a script by a
+ * different route — {@value #DOCKER} and {@value #PODMAN} run it in an image that was
+ * never given that environment — so what is stated here belongs to the process engine
+ * alone, and the run's line says which engine it speaks for.
  *
  * @author Ivan Rodriguez
  */
@@ -124,6 +138,19 @@ public class ScriptEngineConfig {
 	 * implied.
 	 */
 	public static final String OUTPUT_CAP_PROPERTY = "smith.tools.scripts.output-cap";
+
+	/**
+	 * The platform's own script timeout, in the form its constructor takes it. That
+	 * constructor's first parameter is a {@code long} because {@code Duration} is a
+	 * Kotlin value class, and the encoding is nanoseconds shifted left by one — measured
+	 * against a default-constructed engine rather than guessed, which is also what
+	 * explains why an argument written as raw nanoseconds looks like half the limit it
+	 * names. It is a constant rather than a read field because nothing here depends on
+	 * its value, and {@code ScriptEnvironmentTest} pins that it still equals the
+	 * platform's default, so a platform that changes it fails a test instead of quietly
+	 * changing run behaviour.
+	 */
+	static final long PLATFORM_DEFAULT_TIMEOUT = (30L * 1_000_000_000L) << 1;
 
 	/** The probe nobody has to name: the platform's own two availability checks. */
 	private static final ContainerAvailability PLATFORM_CONTAINERS = new ContainerAvailability() {
@@ -234,7 +261,7 @@ public class ScriptEngineConfig {
 	static SkillScriptExecutionEngine choose(String choice, String root, ContainerAvailability containers) {
 		return switch (choice) {
 			case NONE -> NoOpExecutionEngine.INSTANCE;
-			case PROCESS -> ProcessSkillScriptExecutionEngine.confinedTo(root);
+			case PROCESS -> hostEngine(root);
 			case DOCKER ->
 				confinedIn(containers::dockerAvailable, DOCKER, root, DockerSkillScriptExecutionEngine::confinedTo);
 			case PODMAN ->
@@ -244,6 +271,57 @@ public class ScriptEngineConfig {
 					+ ". Nothing was installed, and an unrecognised value is refused rather than read as '" + NONE
 					+ "', because a typo that fell through would look like a run that was never asked to execute anything.");
 		};
+	}
+
+	/**
+	 * The process engine this run scripts in: confined to the run root the way the
+	 * platform's own factory confines, and with host environment inheritance switched
+	 * off, which neither that factory nor any constructor a Java caller can name does.
+	 *
+	 * <p>
+	 * <b>Why this is a reflective call rather than a constructor invocation.</b> The
+	 * constructors Java can see are a ladder of {@code @JvmOverloads} forms that stop
+	 * before the two arguments wanted together: the public forms that carry
+	 * {@code inheritEnvironment} do not carry a {@code FileTools} root, and the one that
+	 * carries both is private. So the engine is built by naming that constructor to the
+	 * JVM and asking it to honour the confinement and withhold the environment in the
+	 * same object. That is a deliberate dependency on a shape rather than an accident of
+	 * one: the shape is asserted by {@code ScriptEnvironmentTest}, which runs a script
+	 * and reads its environment, and a platform that moves the constructor fails this
+	 * method's refusal at boot rather than a test nobody reads.
+	 *
+	 * <p>
+	 * Everything else is the platform's own default and taken from the platform rather
+	 * than restated: interpreters and the allowlist are read from its companion, the
+	 * languages are the whole enum its default is built from, the timeout is its default
+	 * in the raw form the constructor wants. Only two things differ from
+	 * {@code confinedTo(root)} — inheritance, and the fact that this one had to say so.
+	 * @param root the run root, confined exactly as the file tools confine it
+	 * @return the engine
+	 * @throws IllegalStateException when this platform version cannot be asked for an
+	 * engine that withholds the host environment. It does not fall back to
+	 * {@code confinedTo}, because that would run scripts with the host's variables in
+	 * hand after the run had been told otherwise — the same promise-reported-as-kept
+	 * failure as a container choice that quietly ran on the host.
+	 */
+	static SkillScriptExecutionEngine hostEngine(String root) {
+		try {
+			Constructor<?> declared = ProcessSkillScriptExecutionEngine.class.getDeclaredConstructor(long.class,
+					Set.class, Map.class, Map.class, boolean.class, Set.class, FileTools.class);
+			declared.setAccessible(true);
+			return (SkillScriptExecutionEngine) declared.newInstance(PLATFORM_DEFAULT_TIMEOUT,
+					EnumSet.allOf(ScriptLanguage.class),
+					ProcessSkillScriptExecutionEngine.Companion.getDefaultInterpreters(), Map.of(), Boolean.FALSE,
+					ProcessSkillScriptExecutionEngine.Companion.getSAFE_ENV_ALLOWLIST(), FileTools.readWrite(root));
+		}
+		catch (ReflectiveOperationException | RuntimeException | LinkageError ex) {
+			throw new IllegalStateException(PackSkills.SCRIPT_ENGINE_PROPERTY + "='" + PROCESS + "' asks for scripts"
+					+ " to run on the host with the host's environment withheld, and this platform version offers no"
+					+ " constructor that takes a root and that switch together. Refusing rather than falling back to"
+					+ " the platform's own factory: that one leaves inheritance on, and a script that ran with every"
+					+ " variable this JVM holds after being promised the allowlist would report the promise as kept.",
+					ex);
+		}
 	}
 
 	/**

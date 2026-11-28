@@ -6,6 +6,7 @@
 package com.embabel.smith.runtime.core;
 
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
@@ -30,24 +31,27 @@ import static org.assertj.core.api.Assertions.assertThat;
  * own variable names, and the sentence the run says about it.
  *
  * <p>
- * <b>The claim, stated plainly.</b> The platform's process engine ships an environment
- * allowlist — {@code SAFE_ENV_ALLOWLIST}, fifteen entries like {@code PATH} and
- * {@code HOME} — and applies it <em>only</em> to an engine constructed with host
- * inheritance switched off. That switch is a constructor parameter, and on this platform
- * version no form of that constructor that carries it is visible to a Java caller: every
- * multi-argument one is marked synthetic, so what Java can reach is the no-argument
- * engine and {@code confinedTo(root)}, both of which take the platform default —
- * inheritance on. So the engine the {@code process} selection installs hands a script the
- * whole host environment, API keys among it, and {@code confinedTo} confines
- * <em>paths</em> only. The first case measures that; it is not a claim about a boundary,
- * it is the reason the second case exists.
+ * <b>The pair, in the order that makes each mean something.</b> The platform's process
+ * engine ships an environment allowlist — {@code SAFE_ENV_ALLOWLIST}, fifteen entries
+ * like {@code PATH} and {@code HOME} — and applies it <em>only</em> to an engine
+ * constructed with host inheritance switched off, which its own factories never do:
+ * {@code confinedTo(root)} passes a root and nothing else. So the platform default hands
+ * a script the whole host environment, API keys among it, and that is what the second
+ * case measures. The first case measures the other half of the story, which is that this
+ * module does not ship that engine: the constructors Java can name stop before the pair
+ * wanted here — the public forms that carry the inheritance switch take no confined root,
+ * and the one that takes both is private — so {@code ScriptEngineConfig} names that
+ * constructor to the JVM and builds an engine that withholds the host environment, and a
+ * variable outside the allowlist does not reach the child. The two cases are the same
+ * script run twice against the same host — one assertion each side of a real difference,
+ * not a claim about a boundary nobody can observe.
  *
  * <p>
  * <b>What the run says.</b> A run that offers scripts also says what they can read, on
- * the same line that says scripts are in play, naming the allowlist that this engine does
- * not apply — so an operator does not read "scripts offered as tools" as "scripts
- * sandboxed". With the switch off nothing runs, so that clause is absent rather than
- * negated, and the line still distinguishes a withheld capability from an absent one.
+ * the line that says scripts are in play, so an operator does not read "scripts offered
+ * as tools" as "scripts sandboxed" — or, now that the list is applied, read the reverse
+ * of it. With the switch off nothing runs, so that clause is absent rather than negated,
+ * and the line still distinguishes a withheld capability from an absent one.
  *
  * <p>
  * Runs with no model and no endpoint. The script prints names of variables and nothing
@@ -62,6 +66,25 @@ class ScriptEnvironmentTest {
 	 * files.
 	 */
 	private static final String CALL_WITH_NOTHING = "{\"args\":[],\"stdin\":\"\",\"inputFiles\":[]}";
+
+	/**
+	 * The two names the engine writes into every script's environment itself, after any
+	 * filtering. They are excluded from the host-variable comparison because they are not
+	 * host variables, and a shell that happened to export one would otherwise turn the
+	 * first case below into a coin flip.
+	 */
+	private static final List<String> RUN_DIRECTORIES = List.of("INPUT_DIR", "OUTPUT_DIR");
+
+	/**
+	 * Names the interpreter puts into its own environment as it starts, whether or not
+	 * anything handed them over: the last command's path, the working directory, the
+	 * shell nesting depth. They are excluded from the comparison because they arrive
+	 * after the engine's filter and would otherwise be indistinguishable from a leak —
+	 * measured rather than assumed: the isolated child's entire environment is the
+	 * allowlist plus {@link #RUN_DIRECTORIES} plus exactly these, and the case that names
+	 * the platform default hands over hundreds more.
+	 */
+	private static final Set<String> INTERPRETER_OWNED = Set.of("_", "PWD", "SHLVL", "OLDPWD");
 
 	/**
 	 * A host that can run no container, which is irrelevant here and only needed because
@@ -86,30 +109,73 @@ class ScriptEnvironmentTest {
 	Path tmp;
 
 	@Test
-	void aScriptSeesTheHostEnvironmentInFullBecauseTheSwitchThatWouldNarrowItIsNotReachableFromJava()
-			throws IOException {
-		Set<String> outsideTheSafeList = new TreeSet<>(System.getenv().keySet());
-		outsideTheSafeList.removeAll(ProcessSkillScriptExecutionEngine.Companion.getSAFE_ENV_ALLOWLIST());
+	void theEngineThisModuleInstallsKeepsHostVariablesOutOfTheScript() throws IOException {
+		Set<String> outsideTheSafeList = hostVariablesOutsideTheAllowlist();
 		assertThat(outsideTheSafeList)
-			.as("this JVM holds variables the engine's allowlist would have dropped, so the claim below is not vacuous")
+			.as("this JVM holds variables the allowlist would drop, so the claim below is not vacuous")
 			.isNotEmpty();
 
 		List<String> seen = environmentSeenBy(tool(skillsOf(scriptedPack(), engine()), "envprint_env"));
 
-		assertThat(seen).as("the script was given an environment, not an empty one").contains("PATH").isNotEmpty();
 		assertThat(seen)
-			.as("and every variable this JVM holds beyond the allowlist is in it, because inheritance"
-					+ " is on and this platform gives a Java caller no way to switch it off")
+			.as("the script was given a working environment, not an emptied one — an interpreter"
+					+ " still has to be findable")
+			.contains("PATH");
+		Set<String> whatMayArrive = new TreeSet<>(ProcessSkillScriptExecutionEngine.Companion.getSAFE_ENV_ALLOWLIST());
+		whatMayArrive.addAll(RUN_DIRECTORIES);
+		whatMayArrive.addAll(INTERPRETER_OWNED);
+		assertThat(seen)
+			.as("and the child's whole environment is that list, the two run directories and what"
+					+ " the interpreter writes itself — nothing else")
+			.isSubsetOf(whatMayArrive);
+		assertThat(seen).as("stated as a refusal: none of this JVM's own variables is among them")
+			.doesNotContainAnyElementsOf(outsideTheSafeList);
+	}
+
+	@Test
+	void thePlatformsOwnDefaultEngineLeaksThoseSameVariables() throws IOException {
+		Set<String> outsideTheSafeList = hostVariablesOutsideTheAllowlist();
+
+		List<String> seen = environmentSeenBy(
+				tool(skillsOf(scriptedPack(), ProcessSkillScriptExecutionEngine.confinedTo(this.tmp.toString())),
+						"envprint_env"));
+
+		assertThat(seen)
+			.as("the engine the platform's own factory builds hands over every variable this JVM holds beyond"
+					+ " the allowlist, which is the reason the case above exists rather than a rhetorical one")
 			.containsAll(outsideTheSafeList);
+	}
+
+	@Test
+	void theRunDirectoriesReachTheScriptAfterTheFilter() throws IOException {
+		List<String> seen = environmentSeenBy(tool(skillsOf(scriptedPack(), engine()), "envprint_env"));
+
+		assertThat(seen)
+			.as("the engine writes these itself, after filtering, so withholding the host environment does not"
+					+ " leave a script unable to find the folder it was given")
+			.containsAll(RUN_DIRECTORIES);
+	}
+
+	@Test
+	void theEngineBuiltWithInheritanceOffStillCarriesThePlatformsOwnTimeout() throws ReflectiveOperationException {
+		Field timeout = ProcessSkillScriptExecutionEngine.class.getDeclaredField("timeout");
+		timeout.setAccessible(true);
+
+		assertThat(timeout.getLong(ProcessSkillScriptExecutionEngine.confinedTo(this.tmp.toString())))
+			.as("the constructor takes the timeout as a raw value-class long, and this module passes the"
+					+ " platform's own default rather than a number of its own; if this goes red the platform"
+					+ " changed its default and every run's limit changed with it")
+			.isEqualTo(ScriptEngineConfig.PLATFORM_DEFAULT_TIMEOUT);
 	}
 
 	@Test
 	void theRunThatOffersScriptsSaysWhatTheyCanBeRead() throws IOException {
 		PackSkills carried = PackSkills.at(scriptedPack(), "exec", engine());
 
-		assertThat(carried.notes()).as("the line that says scripts run also names the list it did not apply")
-			.anyMatch((line) -> line.contains("script environment") && line.contains("the host's in full")
-					&& line.contains("PATH"));
+		assertThat(carried.notes())
+			.as("the line that says scripts run also names the list, so the sentence cannot be read as"
+					+ " silence about the environment")
+			.anyMatch((line) -> line.contains("script environment") && line.contains("PATH"));
 	}
 
 	@Test
@@ -120,6 +186,19 @@ class ScriptEnvironmentTest {
 			.anyMatch((line) -> line.contains("skill scripts") && line.contains("not executed"));
 		assertThat(carried.notes()).as("and the environment is not, because no script runs to see it")
 			.noneMatch((line) -> line.contains("script environment"));
+	}
+
+	/**
+	 * The variables this JVM holds that the engine's allowlist does not name, minus the
+	 * two the engine adds to every script itself.
+	 * @return the names, sorted, so a failure prints them legibly
+	 */
+	private static Set<String> hostVariablesOutsideTheAllowlist() {
+		Set<String> outside = new TreeSet<>(System.getenv().keySet());
+		outside.removeAll(ProcessSkillScriptExecutionEngine.Companion.getSAFE_ENV_ALLOWLIST());
+		outside.removeAll(RUN_DIRECTORIES);
+		outside.removeAll(INTERPRETER_OWNED);
+		return outside;
 	}
 
 	/**

@@ -134,6 +134,15 @@ class ScriptEngineConfigTest {
 		ScriptEngineConfig.ContainerAvailability nowhere = containers(false, false);
 		refuses(ScriptEngineConfig.DOCKER, nowhere);
 		refuses(ScriptEngineConfig.PODMAN, nowhere);
+		// The direction that says each container choice asks its own probe rather than
+		// the
+		// other one's: a host with Docker and without Podman must not satisfy `podman`,
+		// and
+		// one with Podman and without Docker must not satisfy `docker`. A probe wired to
+		// the
+		// wrong daemon would otherwise pass as working wherever both daemons exist.
+		refuses(ScriptEngineConfig.PODMAN, containers(true, false));
+		refuses(ScriptEngineConfig.DOCKER, containers(false, true));
 		// The control: the same call against a host that can run containers does install
 		// the engine, so the refusals above are the probe answering and not an
 		// unconditional rejection of containers.

@@ -176,9 +176,12 @@ class ScriptExecutionTest {
 
 	/**
 	 * The process engine with a shortened execution limit. The limit is a constructor
-	 * parameter, but the leading {@code Duration} value-class argument makes the deeper
-	 * overloads synthetic — {@code confinedTo}'s own comment says a Java caller cannot
-	 * reach them — so the one-argument form is asked for by reflection. Nothing else is
+	 * parameter, but the leading {@code Duration} value-class argument makes every form
+	 * of that constructor invisible to a Java compiler — {@code confinedTo}'s own comment
+	 * says so — so the one-argument form is asked for by reflection. The argument is the
+	 * encoded value rather than nanoseconds: the encoding shifts nanoseconds left by one,
+	 * measured against a default-constructed engine, which is also why an engine handed
+	 * raw nanoseconds stops at half the limit its own message names. Nothing else is
 	 * changed: languages, interpreters and staging stay at their defaults.
 	 * @param timeout how long a script may run before the engine kills it
 	 * @return an engine that stops scripts after that long
@@ -187,11 +190,11 @@ class ScriptExecutionTest {
 		try {
 			Constructor<?> limit = ProcessSkillScriptExecutionEngine.class.getDeclaredConstructor(long.class);
 			limit.setAccessible(true);
-			return (ProcessSkillScriptExecutionEngine) limit.newInstance(timeout.toNanos());
+			return (ProcessSkillScriptExecutionEngine) limit.newInstance(timeout.toNanos() << 1);
 		}
 		catch (ReflectiveOperationException ex) {
-			throw new IllegalStateException("the engine's timeout is no longer reachable the way this test reads "
-					+ "it, so the timeout case needs the thirty-second default instead", ex);
+			throw new IllegalStateException("the engine's timeout is no longer reachable the way this test reads it, "
+					+ "so the timeout case needs the thirty-second default instead", ex);
 		}
 	}
 
