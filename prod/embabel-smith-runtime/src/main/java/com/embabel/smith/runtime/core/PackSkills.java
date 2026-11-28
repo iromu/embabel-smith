@@ -360,17 +360,25 @@ public final class PackSkills {
 	 * @return the line
 	 */
 	private static String scriptState(Map<String, LlmReference> carried, SkillScriptExecutionEngine scriptEngine) {
-		boolean scripts = carried.values()
+		Set<String> carriers = new LinkedHashSet<>();
+		carried.values()
 			.stream()
 			.filter(Skills.class::isInstance)
 			.map(Skills.class::cast)
 			.flatMap((skills) -> skills.getSkills().stream())
-			.anyMatch(LoadedSkill::hasScripts);
+			.filter(LoadedSkill::hasScripts)
+			.map(LoadedSkill::getName)
+			.forEach(carriers::add);
 		boolean offered = (scriptEngine != null) && !scriptEngine.supportedLanguages().isEmpty();
 		String state = (offered) ? "offered as tools by the engine " + SCRIPT_ENGINE_PROPERTY + " selects"
 				: "not executed (switch " + SCRIPT_ENGINE_PROPERTY + " selects an engine)";
-		return "skill scripts: " + (scripts ? "this pack carries them" : "none carried") + ", " + state
-				+ environment(scriptEngine, offered);
+		// The carriers are named, not just counted: a run that executed a script also
+		// says
+		// which skill it came from, and the two lines only line up if this one names the
+		// skills that could have been called.
+		return "skill scripts: "
+				+ (carriers.isEmpty() ? "none carried" : "this pack carries them (" + String.join(", ", carriers) + ")")
+				+ ", " + state + environment(scriptEngine, offered);
 	}
 
 	/**
@@ -397,7 +405,7 @@ public final class PackSkills {
 	 * @return the clause, empty when nothing runs or when it is not the process engine
 	 */
 	private static String environment(SkillScriptExecutionEngine scriptEngine, boolean offered) {
-		if (!offered || !(scriptEngine instanceof ProcessSkillScriptExecutionEngine)) {
+		if (!offered || !(ScriptEngineConfig.underlying(scriptEngine) instanceof ProcessSkillScriptExecutionEngine)) {
 			return "";
 		}
 		return "; script environment: the host's in full — the engine's own allowlist ["
