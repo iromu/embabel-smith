@@ -23,11 +23,15 @@ ingests every pack into one platform, selects the goal, and executes a GOAP plan
 
 ## References and skills
 
-A step's `references:` entry names a skill the pack carries. `core/RuntimeCore` hands the scope
-builder a `core/ReferenceAwareStepSpecRepository` over the step repository, and that wrapper does two
-things nothing else in the deploy path can: the scope builder takes tool groups and tools but no
-references, so the context a step is emitted against would otherwise carry none, and upstream resolves
-a declared name against that list with a plain map lookup whose miss is silent.
+A step's `references:` entry names something its definition carries: a skill of its folders, or an
+entry its `references.yml` declares — `agent-spec-format.md` states the kinds and their format, and
+this page does not repeat it. `core/PackReferences` is what reads both for one definition, and
+`core/RuntimeCore` hands the scope builder a `core/ReferenceAwareStepSpecRepository` over the step
+repository; that wrapper does two things nothing else in the deploy path can: the scope builder takes
+tool groups and tools but no references, so the context a step is emitted against would otherwise
+carry none, and upstream resolves a declared name against that list with a plain map lookup whose miss
+is silent. Reading the skill folders alone would answer a step that declares one name and no more,
+which is why one seam resolves every kind rather than one per kind.
 
 - **One container per definition.** `core/PackSkills` builds a `Skills` reference named
   `<agent>-skills` from the definition's own `skills/`, and `shared-skills` from the `skills/` of its
@@ -42,17 +46,18 @@ a declared name against that list with a plain map lookup whose miss is silent.
   that reason. The names are pinned by test.
 - **Resolution is per definition.** A name carried only by a sibling definition, or by an unrelated
   folder, does not resolve; it is reported as dangling rather than resolving through a neighbour.
-  Ahead of that, the pack validator refuses a step that declares a skill no folder its pack can reach
-  carries — naming the step, the declared name, and the names actually carried — so the pack is
-  dropped at the source and never reaches a run. The wrapper's dangling line is the backstop for a
-  path that bypasses validation, not the ordinary route.
+  Ahead of that, the pack validator refuses a step that declares a reference neither a folder its
+  pack can reach nor its `references.yml` carries — naming the step, the declared name, and the names
+  actually carried — so the pack is dropped at the source and never reaches a run. The wrapper's
+  dangling line is the backstop for a path that bypasses validation, not the ordinary route.
 - **A reference never changes the plan.** It alters what a selected step's model call can reach, not
   which steps the planner selects.
 
 What an ingest decided goes to **stderr**, ahead of the result, so the goal's own output stays the
 only thing on stdout: which step was attached to which container, every skill folder the loader
-refused (by path), every declared name that resolved to nothing (naming the step and the name), and
-the script state in force. A silent absence and a policy block look identical otherwise.
+refused (by path), every `references.yml` entry it declined to construct (by name, and naming the
+kind it has no recipe for), every declared name that resolved to nothing (naming the step and the
+name), and the script state in force. A silent absence and a policy block look identical otherwise.
 
 Scripts are **off by default**: a pack whose skill ships a `scripts/` folder offers no script tool,
 and the run says so and names the switch — `smith.tools.scripts.engine` — rather than leaving the
@@ -259,7 +264,7 @@ pointed at the whole `coding-agent` folder, `--goal codebaseMapped` refuses at t
 step it never needed. Whether the gate should instead consider only the planned steps is an open
 question, recorded against the example's task list rather than decided here.
 
-Three facts about `--source` that the commands above depend on and that no error message states.
+Four facts about `--source` that the commands above depend on and that no error message states.
 `folder:` resolves the **children** of the directory it is given, so pointing it at a pack rather
 than at a folder of packs yields `spec source '…' contains no agent specs` — `arithmetic` is
 addressable through its parent, `coding-agent`'s definitions through `coding-agent`. Shared skills
@@ -267,8 +272,16 @@ are read from the source root's own `skills/` directory, so lifting one definiti
 `coding-agent` without that directory leaves its `references: [repo-map]` unresolvable, and the
 result is the same empty-source line with nothing naming the pack or the name — the run report that
 names unresolved references applies to a deployed pack's steps and never gets the chance to fire for
-a pack that never arrived. And `--trust-tier` gates on tool-group role names only, so it cannot
-restrict a capability that registers no role.
+a pack that never arrived. The third cause of that same line is layout: a pack needs a `types/`
+directory to survive validation at all, even an empty one, which is why `agent-specs/arithmetic`
+carries a `types/.gitkeep` that no step reads. The rule is `smith-common`'s own, under the code
+`LAYOUT_MISSING_TYPES`, and `FolderSpecSource` keeps only the candidates that validate — measured
+2026-11-28 against two staging directories that differed in that one directory alone, where the one
+with `types/` deployed the pack and printed the tier refusal below, and the one without it printed
+the empty-source line and named nothing. A validation failure does leave a warning on the resolved
+source, but nothing on the terminal prints it, so the three causes are indistinguishable from the
+output. And `--trust-tier` gates on tool-group role names only, so it cannot restrict a capability
+that registers no role.
 
 `agent-specs/arithmetic` shows the tier from the other side, since its single step declares `math`,
 which registers from upstream rather than from this project's switches. At the default tier it
