@@ -17,7 +17,6 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -202,13 +201,18 @@ class AgentSpecSkillReferenceTest {
 		// Upstream's GoalSpec carries no references field, and a goal contributes no
 		// model
 		// call of its own, so the key is inert rather than an error: the pack still
-		// validates.
+		// validates. Written into the one document the writer emits, so the key really is
+		// the one the runtime's verbatim staging hands to the reader.
 		write(packDeclaring(List.of()), dir);
 		Files.writeString(dir.resolve("goal.yml"),
-				Files.readString(dir.resolve("goal.yml")) + "references:\n  - " + SKILL + "\n",
-				StandardOpenOption.APPEND);
+				Files.readString(dir.resolve("goal.yml")) + "references:\n  - " + SKILL + "\n");
 
-		assertThat(validator.validate(dir).isValid()).isTrue();
+		ValidationResult result = validator.validate(dir);
+
+		assertThat(result.isValid()).as(() -> result.issues().toString()).isTrue();
+		// Reported under its own code rather than dropped: the author learns the
+		// declaration does nothing without the pack being refused for it.
+		assertThat(result.issuesWithCode("REFERENCES_INERT_ON_GOAL")).hasSize(1);
 	}
 
 	// --- fixtures --------------------------------------------------------------

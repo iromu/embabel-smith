@@ -4,9 +4,12 @@ description: "Answer a coffee-brewing question using the bundled domain guide"
 inputTypeNames:
   - com.embabel.agent.domain.io.UserInput
 outputTypeName: com.embabel.agent.spec.model.BackgroundMessage
+references:
+  - domain-guide
 prompt: |
   Answer the user's question about coffee brewing.
-  Consult the bundled domain guide (references/domain.md) on demand — load only the part you need —
-  then answer in two or three plain-language sentences. Do not paste the guide.
+  The pack carries a domain guide as reference material named domain-guide. Use its tools to list
+  what it holds and read only the part you need — do not read all of it, and do not paste it.
+  Then answer in two or three plain-language sentences.
 
   User question: {{userInput.content}}

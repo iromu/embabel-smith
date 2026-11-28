@@ -5,6 +5,7 @@
 
 package com.embabel.smith.common.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonInclude.Include;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -32,6 +33,17 @@ public record GoalStepSpec(@JsonProperty("stepType") String stepType, @JsonPrope
 	/** The step-type discriminator value written to {@code stepType} in the YAML. */
 	public static final String STEP_TYPE = "goal";
 
+	/**
+	 * Whether the goal is callable, read from the {@code export} component.
+	 * <p>
+	 * Ignored by the writer on purpose: without the annotation Jackson serializes this
+	 * derived accessor as an extra {@code exported} key beside the real {@code export}
+	 * one, and {@code exported} is a key neither this model nor upstream's
+	 * {@code GoalSpec} implements — so every pack this repo writes would carry a key the
+	 * format's own unknown-key check exists to refuse.
+	 * @return true when the goal is exported and therefore callable
+	 */
+	@JsonIgnore
 	public boolean isExported() {
 		return Boolean.TRUE.equals(this.export);
 	}

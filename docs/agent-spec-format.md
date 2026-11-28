@@ -18,12 +18,27 @@ The POC modules map this format onto Embabel's runtime types; the format itself 
     <name>.yml          ActionStepSpec (one file per action)
   types/
     <name>.yml          DynamicTypeDef (intermediate pure-data types)
+  references.yml        OPTIONAL — references the pack carries that are not skills,
+                        each entry declaring `name`, `kind` and `path`
   skills/               OPTIONAL — Agent Skills the pack carries (pure data, no code)
     <name>/SKILL.md     front matter declares `name` and `description`
 ```
 
 `types/` may be empty (a `.gitkeep` is written to keep the directory). An agent spec exposes
 **exactly one** callable goal, and that goal *is* the exported goal.
+
+`references.yml` is optional and lists what a step's `references:` may name besides skills: a
+`directory`, a `document`, a literal `brief`, or a `skills` folder, each under a name. Only those
+kinds are accepted — each names a platform reference type, so neither a property nor this file can
+nominate a class. Two of them differ in what the model receives: a
+`document` contributes its whole text on every call, while a `directory` contributes its description
+and notes and offers prefixed tools for reading parts of it, which is the form a prompt meaning "load
+only what you need" wants. `AgentSpecValidator` reads the file straight off disk, and
+`AgentSpecWriter` does not emit it, which the last check under **Validation** returns to. What
+an ingest does with it is narrower than what the format accepts: a deploy answers a declared name
+only from the pack's `skills/` folders, so a `directory`, `document` or `brief` entry validates
+today and is then said unresolved by the run rather than constructed — the half of the format the
+runtime does not implement yet.
 
 `skills/` is optional: a pack that carries none is a complete agent spec, and the directory adds no
 requirement elsewhere in the format. When several agent definitions sit side by side in one folder, a
@@ -35,7 +50,7 @@ own copy serves the reference.
 
 ## The contract
 
-Seven invariants define the format. Both sides of the system check against one schema — field names
+Nine invariants define the format. Both sides of the system check against one schema — field names
 follow Embabel's own spec YAML (`stepType`, `export`, `inputTypeNames`, `outputTypeName`,
 `ownProperties`) — because letting the producer and the consumer parse YAML independently is how the
 two drift apart.
@@ -48,10 +63,18 @@ two drift apart.
 4. Intermediate types are pure data — a name, a description, named typed own-properties. No compiled
    JVM class, which is what makes a spec portable and ingestible without a build.
 5. Every type reference resolves: framework-provided or declared in `types/`.
-6. Every declared reference resolves to a skill the pack — or the folder sharing its `skills/` —
-   actually carries.
+6. Every declared reference resolves to something the pack carries — a skill under its own `skills/`
+   (or the folder sharing it), or an entry its `references.yml` declares.
 7. The manifest declares runtime defaults — `name` and `version` required, planner and model
    optional.
+8. A reference the pack declares in `references.yml` is of a kind the runtime can construct, its
+   backing path is present in the pack, and its name is still unique once the platform sanitizes it
+   into a tool prefix. Two names collapsing to one prefix is a silent overwrite of one reference's
+   tools by the other's, and a name resolving to nothing is a silent skip — neither is discoverable
+   at run time.
+9. A step file carries only keys the format implements. The reader does not fail on a key it does not
+   know, so an invented key — a per-step approval, a retry count — reads as a control that was
+   configured while doing nothing, which is worse than the control being absent.
 
 ## `manifest.yml` — `AgentSpecManifest`
 
@@ -95,20 +118,32 @@ Optional, all nullable: `pre`, `post` (lists of condition names), `cost`, `value
 
 ### References
 
-```yaml
-references:             # OPTIONAL — the skills this step asks to be in play
-  - repo-notes
-```
-
-`references` is Embabel's own step-spec key, and each entry is the **declared name** of a skill the
-pack carries (or the folder sharing its `skills/` carries). It is a *request* for that capability,
+`references` is Embabel's own step-spec key, and each entry is the **declared name** of something the
+pack carries — a skill under its own `skills/` (or the folder sharing it), or an entry of its
+`references.yml`. It is a *request* for that capability,
 not a grant of reach: it adds no trust claim of its own, and it is **not** a tool group — the tier
 gate still applies to whatever the step is allowed to call. A step that declares none is offered
 nothing from the pack's skills, whatever the pack carries.
 
+```yaml
+references:             # OPTIONAL — what this step asks to be in play
+  - repo-notes
+```
+
+A reference the pack carries without a skill folder is declared in `references.yml` and named here by
+the same key:
+
+```yaml
+# references.yml
+references:
+  - name: domain-guide
+    kind: directory         # skills | directory | document | brief
+    path: references
+```
+
 A `references:` key written in `goal.yml` is inert: upstream's `GoalSpec` carries no such field and a
 goal contributes no model call of its own, so the declaration is ignored and the pack still
-validates. Only action steps reference.
+validates, with `REFERENCES_INERT_ON_GOAL` recorded. Only action steps reference.
 
 ### Prompt references
 
@@ -169,17 +204,44 @@ another type name).
    does not carry, rather than skipped. The skill a reference names is the name its `SKILL.md` front
    matter declares; the folder name answers only when the file declares none.
 7. **Declared references resolve** — every `references` entry names a skill the pack's own `skills/`
-   or the immediate parent's `skills/` carries, one issue per declaring step. This is the reference
+   or the immediate parent's `skills/` carries, or a reference its `references.yml` declares, one
+   issue per declaring step. This is the reference
    counterpart of check 4, and it exists because upstream resolves an unmatched name with a silent
    `map.get`/null skip: the name is then offered to no model and the run answers as though the
    capability never existed. The same rule is why a dangling name must be caught here rather than
    discovered at run time.
+8. **A declared reference is one the runtime can build** — the kind is one of `skills`, `directory`,
+   `document` or `brief`; a path-backed kind has a path, and that path exists in the pack in the shape
+   the kind needs (a `document` a file, the others a directory); and a name is usable as a tool prefix
+   and unique, once sanitized, among the other declared names and the skill names the pack already
+   answers to. A name written on a goal rather than a step is *advisory*: `GoalSpec` has no references
+   field and a goal contributes no model call of its own, so the declaration is ignored and the pack
+   deploys — the point of saying it is that the author learns it here rather than at run time.
+9. **Step keys are keys the format has** — each step file and `goal.yml` is also read as written,
+   since the runtime stages them verbatim and the reader ignores what it does not know. A key nothing
+   in the format implements is named and refuses the pack. A key the upstream model implements but
+   `AgentSpecWriter` never emits (`llm`, `tools`, `export`) is *advisory*: it honors at deploy and is
+   lost at the next save. An action-only key written in `goal.yml` is *advisory* too, under its own
+   code, for the reason in check 8.
+10. **A references file survives a deploy, not a rewrite** — *advisory*, and it fires on every pack
+    that carries the file. The writer emits `manifest.yml`, `goal.yml`, `steps/` and `types/` and has
+    no representation for `references.yml`, so a studio save or a builder repair ships the pack with
+    that file and the references it declares gone. The format deliberately gives the writer no
+    passthrough, so the loss is said out loud instead of being prevented.
 
-Issue codes: `LAYOUT_MISSING_MANIFEST`, `LAYOUT_MISSING_GOAL`, `LAYOUT_MISSING_STEPS`,
+Issue codes — every one below is a refusal, so it makes the pack undeployable, except the four marked
+*advisory*: `LAYOUT_MISSING_MANIFEST`, `LAYOUT_MISSING_GOAL`, `LAYOUT_MISSING_STEPS`,
 `LAYOUT_EMPTY_STEPS`, `LAYOUT_MISSING_TYPES`, `SKILL_MISSING_DEFINITION`, `GOAL_MISSING`,
 `GOAL_NOT_EXPORTED`, `DANGLING_TYPE_REF`, `DANGLING_REFERENCE`, `PROMPT_MISSING`,
 `PROMPT_UNDECLARED_INPUT`, `PROMPT_UNKNOWN_PROPERTY`, `PROMPT_IGNORES_DECLARED_INPUT`,
-`PARSE_ERROR`.
+`REFERENCE_UNKNOWN_KIND`, `REFERENCE_MISSING_PATH`, `REFERENCE_UNUSABLE_NAME`,
+`REFERENCE_PREFIX_COLLISION`, `REFERENCE_UNNAMED`, `UNKNOWN_STEP_KEY`, `PARSE_ERROR`; and advisory —
+`REFERENCES_INERT_ON_GOAL`, `KEY_INERT_ON_GOAL`, `KEY_NOT_PRESERVED_ON_REWRITE`,
+`REFERENCES_FILE_NOT_PRESERVED_ON_REWRITE`.
+
+`isValid()` means *no error finding*, not *no finding*: a pack carrying an advisory code validates and
+deploys, and the advisory is where a declaration that will be ignored — or lost at the next rewrite —
+is recorded. A report that a pack is valid should therefore still show its advisories.
 
 ## Mapping to Embabel (the runtime seam)
 

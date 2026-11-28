@@ -1,0 +1,4 @@
+references:
+  - name: domain-guide
+    kind: directory
+    path: references
