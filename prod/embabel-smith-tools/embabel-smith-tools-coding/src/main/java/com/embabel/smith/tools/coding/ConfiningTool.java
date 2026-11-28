@@ -47,6 +47,13 @@ import tools.jackson.databind.ObjectMapper;
  * expose map builds, which come through here too.
  *
  * <p>
+ * <b>What is noted, on the way out.</b> The same wrapper sees which tool answered and
+ * which path it was aimed at, which is the pair nothing else in this JVM has: upstream's
+ * read log belongs to the read-only instance and names paths alone. So a group built with
+ * a {@link ReadPathLog} can tell a run what it read, in the same per-call shape a script
+ * call is reported in — and a refused call is not in it, because nothing was read.
+ *
+ * <p>
  * A refusal is returned as a tool error rather than thrown, so the run continues and the
  * tool result is where the operator sees it — the same shape upstream's own traversal
  * refusal takes.
@@ -82,9 +89,16 @@ public final class ConfiningTool implements DelegatingTool {
 
 	private final RunRoot root;
 
+	private final ReadPathLog reads;
+
 	ConfiningTool(Tool delegate, RunRoot root) {
+		this(delegate, root, new ReadPathLog());
+	}
+
+	ConfiningTool(Tool delegate, RunRoot root, ReadPathLog reads) {
 		this.delegate = delegate;
 		this.root = root;
+		this.reads = reads;
 	}
 
 	@Override
@@ -99,14 +113,78 @@ public final class ConfiningTool implements DelegatingTool {
 
 	@Override
 	public Tool.Result call(String input) {
-		String refusal = refusalFor(input);
-		return (refusal != null) ? Tool.Result.error(refusal) : bounded(this.delegate.call(input));
+		return settled(input, () -> this.delegate.call(input));
 	}
 
 	@Override
 	public Tool.Result call(String input, com.embabel.agent.api.tool.ToolCallContext context) {
-		String refusal = refusalFor(input);
-		return (refusal != null) ? Tool.Result.error(refusal) : bounded(this.delegate.call(input, context));
+		return settled(input, () -> this.delegate.call(input, context));
+	}
+
+	/**
+	 * The one route every call takes: confine, then delegate, then cap.
+	 *
+	 * <p>
+	 * The order is the claim. The refusal is worked out before the delegate is touched,
+	 * so a call aimed outside the root never reaches the platform's instance rather than
+	 * reaching it and having its result edited afterwards. And a read that was refused is
+	 * not recorded, because nothing was read.
+	 * @param input the tool-call arguments as the model sent them
+	 * @param call the delegate call, taken only once the arguments are known to stay
+	 * inside
+	 * @return the refusal, or the delegate's answer with the search cap applied
+	 */
+	private Tool.Result settled(String input, java.util.function.Supplier<Tool.Result> call) {
+		JsonNode arguments = arguments(input);
+		String refusal = refusalFor(arguments);
+		if (refusal != null) {
+			return Tool.Result.error(refusal);
+		}
+		return bounded(recorded(arguments, call.get()));
+	}
+
+	/**
+	 * Note an answered read, and hand the answer back unchanged.
+	 * @param arguments the call's arguments, already parsed
+	 * @param result what the platform's instance answered
+	 * @return {@code result}
+	 */
+	private Tool.Result recorded(JsonNode arguments, Tool.Result result) {
+		String tool = getDefinition().getName();
+		if (result instanceof Tool.Result.Error || !ReadPathLog.records(tool)) {
+			return result;
+		}
+		// A search is recorded against the directory it searched, because its argument is
+		// a
+		// pattern rather than a location and a record naming a pattern reads as a file
+		// that
+		// no file matches.
+		String file = (SEARCH_TOOLS.contains(tool)) ? this.root.path().toString() : touched(arguments);
+		this.reads.record(file, tool, this.root.path().toString());
+		return result;
+	}
+
+	/**
+	 * The place a call was aimed at, inside the root.
+	 * @param arguments the call's arguments
+	 * @return the resolved path, or the root itself when the call named no location
+	 */
+	private String touched(JsonNode arguments) {
+		String requested = location(arguments);
+		if (requested == null) {
+			return this.root.path().toString();
+		}
+		try {
+			return this.root.resolve(requested).toString();
+		}
+		catch (RunRoot.EscapesRootException ex) {
+			// Unreachable on the ordinary route, since refusalFor refused this call
+			// first.
+			// Named as the root rather than as the escape, so a record never states a
+			// path
+			// outside the root.
+			return this.root.path().toString();
+		}
 	}
 
 	/**
@@ -166,18 +244,19 @@ public final class ConfiningTool implements DelegatingTool {
 	}
 
 	/**
-	 * Why this call would leave the root, if it would.
+	 * The call's arguments, parsed once so that the check and the record read the same
+	 * values.
 	 * @param input the tool-call arguments as the model sent them
-	 * @return the refusal text naming path and root, or {@code null} to let the call
-	 * through
+	 * @return the object node, or {@code null} when the call carries nothing to aim
+	 * anywhere
 	 */
-	String refusalFor(String input) {
+	private static JsonNode arguments(String input) {
 		if (input == null || input.isBlank()) {
 			return null;
 		}
-		final JsonNode arguments;
+		final JsonNode parsed;
 		try {
-			arguments = JSON.readTree(input);
+			parsed = JSON.readTree(input);
 		}
 		catch (RuntimeException ex) {
 			// Not JSON: nothing to aim anywhere. The delegate's own argument parsing is
@@ -185,14 +264,24 @@ public final class ConfiningTool implements DelegatingTool {
 			// thing that reports a malformed call, which is its business and its message.
 			return null;
 		}
-		if (arguments == null || !arguments.isObject()) {
+		return (parsed != null && parsed.isObject()) ? parsed : null;
+	}
+
+	/**
+	 * Why this call would leave the root, if it would.
+	 * @param arguments the parsed arguments, or {@code null}
+	 * @return the refusal text naming path and root, or {@code null} to let the call
+	 * through
+	 */
+	String refusalFor(JsonNode arguments) {
+		if (arguments == null) {
 			return null;
 		}
 		for (Map.Entry<String, JsonNode> entry : arguments.properties()) {
-			if (!LOCATION_ARGUMENTS.contains(entry.getKey()) || !entry.getValue().isTextual()) {
+			String requested = locationOf(entry);
+			if (requested == null) {
 				continue;
 			}
-			String requested = entry.getValue().asString();
 			try {
 				this.root.resolve(requested);
 			}
@@ -204,24 +293,77 @@ public final class ConfiningTool implements DelegatingTool {
 	}
 
 	/**
-	 * Confine every tool in a list to one root.
+	 * The place a call names, which is what a read is recorded against.
+	 * @param arguments the parsed arguments, or {@code null}
+	 * @return the first location-bearing argument, or {@code null} when the call names
+	 * none
+	 */
+	private static String location(JsonNode arguments) {
+		if (arguments == null) {
+			return null;
+		}
+		for (Map.Entry<String, JsonNode> entry : arguments.properties()) {
+			String requested = locationOf(entry);
+			if (requested != null) {
+				return requested;
+			}
+		}
+		return null;
+	}
+
+	private static String locationOf(Map.Entry<String, JsonNode> entry) {
+		if (!LOCATION_ARGUMENTS.contains(entry.getKey()) || !entry.getValue().isTextual()) {
+			return null;
+		}
+		return entry.getValue().asString();
+	}
+
+	/**
+	 * Confine every tool in a list to one root, recording nothing.
 	 * @param tools the tools as their authors made them
 	 * @param root the run root to check their location arguments against
 	 * @return the same tools, each wrapped once
 	 */
 	public static List<Tool> confine(List<Tool> tools, RunRoot root) {
-		return tools.stream().map((tool) -> confine(tool, root)).toList();
+		return confine(tools, root, new ReadPathLog());
 	}
 
 	/**
-	 * Confine one tool, leaving it alone when it is confined already, so a tool that
-	 * checks its own arguments is not wrapped twice for the same answer.
+	 * Confine every tool in a list to one root, recording its reads.
+	 * @param tools the tools as their authors made them
+	 * @param root the run root to check their location arguments against
+	 * @param reads the log answered reads are noted in
+	 * @return the same tools, each wrapped once
+	 */
+	public static List<Tool> confine(List<Tool> tools, RunRoot root, ReadPathLog reads) {
+		return tools.stream().map((tool) -> confine(tool, root, reads)).toList();
+	}
+
+	/**
+	 * Confine one tool, recording nothing.
 	 * @param tool the tool to wrap
 	 * @param root the run root to check its location arguments against
 	 * @return the confined tool
 	 */
 	public static Tool confine(Tool tool, RunRoot root) {
-		return (tool instanceof ConfiningTool) ? tool : new ConfiningTool(tool, root);
+		return confine(tool, root, new ReadPathLog());
+	}
+
+	/**
+	 * Confine one tool, leaving it alone when it is confined already, so a tool that
+	 * checks its own arguments is not wrapped twice for the same answer.
+	 *
+	 * <p>
+	 * A tool confined already keeps the log it was confined with, so a group that wants
+	 * its reads recorded passes the log to the first confine its tools see, not to a
+	 * later one.
+	 * @param tool the tool to wrap
+	 * @param root the run root to check its location arguments against
+	 * @param reads the log answered reads are noted in
+	 * @return the confined tool
+	 */
+	public static Tool confine(Tool tool, RunRoot root, ReadPathLog reads) {
+		return (tool instanceof ConfiningTool) ? tool : new ConfiningTool(tool, root, reads);
 	}
 
 }

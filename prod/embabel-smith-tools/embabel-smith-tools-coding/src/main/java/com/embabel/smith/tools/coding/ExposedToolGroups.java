@@ -108,6 +108,9 @@ public final class ExposedToolGroups {
 	 * @param root the run root every composed tool is confined to
 	 * @param timeout the command timeout {@value #COMMAND} carries
 	 * @param maxOutputChars the output allowance {@value #COMMAND} carries
+	 * @param reads where the reads a composed capability answers are noted. A composed
+	 * role and the {@code file} group are two doors to the same reader, so a run that
+	 * asked for one of them still gets one record per read rather than a record per door
 	 * @return the composed groups, in role order; empty when nothing is configured, which
 	 * is the default
 	 * @throws IllegalStateException when an entry names something outside
@@ -115,11 +118,11 @@ public final class ExposedToolGroups {
 	 * property, the entry, and the vocabulary.
 	 */
 	public static List<ToolGroup> groups(Map<String, List<String>> expose, RunRoot root, Duration timeout,
-			int maxOutputChars) {
+			int maxOutputChars, ReadPathLog reads) {
 		List<ToolGroup> groups = new ArrayList<>();
 		for (String role : new TreeSet<>(expose.keySet())) {
 			List<String> capabilities = expose.get(role);
-			groups.add(group(role, capabilities, root, timeout, maxOutputChars));
+			groups.add(group(role, capabilities, root, timeout, maxOutputChars, reads));
 		}
 		return groups;
 	}
@@ -131,10 +134,11 @@ public final class ExposedToolGroups {
 	 * @param root the run root
 	 * @param timeout the command timeout
 	 * @param maxOutputChars the output allowance
+	 * @param reads the log answered reads are noted in
 	 * @return the group answering that role
 	 */
 	private static ToolGroup group(String role, List<String> capabilities, RunRoot root, Duration timeout,
-			int maxOutputChars) {
+			int maxOutputChars, ReadPathLog reads) {
 		String property = PREFIX + role;
 		if (capabilities == null || capabilities.isEmpty()) {
 			throw new IllegalStateException(property + " names a role but no capability, so it would register a "
@@ -150,7 +154,8 @@ public final class ExposedToolGroups {
 		if (capabilities.contains(FILE_WRITE)) {
 			withEdit.add(TargetedEditTool.tool(root));
 		}
-		return CodingToolGroups.ofTools(role, describe(role, capabilities), ConfiningTool.confine(withEdit, root));
+		return CodingToolGroups.ofTools(role, describe(role, capabilities),
+				ConfiningTool.confine(withEdit, root, reads));
 	}
 
 	/**

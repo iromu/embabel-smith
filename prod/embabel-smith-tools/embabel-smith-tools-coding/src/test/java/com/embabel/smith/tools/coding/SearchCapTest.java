@@ -204,25 +204,51 @@ class SearchCapTest {
 		}
 
 		@SuppressWarnings("unchecked")
-		@Test
-		@DisplayName("the same wrapper bounds the same search, because it is the same wrapper")
-		void theComposedSearchIsBoundedToo() throws IOException {
+		private ToolGroup wideRole() {
 			// Composed roles arrive as one List<ToolGroup> provider bean rather than as
 			// group beans, so they are read from the bean by name — the channel
-			// ExposeMapBootStateTest documents. The point here is that this route goes
-			// through the same confine() call, so the cap it gets is the cap the file
-			// group's search gets.
+			// ExposeMapBootStateTest documents.
 			List<ToolGroup> composed = (List<ToolGroup>) this.context.getBean("exposedToolGroups", List.class);
-			ToolGroup wide = composed.stream()
+			return composed.stream()
 				.filter((group) -> "wide".equals(group.getMetadata().getRole()))
 				.findFirst()
 				.orElseThrow(() -> new AssertionError("the expose map registered no 'wide' role; roles "
 						+ composed.stream().map((group) -> group.getMetadata().getRole()).toList()));
+		}
+
+		@Test
+		@DisplayName("the same wrapper bounds the same search, because it is the same wrapper")
+		void theComposedSearchIsBoundedToo() throws IOException {
+			// This route goes through the same confine() call, so the cap it gets is the
+			// cap the file group's search gets.
+			ToolGroup wide = wideRole();
 			assertThat(ToolCalls.names(wide)).as("the composed role offers the search").contains("findFiles");
 			List<String> paths = seed("composed", OVER_CAP);
 			String answer = ToolCalls.call(ToolCalls.tool(wide, "findFiles"), "glob", globFor("composed"));
 			assertThat(answer).contains("cap reached").contains(String.valueOf(ConfiningTool.SEARCH_CAP));
 			assertThat(paths.stream().filter(answer::contains).count()).isEqualTo(ConfiningTool.SEARCH_CAP);
+		}
+
+		@Test
+		@DisplayName("and it bounds the content search through that route as well")
+		void theComposedContentSearchIsBoundedToo() throws IOException {
+			// The cap is applied to two tool names, so the composed route has to be
+			// watched on both. A wrapper that bounded the filename search alone would
+			// pass the case above and leave the content search unbounded wherever the
+			// expose map composed a role — which is the only route that reaches a
+			// deployment the file group's own switch was never asked about.
+			ToolGroup wide = wideRole();
+			assertThat(ToolCalls.names(wide)).as("the composed role offers the content search too")
+				.contains("findPatternInProject");
+			List<String> paths = seed("wide-text", OVER_CAP);
+			String answer = ToolCalls.call(ToolCalls.tool(wide, "findPatternInProject"), "pattern", "needle",
+					"globPattern", globFor("wide-text"));
+			assertThat(answer).contains("cap reached")
+				.contains(String.valueOf(ConfiningTool.SEARCH_CAP))
+				.contains(String.valueOf(OVER_CAP));
+			assertThat(paths.stream().filter(answer::contains).count())
+				.as("exactly the cap, from the other entry point")
+				.isEqualTo(ConfiningTool.SEARCH_CAP);
 		}
 
 	}

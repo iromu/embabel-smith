@@ -56,18 +56,33 @@ public class CodingToolsAutoConfiguration {
 	private static final Logger logger = LoggerFactory.getLogger(CodingToolsAutoConfiguration.class);
 
 	/**
+	 * The reads this deployment answers. Registered whatever the switches say, in the
+	 * same spirit as the boot report: a run that registered nothing still has to be able
+	 * to say it read nothing, and a host that wants to print what a run touched needs one
+	 * object to ask rather than three — the file group and every composed capability that
+	 * names a file capability are doors to the same log.
+	 * @return the log the published file tools note their reads in
+	 */
+	@Bean
+	public ReadPathLog codingReadPathLog() {
+		return new ReadPathLog();
+	}
+
+	/**
 	 * The file tools, at the configured root. On unless switched off: the role is in the
 	 * runtime's default tier vocabulary and the platform ships the tools behind it. What
 	 * that group may do to a filesystem is decided here, once: {@code writes} off means
 	 * no writer is ever built for it.
 	 * @param properties the addon's settings, of which this uses the run root and whether
 	 * a writer may exist
+	 * @param reads the log this group's reads are noted in
 	 * @return the file-tools holder, kept as a bean so what it read is reportable
 	 */
 	@Bean
 	@ConditionalOnProperty(prefix = "smith.tools.file", name = "enabled", havingValue = "true", matchIfMissing = true)
-	public CodingFileTools codingFileTools(CodingToolsProperties properties) {
-		return CodingFileTools.at(RunRoot.of(properties.getCoding().getRoot()), properties.getCoding().isWrites());
+	public CodingFileTools codingFileTools(CodingToolsProperties properties, ReadPathLog reads) {
+		return CodingFileTools.at(RunRoot.of(properties.getCoding().getRoot()), properties.getCoding().isWrites(),
+				reads);
 	}
 
 	/**
@@ -106,16 +121,18 @@ public class CodingToolsAutoConfiguration {
 	 * documented state — nothing here registers a role nobody named.
 	 * @param properties the addon's settings, of which this uses the expose map, the run
 	 * root, and the two bounds a composed {@code command} capability carries
+	 * @param reads the log a composed file capability's reads are noted in, which is the
+	 * same log the {@code file} group writes to
 	 * @return the composed groups, in role order
 	 * @throws IllegalStateException when an entry names a capability outside
 	 * {@link ExposedToolGroups#CAPABILITIES}, which refuses the boot rather than
 	 * registering a role that answers with nothing
 	 */
 	@Bean
-	public List<ToolGroup> exposedToolGroups(CodingToolsProperties properties) {
+	public List<ToolGroup> exposedToolGroups(CodingToolsProperties properties, ReadPathLog reads) {
 		CodingToolsProperties.Coding coding = properties.getCoding();
 		return ExposedToolGroups.groups(properties.getExpose(), RunRoot.of(coding.getRoot()),
-				coding.getCommandTimeout(), coding.getMaxOutputChars());
+				coding.getCommandTimeout(), coding.getMaxOutputChars(), reads);
 	}
 
 	/**

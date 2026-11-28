@@ -29,11 +29,12 @@ import static org.assertj.core.api.Assertions.assertThat;
  * {@code spring-ai-starter-mcp-client} puts {@code McpSyncClient} on the classpath. That
  * configuration cannot be imported into this module's test classpath (this addon depends
  * on no Embabel auto-configuration at all, deliberately), so the bean below stands in for
- * it under upstream's own bean name. What is under test is the report's attribution rule
- * — a group this module's beans did not produce is not reported as ours — and the
- * stand-in exercises exactly that rule. The role that answers in a real runtime boot is
- * asserted where the real bean is on the classpath: {@code ResolvedToolGroupsTest} in the
- * runtime module.
+ * it. What is under test is the report's attribution rule — a group whose bean name is
+ * not one this module authored is not reported as ours — and the stand-in exercises
+ * exactly that rule, so its name is its own rather than upstream's:
+ * {@link SomebodyElsesGroups#foreignMathGroup()} says why that matters. The role that
+ * answers in a real runtime boot is asserted where the real bean is on the classpath:
+ * {@code ResolvedToolGroupsTest} in the runtime module.
  *
  * @author Ivan Rodriguez
  */
@@ -96,13 +97,20 @@ class ForeignGroupAttributionTest {
 	static class SomebodyElsesGroups {
 
 		/**
-		 * Upstream's bean name, on purpose: the report attributes by bean name, so the
-		 * stand-in has to be indistinguishable from the real thing in the one way the
-		 * report can see.
+		 * Named for what it is rather than for upstream's bean, which is
+		 * {@code mathToolGroup}. The rule under test is membership: a bean whose name is
+		 * not one of this addon's own is somebody else's, so any name outside that set
+		 * exercises it just as well and borrowing upstream's proves nothing extra. What
+		 * borrowing it would buy is a duplicate definition — if the platform's
+		 * auto-configuration ever reached this test classpath, two beans named
+		 * {@code mathToolGroup} would fail the context outright and take every boot in
+		 * this module down with it, not just this case, and the fix for that would look
+		 * like a bean-overriding flag rather than like the collision it is. The role it
+		 * answers stays {@code math}, since that is what the report prints.
 		 * @return a group answering {@code math}
 		 */
 		@Bean
-		ToolGroup mathToolGroup() {
+		ToolGroup foreignMathGroup() {
 			return CodingToolGroups.ofTools("math", "Arithmetic, from upstream.", List.of());
 		}
 

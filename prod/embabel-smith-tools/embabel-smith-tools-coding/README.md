@@ -6,11 +6,13 @@ without any deployment writing Java. Everything it offers is confined to one dir
 run root — and every switch it reads is reported at start-up rather than left to be inferred
 from a run that was offered nothing.
 
-It is inert until a deployment declares it. `embabel-smith-runtime` declares it as an
-*optional* dependency, so a plain `smith run` gets the `file` group while
-`embabel-smith-studio` and an A2A host — which reach the runtime as a dependency — still
-resolve neither role. A deployment that wants file- or command-backed tools declares this
-module itself; it does not inherit them from something that happens to depend on the runtime.
+It is inert until a deployment declares it. `embabel-smith-runtime` declares it at
+*provided* scope — a scope that stops at the module that declares it — so a plain
+`smith run` gets the `file` group while `embabel-smith-studio` and an A2A host, which
+reach the runtime as a dependency, still resolve neither role. Why that scope rather
+than `optional` is settled in `docs/05-architecture.md`. A deployment that wants file- or
+command-backed tools declares this module itself; it does not inherit them from something
+that happens to depend on the runtime.
 
 ## What registers
 
@@ -96,7 +98,10 @@ the number found, so a shortened listing cannot read as the whole repository. Un
 nothing is added or restated — every match comes back with its path. The bound is a constant
 rather than a property, because a knob invites a deployment to raise it until the listing
 stops meaning anything, and it is scoped to those two names: clipping a `readFile` the same
-way would quietly make it a different tool from the one the platform describes.
+way would quietly make it a different tool from the one the platform describes. Path matching
+is offered through `findFiles`, which takes a `glob`, rather than as a separate yes/no
+predicate tool — a predicate would cost a round-trip to answer a question about a pattern the
+model cannot see.
 
 Empty by default, and empty is the documented state: nothing registers a role nobody named.
 Composed roles reach the platform the way upstream's own operator-authored roles do — as one

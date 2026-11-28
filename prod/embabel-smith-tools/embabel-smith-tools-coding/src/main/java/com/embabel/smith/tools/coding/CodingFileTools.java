@@ -64,7 +64,9 @@ import com.embabel.agent.tools.file.PatternSearch;
  * read ({@code FileReadLog.getPathsRead()}), and that log belongs to the instance the
  * tools were made from. Holding the instances as a bean is what lets a host — and the
  * addon's own boot test — report which paths a run touched, instead of only claiming that
- * it could.
+ * it could. The bean is also where a {@link ReadPathLog} is attached, which is what the
+ * platform's log cannot say: which tool answered, under which root, and what the searches
+ * over the root looked at.
  *
  * @author Ivan Rodriguez
  */
@@ -87,12 +89,15 @@ public final class CodingFileTools {
 
 	private final PatternSearch searchTools;
 
-	private CodingFileTools(RunRoot root, FileReadTools readTools, FileWriteTools writeTools,
-			PatternSearch searchTools) {
+	private final ReadPathLog reads;
+
+	private CodingFileTools(RunRoot root, FileReadTools readTools, FileWriteTools writeTools, PatternSearch searchTools,
+			ReadPathLog reads) {
 		this.root = root;
 		this.readTools = readTools;
 		this.writeTools = writeTools;
 		this.searchTools = searchTools;
+		this.reads = reads;
 	}
 
 	/**
@@ -101,12 +106,16 @@ public final class CodingFileTools {
 	 * @param writes whether to build {@code FileTools.readWrite} at all. False leaves
 	 * this object holding no writer, which is the state the switch's documented default
 	 * is meant to be in
+	 * @param reads where the reads this object's tools answer are noted, which is what
+	 * lets a run say what it read — including the searches, which the platform's own read
+	 * log never sees because they are answered by {@code LocalDirectory}, not by the
+	 * reader
 	 * @return the file tools for that root
 	 */
-	public static CodingFileTools at(RunRoot root, boolean writes) {
+	public static CodingFileTools at(RunRoot root, boolean writes, ReadPathLog reads) {
 		String path = root.path().toString();
 		return new CodingFileTools(root, FileTools.readOnly(path), writes ? FileTools.readWrite(path) : null,
-				new LocalDirectory(path, DIRECTORY_DESCRIPTION));
+				new LocalDirectory(path, DIRECTORY_DESCRIPTION), reads);
 	}
 
 	/**
@@ -151,7 +160,9 @@ public final class CodingFileTools {
 	 * argument that resolves outside the root is refused before the platform's own
 	 * lexical check is reached.
 	 * @return the file group's tool list, in read, write, search, edit order; with writes
-	 * off the write and edit entries are absent, because nothing was built to source them
+	 * off the write and edit entries are absent, because nothing was built to source
+	 * them. Reads answered through this list are noted in the log this object was built
+	 * with
 	 */
 	public List<Tool> tools() {
 		Map<String, Tool> offered = new LinkedHashMap<>();
@@ -165,7 +176,7 @@ public final class CodingFileTools {
 		if (this.writeTools != null) {
 			withEdit.add(TargetedEditTool.tool(this.root));
 		}
-		return ConfiningTool.confine(withEdit, this.root);
+		return ConfiningTool.confine(withEdit, this.root, this.reads);
 	}
 
 	private static String name(Tool tool) {
