@@ -274,8 +274,11 @@ restrict a capability that registers no role.
 which registers from upstream rather than from this project's switches. At the default tier it
 refuses before execution naming both: `pack 'arithmetic' declares tool group(s) [math] that require
 a higher trust tier (granted: standard)`. At `--trust-tier high` with no tool property set it
-achieved `arithmeticAnswered` in PT2.8S. No switch is involved in either half, and that is the one
-default this project inherits rather than chooses. On the offered names: `RunCommand` prints no
+achieved `arithmeticAnswered` in PT2.8S. Both halves ran against a staging directory holding
+`arithmetic` alone, so the goal's discoverability is a fact about the pack and its own folder rather
+than about the corpus beside it: `folder:` resolves children, and the only child there is the pack. No
+switch is involved in either half, and that is the one default this project inherits rather than
+chooses. On the offered names: `RunCommand` prints no
 `offered=` line — that surface exists in the runtime module's live test, not in the CLI — so what a
 CLI run shows instead is the calls themselves, `calling tool math` and then `multiply`, alongside
 the boot's `2 tool groups: file, math`. A first attempt at that leg reached the same two tools and
