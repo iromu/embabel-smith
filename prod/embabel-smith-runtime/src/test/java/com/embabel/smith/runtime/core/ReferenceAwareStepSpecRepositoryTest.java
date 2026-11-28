@@ -117,18 +117,18 @@ class ReferenceAwareStepSpecRepositoryTest {
 
 	@Test
 	void aStepDeclaringASkillAndADocumentIsAttachedToBothHolders() throws IOException {
-		ReferenceAwareStepSpecRepository repository = twoKindRepository(List.of("repo-map", "domain-doc"), true);
+		ReferenceAwareStepSpecRepository repository = twoKindRepository(List.of("repo-map", "domain-guide"), true);
 		repository.findAll();
 
 		// One step, two kinds, one line: the container its skill folder belongs to, and
 		// the document its references file declares.
-		assertThat(repository.attached()).containsExactly("locate -> [survey-skills, domain-doc]");
+		assertThat(repository.attached()).containsExactly("locate -> [survey-skills, domain-guide]");
 		assertThat(repository.unresolved()).isEmpty();
 	}
 
 	@Test
 	void theSameStepOnAPackWithoutTheReferencesFileAttachesTheSkillAndNamesTheOther() throws IOException {
-		ReferenceAwareStepSpecRepository repository = twoKindRepository(List.of("repo-map", "domain-doc"), false);
+		ReferenceAwareStepSpecRepository repository = twoKindRepository(List.of("repo-map", "domain-guide"), false);
 		repository.findAll();
 
 		// The pair to the test above, and the shape of the mistake it rules out: a run
@@ -137,7 +137,7 @@ class ReferenceAwareStepSpecRepositoryTest {
 		// vacuous, and the name that went missing is stated rather than left to the
 		// upstream skip.
 		assertThat(repository.attached()).containsExactly("locate -> [survey-skills]");
-		assertThat(repository.unresolved()).containsExactly("step 'locate' declares reference 'domain-doc' that"
+		assertThat(repository.unresolved()).containsExactly("step 'locate' declares reference 'domain-guide' that"
 				+ " neither its definition's skills nor its references file carries");
 	}
 
@@ -147,10 +147,10 @@ class ReferenceAwareStepSpecRepositoryTest {
 		StepSpecContext context = context();
 
 		StepSpecContext carried = ReferenceAwareStepSpecRepository.carrying(context,
-				List.of(refs.carried().get("repo-map"), refs.carried().get("domain-doc")));
+				List.of(refs.carried().get("repo-map"), refs.carried().get("domain-guide")));
 
 		List<LlmReference> holders = carried.getAvailableReferences();
-		assertThat(holders).extracting(LlmReference::getName).containsExactly("survey-skills", "domain-doc");
+		assertThat(holders).extracting(LlmReference::getName).containsExactly("survey-skills", "domain-guide");
 		// Each under its own prefix: the two prefixes differ, and every tool the skill
 		// container lists sits behind the one that belongs to it.
 		assertThat(holders.get(0).toolPrefix()).isNotEqualTo(holders.get(1).toolPrefix());
@@ -245,7 +245,7 @@ class ReferenceAwareStepSpecRepositoryTest {
 		if (referencesFile) {
 			Files.writeString(packDir.resolve(PackReferences.REFERENCES_FILE), """
 					references:
-					  - name: domain-doc
+					  - name: domain-guide
 					    kind: document
 					    path: docs/domain.md
 					""");

@@ -303,8 +303,12 @@ class RuntimeCoreTest {
 		// ReferenceAwareStepSpecRepositoryTest pins directly.
 		assertThat(source.packs()).isEmpty();
 		assertThat(source.warnings()).anyMatch((warning) -> warning.contains("declares reference 'no-such-skill'"));
+		// And the line that ends the run carries it too: an ingest that resolves to
+		// nothing never reaches the report that would otherwise name the declaration, so
+		// the reader of a four-second exit would otherwise see only an empty source.
 		assertThatThrownBy(() -> core().ingest(source)).isInstanceOf(IllegalStateException.class)
-			.hasMessageContaining("contains no agent specs");
+			.hasMessageContaining("contains no agent specs")
+			.hasMessageContaining("no-such-skill");
 	}
 
 	@Test
@@ -341,7 +345,7 @@ class RuntimeCoreTest {
 
 	@Test
 	void aStepGivenASkillAndADocumentIsAttachedToBoth(@TempDir Path tmp) throws Exception {
-		IngestedSource ingested = core().ingest(twoKindPack(tmp, "notes", "domain-doc"));
+		IngestedSource ingested = core().ingest(twoKindPack(tmp, "notes", "domain-guide"));
 
 		assertThat(ingested.goalNames()).as("the pack deployed").contains("answered");
 		// Two kinds, one step, one line: the container the skill folder holds and the
@@ -349,7 +353,7 @@ class RuntimeCoreTest {
 		// single name, and a single-name step resolves whichever kind the run happens to
 		// read — a run that kept only skills would pass all of them. This is the case
 		// where the two doors have to be open at once.
-		assertThat(ingested.report().lines()).anyMatch((line) -> line.contains("read -> [ask-skills, domain-doc]"));
+		assertThat(ingested.report().lines()).anyMatch((line) -> line.contains("read -> [ask-skills, domain-guide]"));
 		assertThat(ingested.report().lines()).as("nothing declared failed to resolve")
 			.noneMatch((line) -> line.contains("declares reference"));
 	}
@@ -358,12 +362,12 @@ class RuntimeCoreTest {
 	void eachKindResolvesOnItsOwnThroughTheSameSeam(@TempDir Path skillDir, @TempDir Path documentDir)
 			throws Exception {
 		IngestedSource skill = core().ingest(twoKindPack(skillDir, "notes"));
-		IngestedSource document = core().ingest(twoKindPack(documentDir, "domain-doc"));
+		IngestedSource document = core().ingest(twoKindPack(documentDir, "domain-guide"));
 
 		// The pair that keeps the test above from passing by accident: the pack is the
 		// same pack either way, so each name really is carried and each resolves alone.
 		assertThat(skill.report().lines()).anyMatch((line) -> line.contains("read -> [ask-skills]"));
-		assertThat(document.report().lines()).anyMatch((line) -> line.contains("read -> [domain-doc]"));
+		assertThat(document.report().lines()).anyMatch((line) -> line.contains("read -> [domain-guide]"));
 	}
 
 	@Test
@@ -609,7 +613,7 @@ class RuntimeCoreTest {
 		Files.writeString(pack.resolve("docs/domain.md"), "The domain of the ask pack, carried by the pack.\n");
 		Files.writeString(pack.resolve(PackReferences.REFERENCES_FILE), """
 				references:
-				  - name: domain-doc
+				  - name: domain-guide
 				    kind: document
 				    path: docs/domain.md
 				""");

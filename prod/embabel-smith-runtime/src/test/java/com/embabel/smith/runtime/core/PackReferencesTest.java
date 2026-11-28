@@ -90,14 +90,14 @@ class PackReferencesTest {
 	void aDocumentReferenceBringsTheFileIntoTheNotes() throws IOException {
 		PackReferences refs = PackReferences.at(pack("""
 				references:
-				  - name: domain-doc
+				  - name: domain-guide
 				    kind: document
 				    path: notes/domain.md
 				"""), "survey");
 
-		LlmReference document = refs.carried().get("domain-doc");
+		LlmReference document = refs.carried().get("domain-guide");
 		assertThat(document).isNotNull();
-		assertThat(document.toolPrefix()).isEqualTo("domain_doc");
+		assertThat(document.toolPrefix()).isEqualTo("domain_guide");
 		assertThat(document.notes()).contains("Domain of the survey pack");
 		// A document says its content rather than offering tools to go and get it.
 		assertThat(listed(document)).isEmpty();

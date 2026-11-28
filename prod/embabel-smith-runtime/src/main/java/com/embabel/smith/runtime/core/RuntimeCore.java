@@ -142,8 +142,12 @@ public class RuntimeCore {
 			}
 		}
 		if (packs.isEmpty()) {
-			throw new IllegalStateException(
-					"spec source '" + source.origin().uri() + "' contains no agent specs" + retiredNote(excluded));
+			// A pack the validator turned away is left out of the result with a warning
+			// naming it and the reason, and on this path nothing later gets to print it:
+			// the run ends here. So the refusal rides on the message that ends it, which
+			// is the only place a reader of a four-second exit 1 will look.
+			throw new IllegalStateException("spec source '" + source.origin().uri() + "' contains no agent specs"
+					+ retiredNote(excluded) + refusedNote(source.warnings()));
 		}
 		checkGoalNameCollisions(packs);
 
@@ -340,6 +344,18 @@ public class RuntimeCore {
 	private static String retiredNote(List<IngestedSource.ExcludedPack> excluded) {
 		return excluded.isEmpty() ? ""
 				: " (excluded as retired: " + excluded.stream().map(IngestedSource.ExcludedPack::name).toList() + ")";
+	}
+
+	/**
+	 * What a source refused rather than resolved. A pack dropped at validation is not in
+	 * the result, so the run report built for a resolved source never runs and its naming
+	 * of refused declarations never prints; this is the same information on the only line
+	 * that survives an ingest that resolves to nothing.
+	 * @param warnings the warnings the source reported alongside its empty result
+	 * @return the note, or the empty string when the source refused nothing
+	 */
+	private static String refusedNote(List<String> warnings) {
+		return warnings.isEmpty() ? "" : " (refused by the source: " + String.join("; ", warnings) + ")";
 	}
 
 	private void checkTier(List<AgentSpec> packs, TrustTier tier) {
