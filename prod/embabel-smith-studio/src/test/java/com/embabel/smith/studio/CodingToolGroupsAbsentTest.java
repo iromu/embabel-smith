@@ -24,15 +24,16 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * <p>
  * This module depends on {@code embabel-smith-runtime}, and the runtime declares
- * {@code embabel-smith-tools-coding} as an <i>optional</i> dependency — an edge that
- * stops at the declaring module rather than propagating to the modules that depend on it.
- * So the studio, a UI utility, gets no filesystem tool from the library it borrows the
- * runtime from: nothing here registers {@code file} or {@code shell}, and a step naming
- * either role is answered by the resolver rather than silently offered nothing. A
- * deployment that wants those tools declares the addon itself; it does not inherit them
- * from something that happens to depend on the runtime.
- * {@code CodingToolGroupsAbsentTest} in {@code embabel-smith-a2a-starter} is the same
- * claim from the other such host.
+ * {@code embabel-smith-tools-coding} at <i>provided</i> scope — an edge that stops at the
+ * declaring module rather than propagating to the modules that depend on it, which is
+ * what an absence test like this one can pin. (Provided rather than optional, and why, is
+ * settled in {@code docs/05-architecture.md} rather than re-derived here.) So the studio,
+ * a UI utility, gets no filesystem tool from the library it borrows the runtime from:
+ * nothing here registers {@code file} or {@code shell}, and a step naming either role is
+ * answered by the resolver rather than silently offered nothing. A deployment that wants
+ * those tools declares the addon itself; it does not inherit them from something that
+ * happens to depend on the runtime. {@code CodingToolGroupsAbsentTest} in
+ * {@code embabel-smith-a2a-starter} is the same claim from the other such host.
  *
  * <p>
  * <b>Why the resolver is asked and not the dependency tree.</b> A pom grep proves what is
@@ -61,7 +62,7 @@ class CodingToolGroupsAbsentTest {
 
 	@Test
 	@DisplayName("the runtime is on the classpath and the coding addon is not")
-	void theEdgeUnderTestIsTheOptionalOne() {
+	void theEdgeUnderTestIsTheProvidedOne() {
 		assertThat(present("com.embabel.smith.runtime.SmithRuntimeApplication")).as("runtime on the classpath")
 			.isTrue();
 		assertThat(present("com.embabel.smith.tools.coding.CodingToolsAutoConfiguration"))

@@ -23,15 +23,17 @@ import static org.assertj.core.api.Assertions.assertThat;
  * A host that gains an A2A surface resolves neither coding role.
  *
  * <p>
- * {@code embabel-smith-runtime} declares {@code embabel-smith-tools-coding} as an
- * <i>optional</i> dependency, and an optional edge stops at the module that declares it —
- * it does not reach a module that depends on the runtime. This module depends on the
- * runtime and not on the addon, which is the whole reason a deployment that boots an A2A
- * surface is not also a deployment that offers filesystem tools: nothing here registers
- * {@code file} or {@code shell}, so the addon's auto-configuration never runs and a step
- * naming either role is answered by the resolver instead of quietly offered nothing.
- * {@code CodingToolGroupsAbsentTest} in {@code embabel-smith-studio} is the same claim
- * read from the other host that reaches the runtime as a dependency.
+ * {@code embabel-smith-runtime} declares {@code embabel-smith-tools-coding} at
+ * <i>provided</i> scope, and a provided edge stops at the module that declares it — it
+ * does not reach a module that depends on the runtime. (Provided rather than optional,
+ * and why that choice was made, is settled in {@code docs/05-architecture.md} rather than
+ * re-derived here.) This module depends on the runtime and not on the addon, which is the
+ * whole reason a deployment that boots an A2A surface is not also a deployment that
+ * offers filesystem tools: nothing here registers {@code file} or {@code shell}, so the
+ * addon's auto-configuration never runs and a step naming either role is answered by the
+ * resolver instead of quietly offered nothing. {@code CodingToolGroupsAbsentTest} in
+ * {@code embabel-smith-studio} is the same claim read from the other host that reaches
+ * the runtime as a dependency.
  *
  * <p>
  * <b>Why the resolver is asked rather than the classpath alone.</b> A classpath grep says
@@ -61,7 +63,7 @@ class CodingToolGroupsAbsentTest {
 
 	@Test
 	@DisplayName("the runtime is on the classpath and the coding addon is not")
-	void theEdgeUnderTestIsTheOptionalOne() {
+	void theEdgeUnderTestIsTheProvidedOne() {
 		assertThat(present("com.embabel.smith.runtime.SmithRuntimeApplication")).as("runtime on the classpath")
 			.isTrue();
 		assertThat(present("com.embabel.smith.tools.coding.CodingToolsAutoConfiguration"))
