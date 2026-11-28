@@ -290,6 +290,99 @@ ours switched on [none], ours disabled by configuration [file], … decided by {
 reader can tell the three apart from the report alone: a tier refusal names the pack and the granted
 tier, a switch-off names the property that decided it, and a missing capability names neither.
 
+### The generic pack and the concrete instance
+
+`agent-specs/` ships two packs that exercise the same channel from opposite ends, and they are worth
+comparing explicitly because it is easy to read one as the other.
+
+`coding-agent` is the **concrete instance**: three definitions, each naming a subject matter — locate
+files, patch files, check a build — with two steps sharing one folder skill and one carrying a
+definition-local skill beside it. Its claims are about resolution: which container answered, that an
+agent's own copy shadows a shared one, that a reference never changes the plan.
+
+`skill-interpreter` is the **generic pack**: seven definitions — `orient`, `select`, `plan`, `act`,
+`script`, `verify`, `escalate` — where every hand-off is a named type (`RunBrief`, `SkillDirective`,
+`ActionPlan`, `WorkLog`, `ScriptEvidence`, `Verification`, `OpenQuestion`, `TaskReport`) and no step
+prompt names a subject matter at all. The named types are what make the chain typed rather than
+merely ordered, since the format has no ordering to test. A grep for domain nouns across those
+prompts is empty once word boundaries are used; a boundary-free grep chases ghosts, because `folder`
+contains `order` and `reported` contains `repo`.
+
+**The attribution rule between them.** A failure in one pack is not a failure of the channel. If the
+generic pack produces a poor report for the subject it was handed, that is the pack's prompt quality
+and it says nothing about whether skill-following works. The converse holds and matters more: the
+concrete instance passing its paths is no evidence that the channel generalises, because that pack was
+written around the skills it carries. Generality is demonstrated only by running the generic pack
+against a skill nobody wrote it for, which is why that leg exists — and why its results belong to the
+pack rather than to the runtime.
+
+### The generic pack, run live
+
+The live half, kept separate from the claims above as the coding example keeps its own. It needs a skill
+the pack was never written for, so the leg stages one: the pack's seven definitions plus a throwaway
+skill — instructions, one reference, one script — in a single source folder, with `select`'s
+`references:` pointed at the new name.
+
+```
+rm -rf /tmp/interp-src && mkdir -p /tmp/interp-src/skills
+cp -r agent-specs/skill-interpreter/* /tmp/interp-src/
+cp -r agent-specs/throwaway/skills/release-notes /tmp/interp-src/skills/
+sed -i 's/workspace-inventory/release-notes/' /tmp/interp-src/select/steps/select.yml
+
+timeout 420 java -jar target/embabel-smith-runtime-<version>-exec.jar run \
+    --source folder:/tmp/interp-src --goal taskReported --trust-tier high \
+    --input "Summarise the changes in this working directory for a release note."
+```
+
+Skill used: `release-notes`, a name that appears in none of the pack's prompts. Strategy: the pack's own
+default, GOAP. Tier: high. Measured 2026-11-28, 06:05 UTC.
+
+It found the skill. The leg is 104 skill-tool calls — 44 `shared_skills_listResources`,
+36 `shared_skills_activate`, 24 `shared_skills_readResource` — and the reads include the throwaway
+skill's own `references/severity-rules.md`, so both kinds of content it carries reached the model. Where
+it stopped is the part worth knowing: `executing orient` once, `executing select` once, nothing after.
+All 104 calls sit inside `select`'s tool loop, and the leg ended when the 420 s cap killed it with
+`LLM action:select: attempt 6 timed out after 60,000ms` on retry 6 of 10. It never terminated, so it
+reported nothing about the skill being unusable. Read against the attribution rule above, that splits
+cleanly: the channel generalised — a pack with no subject matter in its prompts reached a skill nobody
+wrote it for and used its instructions and its resource — and this pack's `select` prompt does not
+converge on this endpoint, which is prompt quality, not runtime behaviour.
+
+The same command at the default tier refuses in 4 s before any step runs, and refuses on a step the plan
+never reached: `Run blocked by trust tier: pack 'interpreter-act' declares tool group(s) [shell] that
+require a higher trust tier (granted: standard)`. That is the scope-wide gate seen in the coding example,
+now on the generic pack: `act` is why nothing ran, and `act` was never going to run.
+
+**The four strategies.** Same staged source, same goal, same tier, one input
+("List the files in this working directory and say what each is for."), `--planner` varied, each leg
+capped at 420 s. Measured 2026-11-28 06:12–06:26 UTC.
+
+| `--planner` | steps selected | terminated on the skill's criteria | model calls | wall |
+| --- | --- | --- | --- | --- |
+| `GOAP` (the pack's default) | `orient`, then `select` | no — killed with `select` on retry 6/10 of its 60 s timeouts | 101 (44 list, 32 activate, 24 read, 1 `listFiles`) | 419 s |
+| `UTILITY` | none | no — `STUCK` | 0 | 3 s |
+| `HYBRID` | none | no — `STUCK` | 0 | 4 s |
+| `SUPERVISOR` | `orient`, then `select` — the platform routes it to the GOAP algorithm, and it behaves like GOAP | no — killed at the cap | 77 (42 list, 18 activate, 16 read, 1 `listFiles`) | 419 s |
+
+The two utility-family legs are informative in a way the timeouts are not. Both print
+`1/8 known actions available in current state` and then
+`Business goal taskReported not achievable in 1 step` — from `UtilityPlanner`, and from
+`HybridUtilityPlanner` for the hybrid — followed by
+`Goal 'taskReported' not achieved (status=STUCK): unmet precondition(s) [taskReport:TaskReport]`. A
+planner with a one-step horizon cannot see a goal seven typed hand-offs away, and it says so while naming
+the type it could not produce, at zero model cost. That is a diagnosis a reader can act on; the GOAP
+timeout is churn, and the difference between the two is only visible in the log, because a killed run
+prints no report at all. The line saying a pack `carries scripts, not executed` appears seven times —
+once per definition — in every leg that terminated, including the tier refusal, and zero times in the
+three legs the cap killed.
+
+Nothing in that output says which planner ran. Each leg contains exactly one `[smith-tools]` line, the
+addon's boot line, and the only planner text anywhere in the four logs is the platform's own logger
+names — so a `--planner` flag is indistinguishable from the pack's `defaultPlanner` in what the run
+reports. A `--planner HYBRID` leg against the same source with the pack's manifest naming a
+`defaultPlanner` behaved exactly as the STUCK legs above (under 4 s, 0 calls, same named precondition)
+and said nothing about the override having applied.
+
 ## A2A endpoint
 
 The A2A surface — the starter library `prod/embabel-smith-a2a-starter`, hosted by
