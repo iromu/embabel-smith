@@ -9,6 +9,7 @@ import java.nio.file.Path;
 import java.util.List;
 
 import com.embabel.agent.core.AgentPlatform;
+import com.embabel.agent.skills.script.SkillScriptExecutionEngine;
 import com.embabel.smith.common.trace.TraceRecord;
 import com.embabel.smith.common.trace.TraceStore;
 import com.embabel.smith.runtime.core.GoalNotFoundException;
@@ -58,6 +59,17 @@ public class AgentSpecRunService {
 	}
 
 	/**
+	 * The JSONL trace store at {@code traceFile}, with the engine a pack's scripts run in
+	 * — the shape the CLI boots with.
+	 * @param platform the booted agent platform
+	 * @param traceFile the JSONL trace file
+	 * @param scriptEngine the engine selected for this host, or {@code null} for none
+	 */
+	public AgentSpecRunService(AgentPlatform platform, Path traceFile, SkillScriptExecutionEngine scriptEngine) {
+		this(platform, new JsonlTraceStore(traceFile), scriptEngine);
+	}
+
+	/**
 	 * Uses an alternative {@link TraceStore} (change: smith-studio-postgres-storage): the
 	 * studio supplies a database-backed or file-backed store selected from its storage
 	 * settings.
@@ -65,7 +77,19 @@ public class AgentSpecRunService {
 	 * @param traceStore the trace store to append records to
 	 */
 	public AgentSpecRunService(AgentPlatform platform, TraceStore traceStore) {
-		this.core = new RuntimeCore(platform);
+		this(platform, traceStore, null);
+	}
+
+	/**
+	 * As above, with the engine a pack's skill scripts run in. The studio and the A2A
+	 * starter use the two-argument form, which leaves scripts unoffered; the CLI passes
+	 * what its boot selected from {@code smith.tools.scripts.engine}.
+	 * @param platform the booted agent platform
+	 * @param traceStore the trace store to append records to
+	 * @param scriptEngine the engine selected for this host, or {@code null} for none
+	 */
+	public AgentSpecRunService(AgentPlatform platform, TraceStore traceStore, SkillScriptExecutionEngine scriptEngine) {
+		this.core = new RuntimeCore(platform, scriptEngine);
 		this.recorder = new TraceRecorder(traceStore);
 	}
 

@@ -9,6 +9,7 @@ import java.nio.file.Path;
 import java.util.concurrent.Callable;
 
 import com.embabel.agent.core.AgentPlatform;
+import com.embabel.agent.skills.script.SkillScriptExecutionEngine;
 import com.embabel.smith.runtime.AgentSpecRunService;
 import com.embabel.smith.runtime.core.TrustTier;
 import com.embabel.smith.runtime.trace.JsonlTraceStore;
@@ -46,8 +47,21 @@ public class RunCommand implements Callable<Integer> {
 
 	private final AgentPlatform platform;
 
+	private final SkillScriptExecutionEngine scriptEngine;
+
 	public RunCommand(AgentPlatform platform) {
+		this(platform, null);
+	}
+
+	/**
+	 * The command over a boot that selected a script engine.
+	 * @param platform the booted agent platform
+	 * @param scriptEngine the engine {@code smith.tools.scripts.engine} selected at boot,
+	 * or {@code null} for none
+	 */
+	public RunCommand(AgentPlatform platform, SkillScriptExecutionEngine scriptEngine) {
 		this.platform = platform;
+		this.scriptEngine = scriptEngine;
 	}
 
 	/**
@@ -56,7 +70,7 @@ public class RunCommand implements Callable<Integer> {
 	 * @return a new run service over the booted platform
 	 */
 	protected AgentSpecRunService newService(Path traceFile) {
-		return new AgentSpecRunService(this.platform, traceFile);
+		return new AgentSpecRunService(this.platform, traceFile, this.scriptEngine);
 	}
 
 	@Override

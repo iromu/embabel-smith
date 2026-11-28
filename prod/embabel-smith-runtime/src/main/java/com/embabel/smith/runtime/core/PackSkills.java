@@ -18,6 +18,8 @@ import java.util.stream.Stream;
 
 import com.embabel.agent.api.reference.LlmReference;
 import com.embabel.agent.skills.Skills;
+import com.embabel.agent.skills.script.NoOpExecutionEngine;
+import com.embabel.agent.skills.script.SkillScriptExecutionEngine;
 import com.embabel.agent.skills.support.LoadedSkill;
 
 /**
@@ -64,11 +66,15 @@ public final class PackSkills {
 
 	private final Map<String, LlmReference> carried;
 
+	private final Map<String, LlmReference> scriptFree;
+
 	private final List<String> notes;
 
-	private PackSkills(List<LlmReference> references, Map<String, LlmReference> carried, List<String> notes) {
+	private PackSkills(List<LlmReference> references, Map<String, LlmReference> carried,
+			Map<String, LlmReference> scriptFree, List<String> notes) {
 		this.references = List.copyOf(references);
 		this.carried = Map.copyOf(carried);
+		this.scriptFree = Map.copyOf(scriptFree);
 		this.notes = List.copyOf(notes);
 	}
 
@@ -80,12 +86,33 @@ public final class PackSkills {
 	 * both
 	 */
 	public static PackSkills at(Path packDir, String agentName) {
+		return at(packDir, agentName, null);
+	}
+
+	/**
+	 * As {@link #at(Path, String)}, with the engine a carried script would run in.
+	 *
+	 * <p>
+	 * The engine is the whole difference between a pack's script being inert text and
+	 * being a callable tool, and it arrives here rather than being chosen here:
+	 * {@link ScriptEngineConfig} reads {@code smith.tools.scripts.engine} once at
+	 * start-up and hands that one engine to every definition in the run. {@code null} is
+	 * the ordinary case — it is what the two-argument form above passes — and it leaves
+	 * Embabel's default engine in place, which claims no language and so offers nothing.
+	 * @param packDir the definition's directory
+	 * @param agentName the definition's name, from its manifest
+	 * @param scriptEngine the engine this run selected, or {@code null} for none
+	 * @return the containers, the name-to-container map, and what the run must say about
+	 * both
+	 */
+	public static PackSkills at(Path packDir, String agentName, SkillScriptExecutionEngine scriptEngine) {
 		List<String> notes = new ArrayList<>();
 		List<LlmReference> references = new ArrayList<>();
 		Map<String, LlmReference> carried = new LinkedHashMap<>();
 		Map<String, Path> servedBy = new LinkedHashMap<>();
-		Container own = load(ownReferenceName(agentName), packDir.resolve("skills"), notes);
-		Container shared = load(SHARED_REFERENCE_NAME, packDir.toAbsolutePath().getParent().resolve("skills"), notes);
+		Container own = load(ownReferenceName(agentName), packDir.resolve("skills"), scriptEngine, notes);
+		Container shared = load(SHARED_REFERENCE_NAME, packDir.toAbsolutePath().getParent().resolve("skills"),
+				scriptEngine, notes);
 		// Own first: a name the shared folder also carries is served by this
 		// definition's copy, and the folder that answered is named rather than left to
 		// the reader to guess — the two locations differ by a prefix only the loader
@@ -104,10 +131,28 @@ public final class PackSkills {
 			}
 		}
 		references.removeIf((reference) -> carried.values().stream().noneMatch((held) -> held == reference));
-		if (!carried.isEmpty()) {
-			notes.add(scriptState(carried));
+		Map<String, LlmReference> scriptFree = new LinkedHashMap<>();
+		for (Map.Entry<String, LlmReference> skill : carried.entrySet()) {
+			scriptFree.put(skill.getKey(), readingOf(skill.getValue(), own, shared));
 		}
-		return new PackSkills(references, carried, notes);
+		if (!carried.isEmpty()) {
+			notes.add(scriptState(carried, scriptEngine));
+		}
+		return new PackSkills(references, carried, scriptFree, notes);
+	}
+
+	/**
+	 * The script-free twin of the container a name resolves to.
+	 * @param container the container the carried map hands out
+	 * @param own this definition's own container
+	 * @param shared the folder's shared container
+	 * @return the same container offering no script tool
+	 */
+	private static LlmReference readingOf(LlmReference container, Container own, Container shared) {
+		if (container == own.reference()) {
+			return own.reading();
+		}
+		return (container == shared.reference()) ? shared.reading() : container;
 	}
 
 	/**
@@ -137,6 +182,27 @@ public final class PackSkills {
 	}
 
 	/**
+	 * The same definitions' skills offered without a script tool, by the same names.
+	 *
+	 * <p>
+	 * <b>Why a twin rather than a filter.</b> The platform's own {@code SkillFilter} is
+	 * never consulted by {@code Skills.tools()} in the version this repo builds against —
+	 * the field is read only by the data class's own {@code copy}, {@code equals},
+	 * {@code hashCode} and {@code toString}, and no class in the jar calls {@code accept}
+	 * — so it cannot take a script off a tool list. What does work is the engine: a
+	 * {@code Skills} asks the engine it holds which languages it claims, so handing it
+	 * the platform's no-op engine yields the same loaded skills, under the same reference
+	 * name, offering only {@code activate}, {@code listResources} and
+	 * {@code readResource}. The reference name surviving is what makes this usable — the
+	 * naming strategy prefixes every callable name with it, so a twin does not invent a
+	 * second wire name for the same skill.
+	 * @return carried name to the container that holds it with scripts off the tool list
+	 */
+	public Map<String, LlmReference> scriptFree() {
+		return this.scriptFree;
+	}
+
+	/**
 	 * What the run has to say about this definition's skills: folders the loader refused,
 	 * names served by a shadowing copy, and the script state in force.
 	 * @return the report lines
@@ -149,15 +215,22 @@ public final class PackSkills {
 	 * Read one directory as a skill container, naming the folders the loader refused.
 	 * @param referenceName the name the container is offered under
 	 * @param folder the directory to read, which need not exist
+	 * @param scriptEngine the engine this run selected, or {@code null} to leave
+	 * Embabel's default in place
 	 * @param notes where to record what the reader could not do
 	 * @return the container, with the names that loaded and the folder they came from
 	 */
-	private static Container load(String referenceName, Path folder, List<String> notes) {
+	private static Container load(String referenceName, Path folder, SkillScriptExecutionEngine scriptEngine,
+			List<String> notes) {
 		if (!Files.isDirectory(folder)) {
-			return new Container(new Skills(referenceName, "no skills at " + folder, List.of()), Map.of());
+			Skills empty = new Skills(referenceName, "no skills at " + folder, List.of());
+			return new Container(empty, empty, Map.of());
 		}
 		Skills skills = new Skills(referenceName, "Skills carried by " + folder, List.of())
 			.withLocalSkills(folder.toString());
+		if (scriptEngine != null) {
+			skills = skills.withScriptExecutionEngine(scriptEngine);
+		}
 		Map<String, Path> folders = new LinkedHashMap<>();
 		Set<Path> loaded = new LinkedHashSet<>();
 		for (LoadedSkill skill : skills.getSkills()) {
@@ -170,7 +243,15 @@ public final class PackSkills {
 				notes.add("skill folder refused by the loader: " + candidate);
 			}
 		}
-		return new Container(skills, folders);
+		// The twin is the same container with the platform's no-op engine, which is the
+		// only way this version of Skills offers a skill without offering its scripts:
+		// the loaded list and the reference name both survive, so the wire prefix does
+		// not
+		// change. With no engine selected there is nothing to take off, and the twin is
+		// the container itself.
+		return new Container(skills,
+				(scriptEngine != null) ? skills.withScriptExecutionEngine(NoOpExecutionEngine.INSTANCE) : skills,
+				folders);
 	}
 
 	/**
@@ -199,28 +280,41 @@ public final class PackSkills {
 	/**
 	 * The script state in force, named as a switch rather than left as an absence a
 	 * reader would otherwise attribute to the trust tier.
+	 *
+	 * <p>
+	 * <b>Why the engine's own claim decides the wording.</b> The platform decides whether
+	 * a carried script becomes a tool on one test — an engine that claims the script's
+	 * language — so this asks the engine the same question rather than assuming that an
+	 * engine object being present means scripts run. The {@code none} selection installs
+	 * the platform's no-op engine, which claims no language, and is reported as not
+	 * executed for the same reason a missing engine is.
 	 * @param carried the skills this definition offers
+	 * @param scriptEngine the engine this run selected, or {@code null} for none
 	 * @return the line
 	 */
-	private static String scriptState(Map<String, LlmReference> carried) {
+	private static String scriptState(Map<String, LlmReference> carried, SkillScriptExecutionEngine scriptEngine) {
 		boolean scripts = carried.values()
 			.stream()
 			.filter(Skills.class::isInstance)
 			.map(Skills.class::cast)
 			.flatMap((skills) -> skills.getSkills().stream())
 			.anyMatch(LoadedSkill::hasScripts);
-		return "skill scripts: " + (scripts ? "this pack carries them" : "none carried") + ", not executed (switch "
-				+ SCRIPT_ENGINE_PROPERTY + " selects an engine)";
+		boolean offered = (scriptEngine != null) && !scriptEngine.supportedLanguages().isEmpty();
+		String state = (offered) ? "offered as tools by the engine " + SCRIPT_ENGINE_PROPERTY + " selects"
+				: "not executed (switch " + SCRIPT_ENGINE_PROPERTY + " selects an engine)";
+		return "skill scripts: " + (scripts ? "this pack carries them" : "none carried") + ", " + state;
 	}
 
 	/**
 	 * One directory read as a container.
 	 *
 	 * @param reference the reference the container is offered under
+	 * @param reading the same container with its scripts off the tool list, the same
+	 * object when there was no engine to take off
 	 * @param folders the skill names that loaded from it, each mapped to the folder that
 	 * carried it — the path a report names when it says which folder answered
 	 */
-	private record Container(Skills reference, Map<String, Path> folders) {
+	private record Container(Skills reference, Skills reading, Map<String, Path> folders) {
 	}
 
 }
