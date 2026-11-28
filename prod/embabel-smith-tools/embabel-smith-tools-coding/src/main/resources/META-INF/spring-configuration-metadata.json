@@ -1,0 +1,92 @@
+{
+  "groups": [
+    {
+      "name": "smith.tools",
+      "type": "com.embabel.smith.tools.coding.CodingToolsProperties",
+      "description": "The tool addons. Every group's own switch sits under this prefix, and so do that group's settings."
+    },
+    {
+      "name": "smith.tools.coding",
+      "type": "com.embabel.smith.tools.coding.CodingToolsProperties$Coding",
+      "description": "Settings shared by the coding addon's groups: the run root every tool is confined to, and the two bounds on a command."
+    }
+  ],
+  "properties": [
+    {
+      "name": "smith.tools.file.enabled",
+      "type": "java.lang.Boolean",
+      "sourceType": "com.embabel.smith.tools.coding.CodingToolsAutoConfiguration",
+      "defaultValue": true,
+      "description": "Register the 'file' tool group (the files inside the run root). On by default, because 'file' is a role the runtime's default trust tier already names and the platform ships the tools behind it. What the group offers depends on smith.tools.coding.writes: with nothing configured it reads, lists and searches and offers no write or edit tool at all. Setting this false makes the role resolve to nothing and the run says it was disabled by configuration, not that it is unknown."
+    },
+    {
+      "name": "smith.tools.shell.enabled",
+      "type": "java.lang.Boolean",
+      "sourceType": "com.embabel.smith.tools.coding.CodingToolsAutoConfiguration",
+      "defaultValue": false,
+      "description": "Register the 'shell' tool group (run a command inside the run root, with its exit code and captured output). Off by default: 'shell' is a role of the trust vocabulary's highest band, so an addon arriving by itself must not start offering a process-spawning tool. Setting it true registers the group; the pack declaring it still has to pass the tier gate."
+    },
+    {
+      "name": "smith.tools.coding.root",
+      "type": "java.lang.String",
+      "sourceType": "com.embabel.smith.tools.coding.CodingToolsProperties$Coding",
+      "description": "The single directory every coding tool works inside, for the life of the process. Defaults to the process's own working directory when unset. A path that resolves outside it - by traversal, by absolute path, or through a link - is refused naming both the path and the root. It is a boot-time value, not a per-run one: the platform resolves tools from beans."
+    },
+    {
+      "name": "smith.tools.coding.writes",
+      "type": "java.lang.Boolean",
+      "sourceType": "com.embabel.smith.tools.coding.CodingToolsProperties$Coding",
+      "defaultValue": false,
+      "description": "Whether the group that registers by default is allowed to hold a writer. Off by default, which is the setting that decides what an untouched deployment can be asked to do to a filesystem: with nothing configured the 'file' group offers reads, listings and searches and no createFile, writeFile, editFile, appendFile or delete, because no writer was ever built rather than one built and hidden. Setting it true builds the platform's read-write file tools at the run root, plus this addon's targeted edit, which refuses an ambiguous match rather than rewriting every occurrence."
+    },
+    {
+      "name": "smith.tools.preset",
+      "type": "java.lang.String",
+      "sourceType": "com.embabel.smith.tools.coding.ToolGroupPresets",
+      "description": "Shorthand for this addon's group switches, written as the switches rather than judged beside them: selecting a preset contributes 'smith.tools.<group>.enabled' for every group this addon contains, so one name stands for the settings an operator would otherwise set one by one. An explicit switch still beats it, because what the preset contributes arrives in a property source placed below the deployment's own, and the boot report names which of the two decided a group. A preset decides every group this addon contains, so one naming only some of them switches the rest off. Unset by default, which is the documented state: with no preset each group keeps its own documented default. A name this addon does not define is reported and applies nothing at all, not even a matching part of it, since a half-applied preset would register a set nobody asked for. Caveat for a native image: a preset is a runtime property source and an AOT build decides the group gates at build time, so a preset cannot add back a bean process-aot froze out."
+    },
+    {
+      "name": "smith.tools.expose",
+      "type": "java.util.Map<java.lang.String,java.util.List<java.lang.String>>",
+      "sourceType": "com.embabel.smith.tools.coding.CodingToolsProperties",
+      "description": "Roles this addon composes for a deployment, one entry per role: 'smith.tools.expose.<role>=<capabilities>'. Each key becomes a tool-group role a pack's step can name, and each value is built from a closed vocabulary - file-read, file-write, search, command - so a role is a curated set of tools this addon knows how to confine to the run root, and nothing else. Empty by default, and empty is the documented state: nothing registers a role nobody named. An entry outside that vocabulary refuses the boot rather than registering a group that answers with no tools, and a fully-qualified class name is refused like any other unknown entry - this map is a closed vocabulary, not a class loader, so it never instantiates a class a property names."
+    },
+    {
+      "name": "smith.tools.coding.command-timeout",
+      "type": "java.time.Duration",
+      "sourceType": "com.embabel.smith.tools.coding.CodingToolsProperties$Coding",
+      "defaultValue": "60s",
+      "description": "How long a command may run before it and its whole process tree are terminated and the result reports it as timed out, rather than the run waiting on it."
+    },
+    {
+      "name": "smith.tools.coding.max-output-chars",
+      "type": "java.lang.Integer",
+      "sourceType": "com.embabel.smith.tools.coding.CodingToolsProperties$Coding",
+      "defaultValue": 20000,
+      "description": "How many characters of each of a command's standard output and standard error the result keeps. Past it the remainder is dropped and the result states the truncation, with the kept and total counts, rather than returning a shortened answer that reads as complete."
+    }
+  ],
+  "hints": [
+    {
+      "name": "smith.tools.expose",
+      "values": [
+        {
+          "value": "file-read",
+          "description": "Read, list and search inside the run root. Carries no writer of any kind, so a role composed of it cannot be asked to change a file."
+        },
+        {
+          "value": "file-write",
+          "description": "The read surface plus create, write, append, delete and this addon's targeted edit, which refuses an ambiguous match instead of rewriting every occurrence."
+        },
+        {
+          "value": "search",
+          "description": "Directory listing and filename and content search, confined to the run root like every other capability here."
+        },
+        {
+          "value": "command",
+          "description": "Run a command inside the run root, bounded by smith.tools.coding.command-timeout and smith.tools.coding.max-output-chars. The capability that needs the most thought before a deployment names it."
+        }
+      ]
+    }
+  ]
+}

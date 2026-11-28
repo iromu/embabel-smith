@@ -12,7 +12,7 @@ The root POM (`pom.xml`) aggregates two trees by default, and a third behind the
 | --- | --- |
 | `smith-common` | The agent-spec format: data model (`common.model`), YAML I/O (`common.io`), validation (`common.validation`), the endpoint gate (`common.config`), and the sample packs (`common.samples`). Framework-free and fully offline-testable. |
 | `poc/` | 26 numbered proof-of-concept modules. **Frozen evidence** — see below. Not in the default reactor: they build only with `-Ppoc` (`make … POC=1`). |
-| `prod/` | The product: `embabel-smith-specsource`, `embabel-smith-runtime`, `embabel-smith-a2a-starter`, `embabel-smith-builder`, `embabel-smith-skillevaluator`, `embabel-smith-studio`. |
+| `prod/` | The product: `embabel-smith-specsource`, `embabel-smith-runtime`, `embabel-smith-a2a-starter`, `embabel-smith-builder`, `embabel-smith-skillevaluator`, `embabel-smith-studio`, and the `embabel-smith-tools` addon tree (`embabel-smith-tools-coding`). A product reaches a tool addon by declaring it: the runtime depends on the coding addon **optionally**, so a plain `smith run` answers the `file` role while the studio's and an A2A host's boots still resolve neither — an optional edge stops at the module that declares it, and both of those products depend on the runtime. The addon's switches and refusals are documented in `prod/embabel-smith-tools/embabel-smith-tools-coding/README.md`. |
 
 `embabel-smith-skillevaluator` is the **Tier 1 skill validator**: a static pipeline
 (`Tier1Runner`) over a skill or a folder of skills, with one `ValidationResult` per validator —

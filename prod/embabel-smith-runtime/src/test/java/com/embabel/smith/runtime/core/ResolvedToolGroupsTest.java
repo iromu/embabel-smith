@@ -6,10 +6,14 @@
 package com.embabel.smith.runtime.core;
 
 import com.embabel.agent.core.AgentPlatform;
+import com.embabel.agent.core.ToolGroup;
 import com.embabel.agent.core.ToolGroupMetadata;
 import com.embabel.agent.core.ToolGroupRequirement;
 import com.embabel.agent.core.ToolGroupResolution;
+import com.embabel.smith.tools.coding.CodingToolGroups;
+import com.embabel.smith.tools.coding.CodingToolsBootReport;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -32,21 +36,23 @@ import static org.assertj.core.api.Assertions.assertThat;
  * <p>
  * {@code availableToolGroups()} as printed by a plain boot, on Linux, with no tool
  * property set: <pre>
- * [math]
+ * [file, math]
  * </pre>
  *
  * <p>
  * Per-role {@code resolveToolGroup} outcome for the roles this change cares about. Each
- * unresolved role answers {@code No tool group matching role '<role>'}; only {@code math}
- * resolves: <pre>
- * AppleScript  unresolved   file        unresolved   search      unresolved
+ * unresolved role answers {@code No tool group matching role '<role>'}; {@code file} and
+ * {@code math} resolve and nothing else does: <pre>
+ * AppleScript  unresolved   file        RESOLVES     search      unresolved
  * blueprint    unresolved   github      unresolved   security    unresolved
  * chat         unresolved   library     unresolved   shell       unresolved
  * process      unresolved   traces      unresolved   validate    unresolved
  * web          unresolved   math        RESOLVES
- * </pre> {@code AppleScript} is absent on Linux as expected, and {@code file} and
- * {@code shell} resolve to nothing at all — nothing in {@code prod/} publishes them on
- * this checkout, which is the gap group 3 closes.
+ * </pre> {@code AppleScript} is absent on Linux as expected, and {@code shell} still
+ * resolves to nothing: {@code prod/embabel-smith-tools/embabel-smith-tools-coding} is on
+ * this module's classpath and registers its {@code file} group by default, but leaves its
+ * process-spawning group off until an operator asks for it. That pair is the default set,
+ * stated as behaviour rather than as a list of properties.
  *
  * <p>
  * The MCP flip — the same boot with
@@ -59,11 +65,15 @@ import static org.assertj.core.api.Assertions.assertThat;
  * credential check. {@code web} is already inside {@code TrustTier.STANDARD}'s allowlist,
  * which is why the set below is an expectation the build defends rather than a snapshot.
  * Neither {@code file} nor {@code shell} is claimed by an upstream group in either boot,
- * so group 3 has both names free at the bean level. They are not free at the property
- * level, though: a mutation check confirmed that
- * {@code embabel.agent.platform.tools.includes.shell.tools=anything} — upstream's own
- * map, empty by default — registers a group under {@code shell} in an otherwise untouched
- * boot, which is the D10 two-sources-claim-one-role case measured rather than assumed.
+ * so both names were free at the bean level when the coding addon took {@code file}. They
+ * were never free at the property level: a mutation check confirmed that
+ * {@code embabel.agent.platform.tools.includes.file.tools=anything} — upstream's own map,
+ * empty by default — registers a second group under {@code file} in an otherwise
+ * untouched boot, which is the D10 two-sources-claim-one-role case measured rather than
+ * assumed. The nested boot below is the same property set against the addon's own group,
+ * and it settles which of the two a step resolves against: the addon's, because the
+ * platform builds its list from {@code ToolGroup} beans before the
+ * {@code List<ToolGroup>} providers and takes the first role match.
  *
  * <p>
  * {@code math} is the one role an untouched runtime already answers with. It is not this
@@ -104,11 +114,16 @@ class ResolvedToolGroupsTest {
 	 * platform or addon change that registers an extra file-, command- or network-backed
 	 * group fails the build instead of quietly widening what a pack can reach.
 	 * <p>
-	 * {@code math} is upstream's own bean (see the class note), not a default this repo
-	 * chose. Everything else in this repo's vocabulary — {@code file}, {@code shell} —
-	 * arrives from the coding addon in group 3, which does not exist yet.
+	 * The two arrived differently, which is the whole content of the coding addon's boot
+	 * report. {@code math} is upstream's own bean (see the class note), not a default
+	 * this repo chose. {@code file} is this repo's: the addon declares it here, registers
+	 * by default, and — with {@code smith.tools.coding.writes} left unset — publishes the
+	 * read-only surface, so the role that arrived by default is the one that can read a
+	 * filesystem and not change it. {@code shell} is absent by design: the addon's
+	 * process-spawning group is off until an operator asks for it, which the probe below
+	 * asserts by name.
 	 */
-	private static final List<String> PINNED_DEFAULT_ROLES = List.of("math");
+	private static final List<String> PINNED_DEFAULT_ROLES = List.of("file", "math");
 
 	/**
 	 * The roles the probe asks about by name: the nine this change names, plus the five
@@ -178,6 +193,136 @@ class ResolvedToolGroupsTest {
 					Stream.concat(PINNED_DEFAULT_ROLES.stream(), MCP_ADDED_ROLES.stream()).toList());
 		}
 
+	}
+
+	/**
+	 * The same boot with an operator composing a role of their own through
+	 * {@code smith.tools.expose.<role>}. The addon's own module proves such a group is
+	 * <em>built</em>; only a boot holding the platform's resolver can prove a step's
+	 * declaration <em>reaches</em> it, because composed roles travel on a
+	 * {@code List<ToolGroup>} provider bean — the channel the resolver reads after the
+	 * individual {@code ToolGroup} beans, and the one a module without a platform cannot
+	 * exercise. The spec's scenario is stated as resolution, so that is what is asserted
+	 * here rather than the bean list.
+	 */
+	@SpringBootTest(properties = { "OPENAI_CUSTOM_BASE_URL=http://127.0.0.1:9/v1", "OPENAI_CUSTOM_API_KEY=test",
+			"OPENAI_CUSTOM_MODELS=test-model", "embabel.models.default-llm=test-model",
+			"smith.tools.expose.review=file-read,search" })
+	@Nested
+	@DisplayName("with an operator-composed role")
+	class AnOperatorComposedRole {
+
+		/**
+		 * What {@code file-read} and {@code search} compose: the platform's read-only
+		 * {@code FileTools} instance (read, size, count) and its {@code LocalDirectory}
+		 * (listing, filename search, content search). Named in full because the claim is
+		 * that a composed role carries exactly the two capabilities it named and nothing
+		 * else, so a platform bump that renames or adds one of them fails here rather
+		 * than quietly widening a role an operator believes they pinned.
+		 */
+		private static final List<String> COMPOSED_TOOLS = List.of("readFile", "fileCount", "fileSize", "listFiles",
+				"findFiles", "findPatternInProject");
+
+		/** Everything a composed read role must not offer, writer and command alike. */
+		private static final List<String> NOT_OFFERED = List.of("createFile", "writeFile", "appendFile", "delete",
+				"createDirectory", "editFile", "runCommand");
+
+		@Autowired
+		private AgentPlatform platform;
+
+		@Test
+		void theComposedRoleResolvesToASingleGroup() {
+			ToolGroupResolution resolution = this.platform.getToolGroupResolver()
+				.resolveToolGroup(new ToolGroupRequirement("review", Set.of(), null));
+			assertThat(resolution.getResolvedToolGroup())
+				.as("a role named only by a property resolves: %s", resolution.getFailureMessage())
+				.isNotNull();
+		}
+
+		@Test
+		void itOffersExactlyTheNamedCapabilities() {
+			List<String> offered = offeredNames(resolve("review"));
+			assertThat(offered).containsExactlyInAnyOrderElementsOf(COMPOSED_TOOLS);
+			assertThat(offered).doesNotContainAnyElementsOf(NOT_OFFERED);
+		}
+
+		@Test
+		void itAddsANameWithoutDisplacingTheGroupsTheAddonOwns() {
+			assertThat(availableRoles(this.platform)).contains("review");
+			assertThat(availableRoles(this.platform)).contains("file");
+			assertThat(resolve("file").getMetadata().getProvider()).isEqualTo("embabel-smith");
+		}
+
+		private ToolGroup resolve(String role) {
+			ToolGroup resolved = resolvedGroup(this.platform, role);
+			assertThat(resolved).as("role '%s' resolves", role).isNotNull();
+			return resolved;
+		}
+
+	}
+
+	/**
+	 * The same boot with upstream's own includes map also claiming {@code file} — the
+	 * two-sources-one-role case with a platform on the classpath, and so the only place
+	 * in this repo that can answer the question the addon's own module cannot: which
+	 * claimant a step actually resolves against. It resolves against the addon, whose
+	 * group carries this repo's provider string, because the platform builds its list
+	 * from {@code ToolGroup} beans before the {@code List<ToolGroup>} providers and takes
+	 * the first role match. The MCP-backed group is shadowed, not absent, and the addon's
+	 * boot report says so by name.
+	 */
+	@SpringBootTest(properties = { "OPENAI_CUSTOM_BASE_URL=http://127.0.0.1:9/v1", "OPENAI_CUSTOM_API_KEY=test",
+			"OPENAI_CUSTOM_MODELS=test-model", "embabel.models.default-llm=test-model",
+			"embabel.agent.platform.tools.includes.file.tools=anything" })
+	@Nested
+	@DisplayName("with upstream's includes map also claiming file")
+	class UpstreamAlsoClaimsFile {
+
+		/** The provider every group this repo's addons publish carries. */
+		private static final String OUR_PROVIDER = "embabel-smith";
+
+		@Autowired
+		private AgentPlatform platform;
+
+		@Autowired
+		private CodingToolsBootReport report;
+
+		@Test
+		void theAddonsGroupIsTheOneThatAnswers() {
+			ToolGroupResolution resolution = this.platform.getToolGroupResolver()
+				.resolveToolGroup(new ToolGroupRequirement(CodingToolGroups.FILE_ROLE, Set.of(), null));
+			assertThat(resolution.getResolvedToolGroup()).as("the addon's group, not the MCP-backed one").isNotNull();
+			assertThat(resolution.getResolvedToolGroup().getMetadata().getProvider()).isEqualTo(OUR_PROVIDER);
+		}
+
+		@Test
+		void theReportSaysBothHowOursArrivedAndWhatItShadowed() {
+			assertThat(this.report.registeredByDefault()).contains(CodingToolGroups.FILE_ROLE);
+			assertThat(this.report.shadowedByUs()).containsKey(CodingToolGroups.FILE_ROLE);
+			assertThat(this.report.notOurs()).contains("math");
+		}
+
+	}
+
+	/**
+	 * The group a role resolves to, or {@code null} when nothing answers it.
+	 * @param platform the booted platform to ask
+	 * @param role the role a step would declare
+	 * @return the resolved group, or {@code null}
+	 */
+	private static ToolGroup resolvedGroup(AgentPlatform platform, String role) {
+		return platform.getToolGroupResolver()
+			.resolveToolGroup(new ToolGroupRequirement(role, Set.of(), null))
+			.getResolvedToolGroup();
+	}
+
+	/**
+	 * The tool names a resolved group offers a model, in the group's own order.
+	 * @param group the resolved group
+	 * @return the offered tool names
+	 */
+	private static List<String> offeredNames(ToolGroup group) {
+		return group.getTools().stream().map((tool) -> tool.getDefinition().getName()).toList();
 	}
 
 	/**

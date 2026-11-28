@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+                     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.iromu.embabel.smith</groupId>
+        <artifactId>embabel-smith-tools</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>embabel-smith-tools-coding</artifactId>
+    <name>embabel-smith-tools-coding</name>
+    <description>
+        The coding tool addon: the file and command surface a general coding agent needs,
+        published as the two roles the runtime's own trust vocabulary already names — file
+        (on by default) and shell (off until asked) — through an auto-configuration a host
+        picks up by having this jar on its classpath. Every tool works inside one run root
+        (smith.tools.coding.root, defaulting to the process working directory), and an
+        escaping path is refused naming both path and root. Depends on the Embabel api and
+        nothing of this repo's: not the runtime, not the studio, not the builder, and — as
+        the inherited enforcer ban enforces — no poc-* artifact, though the command tool is
+        the poc-7 bash tool extracted rather than depended on.
+    </description>
+
+    <dependencies>
+        <!-- The platform's own tool interfaces (FileReadTools, FileWriteTools,
+             PatternSearch), its ToolGroup factories, and Tool — the addon publishes
+             upstream instances and authors three tools of its own against them. Declared
+             rather than the starter: an addon publishes beans, it does not boot a platform,
+             so the platform auto-configurations (and with them the model providers and the
+             MCP-backed groups) stay off this classpath. This jar brings spring-boot-starter
+             itself, which is where @AutoConfiguration and @ConditionalOnProperty come from. -->
+        <dependency>
+            <groupId>com.embabel.agent</groupId>
+            <artifactId>embabel-agent-api</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

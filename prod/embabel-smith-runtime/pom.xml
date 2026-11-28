@@ -27,6 +27,20 @@
             <groupId>org.iromu.embabel.smith</groupId>
             <artifactId>embabel-smith-specsource</artifactId>
         </dependency>
+        <!-- The coding tool addon, which is what makes a plain `smith run` able to answer the
+             `file` role with nothing configured. Declared <optional> on purpose, and the reason
+             is who depends on this module: embabel-smith-studio and embabel-smith-a2a-starter
+             both do, and an optional dependency stops at the module that declares it. So the
+             runtime's own boot gains the addon's groups while the studio's and an a2a host's
+             boots still resolve neither — a deployment reaches for file- and command-backed
+             tools by declaring the addon, not by depending on something that happens to
+             depend on it. A non-optional edge here would widen two other products' default
+             tool surfaces from a commit that only meant to change the CLI's. -->
+        <dependency>
+            <groupId>org.iromu.embabel.smith</groupId>
+            <artifactId>embabel-smith-tools-coding</artifactId>
+            <optional>true</optional>
+        </dependency>
         <dependency>
             <groupId>com.embabel.agent</groupId>
             <artifactId>embabel-agent-starter</artifactId>

@@ -247,6 +247,13 @@
                 <artifactId>embabel-smith-skillevaluator</artifactId>
                 <version>${project.version}</version>
             </dependency>
+            <!-- The tool addons. A host declares the family it wants and the addon's own
+                 @AutoConfiguration decides which of its groups register. -->
+            <dependency>
+                <groupId>org.iromu.embabel.smith</groupId>
+                <artifactId>embabel-smith-tools-coding</artifactId>
+                <version>${project.version}</version>
+            </dependency>
             <dependency>
                 <groupId>org.iromu.embabel.smith</groupId>
                 <artifactId>embabel-smith-runtime</artifactId>

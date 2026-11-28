@@ -1,0 +1,8 @@
+# Registers the preset that writes this addon's group switches. A preset is shorthand
+# for smith.tools.<group>.enabled rather than a second gate, and it is contributed as a
+# property source ordered last so an explicit switch keeps winning by Spring's own
+# precedence. Boot 4.1 loads EnvironmentPostProcessors from spring.factories under this
+# key (the META-INF/spring/*.imports convention is auto-configuration only), which is the
+# same route the a2a starter uses for its own environment contribution.
+org.springframework.boot.EnvironmentPostProcessor=\
+com.embabel.smith.tools.coding.CodingToolsPresetEnvironmentPostProcessor
