@@ -33,14 +33,17 @@ import com.embabel.smith.common.io.Yaml;
  * {@code references.yml} declares.
  *
  * <p>
- * <b>The file is three fields per entry.</b> {@code references.yml} holds a
- * {@code references:} list of {@code name}, {@code kind} and {@code path}. There is no
- * fourth field, on purpose: a format that took a class name, a factory name or a
- * property-driven type would let the pack or the deployment nominate a class for the
- * runtime to instantiate. What happens instead is a {@code switch} over four literals,
- * each arm calling a platform constructor, so the set of things a pack can make the
- * runtime build is closed at compile time. A kind outside those four is refused by name
- * rather than passed to something that might exist.
+ * <b>The file is three fields per entry, plus one optional switch.</b>
+ * {@code references.yml} holds a {@code references:} list of {@code name}, {@code kind}
+ * and {@code path}. The fourth field a declaration may add is {@code scripts: true}, and
+ * what it changes is which engine the folder it already named is built with — the one
+ * this run selected rather than the platform's no-op engine — so it names no class, no
+ * factory and no property. That is the point of the closed set: a format that took a
+ * class name or a property-driven type would let the pack or the deployment nominate
+ * something for the runtime to instantiate, so what happens instead is a {@code switch}
+ * over four literals, each arm calling a platform constructor. A kind outside those four
+ * is refused by name rather than passed to something that might exist, and
+ * {@code scripts} is refused on a kind that cannot honour it rather than read as nothing.
  *
  * <p>
  * <b>What each kind becomes.</b> A {@code skills} folder becomes a {@link Skills}
@@ -100,11 +103,15 @@ public final class PackReferences {
 
 	private final Map<String, String> forms;
 
+	private final Set<String> scriptsAskedFor;
+
 	private final List<String> notes;
 
-	private PackReferences(Map<String, LlmReference> carried, Map<String, String> forms, List<String> notes) {
+	private PackReferences(Map<String, LlmReference> carried, Map<String, String> forms, Set<String> scriptsAskedFor,
+			List<String> notes) {
 		this.carried = Map.copyOf(carried);
 		this.forms = Map.copyOf(forms);
+		this.scriptsAskedFor = Set.copyOf(scriptsAskedFor);
 		this.notes = List.copyOf(notes);
 		List<LlmReference> distinct = new ArrayList<>();
 		for (LlmReference reference : carried.values()) {
@@ -169,9 +176,10 @@ public final class PackReferences {
 		notes.addAll(skills.notes());
 		Map<String, LlmReference> carried = new LinkedHashMap<>(skills.carried());
 		Map<String, String> owners = new LinkedHashMap<>();
+		Set<String> scripted = new LinkedHashSet<>();
 		carried.keySet().forEach((name) -> owners.put(prefixOf(name), "skill '" + name + "'"));
 		for (Declared declared : read(packDir, notes)) {
-			LlmReference value = construct(declared, packDir, notes);
+			LlmReference value = construct(declared, packDir, notes, scriptEngine);
 			if (value == null) {
 				continue;
 			}
@@ -183,6 +191,9 @@ public final class PackReferences {
 			}
 			owners.put(prefixOf(declared.name()), "reference '" + declared.name() + "'");
 			carried.put(declared.name(), value);
+			if (honoursScripts(declared)) {
+				scripted.add(declared.name());
+			}
 		}
 		Map<LlmReference, LlmReference> facaded = new IdentityHashMap<>();
 		Set<String> chosen = new LinkedHashSet<>();
@@ -213,7 +224,7 @@ public final class PackReferences {
 			shaped.put(name, value);
 			forms.put(name, (facaded.containsKey(reference)) ? FACADE : DIRECT);
 		});
-		return new PackReferences(shaped, forms, notes);
+		return new PackReferences(shaped, forms, scripted, notes);
 	}
 
 	/**
@@ -243,6 +254,27 @@ public final class PackReferences {
 	 */
 	public Map<String, String> forms() {
 		return this.forms;
+	}
+
+	/**
+	 * The carried names whose declaration asked for scripts, as {@code references.yml}
+	 * writes them.
+	 *
+	 * <p>
+	 * This is the half of the script question a pack decides rather than the deployment.
+	 * {@link PackSkills} can say of a definition that the selected engine offers scripts,
+	 * which is a statement about the pack and true of every step in it; whether
+	 * <em>this</em> declaration wants the script-bearing shape of a folder it names is a
+	 * property of the entry, written there as {@code scripts: true}. A name absent from
+	 * this set asked for nothing, which is the reading shape: the same skills, under the
+	 * same reference name, offering {@code activate}, {@code listResources} and
+	 * {@code readResource} and no script tool. What the shape is built from is the
+	 * engine, because a {@code Skills} asks the engine it holds which languages it claims
+	 * — see {@link #skills(String, Path, List, SkillScriptExecutionEngine)}.
+	 * @return the carried names declared with {@code scripts: true}
+	 */
+	public Set<String> scriptsAskedFor() {
+		return this.scriptsAskedFor;
 	}
 
 	/**
@@ -285,9 +317,44 @@ public final class PackReferences {
 				notes.add(REFERENCES_FILE + " lists a reference that is not a name, kind and path");
 				continue;
 			}
-			declared.add(new Declared(text(fields.get("name")), text(fields.get("kind")), text(fields.get("path"))));
+			declared.add(new Declared(text(fields.get("name")), text(fields.get("kind")), text(fields.get("path")),
+					asksForScripts(fields.get("scripts"), text(fields.get("name")), notes)));
 		}
 		return declared;
+	}
+
+	/**
+	 * The optional {@code scripts} switch of an entry. Absent is false, which is the
+	 * whole default; a value that is neither true nor false is said rather than read as
+	 * false, because a quoted {@code "true"} is the one way to ask for scripts and
+	 * quietly not get them.
+	 * @param value the field as the file writes it, or {@code null} when absent
+	 * @param name the entry's name, for the note
+	 * @param notes where to record a value that is not a switch
+	 * @return whether this entry asks for the script-bearing shape of what it names
+	 */
+	private static boolean asksForScripts(Object value, String name, List<String> notes) {
+		if (value == null) {
+			return false;
+		}
+		if (value instanceof Boolean flag) {
+			return flag;
+		}
+		notes.add("reference '" + name + "' declares scripts: " + value
+				+ ", which is neither true nor false, so scripts are not asked for");
+		return false;
+	}
+
+	/**
+	 * Whether a declaration's {@code scripts} switch can mean anything for the kind it
+	 * names. Only a skills folder hands out script tools — a directory's tools are the
+	 * file tools, a document's and a brief's are notes rather than calls — so asking on
+	 * any other kind is refused rather than read as nothing.
+	 * @param declared the entry as the file writes it
+	 * @return true when asking for scripts changes what gets built
+	 */
+	private static boolean honoursScripts(Declared declared) {
+		return declared.scripts() && "skills".equals(declared.kind());
 	}
 
 	/**
@@ -298,9 +365,12 @@ public final class PackReferences {
 	 * @param declared the entry as the file writes it
 	 * @param packDir the definition's directory, which a declared path resolves against
 	 * @param notes where to record what was refused
+	 * @param scriptEngine the engine this run selected, handed to a skills entry that
+	 * asked for scripts and to no other
 	 * @return the reference to carry, or {@code null} when the entry was refused
 	 */
-	private static LlmReference construct(Declared declared, Path packDir, List<String> notes) {
+	private static LlmReference construct(Declared declared, Path packDir, List<String> notes,
+			SkillScriptExecutionEngine scriptEngine) {
 		if (declared.name() == null || declared.name().isBlank()) {
 			notes.add("a reference in " + REFERENCES_FILE + " carries no name, so no step can ask for it");
 			return null;
@@ -326,8 +396,12 @@ public final class PackReferences {
 				return null;
 			}
 		}
+		if (declared.scripts() && !honoursScripts(declared)) {
+			notes.add("reference '" + declared.name() + "' asks for scripts, which kind '" + declared.kind()
+					+ "' does not offer; only a skills folder hands out script tools");
+		}
 		return switch (declared.kind()) {
-			case "skills" -> skills(declared.name(), target, notes);
+			case "skills" -> skills(declared.name(), target, notes, honoursScripts(declared) ? scriptEngine : null);
 			case "directory" -> directory(declared.name(), target);
 			case "document" -> document(declared.name(), target);
 			default -> brief(declared.name(), target, notes);
@@ -339,12 +413,18 @@ public final class PackReferences {
 	 * @param name the name a step declares
 	 * @param folder the folder, already checked to exist
 	 * @param notes where to record a folder the loader refused
+	 * @param scriptEngine the engine that makes this folder's scripts callable, or
+	 * {@code null} for the reading shape — Embabel's default engine claims no language,
+	 * so the same loaded skills are offered under the same name with no script tool,
+	 * which is also how {@link PackSkills} builds its twin
 	 * @return the container
 	 */
-	private static LlmReference skills(String name, Path folder, List<String> notes) {
+	private static LlmReference skills(String name, Path folder, List<String> notes,
+			SkillScriptExecutionEngine scriptEngine) {
 		Skills skills = new Skills(name, "Skills carried by " + folder, List.of());
 		try {
-			return skills.withLocalSkills(folder.toString());
+			Skills loaded = skills.withLocalSkills(folder.toString());
+			return (scriptEngine != null) ? loaded.withScriptExecutionEngine(scriptEngine) : loaded;
 		}
 		catch (RuntimeException ex) {
 			notes.add("skills folder " + folder + " was refused: " + ex.getMessage());
@@ -435,8 +515,10 @@ public final class PackReferences {
 	 * @param name what a step declares
 	 * @param kind which of the four kinds it is, or something the runtime cannot build
 	 * @param path what to build it from, relative to the pack
+	 * @param scripts whether the entry asked for the script-bearing shape of what it
+	 * names, which only a skills kind can mean
 	 */
-	private record Declared(String name, String kind, String path) {
+	private record Declared(String name, String kind, String path, boolean scripts) {
 	}
 
 }

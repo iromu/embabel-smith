@@ -95,6 +95,45 @@ class AgentSpecPackReferenceTest {
 		assertThat(issues.get(0).message()).contains("webhook").contains("document").contains(DOC);
 	}
 
+	// --- the scripts switch -------------------------------------------------
+
+	@Test
+	void acceptsScriptsOnASkillsReference(@TempDir Path dir) throws Exception {
+		// The one switch a references.yml entry may add. It names no class and no
+		// property,
+		// only which shape of the folder the entry already gave the runtime should build,
+		// so a pack asking for it is what the format allows rather than something to warn
+		// about.
+		write(packDeclaring(List.of("running")), dir);
+		Files.createDirectories(dir.resolve("carried-skills"));
+		referencesYml(dir, "- name: running\n  kind: skills\n  path: carried-skills\n  scripts: true\n");
+
+		ValidationResult result = validator.validate(dir);
+
+		assertThat(apartFromRewriteNote(result)).isEmpty();
+		assertThat(result.issuesWithCode("REFERENCE_SCRIPTS_UNSUPPORTED")).isEmpty();
+		assertThat(result.isValid()).isTrue();
+	}
+
+	@Test
+	void refusesScriptsOnAKindThatHandsOutNoScriptTool(@TempDir Path dir) throws Exception {
+		// A directory reference has file tools and no script tool, so the switch would
+		// read
+		// as a capability the pack configured while doing nothing — the one failure mode
+		// the
+		// format's invariants exist to prevent.
+		write(packDeclaring(List.of("notes-dir")), dir);
+		Files.createDirectories(dir.resolve("notes"));
+		referencesYml(dir, "- name: notes-dir\n  kind: directory\n  path: notes\n  scripts: true\n");
+
+		ValidationResult result = validator.validate(dir);
+
+		assertThat(result.isValid()).isFalse();
+		List<ValidationIssue> issues = result.issuesWithCode("REFERENCE_SCRIPTS_UNSUPPORTED");
+		assertThat(issues).hasSize(1);
+		assertThat(issues.get(0).message()).contains("notes-dir").contains("directory").contains("scripts");
+	}
+
 	// --- a backing path that is gone ------------------------------------------
 
 	@Test

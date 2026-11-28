@@ -15,6 +15,8 @@ import java.util.Set;
 import com.embabel.agent.api.reference.LlmReference;
 import com.embabel.agent.core.DataDictionary;
 import com.embabel.agent.domain.io.UserInput;
+import com.embabel.agent.skills.script.ProcessSkillScriptExecutionEngine;
+import com.embabel.agent.skills.script.ScriptTool;
 import com.embabel.agent.spec.model.StepSpecContext;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -135,6 +137,72 @@ class PackReferencesTest {
 		assertThat(listed(refs.carried().get("extra-skills"))).contains("extra_skills_activate",
 				"extra_skills_readResource");
 		assertThat(refs.carried().get("extra-skills").notes()).contains("extra-style");
+	}
+
+	@Test
+	void oneFolderDeclaredTwiceHandsItsScriptsToTheEntryThatAskedAndNotToTheOther() throws IOException {
+		Path packDir = pack("""
+				references:
+				  - name: extra-skills
+				    kind: skills
+				    path: extra
+				  - name: extra-skills-running
+				    kind: skills
+				    path: extra
+				    scripts: true
+				""");
+		Path scripts = Files.createDirectories(packDir.resolve("extra/extra-style/scripts"));
+		Files.writeString(scripts.resolve("map.sh"), "#!/bin/bash\necho mapped\n");
+		scripts.resolve("map.sh").toFile().setExecutable(true);
+
+		// The engine is on for both declarations, so the only thing that separates them
+		// is
+		// the switch — which is the pair 6.3 exists to make declarable.
+		PackReferences refs = PackReferences.at(packDir, "survey", Set.of(),
+				ProcessSkillScriptExecutionEngine.confinedTo(packDir.toString()));
+
+		assertThat(refs.scriptsAskedFor()).as("only the entry that wrote the switch asked")
+			.containsExactly("extra-skills-running");
+		assertThat(scriptTools(refs.carried().get("extra-skills-running")))
+			.as("the entry that asked hands out the script")
+			.isNotEmpty();
+		assertThat(scriptTools(refs.carried().get("extra-skills")))
+			.as("the plain entry is the reading shape, engine or not")
+			.isEmpty();
+	}
+
+	@Test
+	void askingForScriptsOnAKindThatHandsOutNoneIsNamedRatherThanIgnored() throws IOException {
+		PackReferences refs = PackReferences.at(pack("""
+				references:
+				  - name: domain-guide
+				    kind: directory
+				    path: notes
+				    scripts: true
+				"""), "survey");
+
+		// The reference is still carried — it is the switch that means nothing here, not
+		// the
+		// folder — so the pack author learns that from the run rather than from a missing
+		// script tool they were never told to expect.
+		assertThat(refs.carried()).containsKey("domain-guide");
+		assertThat(refs.scriptsAskedFor()).isEmpty();
+		assertThat(refs.notes()).anyMatch((line) -> line.contains("asks for scripts") && line.contains("directory"));
+	}
+
+	@Test
+	void aScriptsValueThatIsNotABooleanIsNamedAndReadAsOff() throws IOException {
+		PackReferences refs = PackReferences.at(pack("""
+				references:
+				  - name: extra-skills
+				    kind: skills
+				    path: extra
+				    scripts: "true"
+				"""), "survey");
+
+		assertThat(refs.scriptsAskedFor()).as("a quoted switch is not a switch").isEmpty();
+		assertThat(refs.notes())
+			.anyMatch((line) -> line.contains("scripts: true") && line.contains("neither true nor false"));
 	}
 
 	@Test
@@ -304,6 +372,21 @@ class PackReferencesTest {
 	 */
 	private static List<String> listed(LlmReference reference) {
 		return LlmReference.prefixedTools(reference).stream().map((tool) -> tool.getDefinition().getName()).toList();
+	}
+
+	/**
+	 * The scripts a reference actually hands out as callable, asked of the reference
+	 * rather than inferred from the engine or from the listed names — two names for one
+	 * folder differ by prefix, so their listed names would not compare.
+	 * @param reference the value to ask
+	 * @return the callable scripts, by name
+	 */
+	private static List<String> scriptTools(LlmReference reference) {
+		return reference.tools()
+			.stream()
+			.filter(ScriptTool.class::isInstance)
+			.map((tool) -> tool.getDefinition().getName())
+			.toList();
 	}
 
 	/**

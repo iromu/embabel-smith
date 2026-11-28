@@ -68,7 +68,8 @@ two drift apart.
 7. The manifest declares runtime defaults — `name` and `version` required, planner and model
    optional.
 8. A reference the pack declares in `references.yml` is of a kind the runtime can construct, its
-   backing path is present in the pack, and its name is still unique once the platform sanitizes it
+   backing path is present in the pack, its `scripts` switch appears only on a kind that hands out
+   script tools, and its name is still unique once the platform sanitizes it
    into a tool prefix. Two names collapsing to one prefix is a silent overwrite of one reference's
    tools by the other's, and a name resolving to nothing is a silent skip — neither is discoverable
    at run time.
@@ -140,6 +141,15 @@ references:
     kind: directory         # skills | directory | document | brief
     path: references
 ```
+
+A `skills` entry may add `scripts: true`, which asks for the script-bearing shape of the folder it
+names — the same skills, under the same reference name, offering their scripts as callable tools.
+Absent means `false`, the reading shape: `activate`, `listResources` and `readResource`, and no
+script tool. That default is why a pack that wants one step to read a skill and another to run its
+script declares the same folder twice, once plain and once with the switch, under two names — legal
+under invariant 8 as long as the two names sanitize to different tool prefixes. Asking for scripts on
+a `directory`, `document` or `brief` is refused, because those kinds hand out no script tools and the
+switch would then read as a capability that was configured while doing nothing.
 
 A `references:` key written in `goal.yml` is inert: upstream's `GoalSpec` carries no such field and a
 goal contributes no model call of its own, so the declaration is ignored and the pack still

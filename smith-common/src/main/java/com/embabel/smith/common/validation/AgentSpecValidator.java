@@ -376,7 +376,10 @@ public class AgentSpecValidator {
 	 * are not skills — and checks what it declares. Each entry is a name, a kind and a
 	 * path, and the kinds are limited to the ones the runtime can construct through the
 	 * platform's own reference types, so neither a property nor this file can nominate a
-	 * class.
+	 * class. The one switch an entry may add is {@code scripts: true}, accepted because
+	 * it names nothing beyond the folder the entry already gave — and refused on a kind
+	 * that hands out no script tools, since a declaration the runtime would quietly
+	 * ignore is worse than one it rejects.
 	 * @param packDir the pack's directory
 	 * @param carriedSkills the skill names the pack already answers to, which count
 	 * towards a name being taken
@@ -439,6 +442,12 @@ public class AgentSpecValidator {
 					issues.add(ValidationIssue.of("REFERENCE_MISSING_PATH", "reference '" + name + "' of kind '" + kind
 							+ "' points at '" + path + "', which the pack does not carry", REFERENCES_FILE));
 				}
+			}
+			if (Boolean.TRUE.equals(entry.get("scripts")) && !"skills".equals(kind)) {
+				issues.add(ValidationIssue.of(
+						"REFERENCE_SCRIPTS_UNSUPPORTED", "reference '" + name + "' asks for scripts, which kind '"
+								+ kind + "' does not offer; only a skills folder hands out script tools",
+						REFERENCES_FILE));
 			}
 
 			String prefix = toolPrefix(name);
